@@ -45,6 +45,12 @@ export function generateNoteSequence(rootNote, intervals) {
     // 生成序列
     for (const interval of intervals) {
         // 获取间隔的半音数
+        // 检查音级是否在映射中存在
+        if (!intervalToSemitones.hasOwnProperty(interval)) {
+            console.error(`未知的间隔: ${interval}`);
+            continue;
+        }
+        
         const intervalSemitones = intervalToSemitones[interval];
         if (intervalSemitones === undefined) {
             console.error(`未知的间隔: ${interval}`);

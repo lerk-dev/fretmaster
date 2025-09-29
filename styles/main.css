@@ -7,8 +7,9 @@
 }
 
 body {
-    background: linear-gradient(135deg, #1a2a3a, #0d1b2a);
-    color: #e0e0e0;
+
+    background-color: #1a2a3a;
+    color: #fff;
     padding: 12px;
     display: flex;
     flex-direction: column;

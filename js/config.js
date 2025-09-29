@@ -13,6 +13,7 @@ export const intervalToSemitones = {
     '1': 0,
     '♭2': 1,
     '2': 2,
+    '♯2': 3,
     '♭3': 3,
     '3': 4,
     '4': 5,
@@ -20,8 +21,10 @@ export const intervalToSemitones = {
     '♯4': 6,
     '♭5': 6,
     '5': 7,
+    '♯5': 8,
     '♭6': 8,
     '6': 9,
+    '♯6': 11,
     '♭7': 10,
     '7': 11
 };
@@ -50,7 +53,7 @@ export const scaleTypes = {
     
     // 和声小调系列
     'harmonicMinor': { name: 'Harmonic Minor - 1 2 ♭3 4 5 ♭6 7', intervals: ['1', '2', '♭3', '4', '5', '♭6', '7'] },
-    'dorianSharp2': { name: 'Dorian ♯2 - 1 ♯2 ♭3 4 5 6 ♭7', intervals: ['1', '♯2', '♭3', '4', '5', '6', '♭7'] },
+    'dorianSharp2': { name: 'Dorian ♯2 - 1 ♯2 3 4 5 6 ♭7', intervals: ['1', '♯2', '3', '4', '5', '6', '♭7'] },
     'phrygianMajor': { name: 'Phrygian Major - 1 ♭2 3 4 5 ♭6 ♭7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '♭7'] },
     'lydianSharp2': { name: 'Lydian ♯2 - 1 ♯2 3 ♯4 5 6 7', intervals: ['1', '♯2', '3', '♯4', '5', '6', '7'] },
     'mixolydianFlat6': { name: 'Mixolydian ♭6 - 1 2 3 4 5 ♭6 ♭7', intervals: ['1', '2', '3', '4', '5', '♭6', '♭7'] },
@@ -80,7 +83,7 @@ export const scaleTypes = {
     // 其他常见音阶
     'wholeTone': { name: 'Whole Tone - 1 2 3 ♯4 ♯5 ♯6', intervals: ['1', '2', '3', '♯4', '♯5', '♯6'] },
     'diminished': { name: 'Diminished (Half-Whole) - 1 ♭2 ♭3 3 ♯4 5 6 ♭7', intervals: ['1', '♭2', '♭3', '3', '♯4', '5', '6', '♭7'] },
-    'diminishedWhole': { name: 'Diminished (Whole-Half) - 1 2 ♭3 4 ♯4 ♯5 6 7', intervals: ['1', '2', '♭3', '4', '♯4', '♯5', '6', '7'] },
+    'diminishedWhole': { name: 'Diminished (Whole-Half) - 1 2 ♭3 ♯4 ♯5 6 7', intervals: ['1', '2', '♭3', '♯4', '♯5', '6', '7'] },
     'chromatic': { name: 'Chromatic - 1 ♭2 2 ♭3 3 4 ♯4 5 ♭6 6 ♭7 7', intervals: ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'] },
     
     // 异国风格音阶
@@ -88,7 +91,7 @@ export const scaleTypes = {
     'gypsy': { name: 'Gypsy - 1 ♭2 3 4 5 ♭6 7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '7'] },
     'japanese': { name: 'Japanese - 1 ♭2 4 5 ♭6', intervals: ['1', '♭2', '4', '5', '♭6'] },
     'egyptian': { name: 'Egyptian - 1 2 4 5 ♭7', intervals: ['1', '2', '4', '5', '♭7'] },
-    'hungarian': { name: 'Hungarian - 1 ♯2 ♭3 ♯4 5 ♭6 7', intervals: ['1', '♯2', '♭3', '♯4', '5', '♭6', '7'] },
+    'hungarian': { name: 'Hungarian - 1 ♯2 3 ♯4 5 ♭6 7', intervals: ['1', '♯2', '3', '♯4', '5', '♭6', '7'] },
     'persian': { name: 'Persian - 1 ♭2 3 4 ♭5 ♭6 7', intervals: ['1', '♭2', '3', '4', '♭5', '♭6', '7'] },
     'byzantine': { name: 'Byzantine - 1 ♭2 3 4 5 ♭6 7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '7'] },
     'enigmatic': { name: 'Enigmatic - 1 ♭2 3 ♯4 ♯5 ♯6 7', intervals: ['1', '♭2', '3', '♯4', '♯5', '♯6', '7'] },

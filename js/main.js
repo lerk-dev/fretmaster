@@ -3,6 +3,7 @@
  */
 
 import { defaultState, scaleTypes, chordTypes, noteToSemitones, intervalToSemitones } from './config.js';
+import { t, switchLanguage, getCurrentLanguage, getSupportedLanguages } from './i18n.js';
 import { getAudioDevices, startRecording, stopRecording, setSelectedDevice, setInputGain, setAudioProcessCallback } from './audio.js';
 import { Pitchfinder, checkPitchMatch, frequencyToNoteName } from './pitch-detection.js';
 import { generateScaleExercise, generateChordExercise, generateNextExercise, formatChordSymbol } from './exercises.js';
@@ -164,6 +165,11 @@ async function processAudio(event) {
         // 动态调整YIN算法参数
         const isLowFrequencyTarget = state.currentSequence.some(interval => {
             const rootValue = noteToSemitones[state.rootNote];
+            // 检查音级是否在映射中存在
+            if (!intervalToSemitones.hasOwnProperty(interval)) {
+                console.error(`未知的音级: ${interval}`);
+                return false;
+            }
             const semitone = (rootValue + intervalToSemitones[interval]) % 12;
             const freq = 440 * Math.pow(2, (semitone - 9) / 12);
             return freq < 110;
@@ -198,6 +204,12 @@ async function processAudio(event) {
     if (!detectedFreq) return;
 
     const currentInterval = state.currentSequence[state.currentStep];
+    // 检查音级是否在映射中存在
+    if (!intervalToSemitones.hasOwnProperty(currentInterval)) {
+        console.error(`未知的音级: ${currentInterval}`);
+        return;
+    }
+    
     const rootValue = noteToSemitones[state.rootNote];
     const targetSemitone = (rootValue + intervalToSemitones[currentInterval]) % 12;
     const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12);
@@ -584,7 +596,10 @@ async function initApp() {
     console.log('应用初始化中...');
     
     try {
-        // 首先初始化事件监听器，这是最重要的
+        // 初始化语言设置
+        initLanguageSettings();
+        
+        // 初始化事件监听器
         initEventListeners();
         
         // 然后初始化音频系统
@@ -621,6 +636,158 @@ function initMl5Support() {
     showStatus('初始化中...', 'loading');
 }
 
+// 初始化语言设置
+function initLanguageSettings() {
+    console.log('初始化语言设置');
+    
+    // 确保DOM已加载
+    if (document.readyState !== 'complete' && document.readyState !== 'interactive') {
+        console.log('DOM未加载完成，等待加载完成...');
+        // 使用setTimeout确保在下一个事件循环中执行
+        setTimeout(() => {
+            initLanguageSettings();
+        }, 10);
+        return;
+    }
+    
+    // 设置语言按钮事件监听器
+    const langZhBtn = document.getElementById('langZhBtn');
+    const langEnBtn = document.getElementById('langEnBtn');
+    
+    if (langZhBtn && langEnBtn) {
+        console.log('找到语言按钮');
+        // 设置当前语言按钮状态
+        const currentLang = getCurrentLanguage();
+        console.log('当前语言:', currentLang);
+        if (currentLang === 'zh-CN') {
+            langZhBtn.style.background = 'linear-gradient(to right, #4fc3f7, #29b6f6)';
+            langEnBtn.style.background = 'linear-gradient(to right, #555, #666)';
+        } else {
+            langEnBtn.style.background = 'linear-gradient(to right, #4fc3f7, #29b6f6)';
+            langZhBtn.style.background = 'linear-gradient(to right, #555, #666)';
+        }
+        
+        // 移除可能已存在的事件监听器，防止重复绑定
+        const cloneZhBtn = langZhBtn.cloneNode(true);
+        langZhBtn.parentNode.replaceChild(cloneZhBtn, langZhBtn);
+        
+        const cloneEnBtn = langEnBtn.cloneNode(true);
+        langEnBtn.parentNode.replaceChild(cloneEnBtn, langEnBtn);
+        
+        cloneZhBtn.addEventListener('click', () => {
+            console.log('切换语言为中文');
+            if (switchLanguage('zh-CN')) {
+                console.log('中文语言设置成功');
+                // 更新按钮状态
+                cloneZhBtn.style.background = 'linear-gradient(to right, #4fc3f7, #29b6f6)';
+                cloneEnBtn.style.background = 'linear-gradient(to right, #555, #666)';
+                // 立即应用翻译而不依赖页面刷新
+                console.log('应用中文翻译');
+                applyTranslations();
+                // 同时尝试刷新页面以确保所有内容都更新
+                setTimeout(() => {
+                    console.log('重新加载页面');
+                    location.reload();
+                }, 100);
+            } else {
+                console.log('中文语言设置失败');
+            }
+        });
+        
+        cloneEnBtn.addEventListener('click', () => {
+            console.log('切换语言为英文');
+            if (switchLanguage('en')) {
+                console.log('英文语言设置成功');
+                // 更新按钮状态
+                cloneEnBtn.style.background = 'linear-gradient(to right, #4fc3f7, #29b6f6)';
+                cloneZhBtn.style.background = 'linear-gradient(to right, #555, #666)';
+                // 立即应用翻译而不依赖页面刷新
+                console.log('应用英文翻译');
+                applyTranslations();
+                // 同时尝试刷新页面以确保所有内容都更新
+                setTimeout(() => {
+                    console.log('重新加载页面');
+                    location.reload();
+                }, 100);
+            } else {
+                console.log('英文语言设置失败');
+            }
+        });
+        console.log('语言设置按钮事件绑定成功');
+    } else {
+        console.log('未找到语言按钮，可能是因为DOM还未完全加载');
+        // 如果未找到按钮，等待一段时间后重试
+        setTimeout(() => {
+            initLanguageSettings();
+        }, 100);
+    }
+}
+
+// 为页面元素添加翻译键
+function setupTranslationKeys() {
+    console.log('设置翻译键');
+    
+    // 设置面板标签
+    setTranslationKey('scaleSettingsLabel', 'settings_scale');
+    setTranslationKey('chordSettingsLabel', 'settings_chord');
+    setTranslationKey('deviceSettingsLabel', 'settings_device');
+    setTranslationKey('generalSettingsLabel', 'settings_general');
+    
+    // 音阶设置
+    setTranslationKey('rootNoteLabel', 'scale_root_note');
+    setTranslationKey('scaleTypeLabel', 'scale_type');
+    setTranslationKey('scaleOrderLabel', 'scale_order');
+    setTranslationKey('scaleOrderedBtn', 'scale_ordered');
+    setTranslationKey('scaleRandomBtn', 'scale_random');
+    setTranslationKey('scaleArpeggioBtn', 'scale_arpeggio');
+    
+    // 和弦设置
+    setTranslationKey('chordRootNoteLabel', 'chord_root_note');
+    setTranslationKey('chordTypeLabel', 'chord_type');
+    setTranslationKey('chordOrderLabel', 'chord_order');
+    setTranslationKey('chordOrderedBtn', 'chord_ordered');
+    setTranslationKey('chordRandomBtn', 'chord_random');
+    setTranslationKey('chordAllBtn', 'chord_all');
+    setTranslationKey('chordNoneBtn', 'chord_none');
+    setTranslationKey('chordInvertBtn', 'chord_invert');
+    
+    // 设备设置
+    setTranslationKey('audioInputLabel', 'device_audio_input');
+    setTranslationKey('refreshDevicesBtn', 'device_refresh');
+    setTranslationKey('gainLabel', 'device_gain');
+    setTranslationKey('metronomeLabel', 'device_metronome');
+    setTranslationKey('tempoLabel', 'device_tempo');
+    setTranslationKey('sensitivityLabel', 'device_sensitivity');
+    setTranslationKey('cooldownLabel', 'device_cooldown');
+    
+    // 通用设置
+    setTranslationKey('languageLabel', 'general_language');
+    setTranslationKey('themeLabel', 'general_theme');
+    
+    // 按钮
+    setTranslationKey('startBtn', 'btn_start');
+    setTranslationKey('backToMainBtn', 'btn_back');
+    
+    // 状态信息
+    setTranslationKey('statusIndicator', 'status_ready');
+    
+    // 底部导航
+    setTranslationKey('navScaleBtn', 'nav_scale');
+    setTranslationKey('navChordBtn', 'nav_chord');
+    setTranslationKey('navProgressionBtn', 'nav_progression');
+    setTranslationKey('navSettingsBtn', 'nav_settings');
+    
+    console.log('翻译键设置完成');
+}
+
+// 为单个元素设置翻译键
+function setTranslationKey(elementId, translationKey) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.dataset.i18nKey = translationKey;
+    }
+}
+
 // 显示状态信息
 function showStatus(message, type = 'info') {
     const statusEl = document.getElementById('statusIndicator');
@@ -645,6 +812,10 @@ function initEventListeners() {
     // 等待DOM完全加载
     if (document.readyState !== 'complete') {
         console.log('DOM未完全加载，等待加载完成...');
+        // 使用setTimeout确保在下一个事件循环中执行
+        setTimeout(() => {
+            initEventListeners();
+        }, 10);
         return;
     }
     
@@ -729,6 +900,41 @@ function initEventListeners() {
             }
         });
         console.log(`选项卡 ${index + 1} 事件绑定成功:`, tab.dataset.tab);
+    });
+
+    // 底部导航栏切换
+    const navItems = document.querySelectorAll('.nav-item');
+    console.log('找到', navItems.length, '个导航项');
+    
+    navItems.forEach((item, index) => {
+        item.addEventListener('click', function() {
+            console.log('点击导航项:', this.dataset.tab);
+            
+            // 移除所有活跃状态
+            navItems.forEach(t => t.classList.remove('active'));
+            // 添加当前活跃状态
+            this.classList.add('active');
+            
+            const tabName = this.dataset.tab;
+            
+            // 隐藏所有设置面板
+            document.querySelectorAll('.settings-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // 显示对应的设置面板
+            if (tabName === 'scale') {
+                const scaleSettings = document.querySelector('.scale-settings');
+                if (scaleSettings) scaleSettings.style.display = 'block';
+            } else if (tabName === 'chord') {
+                const chordSettings = document.querySelector('.chord-settings');
+                if (chordSettings) chordSettings.style.display = 'block';
+            } else if (tabName === 'device') {
+                const deviceSettings = document.querySelector('.device-settings');
+                if (deviceSettings) deviceSettings.style.display = 'block';
+            }
+        });
+        console.log(`导航项 ${index + 1} 事件绑定成功:`, item.dataset.tab);
     });
 
     // 顺序按钮事件
@@ -830,10 +1036,126 @@ function initEventListeners() {
 // 启动应用 - 注释掉以避免与HTML内嵌系统冲突
 // document.addEventListener('DOMContentLoaded', initApp);
 
+// 应用翻译
+function applyTranslations() {
+    console.log('开始应用翻译');
+    
+    // 确保DOM已加载
+    if (document.readyState !== 'complete' && document.readyState !== 'interactive') {
+        console.log('DOM未加载完成，等待加载完成...');
+        // 使用setTimeout确保在下一个事件循环中执行
+        setTimeout(() => {
+            applyTranslations();
+        }, 10);
+        return;
+    }
+    
+    // 首先设置翻译键
+    setupTranslationKeys();
+    
+    console.log('当前语言:', getCurrentLanguage());
+    
+    // 页面标题
+    const titleElement = document.querySelector('title');
+    if (titleElement) {
+        const titleText = t('page_title');
+        console.log('页面标题文本:', titleText);
+        titleElement.textContent = titleText;
+    }
+    
+    // 语言按钮文本
+    const langZhBtn = document.getElementById('langZhBtn');
+    const langEnBtn = document.getElementById('langEnBtn');
+    console.log('找到语言按钮:', langZhBtn, langEnBtn);
+    if (langZhBtn) {
+        const zhText = t('lang_zh');
+        console.log('中文按钮文本:', zhText);
+        langZhBtn.textContent = zhText;
+    }
+    if (langEnBtn) {
+        const enText = t('lang_en');
+        console.log('英文按钮文本:', enText);
+        langEnBtn.textContent = enText;
+    }
+    
+    // 翻译所有带有data-i18n-key属性的元素
+    const i18nElements = document.querySelectorAll('[data-i18n-key]');
+    console.log('找到', i18nElements.length, '个需要翻译的元素');
+    
+    i18nElements.forEach(element => {
+        const key = element.dataset.i18nKey;
+        const translation = t(key);
+        
+        if (translation && translation !== key) { // 只有当找到翻译时才应用
+            console.log('翻译元素 #' + element.id + ' (' + key + '): ' + translation);
+            
+            // 翻译元素内容
+            if (element.textContent.trim() !== '') {
+                element.textContent = translation;
+            }
+            
+            // 翻译placeholder属性
+            if (element.hasAttribute('placeholder')) {
+                element.setAttribute('placeholder', translation);
+            }
+            
+            // 翻译title属性
+            if (element.hasAttribute('title')) {
+                element.setAttribute('title', translation);
+            }
+        }
+    });
+    
+    // 特别处理常见的UI元素 - 确保即使没有data-i18n-key也能翻译
+    
+    // 应用标题和说明
+    const appTitle = document.querySelector('h1');
+    if (appTitle) {
+        const titleText = t('app_title').replace('🎸 ', ''); // 移除emoji
+        appTitle.textContent = titleText;
+    }
+    
+    const instructions = document.querySelector('.instructions');
+    if (instructions) {
+        instructions.textContent = t('app_instructions');
+    }
+    
+    // 应用按钮文本
+    const startPracticeBtn = document.getElementById('startBtn');
+    if (startPracticeBtn) {
+        startPracticeBtn.textContent = t('btn_start');
+    }
+    
+    // 确保状态指示器显示正确的翻译
+    const statusIndicator = document.getElementById('statusIndicator');
+    if (statusIndicator && statusIndicator.textContent.includes('准备就绪')) {
+        statusIndicator.textContent = t('status_ready');
+    }
+    
+    // 翻译底部导航
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        const tabType = item.dataset.tab;
+        if (tabType === 'scale') {
+            item.textContent = t('nav_scale');
+        } else if (tabType === 'chord') {
+            item.textContent = t('nav_chord');
+        } else if (tabType === 'progression') {
+            item.textContent = t('nav_progression');
+        } else if (tabType === 'settings') {
+            item.textContent = t('nav_settings');
+        }
+    });
+    
+    console.log('翻译应用完成');
+}
+
 // 导出供其他模块使用
 window.appState = state;
 
 // 导出函数供HTML内嵌系统使用
+window.initLanguageSettings = initLanguageSettings;
+window.applyTranslations = applyTranslations;
 window.generateExerciseFromModule = generateExercise;
 window.generateNextExerciseFromModule = generateNextExercise;
 window.processAudioFromModule = processAudio;

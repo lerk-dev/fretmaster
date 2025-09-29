@@ -65,8 +65,8 @@
         }
 
         body {
-            background: linear-gradient(135deg, #1a2a3a, #0d1b2a);
-            color: #e0e0e0;
+            background: linear-gradient(135deg, #1a1a1a, #0d1b2a);
+            color: #fff;
             padding: 12px;
             display: flex;
             flex-direction: column;
@@ -1644,6 +1644,21 @@
                         </div>
                     </div>
                     
+                    <!-- 语言设置 -->
+                    <div class="settings-section-title" style="margin-top: 20px;">
+                        <i>🌍</i> 语言设置
+                    </div>
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            语言 / Language
+                            <span class="info">界面语言</span>
+                        </div>
+                        <div style="display: flex; gap: 10px; width: 100%;">
+                            <button id="langZhBtn" class="btn" style="flex: 1; padding: 12px; font-size: 14px;">中文</button>
+                            <button id="langEnBtn" class="btn" style="flex: 1; padding: 12px; font-size: 14px;">English</button>
+                        </div>
+                    </div>
+                    
                     <!-- 设置管理 -->
                     <div class="settings-section-title" style="margin-top: 20px;">
                         <i>😎</i> 设置管理
@@ -1760,14 +1775,14 @@
                                     <option value="gypsy">Gypsy - 1 ♭2 3 4 5 ♭6 7</option>
                                     <option value="japanese">Japanese - 1 ♭2 4 5 ♭6</option>
                                     <option value="egyptian">Egyptian - 1 2 4 5 ♭7</option>
-                                    <option value="hungarian">Hungarian - 1 ♯2 ♭3 ♯4 5 ♭6 7</option>
+                                    <option value="hungarian">Hungarian - 1 ♯2 3 ♯4 5 ♭6 7</option>
                                     <option value="persian">Persian - 1 ♭2 3 4 ♭5 ♭6 7</option>
                                     <option value="byzantine">Byzantine - 1 ♭2 3 4 5 ♭6 7</option>
                                     <option value="enigmatic">Enigmatic - 1 ♭2 3 ♯4 ♯5 ♯6 7</option>
                                     <option value="neapolitan">Neapolitan - 1 ♭2 ♭3 4 5 ♭6 7</option>
                                     <option value="spanish">Spanish - 1 ♭2 3 4 5 ♭6 ♭7</option>
                                 </optgroup>
-                                
+
                                 <option value="random" selected>随机调式</option>
                             </select>
                         </div>
@@ -1817,13 +1832,13 @@
                         
                         // 和声小调系列
                         'harmonicMinor': { name: 'Harmonic Minor - 1 2 ♭3 4 5 ♭6 7', intervals: ['1', '2', '♭3', '4', '5', '♭6', '7'] },
-                        'dorianSharp2': { name: 'Dorian ♯2 - 1 ♯2 ♭3 4 5 6 ♭7', intervals: ['1', '♯2', '♭3', '4', '5', '6', '♭7'] },
+                        'dorianSharp2': { name: 'Dorian ♯2 - 1 ♯2 3 4 5 6 ♭7', intervals: ['1', '♯2', '3', '4', '5', '6', '♭7'] },
                         'phrygianMajor': { name: 'Phrygian Major - 1 ♭2 3 4 5 ♭6 ♭7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '♭7'] },
                         'lydianSharp2': { name: 'Lydian ♯2 - 1 ♯2 3 ♯4 5 6 7', intervals: ['1', '♯2', '3', '♯4', '5', '6', '7'] },
                         'mixolydianFlat6': { name: 'Mixolydian ♭6 - 1 2 3 4 5 ♭6 ♭7', intervals: ['1', '2', '3', '4', '5', '♭6', '♭7'] },
                         'lydianFlat2': { name: 'Lydian ♭2 - 1 ♭2 3 ♯4 5 6 7', intervals: ['1', '♭2', '3', '♯4', '5', '6', '7'] },
                         'superLocrianDiminished': { name: 'Super Locrian Diminished - 1 ♭2 ♭3 ♭4 ♭5 ♭6 6', intervals: ['1', '♭2', '♭3', '♭4', '♭5', '♭6', '6'] },
-                        
+
                         // 旋律小调系列
                         'melodicMinor': { name: 'Melodic Minor - 1 2 ♭3 4 5 6 7', intervals: ['1', '2', '♭3', '4', '5', '6', '7'] },
                         'melodicMinorDescending': { name: 'Melodic Minor Descending - 1 ♭7 ♭6 5 4 ♭3 2 1', intervals: ['1', '♭7', '♭6', '5', '4', '♭3', '2', '1'] },
@@ -1847,7 +1862,7 @@
                         // 其他常见音阶
                         'wholeTone': { name: 'Whole Tone - 1 2 3 ♯4 ♯5 ♯6', intervals: ['1', '2', '3', '♯4', '♯5', '♯6'] },
                         'diminished': { name: 'Diminished (Half-Whole) - 1 ♭2 ♭3 3 ♯4 5 6 ♭7', intervals: ['1', '♭2', '♭3', '3', '♯4', '5', '6', '♭7'] },
-                        'diminishedWhole': { name: 'Diminished (Whole-Half) - 1 2 ♭3 4 ♯4 ♯5 6 7', intervals: ['1', '2', '♭3', '4', '♯4', '♯5', '6', '7'] },
+                        'diminishedWhole': { name: 'Diminished (Whole-Half) - 1 2 ♭3 ♯4 ♯5 6 7', intervals: ['1', '2', '♭3', '♯4', '♯5', '6', '7'] },
                         'chromatic': { name: 'Chromatic - 1 ♭2 2 ♭3 3 4 ♯4 5 ♭6 6 ♭7 7', intervals: ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'] },
                         
                         // 异国风格音阶
@@ -1855,12 +1870,13 @@
                         'gypsy': { name: 'Gypsy - 1 ♭2 3 4 5 ♭6 7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '7'] },
                         'japanese': { name: 'Japanese - 1 ♭2 4 5 ♭6', intervals: ['1', '♭2', '4', '5', '♭6'] },
                         'egyptian': { name: 'Egyptian - 1 2 4 5 ♭7', intervals: ['1', '2', '4', '5', '♭7'] },
-                        'hungarian': { name: 'Hungarian - 1 ♯2 ♭3 ♯4 5 ♭6 7', intervals: ['1', '♯2', '♭3', '♯4', '5', '♭6', '7'] },
+                        'hungarian': { name: 'Hungarian - 1 ♯2 3 ♯4 5 ♭6 7', intervals: ['1', '♯2', '3', '♯4', '5', '♭6', '7'] },
                         'persian': { name: 'Persian - 1 ♭2 3 4 ♭5 ♭6 7', intervals: ['1', '♭2', '3', '4', '♭5', '♭6', '7'] },
                         'byzantine': { name: 'Byzantine - 1 ♭2 3 4 5 ♭6 7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '7'] },
                         'enigmatic': { name: 'Enigmatic - 1 ♭2 3 ♯4 ♯5 ♯6 7', intervals: ['1', '♭2', '3', '♯4', '♯5', '♯6', '7'] },
                         'neapolitan': { name: 'Neapolitan - 1 ♭2 ♭3 4 5 ♭6 7', intervals: ['1', '♭2', '♭3', '4', '5', '♭6', '7'] },
                         'spanish': { name: 'Spanish - 1 ♭2 3 4 5 ♭6 ♭7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '♭7'] }
+
                     };
                     </script>
                     
@@ -2044,7 +2060,7 @@
                     // 查找音阶中第一个出现的指定音程（如'3', '♭3', '♯3'等）
                     function findFirstIntervalOfType(intervals, degree) {
                         // 特殊处理：对于blues音阶等特殊音阶，优先检查是否有对应度数的变音记号版本
-                        // 例如，对于blues音阶，3度可能是♭3，4度可能是♭4，7度可能是♭7
+                        // 例如，对于blues音阶，3度可能是♭3，7度可能是♭7
                         if (degree === '3') {
                             for (let i = 0; i < intervals.length; i++) {
                                 if (intervals[i] === '♭3') {
@@ -2412,8 +2428,8 @@
                 '♯2': 3,
                 '♭3': 3,
                 '3': 4,
-                '♭4': 4,
                 '4': 5,
+                '♭4': 4,
                 '♯4': 6,
                 '♭5': 6,
                 '5': 7,
@@ -2423,7 +2439,6 @@
                 '♯6': 10,
                 '♭7': 10,
                 '7': 11
-
             };
 
             // 音名到半音数的映射（C = 0）
@@ -2450,7 +2465,7 @@
                 
                 // 和声小调系列
                 'harmonicMinor': { name: 'Harmonic Minor - 1 2 ♭3 4 5 ♭6 7', intervals: ['1', '2', '♭3', '4', '5', '♭6', '7'] },
-                'dorianSharp2': { name: 'Dorian ♯2 - 1 ♯2 ♭3 4 5 6 ♭7', intervals: ['1', '♯2', '♭3', '4', '5', '6', '♭7'] },
+                'dorianSharp2': { name: 'Dorian ♯2 - 1 ♯2 3 4 5 6 ♭7', intervals: ['1', '♯2', '3', '4', '5', '6', '♭7'] },
                 'phrygianMajor': { name: 'Phrygian Major - 1 ♭2 3 4 5 ♭6 ♭7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '♭7'] },
                 'lydianSharp2': { name: 'Lydian ♯2 - 1 ♯2 3 ♯4 5 6 7', intervals: ['1', '♯2', '3', '♯4', '5', '6', '7'] },
                 'mixolydianFlat6': { name: 'Mixolydian ♭6 - 1 2 3 4 5 ♭6 ♭7', intervals: ['1', '2', '3', '4', '5', '♭6', '♭7'] },
@@ -2480,7 +2495,7 @@
                 // 其他常见音阶
                 'wholeTone': { name: 'Whole Tone - 1 2 3 ♯4 ♯5 ♯6', intervals: ['1', '2', '3', '♯4', '♯5', '♯6'] },
                 'diminished': { name: 'Diminished (Half-Whole) - 1 ♭2 ♭3 3 ♯4 5 6 ♭7', intervals: ['1', '♭2', '♭3', '3', '♯4', '5', '6', '♭7'] },
-                'diminishedWhole': { name: 'Diminished (Whole-Half) - 1 2 ♭3 4 ♯4 ♯5 6 7', intervals: ['1', '2', '♭3', '4', '♯4', '♯5', '6', '7'] },
+                'diminishedWhole': { name: 'Diminished (Whole-Half) - 1 2 ♭3 ♯4 ♯5 6 7', intervals: ['1', '2', '♭3', '♯4', '♯5', '6', '7'] },
                 'chromatic': { name: 'Chromatic - 1 ♭2 2 ♭3 3 4 ♯4 5 ♭6 6 ♭7 7', intervals: ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'] },
                 
                 // 异国风格音阶
@@ -2488,12 +2503,13 @@
                 'gypsy': { name: 'Gypsy - 1 ♭2 3 4 5 ♭6 7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '7'] },
                 'japanese': { name: 'Japanese - 1 ♭2 4 5 ♭6', intervals: ['1', '♭2', '4', '5', '♭6'] },
                 'egyptian': { name: 'Egyptian - 1 2 4 5 ♭7', intervals: ['1', '2', '4', '5', '♭7'] },
-                'hungarian': { name: 'Hungarian - 1 ♯2 ♭3 ♯4 5 ♭6 7', intervals: ['1', '♯2', '♭3', '♯4', '5', '♭6', '7'] },
+                'hungarian': { name: 'Hungarian - 1 ♯2 3 ♯4 5 ♭6 7', intervals: ['1', '♯2', '3', '♯4', '5', '♭6', '7'] },
                 'persian': { name: 'Persian - 1 ♭2 3 4 ♭5 ♭6 7', intervals: ['1', '♭2', '3', '4', '♭5', '♭6', '7'] },
                 'byzantine': { name: 'Byzantine - 1 ♭2 3 4 5 ♭6 7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '7'] },
                 'enigmatic': { name: 'Enigmatic - 1 ♭2 3 ♯4 ♯5 ♯6 7', intervals: ['1', '♭2', '3', '♯4', '♯5', '♯6', '7'] },
                 'neapolitan': { name: 'Neapolitan - 1 ♭2 ♭3 4 5 ♭6 7', intervals: ['1', '♭2', '♭3', '4', '5', '♭6', '7'] },
                 'spanish': { name: 'Spanish - 1 ♭2 3 4 5 ♭6 ♭7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '♭7'] }
+
             };
 
             // 和弦类型定义
@@ -3163,7 +3179,6 @@
                         
                         updateUIFromSettings();
                         
-                        alert('设置已重置为默认值');
                         console.log('设置已重置');
                     } catch (error) {
                         console.error('重置设置失败:', error);
@@ -3729,9 +3744,14 @@
                 // 动态调整YIN算法参数 - 低频使用更高灵敏度
                 const isLowFrequencyTarget = state.currentSequence.some(interval => {
                     const rootValue = noteToSemitones[state.rootNote];
+                    // 检查音级是否在映射中存在
+                    if (!intervalToSemitones.hasOwnProperty(interval)) {
+                        console.error(`未知的音级: ${interval}`);
+                        return false;
+                    }
                     const semitone = (rootValue + intervalToSemitones[interval]) % 12;
                     const freq = 440 * Math.pow(2, (semitone - 9) / 12);
-                    return freq < 110; // A2以下视为低频
+                    return freq < 110;
                 });
 
                 const yinParams = isLowFrequencyTarget ?
@@ -3760,8 +3780,15 @@
                 }
 
                 const currentInterval = state.currentSequence[state.currentStep];
+                // 检查音级是否在映射中存在
+                if (!intervalToSemitones.hasOwnProperty(currentInterval)) {
+                    console.error(`未知的音级: ${currentInterval}`);
+                    return;
+                }
+                
                 const rootValue = noteToSemitones[state.rootNote];
                 const targetSemitone = (rootValue + intervalToSemitones[currentInterval]) % 12;
+
                 const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12);
 
                 // 优化音高匹配算法
@@ -3840,39 +3867,33 @@
                 if (state.isAnswered || confidence < state.confidenceThreshold) return;
 
                 const currentInterval = state.currentSequence[state.currentStep];
+                // 检查音级是否在映射中存在
+                if (!intervalToSemitones.hasOwnProperty(currentInterval)) {
+                    console.error(`未知的音级: ${currentInterval}`);
+                    return;
+                }
+                
                 const rootValue = noteToSemitones[state.rootNote];
                 const targetSemitone = (rootValue + intervalToSemitones[currentInterval]) % 12;
-
                 const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12);
 
-                const cents = 1200 * Math.log2(detectedPitch / targetFrequency);
-
-                updatePitchDisplay(detectedPitch, cents, confidence);
-
+                // 优化音高匹配算法
+                const cents = 1200 * Math.log2(detectedFreq / targetFrequency);
                 const centsMod = Math.abs(cents) % 1200;
                 const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod;
 
-                // 对F和F♯音符使用更宽松的匹配标准，同时考虑敏感度设置
-                const detectedNote = frequencyToNoteName(detectedPitch);
-                let baseCentsThreshold = 20; // 默认音分差阈值
+                // 动态调整匹配阈值 - 低频更宽松，并且基于敏感度设置
+                const baseThreshold = detectedFreq < 110 ? 35 :
+                    currentInterval === '1' ? 25 : 15;
+                
+                // 根据敏感度调整阈值 - 敏感度越高，阈值越小
+                const threshold = baseThreshold * (2 - state.sensitivity);
 
-                // 检查目标音符是否为F或F♯
-                const targetNote = frequencyToNoteName(targetFrequency);
-                if (targetNote.name === 'F' || targetNote.name === 'F♯') {
-                    baseCentsThreshold = 35; // 对F和F♯使用更宽松的阈值
-                }
-
-                // 如果检测到的音符是F或F♯，也使用更宽松的阈值
-                if (detectedNote.name === 'F' || detectedNote.name === 'F♯') {
-                    baseCentsThreshold = Math.max(baseCentsThreshold, 35);
-                }
-
-                // 根据敏感度调整阈值
-                const centsThreshold = baseCentsThreshold * (2 - state.sensitivity);
-
-                if (adjustedCents <= centsThreshold) {
+                if (adjustedCents <= threshold && yinResult.probability > state.confidenceThreshold) {
                     handleCorrectAnswer();
                 }
+
+                updatePitchDisplay(detectedFreq, cents, yinResult.probability);
             }
 
             // 更新实时音高显示
@@ -6135,9 +6156,58 @@
             }
 
             // 启动应用
-            initApp();
+            if (typeof initApp === 'function') {
+                initApp();
+            } else {
+                console.error('initApp函数未定义');
+            }
+            
+            // 初始化语言设置
+            if (typeof initLanguageSettings === 'function') {
+                initLanguageSettings();
+            } else {
+                console.error('initLanguageSettings函数未定义');
+            }
+            
+            // 等待DOM加载完成后再初始化应用
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                console.log('DOM已加载完成，直接初始化应用');
+                // 启动应用（这将初始化所有功能，包括语言设置）
+                if (typeof initApp === 'function') {
+                    initApp();
+                } else {
+                    console.error('initApp函数未定义');
+                }
+                
+                // 应用翻译
+                if (typeof applyTranslations === 'function') {
+                    applyTranslations();
+                } else {
+                    console.error('applyTranslations函数未定义');
+                }
+            } else {
+                console.log('DOM未加载完成，等待DOMContentLoaded事件');
+                document.addEventListener('DOMContentLoaded', function() {
+                    console.log('DOMContentLoaded事件触发，初始化应用');
+                    // 启动应用（这将初始化所有功能，包括语言设置）
+                    if (typeof initApp === 'function') {
+                        initApp();
+                    } else {
+                        console.error('initApp函数未定义');
+                    }
+                    
+                    // 应用翻译
+                    if (typeof applyTranslations === 'function') {
+                        applyTranslations();
+                    } else {
+                        console.error('applyTranslations函数未定义');
+                    }
+                });
+            }
         });
     </script>
-</body>
-
+<!-- 翻译测试脚本 -->
+    <script src="js/translate-test.js"></script>
+    
+    </body>
 </html>

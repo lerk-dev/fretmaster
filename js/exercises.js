@@ -613,6 +613,12 @@ export function updateExerciseProgress(sequence, currentStep) {
  * 计算目标频率
  */
 export function calculateTargetFrequency(rootNote, interval) {
+    // 检查音级是否在映射中存在
+    if (!intervalToSemitones.hasOwnProperty(interval)) {
+        console.error(`未知的音级: ${interval}`);
+        return null;
+    }
+    
     const rootValue = noteToSemitones[rootNote];
     const targetSemitone = (rootValue + intervalToSemitones[interval]) % 12;
     return 440 * Math.pow(2, (targetSemitone - 9) / 12);
