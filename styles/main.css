@@ -1,86 +1,251 @@
-/* 全局样式 */
+/* 全局样式 - 现代简约卡片风格 */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 body {
-
-    background-color: #1a2a3a;
-    color: #fff;
-    padding: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-attachment: fixed;
+    color: #2d3748;
+    padding: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
     min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* 几何背景装饰 */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* 浮动几何形状 */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.03) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.03) 75%);
+    background-size: 60px 60px;
+    background-position: 0 0, 0 30px, 30px -30px, -30px 0px;
+    animation: geometricFloat 30s linear infinite;
+    pointer-events: none;
+    z-index: -1;
+}
+
+@keyframes geometricFloat {
+    0% { transform: translateX(0px) translateY(0px); }
+    100% { transform: translateX(60px) translateY(60px); }
+}
+
+/* 科技感扫描线效果 */
+@keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+}
+
+.scanline {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(120, 219, 255, 0.8), transparent);
+    animation: scanline 3s linear infinite;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* 霓虹灯效果 */
+.neon-glow {
+    text-shadow: 
+        0 0 5px currentColor,
+        0 0 10px currentColor,
+        0 0 15px currentColor,
+        0 0 20px currentColor;
+}
+
+/* 渐变边框动画 */
+@keyframes borderGlow {
+    0% { border-color: rgba(120, 219, 255, 0.2); }
+    50% { border-color: rgba(255, 119, 198, 0.4); }
+    100% { border-color: rgba(120, 219, 255, 0.2); }
+}
+
+.animated-border {
+    animation: borderGlow 3s ease-in-out infinite;
 }
 
 .container {
     max-width: 900px;
     width: 100%;
-    background-color: rgba(40, 40, 50, 0.9);
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c);
+    border-radius: 20px 20px 0 0;
 }
 
 /* 头部样式 */
 .header {
     text-align: center;
-    margin-bottom: 20px;
-    border-bottom: 1px solid rgba(255, 152, 0, 0.3);
-    padding-bottom: 15px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    position: relative;
+}
+
+.header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #78dbff, transparent);
+    border-radius: 1px;
 }
 
 h1 {
-    color: #3a9fc4;
-    margin-bottom: 10px;
-    font-size: 28px;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(135deg, #78dbff 0%, #ff77c6 50%, #7877c6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    text-shadow: 0 0 30px rgba(120, 219, 255, 0.3);
+    position: relative;
+}
+
+h1::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, #78dbff, #ff77c6, #7877c6);
+    border-radius: 8px;
+    z-index: -1;
+    opacity: 0.1;
+    filter: blur(4px);
 }
 
 .instructions {
-    color: #b0b0b0;
-    font-size: 14px;
-    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 15px;
+    line-height: 1.6;
     margin-bottom: 8px;
+    font-weight: 400;
 }
 
 /* 设置面板样式 */
 .settings-panel {
-    background: linear-gradient(to right, rgba(51, 51, 51, 0.8), rgba(60, 60, 70, 0.8));
-    border-radius: 12px;
+    background: rgba(15, 15, 25, 0.9);
+    border: 1px solid rgba(120, 219, 255, 0.15);
+    border-radius: 20px;
     padding: 0;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
+    margin-bottom: 16px;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(120, 219, 255, 0.05);
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: visible;
+}
+
+.settings-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(120, 219, 255, 0.3), transparent);
 }
 
 .settings-tabs {
     display: flex;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(40, 40, 50, 0.8);
+    border-bottom: 1px solid rgba(120, 219, 255, 0.1);
+    background: rgba(10, 10, 20, 0.8);
+    border-radius: 20px 20px 0 0;
+    overflow: hidden;
 }
 
 .settings-tab {
     flex: 1;
-    padding: 12px;
+    padding: 16px 12px;
     text-align: center;
     font-weight: 600;
     font-size: 14px;
-    color: #aaa;
+    color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
-    transition: all 0.2s;
-    border-bottom: 2px solid transparent;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-bottom: 3px solid transparent;
+    position: relative;
+    background: transparent;
+}
+
+.settings-tab:hover {
+    color: rgba(120, 219, 255, 0.8);
+    background: rgba(120, 219, 255, 0.05);
 }
 
 .settings-tab.active {
-    color: #3a9fc4;
-    border-bottom: 2px solid #3a9fc4;
-    background: rgba(128, 128, 128, 0.2);
+    color: #78dbff;
+    border-bottom: 3px solid #78dbff;
+    background: rgba(120, 219, 255, 0.1);
+    box-shadow: inset 0 0 20px rgba(120, 219, 255, 0.1);
+}
+
+.settings-tab.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(120, 219, 255, 0.1), transparent);
+    pointer-events: none;
 }
 
 .settings-content {
@@ -141,7 +306,8 @@ h1 {
     width: 100%;
 }
 
-.select-wrapper::after {
+/* 移除自定义下拉箭头，使用浏览器默认样式 */
+/* .select-wrapper::after {
     content: "▼";
     font-size: 10px;
     color: #808080;
@@ -150,7 +316,7 @@ h1 {
     top: 50%;
     transform: translateY(-50%);
     pointer-events: none;
-}
+} */
 
 select {
     width: 100%;
@@ -160,8 +326,9 @@ select {
     background-color: #2c2c3c;
     color: #fff;
     font-size: 14px;
-    appearance: none;
-    -webkit-appearance: none;
+    /* 移除appearance设置，让浏览器使用默认下拉样式 */
+    /* appearance: none;
+    -webkit-appearance: none; */
     outline: none;
     transition: all 0.2s;
 }
@@ -169,6 +336,111 @@ select {
 select:focus {
     border-color: #ffffff;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+select option {
+    background-color: #2c2c3c;
+    color: #fff;
+    padding: 8px 12px;
+}
+
+select optgroup {
+    background-color: #1a1a2a;
+    color: #3a9fc4;
+    font-weight: bold;
+    padding: 8px 12px;
+}
+
+/* 确保select下拉框可见 */
+select {
+    z-index: 1000;
+    position: relative;
+}
+
+.select-wrapper {
+    z-index: 1000;
+    position: relative;
+}
+
+/* 强制显示select选项 */
+#scaleType {
+    z-index: 9999 !important;
+    position: relative !important;
+}
+
+#scaleType option {
+    display: block !important;
+    visibility: visible !important;
+    background-color: #2c2c3c !important;
+    color: #fff !important;
+    padding: 8px 12px !important;
+}
+
+#scaleType optgroup {
+    display: block !important;
+    visibility: visible !important;
+    background-color: #1a1a2a !important;
+    color: #3a9fc4 !important;
+    font-weight: bold !important;
+    padding: 8px 12px !important;
+}
+
+/* 完全重置select样式，确保原生行为 */
+#scaleType {
+    appearance: menulist !important;
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+    background: #2c2c3c !important;
+    color: #fff !important;
+    border: 1px solid #555 !important;
+    padding: 8px !important;
+    width: 100% !important;
+    font-size: 14px !important;
+    line-height: normal !important;
+    height: auto !important;
+    min-height: 40px !important;
+}
+
+#scaleType:focus {
+    outline: 2px solid #3a9fc4 !important;
+    outline-offset: 2px !important;
+}
+
+/* 强制显示select选项 - 最终解决方案 */
+#scaleType option {
+    background-color: #2c2c3c !important;
+    color: #fff !important;
+    padding: 8px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    line-height: normal !important;
+}
+
+#scaleType optgroup {
+    background-color: #1a1a2a !important;
+    color: #3a9fc4 !important;
+    font-weight: bold !important;
+    padding: 8px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 确保select容器不裁剪内容 */
+.select-wrapper {
+    overflow: visible !important;
+    z-index: 9999 !important;
+    position: relative !important;
+}
+
+.settings-row {
+    overflow: visible !important;
+}
+
+.settings-panel {
+    overflow: visible !important;
 }
 
 /* 开关控件样式 */
@@ -288,29 +560,60 @@ input:checked+.slider:before {
 
 /* 主按钮样式 */
 .btn {
-    padding: 18px 32px;
+    padding: 16px 28px;
     border: none;
-    border-radius: 16px;
-    background: linear-gradient(to right, #4fc3f7, #29b6f6);
+    border-radius: 20px;
+    background: linear-gradient(135deg, #78dbff 0%, #ff77c6 50%, #7877c6 100%);
     color: #fff;
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 16px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 8px 24px rgba(120, 219, 255, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.5px;
     flex: 1;
     max-width: 280px;
 }
 
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
 .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    transform: translateY(-3px);
+    box-shadow: 
+        0 12px 32px rgba(120, 219, 255, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.btn:hover::before {
+    left: 100%;
+}
+
+.btn:active {
+    transform: translateY(-1px);
+    box-shadow: 
+        0 6px 20px rgba(120, 219, 255, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .btn:disabled {
-    background: linear-gradient(to right, #555, #666);
+    background: linear-gradient(135deg, #444 0%, #555 50%, #444 100%);
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.5;
+    transform: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .controls {
@@ -737,7 +1040,22 @@ input:checked+.slider:before {
 }
 
 .metronome-flash {
-    animation: metronomeFlash 0.3s ease;
+    animation: metronomeFlash 0.2s ease-out;
+}
+
+@keyframes metronomeFlash {
+    0% {
+        background: rgba(120, 219, 255, 0.1);
+        box-shadow: 0 0 0 0 rgba(120, 219, 255, 0.4);
+    }
+    50% {
+        background: rgba(120, 219, 255, 0.2);
+        box-shadow: 0 0 20px 5px rgba(120, 219, 255, 0.3);
+    }
+    100% {
+        background: rgba(120, 219, 255, 0.05);
+        box-shadow: 0 0 0 0 rgba(120, 219, 255, 0);
+    }
 }
 
 /* 响应式设计 */
@@ -764,9 +1082,102 @@ input:checked+.slider:before {
     }
 }
 
-@media (max-width: 480px) {
+/* 手机端优化 */
+@media (max-width: 768px) {
+    body {
+        padding: 4px;
+    }
+    
     .container {
         padding: 16px;
+        border-radius: 20px;
+        margin: 0;
+    }
+    
+    h1 {
+        font-size: 28px;
+        margin-bottom: 8px;
+    }
+    
+    .instructions {
+        font-size: 14px;
+        margin-bottom: 6px;
+    }
+    
+    .btn {
+        padding: 14px 20px;
+        font-size: 15px;
+        border-radius: 16px;
+        max-width: 100%;
+    }
+    
+    .settings-panel {
+        margin-bottom: 12px;
+        border-radius: 16px;
+    }
+    
+    .settings-tab {
+        padding: 12px 8px;
+        font-size: 13px;
+    }
+    
+    .settings-content {
+        padding: 16px;
+    }
+    
+    .settings-section-title {
+        font-size: 15px;
+        margin-bottom: 10px;
+    }
+    
+    .settings-label {
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+    
+    .chord-type-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .chord-type-btn {
+        padding: 12px 8px;
+        font-size: 12px;
+        border-radius: 12px;
+    }
+    
+    .progression-order-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 12px;
+    }
+    
+    .sequence-item {
+        font-size: 24px;
+        padding: 8px 12px;
+        border-radius: 12px;
+    }
+    
+    .status-indicator {
+        font-size: 14px;
+        padding: 8px 16px;
+        border-radius: 12px;
+    }
+    
+    .pitch-display {
+        font-size: 24px;
+        margin: 8px 0;
+    }
+    
+    .cents-display {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 12px;
+        border-radius: 16px;
     }
     
     h1 {
@@ -774,16 +1185,16 @@ input:checked+.slider:before {
     }
     
     .btn {
-        padding: 16px 24px;
-        font-size: 16px;
+        padding: 12px 16px;
+        font-size: 14px;
     }
     
     .settings-section-title {
-        font-size: 16px;
+        font-size: 14px;
     }
     
     .settings-tab {
-        padding: 14px 12px;
+        padding: 10px 6px;
         font-size: 14px;
     }
     
