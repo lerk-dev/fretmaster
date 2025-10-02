@@ -1,4 +1,592 @@
 /* 全局样式 - 现代简约卡片风格 */
+
+/* CAGED练习样式 */
+.caged-settings-section {
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(30, 41, 59, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* CAGED形状显示区域 */
+.caged-shape-display {
+    /* background: linear-gradient(135deg, rgba(51, 65, 85, 0.95), rgba(71, 85, 105, 0.95)); */
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 10px;
+    text-align: center;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+
+.caged-shape-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.caged-shape-btn-display {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.caged-shape-btn-display:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: scale(1.05);
+}
+
+.caged-shape-btn-display.current {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    border-color: #60a5fa;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    transform: scale(1.1);
+}
+
+.caged-shape-btn-display.completed {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #34d399;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.caged-shape-btn-display.disabled {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.3);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* CAGED开关按钮样式 */
+.caged-toggle-container {
+    display: flex;
+    align-items: center;
+}
+
+.caged-toggle-btn {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    border: 2px solid #60a5fa;
+    border-radius: 25px;
+    color: #ffffff;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.caged-toggle-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.caged-toggle-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.caged-toggle-btn.active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #34d399;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.caged-toggle-btn.active:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    border-color: #10b981;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+}
+
+.caged-toggle-text {
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+/* MIDI设备支持样式 */
+.midi-toggle-container {
+    display: flex;
+    align-items: center;
+}
+
+.midi-toggle-btn {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    border: 2px solid #a78bfa;
+    border-radius: 25px;
+    color: #ffffff;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.midi-toggle-btn:hover {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    border-color: #8b5cf6;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+}
+
+.midi-toggle-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.midi-toggle-btn.active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #34d399;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.midi-toggle-btn.active:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    border-color: #10b981;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+}
+
+.midi-toggle-text {
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.midi-device-info {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(30, 41, 59, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.midi-device-status {
+    font-size: 14px;
+    color: #e2e8f0;
+    margin-bottom: 8px;
+}
+
+.midi-device-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.midi-device-item {
+    padding: 8px 12px;
+    background: rgba(51, 65, 85, 0.5);
+    border-radius: 6px;
+    font-size: 13px;
+    color: #cbd5e1;
+    border-left: 3px solid #8b5cf6;
+}
+
+/* 自定义下拉列表样式 */
+.custom-dropdown {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    z-index: 999999;
+}
+
+.dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(30, 41, 59, 0.8);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.dropdown-trigger:hover {
+    border-color: rgba(59, 130, 246, 0.6);
+    background: rgba(30, 41, 59, 0.9);
+}
+
+.dropdown-trigger.active {
+    border-color: #3b82f6;
+    background: rgba(30, 41, 59, 1);
+}
+
+.dropdown-text {
+    flex: 1;
+}
+
+.dropdown-arrow {
+    margin-left: 8px;
+    transition: transform 0.3s ease;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.dropdown-trigger.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(15, 23, 42, 0.95);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    margin-top: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 999999;
+    display: none;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-group {
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.dropdown-group:last-child {
+    border-bottom: none;
+}
+
+.group-header {
+    padding: 8px 16px;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.group-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-item:hover {
+    background: rgba(59, 130, 246, 0.1);
+    color: #ffffff;
+}
+
+.dropdown-item.active {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    font-weight: 600;
+}
+
+.item-text {
+    flex: 1;
+    font-size: 14px;
+}
+
+.info-icon {
+    margin-left: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.info-icon:hover {
+    opacity: 1;
+    background: rgba(59, 130, 246, 0.2);
+    transform: scale(1.1);
+}
+
+/* 信息模态框样式 */
+.info-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(5px);
+}
+
+.info-modal-content {
+    background: rgba(15, 23, 42, 0.95);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.info-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.info-modal-title {
+    color: #3b82f6;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.info-modal-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.info-modal-close:hover {
+    color: #ffffff;
+    background: rgba(59, 130, 246, 0.2);
+}
+
+.info-modal-body {
+    color: #e2e8f0;
+    line-height: 1.6;
+}
+
+.info-modal-body h3 {
+    color: #60a5fa;
+    margin: 16px 0 8px 0;
+    font-size: 16px;
+}
+
+.info-modal-body p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.info-modal-body ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.info-modal-body li {
+    margin: 4px 0;
+    font-size: 14px;
+}
+
+/* 确保开始练习按钮不会遮挡自定义下拉列表 */
+.controls {
+    z-index: 1 !important;
+}
+
+.controls .btn {
+    z-index: 1 !important;
+    position: relative;
+}
+
+/* 强制自定义下拉列表在最顶层 */
+.custom-dropdown {
+    z-index: 999999 !important;
+    position: relative !important;
+}
+
+.dropdown-menu {
+    z-index: 999999 !important;
+    position: absolute !important;
+}
+
+/* 确保下拉菜单在所有元素之上 */
+#progressionLevelDropdown {
+    z-index: 999999 !important;
+    position: relative !important;
+}
+
+#progressionLevelDropdown .dropdown-menu {
+    z-index: 999999 !important;
+    position: fixed !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 300px !important;
+    max-width: 90vw !important;
+}
+
+.caged-settings {
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(30, 41, 59, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.caged-shape-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.caged-shape-btn {
+    padding: 8px 16px;
+    background: rgba(51, 65, 85, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    min-width: 60px;
+}
+
+.caged-shape-btn:hover {
+    background: rgba(58, 159, 196, 0.3);
+    border-color: rgba(58, 159, 196, 0.5);
+    transform: translateY(-1px);
+}
+
+.caged-shape-btn.active {
+    background: rgba(58, 159, 196, 0.6);
+    border-color: rgba(58, 159, 196, 0.8);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(58, 159, 196, 0.3);
+}
+
+.caged-type-btn, .caged-mode-btn {
+    padding: 8px 16px;
+    background: rgba(51, 65, 85, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    min-width: 80px;
+}
+
+.caged-type-btn:hover, .caged-mode-btn:hover {
+    background: rgba(58, 159, 196, 0.3);
+    border-color: rgba(58, 159, 196, 0.5);
+    transform: translateY(-1px);
+}
+
+.caged-type-btn.active, .caged-mode-btn.active {
+    background: rgba(58, 159, 196, 0.6);
+    border-color: rgba(58, 159, 196, 0.8);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(58, 159, 196, 0.3);
+}
+
+.checkbox-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #e2e8f0;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #3a9fc4;
+}
+
+/* CAGED指板显示样式 */
+.caged-fretboard {
+    position: relative;
+    margin: 20px 0;
+}
+
+.caged-shape-highlight {
+    position: absolute;
+    background: rgba(58, 159, 196, 0.3);
+    border: 2px solid #3a9fc4;
+    border-radius: 4px;
+    z-index: 10;
+}
+
+.caged-fingering {
+    position: absolute;
+    background: rgba(255, 193, 7, 0.8);
+    color: #000;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 15;
+}
+
+.caged-root-note {
+    background: rgba(220, 38, 38, 0.8) !important;
+    color: #fff !important;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -7,9 +595,8 @@
 }
 
 body {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    background-attachment: fixed;
-    color: #2d3748;
+    background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 50%, #0f0f0f 100%);
+    color: #e5e5e5;
     padding: 20px;
     display: flex;
     flex-direction: column;
@@ -19,7 +606,7 @@ body {
     overflow-x: hidden;
 }
 
-/* 几何背景装饰 */
+/* 暗黑设计感背景 */
 body::before {
     content: '';
     position: fixed;
@@ -28,13 +615,14 @@ body::before {
     width: 100%;
     height: 100%;
     background: 
-        radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+        radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(147, 51, 234, 0.06) 0%, transparent 60%),
+        radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
     pointer-events: none;
     z-index: -1;
 }
 
-/* 浮动几何形状 */
+/* 添加微妙的纹理效果 */
 body::after {
     content: '';
     position: fixed;
@@ -43,21 +631,15 @@ body::after {
     width: 100%;
     height: 100%;
     background-image: 
-        linear-gradient(45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%),
-        linear-gradient(-45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.03) 75%),
-        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.03) 75%);
-    background-size: 60px 60px;
-    background-position: 0 0, 0 30px, 30px -30px, -30px 0px;
-    animation: geometricFloat 30s linear infinite;
+        linear-gradient(45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%);
+    background-size: 40px 40px;
+    background-position: 0 0, 20px 20px;
     pointer-events: none;
     z-index: -1;
+    opacity: 0.3;
 }
 
-@keyframes geometricFloat {
-    0% { transform: translateX(0px) translateY(0px); }
-    100% { transform: translateX(60px) translateY(60px); }
-}
 
 /* 科技感扫描线效果 */
 @keyframes scanline {
@@ -100,7 +682,8 @@ body::after {
 .container {
     max-width: 900px;
     width: 100%;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(0, 0, 0, 0.95);
+    opacity: 0.8;
     border-radius: 20px;
     padding: 32px;
     box-shadow: 
@@ -471,7 +1054,7 @@ select {
 }
 
 .slider {
-    position: absolute;
+    position: relative;
     cursor: pointer;
     top: 0;
     left: 0;
@@ -511,12 +1094,12 @@ input:checked+.slider:before {
 }
 
 .chord-type-btn {
-    padding: 8px 6px;
+    padding: 6px 4px;
     border-radius: 6px;
     border: 1px solid #555;
     background-color: #2c2c3c;
     color: #aaa;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     text-align: center;
     cursor: pointer;
@@ -698,7 +1281,7 @@ input:checked+.slider:before {
     flex-wrap: wrap;
     gap: 6px;
     padding: 10px 0;
-    margin: 0 auto;
+    margin: 20px auto;
     width: 100%;
 }
 
@@ -706,7 +1289,7 @@ input:checked+.slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 700;
     color: #ff8a00;
     transition: all 0.3s ease;
@@ -714,9 +1297,10 @@ input:checked+.slider:before {
     border-radius: 6px;
     background: rgba(51, 65, 85, 0.9);
     min-width: 36px;
+    max-width: 80px;
     height: 36px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    flex: 0 1 auto;
+    flex: 0 0 auto;
 }
 
 .sequence-item.played {
@@ -733,6 +1317,10 @@ input:checked+.slider:before {
     box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
     border-color: rgba(56, 189, 248, 0.3);
     animation: pulse-glow 2s infinite;
+    transform-origin: center;
+    width: auto !important;
+    flex: 0 0 auto !important;
+    max-width: 80px !important;
 }
 
 .next-exercise {
@@ -1006,7 +1594,7 @@ input:checked+.slider:before {
         box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
     }
     50% {
-        transform: scale(1.05);
+        transform: scale(1.02);
         box-shadow: 0 0 30px rgba(56, 189, 248, 0.6);
     }
     100% {
@@ -1027,34 +1615,42 @@ input:checked+.slider:before {
     }
 }
 
-@keyframes metronomeFlash {
-    0% {
-        background: linear-gradient(135deg, #0f172a, #1e293b);
-    }
-    20% {
-        background: linear-gradient(135deg, #1e3a5f, #2d4a7a);
-    }
-    100% {
-        background: linear-gradient(135deg, #0f172a, #1e293b);
-    }
-}
-
+/* 节拍器闪光效果 - 从中心环形向外辐射 */
 .metronome-flash {
-    animation: metronomeFlash 0.2s ease-out;
+    position: relative;
 }
 
-@keyframes metronomeFlash {
+/* 环形扩散效果 */
+.metronome-flash::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.6) 0%, rgba(59, 130, 246, 0.3) 30%, transparent 60%);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: metronomeRipple 0.2s ease-out;
+    pointer-events: none;
+    z-index: -1;
+}
+
+@keyframes metronomeRipple {
     0% {
-        background: rgba(120, 219, 255, 0.1);
-        box-shadow: 0 0 0 0 rgba(120, 219, 255, 0.4);
+        width: 0;
+        height: 0;
+        opacity: 1;
     }
     50% {
-        background: rgba(120, 219, 255, 0.2);
-        box-shadow: 0 0 20px 5px rgba(120, 219, 255, 0.3);
+        width: 150px;
+        height: 150px;
+        opacity: 0.8;
     }
     100% {
-        background: rgba(120, 219, 255, 0.05);
-        box-shadow: 0 0 0 0 rgba(120, 219, 255, 0);
+        width: 300px;
+        height: 300px;
+        opacity: 0;
     }
 }
 
@@ -1136,14 +1732,15 @@ input:checked+.slider:before {
     }
     
     .chord-type-container {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
     }
     
     .chord-type-btn {
-        padding: 12px 8px;
-        font-size: 12px;
-        border-radius: 12px;
+        padding: 8px 4px;
+        font-size: 11px;
+        border-radius: 8px;
+        min-width: 0;
     }
     
     .progression-order-btn {
@@ -1200,5 +1797,393 @@ input:checked+.slider:before {
     
     .chord-type-container {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* 找音练习样式 */
+.pitch-finding-timer {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    text-align: center;
+    padding: 10px 15px;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 8px;
+    border: 2px solid rgba(59, 130, 246, 0.5);
+    backdrop-filter: blur(10px);
+    min-width: 120px;
+}
+
+.timer-label {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 3px;
+}
+
+.timer-display {
+    font-size: 18px;
+    font-weight: bold;
+    color: #3b82f6;
+}
+
+.pitch-finding-current-note {
+    text-align: center;
+    margin: 15px auto;
+    padding: 20px;
+    max-width: 400px;
+    width: fit-content;
+}
+
+.current-note-label {
+    font-size: 16px;
+    color: #94a3b8;
+    margin-bottom: 10px;
+}
+
+.current-note-display {
+    font-size: 72px;
+    font-weight: bold;
+    color: #3b82f6;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    line-height: 1;
+}
+
+.fretboard-container {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    height: 180px;
+    background-color: #222;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 5px;
+    transition: display 0.3s;
+}
+
+
+.fretboard {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.fretboard-string {
+    flex: 1;
+    display: flex;
+    position: relative;
+    border-bottom: 1px solid #444;
+}
+
+.fretboard-string:last-child {
+    border-bottom: none;
+}
+
+.fretboard-fret {
+    flex: 1;
+    position: relative;
+    border-right: 1px solid #444;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    min-height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fretboard-fret:last-child {
+    border-right: none;
+}
+
+.fretboard-fret:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.fretboard-fret[data-fret="0"] {
+    background-color: #5556;
+    position: relative;
+}
+
+.fret-marker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight:normal;
+    z-index: 10;
+    background: transparent;
+    color: #fff;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+
+
+.pitch-finding-next-btn-container {
+    display: flex;
+    justify-content: center;
+    margin: 20px auto;
+    width: 60vw;
+    max-width: 800px;
+}
+
+.pitch-finding-next-btn {
+    background: transparent;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(5, 5, 5, 0.5);
+}
+
+.pitch-finding-next-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.pitch-finding-next-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* 音程练习设置样式 */
+.interval-settings {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #444;
+}
+
+.interval-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.interval-btn {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background-color: #2c2c3c;
+    color: #aaa;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: 40px;
+}
+
+.interval-btn:hover {
+    background-color: #3c3c4c;
+    color: #fff;
+}
+
+.interval-btn.active {
+    background-color: rgba(58, 159, 196, 0.2);
+    color: #3a9fc4;
+    border-color: #3a9fc4;
+}
+
+.practice-mode-btn {
+    flex: 1;
+    padding: 10px 8px;
+    border-radius: 8px;
+    border: 1px solid #555;
+    background-color: #2c2c3c;
+    color: #aaa;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.practice-mode-btn.active {
+    background-color: rgba(58, 159, 196, 0.2);
+    color: #3a9fc4;
+    border-color: #3a9fc4;
+}
+
+/* 音程练习显示样式 */
+.interval-exercise-display {
+    text-align: center;
+    margin-top: 10px;
+    padding: 8px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    position: relative;
+}
+
+/* 背景音级显示 */
+.background-intervals {
+    font-size: 24px;
+    color: rgba(170, 170, 170, 0.3);
+    font-weight: bold;
+    margin-bottom: 5px;
+    opacity: 0.5;
+}
+
+/* 当前题目音级显示 */
+.current-interval {
+    font-size: 48px;
+    color: #3a9fc4;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(58, 159, 196, 0.5);
+    position: relative;
+    z-index: 2;
+}
+
+/* 音程练习正确反馈动画 */
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+.fretboard-note {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 10;
+    background: transparent;
+    color: #fff;
+    animation: noteGlow 2s ease-in-out;
+}
+
+@keyframes noteGlow {
+    0% {
+        box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+    }
+    100% {
+        box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    }
+}
+
+.fretboard-footer {
+    display: flex;
+    justify-content: space-between;
+    max-width: 800px;
+    align-items: center;
+    margin: 0 auto;
+    width: 60vw;
+}
+
+.fret-numbers {
+    display: flex;
+    width: 100%;
+    height: 20px;
+    margin: 0 auto;
+    transition: display 0.3s;
+}
+
+.fret-number {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #b0b0b0;
+    font-size: 11px;
+    background: transparent;
+}
+
+.correct-feedback {
+    text-align: center;
+    margin: 15px 0;
+    padding: 15px;
+    background: rgba(34, 197, 94, 0.2);
+    border: 2px solid #22c55e;
+    border-radius: 10px;
+}
+
+.correct-text {
+    font-size: clamp(16px, 3vw, 20px);
+    font-weight: bold;
+    color: #22c55e;
+    animation: correctPulse 1s ease-in-out;
+}
+
+@keyframes correctPulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.next-note-prompt {
+    text-align: center;
+    margin: 15px 0;
+    padding: 15px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 2px solid #3b82f6;
+    border-radius: 10px;
+}
+
+.next-note-text {
+    font-size: clamp(14px, 2.5vw, 18px);
+    color: #3b82f6;
+    font-weight: bold;
+}
+
+/* 找音练习响应式设计 */
+@media (max-width: 768px) {
+    .pitch-finding-timer {
+        top: 10px;
+        left: 10px;
+        padding: 8px 12px;
+        min-width: 100px;
+    }
+    
+    .timer-label {
+        font-size: 10px;
+    }
+    
+    .timer-display {
+        font-size: 16px;
+    }
+    
+    .pitch-finding-current-note {
+        margin: 10px auto;
+        padding: 15px;
+        max-width: 300px;
+    }
+    
+    .current-note-display {
+        font-size: clamp(36px, 6vw, 48px);
+    }
+    
+    .fretboard-container {
+        height: 150px;
     }
 }
