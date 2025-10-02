@@ -28,8 +28,8 @@
 }
 
 .caged-shape-btn-display {
-    width: 50px;
-    height: 50px;
+    width: 45px;
+    height: 45px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.1);
     border: 2px solid rgba(255, 255, 255, 0.2);
@@ -63,6 +63,12 @@
     border-color: #34d399;
     color: #ffffff;
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.caged-shape-btn-display.completed:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: scale(1.08);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.6);
 }
 
 .caged-shape-btn-display.disabled {
@@ -204,11 +210,12 @@
 .custom-dropdown {
     position: relative;
     width: 100%;
-    max-width: 300px;
+    max-width: 1000px;
     z-index: 999999;
 }
 
 .dropdown-trigger {
+    max-width: 1000px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -253,16 +260,18 @@
     top: 100%;
     left: 0;
     right: 0;
+    width: 100%;
     background: rgba(15, 23, 42, 0.95);
     border: 2px solid rgba(59, 130, 246, 0.3);
     border-radius: 8px;
     margin-top: 4px;
     max-height: 300px;
     overflow-y: auto;
-    z-index: 999999;
+    z-index: 100;
     display: none;
     backdrop-filter: blur(10px);
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
 }
 
 .dropdown-menu.show {
@@ -425,9 +434,18 @@
     font-size: 14px;
 }
 
+/* ========== Z-INDEX 层级管理 ========== */
+/* 层级结构：
+ * 1. 开始练习按钮: z-index: 1 (最低层)
+ * 2. 普通select: z-index: 500 (中层)
+ * 3. 自定义下拉框: z-index: 2000 (最高层)
+ */
+
 /* 确保开始练习按钮不会遮挡自定义下拉列表 */
+/* 开始练习按钮层级：1 (最低) */
 .controls {
     z-index: 1 !important;
+    position: relative;
 }
 
 .controls .btn {
@@ -435,31 +453,98 @@
     position: relative;
 }
 
-/* 强制自定义下拉列表在最顶层 */
+/* 确保按钮不会意外获得更高的层级 */
+#startBtn {
+    z-index: 1 !important;
+    position: relative;
+}
+
+/* 自定义下拉列表层级 */
 .custom-dropdown {
-    z-index: 999999 !important;
+    z-index: 2000 !important;
     position: relative !important;
 }
 
 .dropdown-menu {
-    z-index: 999999 !important;
+    z-index: 2000 !important;
     position: absolute !important;
 }
 
-/* 确保下拉菜单在所有元素之上 */
+/* 练习等级下拉框 - 自定义下拉框层级 */
 #progressionLevelDropdown {
-    z-index: 999999 !important;
+    z-index: 2000 !important;
     position: relative !important;
 }
 
 #progressionLevelDropdown .dropdown-menu {
-    z-index: 999999 !important;
+    z-index: 2000 !important;
     position: fixed !important;
     top: auto !important;
     left: auto !important;
     right: auto !important;
-    width: 300px !important;
+    width: 83% !important;
     max-width: 90vw !important;
+}
+
+/* 乐曲下拉框 - 自定义下拉框层级 */
+#jazzStandardDropdown {
+    z-index: 2000 !important;
+    position: relative !important;
+}
+
+#jazzStandardDropdown .dropdown-menu {
+    z-index: 2000 !important;
+    position: fixed !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 83% !important;
+    max-width: 90vw !important;
+    transform: translateY(0) !important;
+}
+
+/* 调性下拉框 - 自定义下拉框层级 */
+#progressionKeyDropdown {
+    z-index: 2000 !important;
+    position: relative !important;
+}
+
+#progressionKeyDropdown .dropdown-menu {
+    z-index: 2000 !important;
+    position: fixed !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 83% !important;
+    max-width: 90vw !important;
+    transform: translateY(0) !important;
+    /* 确保内容不超出菜单边界 */
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    /* 设置最大高度以启用滚动 */
+    max-height: 300px !important;
+    /* 美化滚动条 */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.5) rgba(30, 41, 59, 0.3);
+}
+
+/* 调性下拉框滚动条样式 (Webkit) */
+#progressionKeyDropdown .dropdown-menu::-webkit-scrollbar {
+    width: 6px;
+}
+
+#progressionKeyDropdown .dropdown-menu::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.3);
+    border-radius: 3px;
+}
+
+#progressionKeyDropdown .dropdown-menu::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.5);
+    border-radius: 3px;
+}
+
+#progressionKeyDropdown .dropdown-menu::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.7);
 }
 
 .caged-settings {
@@ -488,7 +573,7 @@
     font-size: 14px;
     font-weight: 500;
     text-align: center;
-    min-width: 60px;
+    min-width: 40px;
 }
 
 .caged-shape-btn:hover {
@@ -587,6 +672,17 @@
     color: #fff !important;
 }
 
+/* 颜色配置和浏览器兼容性 */
+:root {
+    color-scheme: dark;
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #1a1a1a;
+    --text-primary: #e5e5e5;
+    --accent-blue: #3b82f6;
+    --accent-purple: #9333ea;
+    --accent-green: #10b981;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -594,9 +690,48 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* 强制颜色配置，防止浏览器自动调整 */
+html {
+    color-scheme: dark;
+    -webkit-color-scheme: dark;
+    forced-color-adjust: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 媒体查询：确保在不同环境下颜色一致 */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #0f0f0f;
+        --bg-secondary: #1a1a1a;
+        --text-primary: #e5e5e5;
+    }
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-primary: #0f0f0f;
+        --bg-secondary: #1a1a1a;
+        --text-primary: #e5e5e5;
+    }
+}
+
+/* 强制暗色主题，不受系统设置影响 */
+@media (forced-colors: active) {
+    :root {
+        forced-color-adjust: none;
+    }
+    
+    body {
+        forced-color-adjust: none;
+        background: #0f0f0f !important;
+        color: #e5e5e5 !important;
+    }
+}
+
 body {
-    background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 50%, #0f0f0f 100%);
-    color: #e5e5e5;
+    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-primary) 100%);
+    color: var(--text-primary);
     padding: 20px;
     display: flex;
     flex-direction: column;
@@ -604,6 +739,11 @@ body {
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
+    /* 强制颜色显示，防止浏览器调整 */
+    forced-color-adjust: none;
+    -webkit-forced-color-adjust: none;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
 }
 
 /* 暗黑设计感背景 */
@@ -691,7 +831,7 @@ body::after {
         0 0 0 1px rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -710,7 +850,7 @@ body::after {
 .header {
     text-align: center;
     margin-bottom: 24px;
-    padding-bottom: 20px;
+    padding-bottom: 10px;
     position: relative;
 }
 
@@ -747,9 +887,9 @@ h1::before {
     right: -2px;
     bottom: -2px;
     background: linear-gradient(135deg, #78dbff, #ff77c6, #7877c6);
-    border-radius: 8px;
+    border-radius: 1888px;
     z-index: -1;
-    opacity: 0.1;
+    opacity: 0.05;
     filter: blur(4px);
 }
 
@@ -936,18 +1076,18 @@ select optgroup {
 
 /* 确保select下拉框可见 */
 select {
-    z-index: 1000;
+    z-index: 500;
     position: relative;
 }
 
 .select-wrapper {
-    z-index: 1000;
+    z-index: 500;
     position: relative;
 }
 
-/* 强制显示select选项 */
+/* 普通select下拉框层级 */
 #scaleType {
-    z-index: 9999 !important;
+    z-index: 500 !important;
     position: relative !important;
 }
 
@@ -1014,7 +1154,7 @@ select {
 /* 确保select容器不裁剪内容 */
 .select-wrapper {
     overflow: visible !important;
-    z-index: 9999 !important;
+    z-index: 500 !important;
     position: relative !important;
 }
 
@@ -1109,9 +1249,10 @@ input:checked+.slider:before {
 }
 
 .chord-type-btn.active {
-    background-color: rgba(58, 159, 196, 0.2);
-    color: #3a9fc4;
-    border-color: #3a9fc4;
+    background: rgba(58, 159, 196, 0.6);
+    border-color: rgba(58, 159, 196, 0.8);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(58, 159, 196, 0.3);
 }
 
 /* 顺序按钮样式 */
@@ -1122,25 +1263,27 @@ input:checked+.slider:before {
 }
 
 .order-btn {
-    flex: 1;
-    padding: 10px 8px;
-    border-radius: 8px;
-    border: 1px solid #555;
-    background-color: #2c2c3c;
-    color: #aaa;
-    font-size: 14px;
-    font-weight: 500;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-}
+
+        padding: 8px 16px;
+        background: rgba(51, 65, 85, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        color: #e2e8f0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: center;
+        min-width: 40px;
+    }
+    
 
 .order-btn.active {
-    background-color: rgba(58, 159, 196, 0.2);
-    color: #3a9fc4;
-    border-color: #3a9fc4;
+    background: rgba(58, 159, 196, 0.6);
+    border-color: rgba(58, 159, 196, 0.8);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(58, 159, 196, 0.3);
 }
-
 /* 主按钮样式 */
 .btn {
     padding: 16px 28px;
@@ -1737,10 +1880,13 @@ input:checked+.slider:before {
     }
     
     .chord-type-btn {
-        padding: 8px 4px;
-        font-size: 11px;
-        border-radius: 8px;
+        padding: 6px 2px;
+        font-size: 10px;
+        border-radius: 6px;
         min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     
     .progression-order-btn {
@@ -1796,8 +1942,114 @@ input:checked+.slider:before {
     }
     
     .chord-type-container {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(4, 1fr);
+        gap: 2px;
     }
+}
+
+/* 极小屏幕优化 (320px以下) */
+@media (max-width: 320px) {
+    .chord-type-container {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+    }
+    
+    .chord-type-btn {
+        padding: 4px 1px;
+        font-size: 9px;
+        border-radius: 4px;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+    }
+    
+    /* 小屏幕下的内联提示优化 */
+    .settings-control-group {
+        gap: 8px;
+    }
+    
+    .hint-text-inline {
+        font-size: 9px;
+        padding: 3px 6px;
+    }
+    
+    .hint-text-inline kbd {
+        font-size: 8px;
+        padding: 1px 2px;
+    }
+}
+
+/* 设置控制组样式 */
+.settings-control-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* 内联键盘快捷键提示样式 */
+.keyboard-hint-inline {
+    flex-shrink: 0;
+}
+
+.hint-text-inline {
+    display: inline-block;
+    font-size: 10px;
+    color: #94a3b8;
+    line-height: 1.2;
+    padding: 4px 8px;
+    background: rgba(30, 41, 59, 0.2);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    border-radius: 4px;
+    backdrop-filter: blur(3px);
+    white-space: nowrap;
+}
+
+.hint-text-inline kbd {
+    display: inline-block;
+    padding: 1px 3px;
+    margin: 0 1px;
+    font-size: 9px;
+    font-family: monospace;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 2px;
+    color: #3b82f6;
+    font-weight: bold;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+/* 保留原有的块级提示样式（如果其他地方需要） */
+.keyboard-hint {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.hint-text {
+    display: block;
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.4;
+    padding: 8px 12px;
+    background: rgba(30, 41, 59, 0.3);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 6px;
+    backdrop-filter: blur(5px);
+}
+
+.hint-text kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    margin: 0 2px;
+    font-size: 11px;
+    font-family: monospace;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 3px;
+    color: #3b82f6;
+    font-weight: bold;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* 找音练习样式 */
@@ -2000,9 +2252,10 @@ input:checked+.slider:before {
 }
 
 .interval-btn.active {
-    background-color: rgba(58, 159, 196, 0.2);
-    color: #3a9fc4;
-    border-color: #3a9fc4;
+    background: rgba(58, 159, 196, 0.6);
+    border-color: rgba(58, 159, 196, 0.8);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(58, 159, 196, 0.3);
 }
 
 .practice-mode-btn {
@@ -2020,9 +2273,10 @@ input:checked+.slider:before {
 }
 
 .practice-mode-btn.active {
-    background-color: rgba(58, 159, 196, 0.2);
-    color: #3a9fc4;
-    border-color: #3a9fc4;
+    background: rgba(58, 159, 196, 0.6);
+    border-color: rgba(58, 159, 196, 0.8);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(58, 159, 196, 0.3);
 }
 
 /* 音程练习显示样式 */

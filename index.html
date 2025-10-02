@@ -4,6 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0f0f0f">
+    <meta name="msapplication-navbutton-color" content="#0f0f0f">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title data-i18n-key="page_title">吉他指板视觉化练习工具</title>
     <!-- ml5.js库 - 用于CREPE音高检测算法 -->
     <script src="js/ml5.min.js"></script>
@@ -18,8 +22,8 @@
             // 定义语言数据
             const translations = {
                 'zh-CN': {
-                    'app_title': '🎸 吉他音阶与和弦练习工具 - 支持USB声卡',
-                    'app_instructions': '支持吉他通过USB声卡输入进行音高检测。连接您的USB音频接口后，选择对应的设备即可开始练习。',
+                    'app_title': '🎸 吉他指板视觉化练习工具',
+                 
                     'page_title': '吉他指板视觉化练习工具',
                     'btn_start': '开始练习',
                     'status_ready': '准备就绪',
@@ -208,6 +212,8 @@
                     'quad_chord_notes': '四和弦音',
                     'progression_key': '乐曲',
                     'progression_key_hint': '选择乐曲',
+                    'progression_tunes': '乐曲',
+                    'progression_tunes_hint': '选择练习乐曲',
                     'progression_style': '风格',
                     'progression_style_hint': '选择练习风格',
                     'progression_tempo': '速度',
@@ -286,6 +292,7 @@
                     'pitch_finding_practice_time_hint': '选择练习时长',
                     'pitch_finding_show_fretboard': '显示指板',
                     'pitch_finding_show_fretboard_hint': '检测到正确音高时在指板上显示位置',
+                    'fretboard_keyboard_hint': '💡 ↓隐藏 ↑显示 空格下一个',
                     'pitch_finding_fretboard_range': '指板长度',
                     'pitch_finding_fretboard_range_hint': '选择指板显示范围',
                     'pitch_finding_12_frets': '12品',
@@ -356,9 +363,9 @@
                     'midi_enable': 'MIDI设备'
                 },
                 'en': {
-                    'app_title': '🎸 Guitar Scale and Chord Practice Tool - USB Audio Interface Support',
-                    'app_instructions': 'Supports guitar input through USB audio interface for pitch detection. Connect your USB audio interface and select the corresponding device to start practicing.',
-                    'page_title': 'Guitar Fretboard Visualization Practice Tool',
+                    'app_title': '🎸 Fretboard Master',
+                   
+                    'page_title': 'Fretboard Master',
                     'btn_start': 'Start Practice',
                     'status_ready': 'Ready',
                     'lang_zh': '中文',
@@ -513,8 +520,10 @@
                     'double_chord_notes': 'Double Chord Notes',
                     'triple_chord_notes': 'Triple Chord Notes',
                     'quad_chord_notes': 'Quad Chord Notes',
-                    'progression_key': 'Key',
-                    'progression_key_hint': 'Select key',
+                    'progression_key': 'Tunes',
+                    'progression_key_hint': 'Select a Tune',
+                    'progression_tunes': 'Tunes',
+                    'progression_tunes_hint': 'Select practice tunes',
                     'progression_style': 'Style',
                     'progression_style_hint': 'Select practice style',
                     'progression_tempo': 'Tempo',
@@ -593,6 +602,7 @@
                     'pitch_finding_practice_time_hint': 'Select practice duration',
                     'pitch_finding_show_fretboard': 'Show Fretboard',
                     'pitch_finding_show_fretboard_hint': 'Display note positions on fretboard when correct pitch is detected',
+                    'fretboard_keyboard_hint': '💡 ↓Hide ↑Show Space Next',
                     'pitch_finding_fretboard_range': 'Fretboard Range',
                     'pitch_finding_fretboard_range_hint': 'Select fretboard display range',
                     'pitch_finding_12_frets': '12 Frets',
@@ -781,7 +791,12 @@
                 showFingering: true,
                 showScale: true,
                 currentShape: 'C',
-                currentExercise: null
+                currentExercise: null,
+                currentScaleType: null, // 当前练习的音阶类型（用于保持一致性）
+                currentRootNote: null, // 当前练习的根音（用于保持一致性）
+                isManualSwitch: false, // 标记是否为手动切换形状
+                completedShapesInCurrentRound: [], // 当前轮次中已完成的形状
+                isNewRound: true // 标记是否开始新一轮练习
             };
             
             // 将cagedState和cagedSystem暴露到全局作用域
@@ -985,6 +1000,561 @@
             window.connectMIDIDevices = connectMIDIDevices;
             window.disconnectMIDIDevices = disconnectMIDIDevices;
 
+            // 初始化乐曲下拉框功能
+            window.initJazzStandardDropdown = function() {
+                console.log('初始化乐曲下拉列表...');
+                const dropdown = document.getElementById('jazzStandardDropdown');
+                
+                if (!dropdown) {
+                    console.error('找不到jazzStandardDropdown元素');
+                    return;
+                }
+                
+                // 检查是否已经初始化过
+                if (dropdown.dataset.initialized === 'true') {
+                    console.log('乐曲下拉列表已经初始化过，跳过');
+                    return;
+                }
+                
+                const trigger = dropdown.querySelector('.dropdown-trigger');
+                const menu = dropdown.querySelector('.dropdown-menu');
+                const nativeSelect = document.getElementById('jazzStandard');
+                
+                // 动态生成歌曲列表
+                const jazzStandardsData = window.jazzStandards || jazzStandards;
+                console.log('开始生成歌曲列表，jazzStandards对象:', jazzStandardsData);
+                
+                // 清空现有内容
+                menu.innerHTML = '';
+                
+                // 按字母顺序生成分组
+                const letters = Object.keys(jazzStandardsData).sort();
+                console.log('找到分组:', letters);
+                
+                letters.forEach(letter => {
+                    const group = jazzStandardsData[letter];
+                    const songs = Object.keys(group).sort();
+                    
+                    if (songs.length > 0) {
+                        // 创建分组
+                        const groupLi = document.createElement('li');
+                        groupLi.className = 'dropdown-group';
+                        
+                        const groupHeader = document.createElement('div');
+                        groupHeader.className = 'group-header';
+                        groupHeader.textContent = letter;
+                        groupLi.appendChild(groupHeader);
+                        
+                        const groupItems = document.createElement('ul');
+                        groupItems.className = 'group-items';
+                        
+                        // 添加歌曲
+                        songs.forEach(songName => {
+                            const songLi = document.createElement('li');
+                            songLi.className = 'dropdown-item';
+                            songLi.setAttribute('data-value', songName);
+                            
+                            const itemText = document.createElement('span');
+                            itemText.className = 'item-text';
+                            itemText.textContent = songName;
+                            songLi.appendChild(itemText);
+                            
+                            const infoIcon = document.createElement('span');
+                            infoIcon.className = 'info-icon';
+                            infoIcon.setAttribute('data-info', songName);
+                            infoIcon.textContent = 'ℹ️';
+                            songLi.appendChild(infoIcon);
+                            
+                            groupItems.appendChild(songLi);
+                        });
+                        
+                        groupLi.appendChild(groupItems);
+                        menu.appendChild(groupLi);
+                    }
+                });
+                
+                // 重新获取动态生成的元素
+                const items = dropdown.querySelectorAll('.dropdown-item');
+                const infoIcons = dropdown.querySelectorAll('.info-icon');
+                
+                console.log('动态生成完成，找到乐曲元素:', {
+                    dropdown: !!dropdown,
+                    trigger: !!trigger,
+                    menu: !!menu,
+                    items: items.length,
+                    infoIcons: infoIcons.length,
+                    nativeSelect: !!nativeSelect
+                });
+                
+                // 标记为已初始化
+                dropdown.dataset.initialized = 'true';
+
+                // 切换下拉菜单显示/隐藏
+                trigger.addEventListener('click', function(e) {
+                    console.log('乐曲下拉列表触发器被点击');
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const isOpen = menu.classList.contains('show');
+                    console.log('当前状态:', isOpen ? '打开' : '关闭');
+                    
+                    if (isOpen) {
+                        closeJazzDropdown();
+                    } else {
+                        openJazzDropdown();
+                    }
+                });
+
+                // 点击外部关闭下拉菜单
+                document.addEventListener('click', function(e) {
+                    if (!dropdown.contains(e.target)) {
+                        closeJazzDropdown();
+                    }
+                });
+
+                // 选择选项
+                items.forEach(item => {
+                    item.addEventListener('click', function(e) {
+                        // 检查是否点击的是信息图标
+                        if (e.target.classList.contains('info-icon') || e.target.closest('.info-icon')) {
+                            return;
+                        }
+                        
+                        e.stopPropagation();
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.item-text').textContent;
+                        
+                        // 更新显示文本
+                        dropdown.querySelector('.dropdown-text').textContent = text;
+                        
+                        // 更新原生select的值
+                        nativeSelect.value = value;
+                        
+                        // 触发change事件
+                        const changeEvent = new Event('change', { bubbles: true });
+                        nativeSelect.dispatchEvent(changeEvent);
+                        
+                        // 关闭下拉菜单
+                        closeJazzDropdown();
+                        
+                        console.log('选择了乐曲:', value);
+                    });
+                });
+
+                // 信息图标点击事件 - 使用事件委托
+                
+                // 直接为每个信息图标绑定点击事件
+                infoIcons.forEach((icon, index) => {
+                    icon.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        e.stopImmediatePropagation(); // 阻止事件进一步传播
+                        const songName = this.dataset.info;
+                        showSongInfo(songName);
+                    });
+                });
+                
+                // 使用事件委托作为备用方案
+                menu.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('info-icon')) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const songName = e.target.dataset.info;
+                        showSongInfo(songName);
+                        return;
+                    }
+                    
+                    // 检查是否点击了包含info-icon的元素
+                    const infoIcon = e.target.closest('.info-icon');
+                    if (infoIcon) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const songName = infoIcon.dataset.info;
+                        showSongInfo(songName);
+                        return;
+                    }
+                });
+
+                function openJazzDropdown() {
+                    menu.classList.add('show');
+                    trigger.classList.add('active');
+                    dropdown.querySelector('.dropdown-arrow').textContent = '▲';
+                    
+                    // 动态计算位置，确保不被遮挡
+                    const rect = trigger.getBoundingClientRect();
+                    const menuHeight = menu.offsetHeight || 300;
+                    const viewportHeight = window.innerHeight;
+                    
+                    // 如果下方空间不够，向上展开
+                    if (rect.bottom + menuHeight > viewportHeight) {
+                        menu.style.top = (rect.top - menuHeight) + 'px';
+                    } else {
+                        menu.style.top = rect.bottom + 'px';
+                    }
+                    
+                    menu.style.left = rect.left + 'px';
+                    menu.style.width = rect.width + 'px';
+                }
+
+                function closeJazzDropdown() {
+                    menu.classList.remove('show');
+                    trigger.classList.remove('active');
+                    dropdown.querySelector('.dropdown-arrow').textContent = '▼';
+                }
+
+                // 显示歌曲信息弹窗
+                function showSongInfo(songName) {
+                    console.log('=== showSongInfo 函数被调用 ===');
+                    console.log('歌曲名称:', songName);
+                    
+                    // 确保可以访问jazzStandards对象
+                    const jazzStandardsData = window.jazzStandards || jazzStandards;
+                    console.log('jazzStandards 对象:', jazzStandardsData);
+                    
+                    // 获取歌曲数据
+                    let songData = null;
+                    for (const letter in jazzStandardsData) {
+                        if (jazzStandardsData[letter][songName]) {
+                            songData = jazzStandardsData[letter][songName];
+                            break;
+                        }
+                    }
+                    
+                    if (!songData) {
+                        console.error('找不到歌曲数据:', songName);
+                        alert('找不到歌曲信息：' + songName);
+                        return;
+                    }
+                    
+                    console.log('找到歌曲数据:', songData);
+                    
+                    // 创建弹窗
+                    const modal = document.createElement('div');
+                    modal.className = 'song-info-modal';
+                    modal.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.8);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 10000;
+                    `;
+                    
+                    const content = document.createElement('div');
+                    content.style.cssText = `
+                        background: linear-gradient(135deg, #1e293b, #334155);
+                        border-radius: 16px;
+                        padding: 24px;
+                        max-width: 500px;
+                        width: 90%;
+                        color: #e2e8f0;
+                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                    `;
+                    
+                    // 构建和弦进行显示
+                    const chordsDisplay = songData.chords.join(' - ');
+                    
+                    // 获取歌曲信息，提供默认值
+                    const info = songData.info || {
+                        composer: '未知',
+                        year: '未知',
+                        style: '爵士标准曲',
+                        tempo: 'Medium',
+                        description: '经典爵士标准曲，适合和弦进行练习。'
+                    };
+                    
+                    content.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin: 0; color: #3a9fc4; font-size: 24px;">${songName}</h2>
+                            <button class="close-btn" style="background: none; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">×</button>
+                        </div>
+                        
+                        <div style="margin-bottom: 16px;">
+                            <h3 style="color: #60a5fa; margin: 0 0 8px 0; font-size: 16px;">基本信息</h3>
+                            <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px;">
+                                <p style="margin: 4px 0;"><strong>作曲家:</strong> ${info.composer || '未知'}</p>
+                                <p style="margin: 4px 0;"><strong>年代:</strong> ${info.year || '未知'}</p>
+                                <p style="margin: 4px 0;"><strong>风格:</strong> ${info.style || '爵士标准曲'}</p>
+                                <p style="margin: 4px 0;"><strong>速度:</strong> ${info.tempo || 'Medium'}</p>
+                                <p style="margin: 4px 0;"><strong>原调:</strong> ${songData.key}</p>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 16px;">
+                            <h3 style="color: #60a5fa; margin: 0 0 8px 0; font-size: 16px;">和弦进行</h3>
+                            <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; font-family: monospace; font-size: 14px; line-height: 1.6;">
+                                ${chordsDisplay}
+                            </div>
+                        </div>
+                        
+                        ${info.description ? `
+                        <div style="margin-bottom: 16px;">
+                            <h3 style="color: #60a5fa; margin: 0 0 8px 0; font-size: 16px;">曲目介绍</h3>
+                            <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; line-height: 1.6;">
+                                ${info.description}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button class="select-song-btn" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; border-radius: 8px; padding: 12px 24px; color: white; font-weight: 500; cursor: pointer; transition: all 0.3s ease;">
+                                选择此曲目
+                            </button>
+                        </div>
+                    `;
+                    
+                    modal.appendChild(content);
+                    document.body.appendChild(modal);
+                    
+                    // 关闭按钮事件
+                    content.querySelector('.close-btn').addEventListener('click', function() {
+                        document.body.removeChild(modal);
+                    });
+                    
+                    // 选择曲目按钮事件
+                    content.querySelector('.select-song-btn').addEventListener('click', function() {
+                        // 更新下拉框显示
+                        dropdown.querySelector('.dropdown-text').textContent = songName;
+                        nativeSelect.value = songName;
+                        
+                        // 触发change事件
+                        const changeEvent = new Event('change', { bubbles: true });
+                        nativeSelect.dispatchEvent(changeEvent);
+                        
+                        // 关闭弹窗
+                        document.body.removeChild(modal);
+                        
+                        console.log('从信息弹窗选择了乐曲:', songName);
+                    });
+                    
+                    // 点击背景关闭
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === modal) {
+                            document.body.removeChild(modal);
+                        }
+                    });
+                }
+                
+                // 测试函数 - 可以在控制台调用
+                window.testShowSongInfo = function(songName) {
+                    console.log('测试显示歌曲信息:', songName || 'All Of Me');
+                    showSongInfo(songName || 'All Of Me');
+                };
+            };
+            
+            // 初始化调性下拉框功能
+            window.initProgressionKeyDropdown = function() {
+                console.log('初始化调性下拉列表...');
+                const dropdown = document.getElementById('progressionKeyDropdown');
+                
+                if (!dropdown) {
+                    console.error('找不到progressionKeyDropdown元素');
+                    return;
+                }
+                
+                // 检查是否已经初始化过
+                if (dropdown.dataset.initialized === 'true') {
+                    console.log('调性下拉列表已经初始化过，跳过');
+                    return;
+                }
+                
+                const trigger = dropdown.querySelector('.dropdown-trigger');
+                const menu = dropdown.querySelector('.dropdown-menu');
+                const nativeSelect = document.getElementById('progressionKey');
+                
+                if (!trigger || !menu || !nativeSelect) {
+                    console.error('调性下拉列表缺少必要元素');
+                    return;
+                }
+                
+                // 生成调性列表
+                const allKeys = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
+                menu.innerHTML = '';
+                
+                console.log('开始生成调性选项，总数:', allKeys.length);
+                
+                allKeys.forEach(key => {
+                    const keyLi = document.createElement('li');
+                    keyLi.className = 'dropdown-item';
+                    keyLi.setAttribute('data-value', key);
+                    
+                    const itemText = document.createElement('span');
+                    itemText.className = 'item-text';
+                    itemText.textContent = key;
+                    keyLi.appendChild(itemText);
+                    
+                    menu.appendChild(keyLi);
+                });
+                
+                // 重新查询动态生成的元素
+                const items = dropdown.querySelectorAll('.dropdown-item');
+                console.log('调性选项生成完成，实际生成数量:', items.length);
+                
+                // 点击触发器打开/关闭下拉菜单
+                trigger.addEventListener('click', function(e) {
+                    console.log('调性下拉框触发器被点击');
+                    e.stopPropagation();
+                    if (menu.classList.contains('show')) {
+                        console.log('菜单当前显示，准备关闭');
+                        closeKeyDropdown();
+                    } else {
+                        console.log('菜单当前隐藏，准备打开');
+                        openKeyDropdown();
+                    }
+                });
+                
+                // 点击选项
+                items.forEach(item => {
+                    item.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.item-text').textContent;
+                        
+                        // 更新显示文本
+                        trigger.querySelector('.dropdown-text').textContent = text;
+                        
+                        // 更新原生select的值
+                        nativeSelect.value = value;
+                        
+                        // 触发change事件
+                        const changeEvent = new Event('change', { bubbles: true });
+                        nativeSelect.dispatchEvent(changeEvent);
+                        
+                        closeKeyDropdown();
+                    });
+                });
+                
+                // 点击外部关闭下拉菜单
+                document.addEventListener('click', function(e) {
+                    if (!dropdown.contains(e.target)) {
+                        closeKeyDropdown();
+                    }
+                });
+                
+                function openKeyDropdown() {
+                    console.log('打开调性下拉菜单');
+                    menu.classList.add('show');
+                    trigger.classList.add('active');
+                    dropdown.querySelector('.dropdown-arrow').textContent = '▲';
+                    
+                    // 动态计算位置，确保不被遮挡
+                    const rect = trigger.getBoundingClientRect();
+                    const menuHeight = menu.offsetHeight || 200;
+                    const viewportHeight = window.innerHeight;
+                    
+                    console.log('调性下拉菜单定位信息:', {
+                        triggerRect: rect,
+                        menuHeight: menuHeight,
+                        viewportHeight: viewportHeight
+                    });
+                    
+                    // 计算可用空间并选择最佳展开方向
+                    const spaceBelow = viewportHeight - rect.bottom;
+                    const spaceAbove = rect.top;
+                    
+                    console.log('空间计算:', {
+                        spaceBelow: spaceBelow,
+                        spaceAbove: spaceAbove,
+                        menuHeight: menuHeight,
+                        needsUpward: spaceBelow < menuHeight && spaceAbove > spaceBelow
+                    });
+                    
+                    // 如果下方空间不够且上方空间更大，向上展开
+                    if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+                        const topPosition = Math.max(10, rect.top - menuHeight);
+                        menu.style.top = topPosition + 'px';
+                        console.log('向上展开，top:', topPosition);
+                    } else {
+                        // 向下展开，但确保不超出视口
+                        const topPosition = Math.min(rect.bottom, viewportHeight - menuHeight - 10);
+                        menu.style.top = Math.max(10, topPosition) + 'px';
+                        console.log('向下展开，top:', Math.max(10, topPosition));
+                    }
+                    
+                    menu.style.left = rect.left + 'px';
+                    menu.style.width = rect.width + 'px';
+                    
+                    // 计算合适的最大高度，确保不超出视口
+                    let maxHeight;
+                    if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+                        // 向上展开时，限制高度为上方可用空间
+                        maxHeight = Math.min(300, spaceAbove - 20);
+                    } else {
+                        // 向下展开时，限制高度为下方可用空间
+                        maxHeight = Math.min(300, spaceBelow - 20);
+                    }
+                    
+                    // 确保最小高度，避免过小
+                    maxHeight = Math.max(100, maxHeight);
+                    menu.style.maxHeight = maxHeight + 'px';
+                    
+                    console.log('高度设置:', {
+                        calculatedMaxHeight: maxHeight,
+                        spaceBelow: spaceBelow,
+                        spaceAbove: spaceAbove,
+                        originalMenuHeight: menuHeight
+                    });
+                    
+                    console.log('调性下拉菜单最终样式:', {
+                        top: menu.style.top,
+                        left: menu.style.left,
+                        width: menu.style.width,
+                        display: getComputedStyle(menu).display,
+                        zIndex: getComputedStyle(menu).zIndex
+                    });
+                }
+                
+                function closeKeyDropdown() {
+                    menu.classList.remove('show');
+                    trigger.classList.remove('active');
+                    dropdown.querySelector('.dropdown-arrow').textContent = '▼';
+                }
+                
+                // 标记为已初始化
+                dropdown.dataset.initialized = 'true';
+                console.log('调性下拉列表初始化完成');
+                
+                // 测试函数 - 可以在控制台调用
+                window.testProgressionKeyDropdown = function() {
+                    console.log('=== 测试调性下拉框 ===');
+                    console.log('下拉框元素:', dropdown);
+                    console.log('触发器元素:', trigger);
+                    console.log('菜单元素:', menu);
+                    console.log('菜单项数量:', items.length);
+                    console.log('菜单当前显示状态:', menu.classList.contains('show'));
+                    
+                    const computedStyle = getComputedStyle(menu);
+                    console.log('菜单计算样式:', {
+                        display: computedStyle.display,
+                        position: computedStyle.position,
+                        zIndex: computedStyle.zIndex,
+                        top: computedStyle.top,
+                        left: computedStyle.left,
+                        maxHeight: computedStyle.maxHeight,
+                        overflowY: computedStyle.overflowY,
+                        overflowX: computedStyle.overflowX
+                    });
+                    
+                    // 强制打开菜单进行测试
+                    menu.classList.add('show');
+                    console.log('强制添加show类后的显示状态:', getComputedStyle(menu).display);
+                    
+                    // 检查滚动状态
+                    setTimeout(() => {
+                        console.log('滚动状态检查:', {
+                            scrollHeight: menu.scrollHeight,
+                            clientHeight: menu.clientHeight,
+                            offsetHeight: menu.offsetHeight,
+                            needsScroll: menu.scrollHeight > menu.clientHeight
+                        });
+                    }, 100);
+                };
+            };
+
             // 自定义下拉列表功能
             window.initCustomDropdown = function() {
                 console.log('初始化自定义下拉列表...');
@@ -1089,6 +1659,7 @@
                     const triggerRect = trigger.getBoundingClientRect();
                     menu.style.top = (triggerRect.bottom + 4) + 'px';
                     menu.style.left = triggerRect.left + 'px';
+                    menu.style.width = triggerRect.width + 'px';  // 设置宽度与触发器一致
                 }
 
                 function closeDropdown() {
@@ -2315,10 +2886,8 @@
 
     <div class="container" id="mainScreen">
         <div class="header">
-            <h1 data-i18n-key="app_title">🎸 吉他音阶与和弦练习工具 - 支持USB声卡</h1>
-            <div class="instructions" data-i18n-key="app_instructions">
-                支持吉他通过USB声卡输入进行音高检测。连接您的USB音频接口后，选择对应的设备即可开始练习。
-            </div>
+            <h1 data-i18n-key="app_title">🎸 吉他指板视觉化练习工具</h1>
+
         </div>
 
         <!-- 设置面板 -->
@@ -2336,7 +2905,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="chord_root_note">根音</span>
-                            <span class="info" data-i18n-key="chord_root_note_hint">选择和弦的根音</span>
                         </div>
                         <div class="select-wrapper">
                             <select id="chordRootNote">
@@ -2365,7 +2933,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="chord_type">和弦类型</span>
-                            <span class="info" data-i18n-key="chord_type_hint">选择要练习的和弦类型</span>
                         </div>
                         <div class="chord-type-container">
                             <div class="chord-type-btn" data-value="major">Major</div>
@@ -2404,7 +2971,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="chord_order">顺序</span>
-                            <span class="info" data-i18n-key="chord_order_hint">选择和弦音符的演奏顺序</span>
                         </div>
                         <div class="order-btn-container">
                             <div class="order-btn chord-order-btn active" data-value="ordered" data-i18n-key="order_ascending">上行</div>
@@ -2418,9 +2984,9 @@
                         <div class="settings-label">
                             <span data-i18n-key="chord_custom">自定义和弦</span>:
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" id="useCustomChords">
-                            <span class="slider round"></span>
+                        <label class="midi-slider-container">
+                            <input type="checkbox" id="useCustomChords" class="midi-slider-input">
+                            <span class="midi-slider"></span>
                         </label>
                     </div>
 
@@ -2634,7 +3200,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="progression_level">练习等级</span>
-                            <span class="info" data-i18n-key="progression_level_hint">选择和弦复杂度</span>
                         </div>
                         <!-- 隐藏的原生select -->
                         <select id="progressionLevel" style="display: none;">
@@ -2773,11 +3338,11 @@
 
                     <div class="settings-row">
                         <div class="settings-label">
-                            <span data-i18n-key="progression_key">和弦转换</span>
-                            <span class="info" data-i18n-key="progression_key_hint">选择经典爵士乐歌曲</span>
+                            <span data-i18n-key="progression_tunes">乐曲</span>
                         </div>
                         <div class="select-wrapper">
-                            <select id="jazzStandard">
+                            <!-- 隐藏的原生select -->
+                            <select id="jazzStandard" style="display: none;">
                                 
                                 <optgroup label="5" style="background: #1a1a2a; color: #3a9fc4; font-weight: bold;">
                                     <option value="500 Miles High" style="background: #2c2c3c; color: #fff;">500 Miles High</option>
@@ -2882,39 +3447,26 @@
                                     <option value="Virgo" style="background: #2c2c3c; color: #fff;">Virgo</option>
                                 </optgroup>
                             </select>
+                            
+                            <!-- 自定义乐曲下拉列表 - 将通过JavaScript动态生成 -->
+                            <div class="custom-dropdown" id="jazzStandardDropdown">
+                                <div class="dropdown-trigger">
+                                    <span class="dropdown-text">All Of Me</span>
+                                    <span class="dropdown-arrow">▼</span>
+                        </div>
+                                <ul class="dropdown-menu">
+                                    <!-- 歌曲列表将通过JavaScript动态生成 -->
+                                </ul>
                         </div>
                     </div>
-
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            <span data-i18n-key="progression_order">顺序</span>
-                            <span class="info" data-i18n-key="progression_order_hint">选择和弦进行的演奏顺序</span>
-                        </div>
-                        <div class="order-btn-container">
-                            <div class="order-btn progression-order-btn active" data-value="ordered" data-i18n-key="order_ordered">顺序</div>
-                            <div class="order-btn progression-order-btn" data-value="reverse" data-i18n-key="order_reverse">倒序</div>
-                            <div class="order-btn progression-order-btn" data-value="random" data-i18n-key="order_random">随机</div>
-                        </div>
-                    </div>
-
-                    <div class="settings-row">
-                        <div class="settings-label">
-                            <span data-i18n-key="progression_repeat">重复练习</span>
-                            <span class="info" data-i18n-key="progression_repeat_hint">开启后对歌曲进行重复练习</span>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="enableRepeat">
-                            <span class="slider round"></span>
-                        </label>
                     </div>
 
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="progression_key_label">调</span>
-                            <span class="info" data-i18n-key="progression_key_hint">选择练习的调性</span>
                         </div>
                         <div class="select-wrapper">
-                            <select id="progressionKey">
+                            <select id="progressionKey" style="display: none;">
                                 <option value="C" style="background: #2c2c3c; color: #fff;">C</option>
                                 <option value="C♯" style="background: #2c2c3c; color: #fff;">C♯</option>
                                 <option value="D♭" style="background: #2c2c3c; color: #fff;">D♭</option>
@@ -2933,8 +3485,40 @@
                                 <option value="B♭" style="background: #2c2c3c; color: #fff;">B♭</option>
                                 <option value="B" style="background: #2c2c3c; color: #fff;">B</option>
                             </select>
+                            
+                            <!-- 自定义调性下拉列表 -->
+                            <div class="custom-dropdown" id="progressionKeyDropdown">
+                                <div class="dropdown-trigger">
+                                    <span class="dropdown-text">C 默认</span>
+                                    <span class="dropdown-arrow">▼</span>
+                        </div>
+                                <ul class="dropdown-menu">
+                                    <!-- 调性列表将通过JavaScript动态生成 -->
+                                </ul>
+                            </div>
                         </div>
                     </div>
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span data-i18n-key="progression_order">顺序</span>
+                        </div>
+                        <div class="order-btn-container">
+                            <div class="order-btn progression-order-btn active" data-value="ordered" data-i18n-key="order_ordered">顺序</div>
+                            <div class="order-btn progression-order-btn" data-value="reverse" data-i18n-key="order_reverse">倒序</div>
+                            <div class="order-btn progression-order-btn" data-value="random" data-i18n-key="order_random">随机</div>
+                    </div>
+                    </div>
+
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span data-i18n-key="progression_repeat">重复练习</span>
+                        </div>
+                        <label class="midi-slider-container">
+                            <input type="checkbox" id="enableRepeat" class="midi-slider-input">
+                            <span class="midi-slider"></span>
+                        </label>
+                    </div>
+
                 </div>
 
                 <!-- 找音练习设置 -->
@@ -2947,7 +3531,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="practice_mode">练习模式</span>
-                            <span class="info" data-i18n-key="practice_mode_hint">选择练习类型</span>
                         </div>
                         <div class="order-btn-container">
                             <div class="order-btn practice-mode-btn active" data-mode="single" data-i18n-key="single_note_practice">找音练习</div>
@@ -2958,7 +3541,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="pitch_finding_practice_time">练习时间</span>
-                            <span class="info" data-i18n-key="pitch_finding_practice_time_hint">选择练习时长</span>
                         </div>
                         <div class="select-wrapper">
                             <select id="pitchFindingTime">
@@ -2976,19 +3558,24 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="pitch_finding_show_fretboard">显示指板</span>
-                            <span class="info" data-i18n-key="pitch_finding_show_fretboard_hint">检测到正确音高时在指板上显示位置</span>
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" id="showFretboard" checked>
-                            <span class="slider round"></span>
+                        <div class="settings-control-group">
+                            <label class="midi-slider-container">
+                                <input type="checkbox" id="showFretboard" class="midi-slider-input" checked>
+                                <span class="midi-slider"></span>
                         </label>
+                            <div class="keyboard-hint-inline">
+                                <span class="hint-text-inline" data-i18n-key="fretboard_keyboard_hint">
+                                    💡 <kbd>↓</kbd>隐藏 <kbd>↑</kbd>显示 <kbd>空格</kbd>下一个
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
 
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="pitch_finding_fretboard_range">指板长度</span>
-                            <span class="info" data-i18n-key="pitch_finding_fretboard_range_hint">选择指板显示范围</span>
                         </div>
                         <div class="order-btn-container">
                             <div class="order-btn pitch-finding-range-btn active" data-value="12" data-i18n-key="pitch_finding_12_frets">12品</div>
@@ -3001,7 +3588,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="pitch_finding_next_interval">下一题间隔</span>
-                            <span class="info" data-i18n-key="pitch_finding_next_interval_hint">答对后自动进入下一题的时间间隔</span>
                         </div>
                         <div class="order-btn-container">
                             <div class="order-btn pitch-finding-interval-btn" data-value="0" data-i18n-key="pitch_finding_no_auto">不自动</div>
@@ -3017,7 +3603,6 @@
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span data-i18n-key="interval_selection">选择音程</span>
-                                <span class="info" data-i18n-key="interval_selection_hint">选择要练习的音程</span>
                             </div>
                             <div class="interval-grid">
                                 <div class="interval-btn" data-interval="♭2">♭2</div>
@@ -3050,7 +3635,6 @@
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span data-i18n-key="root_note_setting">设置根音</span>
-                                <span class="info" data-i18n-key="root_note_setting_hint">选择根音或随机</span>
                             </div>
                             <div class="select-wrapper">
                                 <select id="rootNoteSelect" class="custom-select">
@@ -3080,11 +3664,10 @@
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span data-i18n-key="find_root_first">先找根音</span>
-                                <span class="info" data-i18n-key="find_root_first_hint">开启后先练习根音，再练习音程</span>
                             </div>
-                            <label class="switch">
-                                <input type="checkbox" id="findRootFirst" checked>
-                                <span class="slider round"></span>
+                            <label class="midi-slider-container">
+                                <input type="checkbox" id="findRootFirst" class="midi-slider-input" checked>
+                                <span class="midi-slider"></span>
                             </label>
                         </div>
                     </div>
@@ -3098,7 +3681,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="device_audio_input">音频输入设备</span>
-                            <span class="info" data-i18n-key="device_audio_input_hint">选择吉他连接的声卡设备</span>
                         </div>
 
                     </div>
@@ -3115,7 +3697,6 @@
                     <div class="settings-row" style="margin-top: 12px;">
                         <div class="settings-label">
                             <span data-i18n-key="device_gain">输入增益</span>
-                            <span class="info" data-i18n-key="device_gain_hint">调节输入音量大小</span>
                         </div>
                         <div class="gain-control">
                             <input type="range" id="inputGain" min="0" max="200" value="100">
@@ -3126,7 +3707,6 @@
                     <div class="settings-row" style="margin-top: 12px;">
                         <div class="settings-label">
                             <span data-i18n-key="device_sensitivity">音高检测敏感度</span>
-                            <span class="info" data-i18n-key="device_sensitivity_hint">调节音高识别的敏感程度（0.1-1.0）</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 5px; width: 100%;">
                             <input type="range" id="sensitivity" min="0.1" max="1.0" step="0.1" value="0.5"
@@ -3139,7 +3719,6 @@
                     <div class="settings-row" style="margin-bottom: 12px;">
                         <div class="settings-label">
                             <span data-i18n-key="device_confidence">置信度阈值</span>
-                            <span class="info" data-i18n-key="device_confidence_hint">音高识别的可信度要求（0.3-0.9）</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 5px; width: 100%;">
                             <input type="range" id="confidenceThreshold" min="0.3" max="0.9" step="0.1" value="0.6"
@@ -3157,9 +3736,9 @@
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <span class="switch-label" data-i18n-key="device_cooldown">麦克风冷却时间</span>
-                            <label class="switch">
-                                <input type="checkbox" id="enableCooldown" checked>
-                                <span class="slider"></span>
+                            <label class="midi-slider-container">
+                                <input type="checkbox" id="enableCooldown" class="midi-slider-input" checked>
+                                <span class="midi-slider"></span>
                             </label>
                         </div>
                         <div style="display: flex; align-items: center; gap: 5px; width: 60%; margin-left: auto;">
@@ -3175,9 +3754,9 @@
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <span class="switch-label" data-i18n-key="fixed_delay_generation">延迟生成下一题</span>
-                            <label class="switch">
-                                <input type="checkbox" id="enableFixedDelay">
-                                <span class="slider"></span>
+                            <label class="midi-slider-container">
+                                <input type="checkbox" id="enableFixedDelay" class="midi-slider-input">
+                                <span class="midi-slider"></span>
                             </label>
                         </div>
                         <div style="display: flex; align-items: center; gap: 5px; width: 60%; margin-left: auto;">
@@ -3198,9 +3777,9 @@
                         style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <span class="switch-label" data-i18n-key="device_metronome">启用节拍器</span>
-                            <label class="switch">
-                                <input type="checkbox" id="metronomeToggle">
-                                <span class="slider"></span>
+                            <label class="midi-slider-container">
+                                <input type="checkbox" id="metronomeToggle" class="midi-slider-input">
+                                <span class="midi-slider"></span>
                             </label>
                         </div>
                         <div style="display: flex; align-items: center; gap: 5px; width: 60%; margin-left: auto;">
@@ -3215,16 +3794,16 @@
                     <!-- 节拍器选项 -->
                     <div style="display: flex; gap: 15px; margin-bottom: 12px; margin-left: 20px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <label class="switch">
-                                <input type="checkbox" id="metronomeFlashToggle" checked>
-                                <span class="slider"></span>
+                            <label class="midi-slider-container">
+                                <input type="checkbox" id="metronomeFlashToggle" class="midi-slider-input" checked>
+                                <span class="midi-slider"></span>
                             </label>
                             <span class="switch-label" style="font-size: 14px;" data-i18n-key="background_flash">背景闪光</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <label class="switch">
-                                <input type="checkbox" id="metronomeSoundToggle" checked>
-                                <span class="slider"></span>
+                            <label class="midi-slider-container">
+                                <input type="checkbox" id="metronomeSoundToggle" class="midi-slider-input" checked>
+                                <span class="midi-slider"></span>
                             </label>
                             <span class="switch-label" style="font-size: 14px;" data-i18n-key="sound_metronome">声音节拍</span>
                         </div>
@@ -3234,7 +3813,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="midi_support">MIDI设备支持</span>
-                            <span class="info" data-i18n-key="midi_support_hint">连接MIDI键盘或控制器进行练习</span>
                         </div>
                         <div class="midi-toggle-container">
                             <label class="midi-slider-container">
@@ -3262,7 +3840,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="interface_language">语言 / Language</span>
-                            <span class="info" data-i18n-key="interface_language_hint">界面语言</span>
                         </div>
                         <div style="display: flex; gap: 10px; width: 100%;">
                             <button id="langZhBtn" class="btn" style="flex: 1; padding: 12px; font-size: 14px;">中文</button>
@@ -3295,7 +3872,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="caged_practice">CAGED练习</span>
-                            <span class="info" data-i18n-key="caged_practice_hint">基于CAGED系统的音阶和和弦练习</span>
                         </div>
                         <div class="caged-toggle-container">
                             <label class="caged-slider-container">
@@ -3313,7 +3889,6 @@
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span data-i18n-key="caged_shape">CAGED形状</span>
-                                <span class="info" data-i18n-key="caged_shape_hint">选择要练习的CAGED形状</span>
                             </div>
                             <div class="caged-shape-container">
                                 <div class="caged-shape-btn active" data-shape="C" data-i18n-key="caged_c_shape">C形状</div>
@@ -3328,7 +3903,6 @@
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span data-i18n-key="caged_mode">练习模式</span>
-                                <span class="info" data-i18n-key="caged_mode_hint">选择CAGED练习模式</span>
                             </div>
                             <div class="order-btn-container">
                                 <div class="order-btn caged-mode-btn" data-mode="single" data-i18n-key="caged_single_shape">单个形状</div>
@@ -3341,21 +3915,11 @@
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span data-i18n-key="caged_show_fretboard">显示选项</span>
-                                <span class="info">选择CAGED练习中的显示内容</span>
                             </div>
-                            <div class="checkbox-container">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cagedShowFretboard" checked>
-                                    <span data-i18n-key="caged_show_fretboard">显示指板</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cagedShowFingering" checked>
-                                    <span data-i18n-key="caged_show_fingering">显示指法</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="cagedShowScale" checked>
-                                    <span data-i18n-key="caged_show_scale">显示音阶</span>
-                                </label>
+                            <div class="caged-shape-container">
+                                <div class="caged-shape-btn active" id="cagedShowFretboard" data-option="fretboard" data-i18n-key="caged_show_fretboard">显示指板</div>
+                                <div class="caged-shape-btn active" id="cagedShowFingering" data-option="fingering" data-i18n-key="caged_show_fingering">显示指法</div>
+                                <div class="caged-shape-btn active" id="cagedShowScale" data-option="scale" data-i18n-key="caged_show_scale">显示音阶</div>
                             </div>
                         </div>
                     </div>
@@ -3370,7 +3934,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="scale_root_note">调</span>
-                            <span class="info" data-i18n-key="scale_root_note_hint">选择调</span>
                         </div>
                         <div class="select-wrapper">
                             <select id="rootNote">
@@ -3399,7 +3962,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="scale_type">调式</span>
-                            <span class="info" data-i18n-key="scale_type_hint">选择音阶调式</span>
                         </div>
                         <div class="select-wrapper">
                             <select id="scaleType">
@@ -3478,7 +4040,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="scale_direction">方向</span>
-                            <span class="info" data-i18n-key="scale_direction_hint">选择音阶方向</span>
                         </div>
                         <div class="order-btn-container">
                             <div class="order-btn scale-order-btn active" data-value="ordered" data-i18n-key="order_ascending">上行</div>
@@ -3490,7 +4051,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="scale_practice_sequence">练习序列</span>
-                            <span class="info" data-i18n-key="scale_practice_sequence_hint">选择练习序列模式</span>
                         </div>
                         <div class="order-btn-container">
                             <div class="order-btn scale-arpeggio-btn active" data-value="1to1">1→1</div>
@@ -3867,7 +4427,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="chord_root_note">根音</span>
-                            <span class="info" data-i18n-key="chord_root_note_hint">选择和弦的根音</span>
                         </div>
                         <div class="select-wrapper">
                             <select id="chordRootNote">
@@ -3896,7 +4455,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="chord_type">和弦类型</span>
-                            <span class="info" data-i18n-key="chord_type_hint">选择要练习的和弦类型</span>
                         </div>
                         <div class="chord-type-container">
                             <div class="chord-type-btn" data-value="major">Major</div>
@@ -3935,7 +4493,6 @@
                     <div class="settings-row">
                         <div class="settings-label">
                             <span data-i18n-key="chord_order">顺序</span>
-                            <span class="info" data-i18n-key="chord_order_hint">选择和弦音符的演奏顺序</span>
                         </div>
                         <div class="order-btn-container">
                             <div class="order-btn chord-order-btn active" data-value="ordered" data-i18n-key="order_ascending">上行</div>
@@ -4274,15 +4831,36 @@
                 'A': {
                     'All The Things You Are': {
                         key: 'C',
-                        chords: ['VIIm7♭5', 'III7', 'VIm7', 'II7', 'IIm7', 'V7', 'IM7', 'IM7']
+                        chords: ['VIIm7♭5', 'III7', 'VIm7', 'II7', 'IIm7', 'V7', 'IM7', 'IM7'],
+                        info: {
+                            composer: 'Jerome Kern',
+                            year: '1939',
+                            style: '爵士标准曲/百老汇音乐剧',
+                            tempo: 'Medium Ballad',
+                            description: '被誉为最完美的爵士标准曲之一，和声进行复杂而优美，是学习高级和声的经典教材。'
+                        }
                     },
                     'Autumn Leaves': {
                         key: 'G',
-                        chords: ['IVm7', '♭VII7', '♭IIIM7', '♭VIM7', 'IIm7♭5', 'V7', 'Im7', 'Im7']
+                        chords: ['IVm7', '♭VII7', '♭IIIM7', '♭VIM7', 'IIm7♭5', 'V7', 'Im7', 'Im7'],
+                        info: {
+                            composer: 'Joseph Kosma',
+                            year: '1945',
+                            style: '法式香颂/爵士标准曲',
+                            tempo: 'Medium Ballad',
+                            description: '法国作曲家创作的经典曲目，展现了从大调到小调的自然转换，是学习ii-V-i进行的绝佳教材。'
+                        }
                     },
                     'All Of Me': {
                         key: 'C',
-                        chords: ['IM7', 'III7', 'VIm7', 'I7', 'IVM7', 'IVM7', 'IIIm7♭5', 'VI7']
+                        chords: ['IM7', 'III7', 'VIm7', 'I7', 'IVM7', 'IVM7', 'IIIm7♭5', 'VI7'],
+                        info: {
+                            composer: 'Gerald Marks & Seymour Simons',
+                            year: '1931',
+                            style: '爵士标准曲',
+                            tempo: 'Medium Swing',
+                            description: '经典的32小节AABA结构爵士标准曲，以其简单而优美的和声进行著称。'
+                        }
                     },
                     'A Night In Tunisia': {
                         key: 'D',
@@ -4572,6 +5150,9 @@
                     }
                 }
             };
+            
+            // 将jazzStandards暴露到全局作用域
+            window.jazzStandards = jazzStandards;
 
             // 元素引用
             const mainScreen = document.getElementById('mainScreen');
@@ -5625,6 +6206,16 @@
                 // 清除可能存在的fretboard-note元素（旧版本的音符显示）
                 const existingNotes = fretboard.querySelectorAll('.fretboard-note');
                 existingNotes.forEach(note => note.remove());
+                
+                // 清除CAGED相关元素（重要：防止在非CAGED练习中显示）
+                const fretboardContainer = document.getElementById('fretboardContainer');
+                if (fretboardContainer) {
+                    const cagedElements = fretboardContainer.querySelectorAll('.caged-shape-highlight, .caged-fingering');
+                    if (cagedElements.length > 0) {
+                        cagedElements.forEach(el => el.remove());
+                        console.log('清除CAGED元素:', cagedElements.length, '个');
+                    }
+                }
             }
 
             // 检查音程匹配的辅助函数
@@ -5926,7 +6517,6 @@
                 
                 // 如果是找音练习模式，使用不同的处理逻辑
                 if (state.pitchFindingMode) {
-                    console.log('路由到 processPitchFindingAudio');
                     processPitchFindingAudio(inputData, sampleRate);
                     return;
                 }
@@ -6634,6 +7224,14 @@
                     return;
                 }
 
+                // 如果不是手动切换且是第一次生成练习，重置轮次状态
+                if (!window.cagedState.isManualSwitch && 
+                    (!window.cagedState.currentScaleType || !window.cagedState.currentRootNote)) {
+                    window.cagedState.completedShapesInCurrentRound = [];
+                    window.cagedState.isNewRound = true;
+                    console.log('开始新的CAGED练习，重置轮次状态');
+                }
+
                 // 根据练习模式生成练习
                 switch (window.cagedState.practiceMode) {
                     case 'single':
@@ -6664,9 +7262,20 @@
                 
                 // 使用Scale Settings中的根音设置
                 let key = rootNoteEl.value;
-                if (key === 'random') {
-                    const notes = Object.keys(noteToSemitones).filter(n => n.length <= 2);
-                    key = notes[Math.floor(Math.random() * notes.length)];
+                
+                // 如果是手动切换或在同一轮练习中，保持当前根音和音阶类型
+                if (window.cagedState.isManualSwitch || !window.cagedState.isNewRound) {
+                    // 保持当前根音和音阶类型
+                    key = window.cagedState.currentRootNote || key;
+                    console.log('保持当前根音:', key);
+                } else {
+                    // 新一轮练习，可以重新选择根音
+                    if (key === 'random') {
+                        const notes = Object.keys(noteToSemitones).filter(n => n.length <= 2);
+                        key = notes[Math.floor(Math.random() * notes.length)];
+                    }
+                    window.cagedState.currentRootNote = key;
+                    console.log('新一轮练习 - 选择根音:', key);
                 }
                 
                 // 更新CAGED状态中的调性（保持同步）
@@ -6674,10 +7283,25 @@
                 
                 // 使用Scale Settings中的音阶类型
                 let scaleType = scaleTypeEl.value;
-                if (scaleType === 'random') {
-                    const types = Object.keys(scaleTypes);
-                    scaleType = types[Math.floor(Math.random() * types.length)];
+                
+                // 如果是手动切换或在同一轮练习中，保持当前音阶类型
+                if (window.cagedState.isManualSwitch || !window.cagedState.isNewRound) {
+                    if (window.cagedState.currentScaleType) {
+                        scaleType = window.cagedState.currentScaleType;
+                        console.log('保持当前音阶类型:', scaleType);
+                    }
+                } else {
+                    // 新一轮练习，可以重新选择音阶类型
+                    if (scaleType === 'random') {
+                        const types = Object.keys(scaleTypes);
+                        scaleType = types[Math.floor(Math.random() * types.length)];
+                        console.log('新一轮练习 - 随机选择音阶类型:', scaleType);
+                    }
+                    window.cagedState.currentScaleType = scaleType;
                 }
+                
+                // 标记不再是新一轮
+                window.cagedState.isNewRound = false;
                 
                 // 更新目标音程显示
                 const targetIntervalEl = document.getElementById('targetInterval');
@@ -6717,9 +7341,20 @@
                 
                 // 使用Scale Settings中的根音设置
                 let key = rootNoteEl.value;
-                if (key === 'random') {
-                    const notes = Object.keys(noteToSemitones).filter(n => n.length <= 2);
-                    key = notes[Math.floor(Math.random() * notes.length)];
+                
+                // 如果是手动切换或在同一轮练习中，保持当前根音和音阶类型
+                if (window.cagedState.isManualSwitch || !window.cagedState.isNewRound) {
+                    // 保持当前根音和音阶类型
+                    key = window.cagedState.currentRootNote || key;
+                    console.log('保持当前根音:', key);
+                } else {
+                    // 新一轮练习，可以重新选择根音
+                    if (key === 'random') {
+                        const notes = Object.keys(noteToSemitones).filter(n => n.length <= 2);
+                        key = notes[Math.floor(Math.random() * notes.length)];
+                    }
+                    window.cagedState.currentRootNote = key;
+                    console.log('新一轮练习 - 选择根音:', key);
                 }
                 
                 // 更新CAGED状态中的调性（保持同步）
@@ -6727,18 +7362,33 @@
                 
                 // 使用Scale Settings中的音阶类型
                 let scaleType = scaleTypeEl.value;
-                if (scaleType === 'random') {
-                    const types = Object.keys(scaleTypes);
-                    scaleType = types[Math.floor(Math.random() * types.length)];
+                
+                // 如果是手动切换或在同一轮练习中，保持当前音阶类型
+                if (window.cagedState.isManualSwitch || !window.cagedState.isNewRound) {
+                    if (window.cagedState.currentScaleType) {
+                        scaleType = window.cagedState.currentScaleType;
+                        console.log('保持当前音阶类型:', scaleType);
+                    }
+                } else {
+                    // 新一轮练习，可以重新选择音阶类型
+                    if (scaleType === 'random') {
+                        const types = Object.keys(scaleTypes);
+                        scaleType = types[Math.floor(Math.random() * types.length)];
+                        console.log('新一轮练习 - 随机选择音阶类型:', scaleType);
+                    }
+                    window.cagedState.currentScaleType = scaleType;
                 }
+                
+                // 标记不再是新一轮
+                window.cagedState.isNewRound = false;
                 
                 // 更新目标音程显示
                 const targetIntervalEl = document.getElementById('targetInterval');
                 targetIntervalEl.textContent = `${key} ${getScaleDisplayName(scaleTypes[scaleType].name)}`;
                 
-                // 生成连接练习的音阶序列（使用选择的音阶类型，连续两遍）
+                // 生成连接练习的音阶序列（使用选择的音阶类型，单遍即可）
                 const scaleIntervals = [...scaleTypes[scaleType].intervals];
-                state.currentIntervals = [...scaleIntervals, ...scaleIntervals];
+                state.currentIntervals = [...scaleIntervals];
                 state.cagedMode = true;
                 state.cagedShape = window.cagedState.currentShape;
                 state.cagedKey = window.cagedState.currentKey;
@@ -6773,9 +7423,20 @@
                 
                 // 使用Scale Settings中的根音设置
                 let key = rootNoteEl.value;
-                if (key === 'random') {
-                    const notes = Object.keys(noteToSemitones).filter(n => n.length <= 2);
-                    key = notes[Math.floor(Math.random() * notes.length)];
+                
+                // 如果是手动切换或在同一轮练习中，保持当前根音和音阶类型
+                if (window.cagedState.isManualSwitch || !window.cagedState.isNewRound) {
+                    // 保持当前根音和音阶类型
+                    key = window.cagedState.currentRootNote || key;
+                    console.log('保持当前根音:', key);
+                } else {
+                    // 新一轮练习，可以重新选择根音
+                    if (key === 'random') {
+                        const notes = Object.keys(noteToSemitones).filter(n => n.length <= 2);
+                        key = notes[Math.floor(Math.random() * notes.length)];
+                    }
+                    window.cagedState.currentRootNote = key;
+                    console.log('新一轮练习 - 选择根音:', key);
                 }
                 
                 // 更新CAGED状态中的调性（保持同步）
@@ -6786,10 +7447,25 @@
                 
                 // 使用Scale Settings中的音阶类型
                 let scaleType = scaleTypeEl.value;
-                if (scaleType === 'random') {
-                    const types = Object.keys(scaleTypes);
-                    scaleType = types[Math.floor(Math.random() * types.length)];
+                
+                // 如果是手动切换或在同一轮练习中，保持当前音阶类型
+                if (window.cagedState.isManualSwitch || !window.cagedState.isNewRound) {
+                    if (window.cagedState.currentScaleType) {
+                        scaleType = window.cagedState.currentScaleType;
+                        console.log('保持当前音阶类型:', scaleType);
+                    }
+                } else {
+                    // 新一轮练习，可以重新选择音阶类型
+                    if (scaleType === 'random') {
+                        const types = Object.keys(scaleTypes);
+                        scaleType = types[Math.floor(Math.random() * types.length)];
+                        console.log('新一轮练习 - 随机选择音阶类型:', scaleType);
+                    }
+                    window.cagedState.currentScaleType = scaleType;
                 }
+                
+                // 标记不再是新一轮
+                window.cagedState.isNewRound = false;
                 
                 // 更新目标音程显示
                 const targetIntervalEl = document.getElementById('targetInterval');
@@ -6893,9 +7569,14 @@
                     if (selectedShapes.includes(shape)) {
                         if (shape === currentShape) {
                             btn.classList.add('current');
+                            btn.title = `当前形状: ${shape}`;
                         } else {
                             btn.classList.add('completed');
+                            btn.title = `点击切换到 ${shape} 形状`;
                         }
+                    } else {
+                        btn.classList.add('disabled');
+                        btn.title = `${shape} 形状未选中`;
                     }
                 });
             }
@@ -6906,6 +7587,22 @@
                 const originalSelectedShapes = [...window.cagedState.selectedShapes];
                 const currentShape = window.cagedState.currentShape;
                 const currentIndex = originalSelectedShapes.indexOf(currentShape);
+                
+                // 将当前形状标记为已完成
+                if (!window.cagedState.completedShapesInCurrentRound.includes(currentShape)) {
+                    window.cagedState.completedShapesInCurrentRound.push(currentShape);
+                }
+                
+                console.log('已完成形状:', window.cagedState.completedShapesInCurrentRound);
+                console.log('总共需要完成:', originalSelectedShapes);
+                
+                // 检查是否完成了当前轮次的所有形状
+                if (window.cagedState.completedShapesInCurrentRound.length >= originalSelectedShapes.length) {
+                    // 完成一轮，开始新一轮
+                    window.cagedState.completedShapesInCurrentRound = [];
+                    window.cagedState.isNewRound = true;
+                    console.log('完成一轮CAGED形状，开始新一轮练习');
+                }
                 
                 // 循环切换到下一个形状
                 let nextIndex;
@@ -6921,10 +7618,8 @@
                     updateCagedShapeButtons();
                 showOnlySelectedShapes();
                     
-                    // 生成新形状的练习
-                    setTimeout(() => {
+                    // 立即生成新形状的练习（延迟已在handleCagedCorrect中处理）
                         generateCagedExercise();
-                    }, 1000); // 1秒延迟，让用户看到形状切换
             }
 
             // 完成所有CAGED形状
@@ -6974,14 +7669,32 @@
                 const energy = rms(inputData);
                 if (energy < 0.002) return;
                 
-                const noteInfo = frequencyToNoteName(yinResult.frequency);
-                const detectedNote = noteInfo.name; // 提取音符名
+                const detectedNote = frequencyToNoteName(yinResult.frequency);
                 
                 console.log(`CAGED音频处理: 检测到音符=${detectedNote}, 频率=${yinResult.frequency.toFixed(2)}Hz, 能量=${energy.toFixed(4)}`);
+                
+                // 检查检测到的音符是否有效
+                if (!detectedNote) {
+                    console.error('CAGED音频处理: frequencyToNoteName返回了undefined或空值');
+                    return;
+                }
                 
                 // 获取当前应该弹奏的音级
                 const currentInterval = state.currentSequence[state.currentStep];
                     const rootNote = window.cagedState.currentKey;
+                    
+                console.log(`CAGED状态检查: currentStep=${state.currentStep}, currentSequence长度=${state.currentSequence.length}, currentInterval=${currentInterval}, rootNote=${rootNote}`);
+                
+                // 检查状态是否有效
+                if (!currentInterval) {
+                    console.error('CAGED音频处理: 当前音级为undefined');
+                    return;
+                }
+                
+                if (!rootNote) {
+                    console.error('CAGED音频处理: 根音为undefined');
+                    return;
+                }
                     
                 // 检查是否匹配当前音级（使用与普通音阶练习相同的逻辑）
                 if (checkCagedCurrentInterval(detectedNote, rootNote, currentInterval)) {
@@ -6991,9 +7704,36 @@
 
             // 检查CAGED当前音级匹配（使用与普通音阶练习相同的逻辑）
             function checkCagedCurrentInterval(detectedNote, rootNote, currentInterval) {
+                // 检查输入参数的有效性
+                if (!detectedNote) {
+                    console.error(`CAGED检查: 检测音符为空或undefined`);
+                    return false;
+                }
+                
+                if (!rootNote) {
+                    console.error(`CAGED检查: 根音为空或undefined`);
+                    return false;
+                }
+                
+                if (!currentInterval) {
+                    console.error(`CAGED检查: 当前音级为空或undefined`);
+                    return false;
+                }
+                
                 // 检查音级是否在映射中存在
                 if (!intervalToSemitones.hasOwnProperty(currentInterval)) {
                     console.error(`未知的音级: ${currentInterval}`);
+                    return false;
+                }
+                
+                // 检查音符是否在映射中存在
+                if (!noteToSemitones.hasOwnProperty(detectedNote)) {
+                    console.error(`未知的检测音符: ${detectedNote}`);
+                    return false;
+                }
+                
+                if (!noteToSemitones.hasOwnProperty(rootNote)) {
+                    console.error(`未知的根音: ${rootNote}`);
                     return false;
                 }
                 
@@ -7089,19 +7829,28 @@
                 // 检查是否完成当前形状的所有音阶
                 if (state.currentStep >= state.currentIntervals.length) {
                         state.isAnswered = true;
+                    
+                    // 根据全局设置决定延迟时间
+                    let delayTime = 0; // 默认无延迟
+                    if (state.enableFixedDelay) {
+                        delayTime = state.fixedDelayDuration;
+                    }
+                    
+                    console.log(`CAGED形状切换延迟: ${delayTime}ms (全局设置: ${state.enableFixedDelay ? '启用' : '禁用'})`);
+                    
                     // 当前形状练习完成，切换到下一个形状
                     setTimeout(() => {
                         switchToNextCagedShape();
-                    }, 1000);
+                    }, delayTime);
                 } else {
                         // 设置下一个序列项为当前项
                         const next = document.querySelector(`.sequence-item[data-index="${state.currentStep}"]`);
                         if (next) next.classList.add('current');
                         
-                        // 继续当前形状的练习，重置答题状态
+                        // 继续当前形状的练习，重置答题状态（音级间使用较短延迟）
                     setTimeout(() => {
                             state.isAnswered = false;
-                        }, 500);
+                        }, 300); // 音级间延迟减少到300ms
                 }
                 });
             }
@@ -7153,6 +7902,9 @@
 
             // 生成音阶练习
             function generateScaleExercise() {
+                // 重置CAGED模式状态（确保不使用CAGED音频处理）
+                state.cagedMode = false;
+                
                 // 隐藏CAGED形状显示区域（因为这是普通音阶练习）
                 const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
                 if (cagedShapeDisplay) {
@@ -7365,6 +8117,9 @@
 
             // 生成找音练习
             function generatePitchFindingExercise() {
+                // 重置CAGED模式状态（确保不使用CAGED音频处理）
+                state.cagedMode = false;
+                
                 // 隐藏CAGED形状显示区域（因为这是找音练习）
                 const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
                 if (cagedShapeDisplay) {
@@ -7571,6 +8326,9 @@
             // 生成和弦练习
             function generateChordExercise() {
                 try {
+                    // 重置CAGED模式状态（确保不使用CAGED音频处理）
+                    state.cagedMode = false;
+                    
                     // 隐藏CAGED形状显示区域（因为这是和弦练习）
                     const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
                     if (cagedShapeDisplay) {
@@ -8232,6 +8990,9 @@
                 
                 // 音程练习相关函数
                 function generateIntervalExercise() {
+                    // 重置CAGED模式状态（确保不使用CAGED音频处理）
+                    state.cagedMode = false;
+                    
                     // 隐藏CAGED形状显示区域（因为这是音程练习）
                     const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
                     if (cagedShapeDisplay) {
@@ -8253,6 +9014,9 @@
                     
                     if (selectedIntervals.length === 0) {
                         alert('请至少选择一个音程进行练习！');
+                        // 重置CAGED模式状态（退出练习时立即重置）
+                        state.cagedMode = false;
+                        console.log('音程练习退出 - 重置 state.cagedMode = false');
                         // 停止录音并返回主页面
                         stopRecording();
                         practiceScreen.style.display = 'none';
@@ -8569,6 +9333,16 @@
                             intervalDisplay.remove();
                         }
                     });
+                    
+                    // 清除CAGED相关元素（重要：防止在非CAGED练习中显示）
+                    const fretboardContainer = document.getElementById('fretboardContainer');
+                    if (fretboardContainer) {
+                        const cagedElements = fretboardContainer.querySelectorAll('.caged-shape-highlight, .caged-fingering');
+                        if (cagedElements.length > 0) {
+                            cagedElements.forEach(el => el.remove());
+                            console.log('音程练习 - 清除CAGED元素:', cagedElements.length, '个');
+                        }
+                    }
                 }
                 
 
@@ -8579,6 +9353,10 @@
                 // 修改练习屏幕点击事件，确保退出时重置冷却期
                 practiceScreen.addEventListener('click', function () {
                     updateStatusIndicator('正在停止录音...', 'ready');
+
+                    // 重置CAGED模式状态（退出练习时立即重置）
+                    state.cagedMode = false;
+                    console.log('退出练习页面 - 重置 state.cagedMode = false');
 
                     // 重置和弦转换练习的会话状态
                     state.isInProgressionSession = false;
@@ -8740,28 +9518,71 @@
                     });
                 });
 
-                // CAGED显示选项
+                // CAGED显示选项按钮
                 const cagedShowFretboard = document.getElementById('cagedShowFretboard');
                 const cagedShowFingering = document.getElementById('cagedShowFingering');
                 const cagedShowScale = document.getElementById('cagedShowScale');
                 
                 if (cagedShowFretboard) {
-                    cagedShowFretboard.addEventListener('change', function() {
-                        window.cagedState.showFretboard = this.checked;
+                    cagedShowFretboard.addEventListener('click', function() {
+                        console.log('CAGED显示指板按钮被点击，当前状态:', this.classList.contains('active'));
+                        this.classList.toggle('active');
+                        window.cagedState.showFretboard = this.classList.contains('active');
+                        console.log('切换后状态:', this.classList.contains('active'), 'cagedState.showFretboard:', window.cagedState.showFretboard);
                     });
                 }
                 
                 if (cagedShowFingering) {
-                    cagedShowFingering.addEventListener('change', function() {
-                        window.cagedState.showFingering = this.checked;
+                    cagedShowFingering.addEventListener('click', function() {
+                        console.log('CAGED显示指法按钮被点击，当前状态:', this.classList.contains('active'));
+                        this.classList.toggle('active');
+                        window.cagedState.showFingering = this.classList.contains('active');
+                        console.log('切换后状态:', this.classList.contains('active'), 'cagedState.showFingering:', window.cagedState.showFingering);
                     });
                 }
                 
                 if (cagedShowScale) {
-                    cagedShowScale.addEventListener('change', function() {
-                        window.cagedState.showScale = this.checked;
+                    cagedShowScale.addEventListener('click', function() {
+                        console.log('CAGED显示音阶按钮被点击，当前状态:', this.classList.contains('active'));
+                        this.classList.toggle('active');
+                        window.cagedState.showScale = this.classList.contains('active');
+                        console.log('切换后状态:', this.classList.contains('active'), 'cagedState.showScale:', window.cagedState.showScale);
                     });
                 }
+                
+                // 练习界面中的CAGED形状按钮点击事件（手动切换形状）
+                const practiceShapeButtons = document.querySelectorAll('.caged-shape-btn-display');
+                practiceShapeButtons.forEach(btn => {
+                    btn.addEventListener('click', function(event) {
+                        // 阻止事件冒泡，防止触发练习屏幕的退出事件
+                        event.stopPropagation();
+                        event.preventDefault();
+                        
+                        const targetShape = this.dataset.shape;
+                        
+                        // 检查是否是选中的形状且不是当前形状
+                        if (window.cagedState.selectedShapes.includes(targetShape) && 
+                            targetShape !== window.cagedState.currentShape) {
+                            
+                            console.log(`手动切换CAGED形状: ${window.cagedState.currentShape} → ${targetShape}`);
+                            
+                            // 标记为手动切换，保持当前音阶类型
+                            window.cagedState.isManualSwitch = true;
+                            
+                            // 更新当前形状
+                            window.cagedState.currentShape = targetShape;
+                            
+                            // 更新按钮状态
+                            updateCagedShapeButtons();
+                            
+                            // 重新生成当前形状的练习
+                            generateCagedExercise();
+                            
+                            // 重置手动切换标记
+                            window.cagedState.isManualSwitch = false;
+                        }
+                    });
+                });
             }
 
             // 初始化应用
@@ -8779,6 +9600,28 @@
                 initEventListeners();
                 initCagedEventListeners();
                 initKeyboardShortcuts();
+                
+                // 初始化自定义下拉列表
+                if (typeof window.initCustomDropdown === 'function') {
+                    window.initCustomDropdown();
+                } else {
+                    console.error('initCustomDropdown函数未定义');
+                }
+                
+                // 初始化乐曲下拉列表
+                if (typeof window.initJazzStandardDropdown === 'function') {
+                    window.initJazzStandardDropdown();
+                } else {
+                    console.error('initJazzStandardDropdown函数未定义');
+                }
+                
+                // 初始化调性下拉列表
+                if (typeof window.initProgressionKeyDropdown === 'function') {
+                    window.initProgressionKeyDropdown();
+                } else {
+                    console.error('initProgressionKeyDropdown函数未定义');
+                }
+                
                 requestRecordPermission();
             }
 
@@ -9267,6 +10110,9 @@
 
             // 生成和弦转换练习
             function generateProgressionExercise() {
+                // 重置CAGED模式状态（确保不使用CAGED音频处理）
+                state.cagedMode = false;
+                
                 // 隐藏CAGED形状显示区域（因为这是和弦转换练习）
                 const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
                 if (cagedShapeDisplay) {
@@ -9374,6 +10220,9 @@
                     if (isRepeatEnabled) {
                         state.progressionIndex = 0; // 重新开始
                     } else {
+                        // 重置CAGED模式状态（退出练习时立即重置）
+                        state.cagedMode = false;
+                        console.log('和弦进行练习完成退出 - 重置 state.cagedMode = false');
                         // 直接退出练习界面，不弹出提示窗口
                         stopRecording();
                         stopMetronome();
@@ -9886,6 +10735,7 @@
             // 更新调性选择器，设置歌曲的原调为默认选项
             function updateKeySelector(songName) {
                 const progressionKeyEl = document.getElementById('progressionKey');
+                const customDropdown = document.getElementById('progressionKeyDropdown');
                 
                 // 获取歌曲数据
                 let songData = null;
@@ -9900,7 +10750,7 @@
                 
                 const originalKey = songData.key;
                 
-                // 重新生成选项列表
+                // 重新生成原生select选项列表
                 const allKeys = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
                 
                 progressionKeyEl.innerHTML = '';
@@ -9918,6 +10768,62 @@
                     
                     progressionKeyEl.appendChild(option);
                 });
+                
+                // 更新自定义下拉框的显示
+                if (customDropdown) {
+                    const trigger = customDropdown.querySelector('.dropdown-trigger .dropdown-text');
+                    if (trigger) {
+                        trigger.textContent = `${originalKey} 默认`;
+                    }
+                    
+                    // 重新生成自定义下拉框的选项
+                    const menu = customDropdown.querySelector('.dropdown-menu');
+                    if (menu) {
+                        menu.innerHTML = '';
+                        
+                        allKeys.forEach(key => {
+                            const keyLi = document.createElement('li');
+                            keyLi.className = 'dropdown-item';
+                            keyLi.setAttribute('data-value', key);
+                            
+                            const itemText = document.createElement('span');
+                            itemText.className = 'item-text';
+                            if (key === originalKey) {
+                                itemText.textContent = `${key} 默认`;
+                            } else {
+                                itemText.textContent = key;
+                            }
+                            keyLi.appendChild(itemText);
+                            
+                            menu.appendChild(keyLi);
+                        });
+                        
+                        // 重新绑定事件监听器
+                        const items = menu.querySelectorAll('.dropdown-item');
+                        items.forEach(item => {
+                            item.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                const value = this.dataset.value;
+                                const text = this.querySelector('.item-text').textContent;
+                                
+                                // 更新显示文本
+                                trigger.textContent = text;
+                                
+                                // 更新原生select的值
+                                progressionKeyEl.value = value;
+                                
+                                // 触发change事件
+                                const changeEvent = new Event('change', { bubbles: true });
+                                progressionKeyEl.dispatchEvent(changeEvent);
+                                
+                                // 关闭下拉菜单
+                                menu.classList.remove('show');
+                                customDropdown.querySelector('.dropdown-trigger').classList.remove('active');
+                                customDropdown.querySelector('.dropdown-arrow').textContent = '▼';
+                            });
+                        });
+                    }
+                }
             }
             
             // 大调音阶的音级对应关系
