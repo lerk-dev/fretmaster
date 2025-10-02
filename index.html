@@ -33,9 +33,10 @@
                     'nav_chord': '和弦练习',
                     'nav_progression': '和弦进行',
                     'nav_pitch_finding': '音程练习',
+                    'settings_pitch_finding': '音程练习设置',
                     'nav_settings': '设置',
-                    'settings_scale': '音阶设置',
-                    'settings_chord': '和弦设置',
+                    'settings_scale': '音阶练习选项',
+                    'settings_chord': '和弦练习选项',
                     'settings_device': '设备设置',
                     'settings_general': '通用设置',
                     'general_language': '语言设置',
@@ -152,10 +153,12 @@
                     'device_count_none': '未检测到音频输入设备',
                     'default_device': '默认设备',
                     'audio_device': '音频设备',
+                    'key_c_default': 'C 默认',
                     
                     // CAGED练习设置
                     'caged_practice': 'CAGED练习',
                     'caged_practice_hint': '基于CAGED系统的音阶和和弦练习',
+                    'caged_practice_mode': 'CAGED练习模式',
                     'caged_shape': 'CAGED形状',
                     'caged_shape_hint': '选择要练习的CAGED形状',
                     'caged_key': '调性',
@@ -338,6 +341,10 @@
                     // 通用设置其他标签
                     'settings_management': '设置管理',
                     'reset_settings_hint': '点击重置按钮将恢复所有设置为默认值',
+                    'chord_name_display': '和弦名显示',
+                    'chord_name_display_hint': '选择和弦名称的显示方式',
+                    'chord_name_english': '英文名',
+                    'chord_name_symbols': '符号名',
                     
                     // 遗漏的翻译键
                     'sound_metronome': '声音节拍',
@@ -374,9 +381,10 @@
                     'nav_chord': 'Chord Practice',
                     'nav_progression': 'Changes',
                     'nav_pitch_finding': 'Note&Interval',
+                    'settings_pitch_finding': 'Note&Interval Settings',
                     'nav_settings': 'Settings',
-                    'settings_scale': 'Scale Settings',
-                    'settings_chord': 'Chord Settings',
+                    'settings_scale': 'Scale Practice Options',
+                    'settings_chord': 'Chord Practice Options',
                     'settings_device': 'Device Settings',
                     'settings_general': 'General Settings',
                     'general_language': 'Language Settings',
@@ -648,6 +656,10 @@
                     // 通用设置其他标签
                     'settings_management': 'Settings Management',
                     'reset_settings_hint': 'Click reset button to restore all settings to default values',
+                    'chord_name_display': 'Chord Name Display',
+                    'chord_name_display_hint': 'Select chord name display format',
+                    'chord_name_english': 'English',
+                    'chord_name_symbols': 'Symbols',
                     
                     // 遗漏的翻译键
                     'sound_metronome': 'Sound Metronome',
@@ -670,10 +682,12 @@
                     'device_count_none': 'No Audio Input Devices Detected',
                     'default_device': 'Default Device',
                     'audio_device': 'Audio Device',
+                    'key_c_default': 'C Default',
                     
                     // CAGED Practice Settings
                     'caged_practice': 'CAGED Practice',
                     'caged_practice_hint': 'Scale and chord practice based on CAGED system',
+                    'caged_practice_mode': 'CAGED Practice Mode',
                     'caged_shape': 'CAGED Shape',
                     'caged_shape_hint': 'Select CAGED shape to practice',
                     'caged_key': 'Key',
@@ -999,8 +1013,13 @@
             // 将MIDI设备连接函数暴露到全局作用域
             window.connectMIDIDevices = connectMIDIDevices;
             window.disconnectMIDIDevices = disconnectMIDIDevices;
-
-            // 初始化乐曲下拉框功能
+            function positionDropdown(menu, trigger) {
+                const rect = trigger.getBoundingClientRect();
+                menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+                menu.style.left = (rect.left + window.scrollX) + 'px';
+                menu.style.minWidth = rect.width + 'px';
+            }
+                        // 初始化乐曲下拉框功能
             window.initJazzStandardDropdown = function() {
                 console.log('初始化乐曲下拉列表...');
                 const dropdown = document.getElementById('jazzStandardDropdown');
@@ -1175,6 +1194,7 @@
                 });
 
                 function openJazzDropdown() {
+                    positionDropdown(menu, trigger);
                     menu.classList.add('show');
                     trigger.classList.add('active');
                     dropdown.querySelector('.dropdown-arrow').textContent = '▲';
@@ -1202,7 +1222,7 @@
                 }
 
                 // 显示歌曲信息弹窗
-                function showSongInfo(songName) {
+                window.showSongInfo = function(songName) {
                     console.log('=== showSongInfo 函数被调用 ===');
                     console.log('歌曲名称:', songName);
                     
@@ -1240,7 +1260,7 @@
                         display: flex;
                         justify-content: center;
                         align-items: center;
-                        z-index: 10000;
+                        z-index: 10001;
                     `;
                     
                     const content = document.createElement('div');
@@ -1318,15 +1338,28 @@
                     // 选择曲目按钮事件
                     content.querySelector('.select-song-btn').addEventListener('click', function() {
                         // 更新下拉框显示
-                        dropdown.querySelector('.dropdown-text').textContent = songName;
-                        nativeSelect.value = songName;
+                        const jazzStandardDropdown = document.getElementById('jazzStandardDropdown');
+                        const jazzStandardSelect = document.getElementById('jazzStandard');
                         
-                        // 触发change事件
-                        const changeEvent = new Event('change', { bubbles: true });
-                        nativeSelect.dispatchEvent(changeEvent);
+                        if (jazzStandardDropdown) {
+                            jazzStandardDropdown.querySelector('.dropdown-text').textContent = songName;
+                        }
+                        
+                        if (jazzStandardSelect) {
+                            jazzStandardSelect.value = songName;
+                            // 触发change事件
+                            const changeEvent = new Event('change', { bubbles: true });
+                            jazzStandardSelect.dispatchEvent(changeEvent);
+                        }
                         
                         // 关闭弹窗
                         document.body.removeChild(modal);
+                        
+                        // 如果是在全屏选择器中打开的，也关闭全屏选择器
+                        const fullscreenSelector = document.getElementById('fullscreenSelector');
+                        if (fullscreenSelector && fullscreenSelector.style.display !== 'none') {
+                            fullscreenSelector.style.display = 'none';
+                        }
                         
                         console.log('从信息弹窗选择了乐曲:', songName);
                     });
@@ -1342,7 +1375,9 @@
                 // 测试函数 - 可以在控制台调用
                 window.testShowSongInfo = function(songName) {
                     console.log('测试显示歌曲信息:', songName || 'All Of Me');
-                    showSongInfo(songName || 'All Of Me');
+                    if (typeof window.showSongInfo === 'function') {
+                        window.showSongInfo(songName || 'All Of Me');
+                    }
                 };
             };
             
@@ -1436,6 +1471,7 @@
                 });
                 
                 function openKeyDropdown() {
+                    positionDropdown(menu, trigger);
                     console.log('打开调性下拉菜单');
                     menu.classList.add('show');
                     trigger.classList.add('active');
@@ -1651,6 +1687,7 @@
                 });
 
                 function openDropdown() {
+                    positionDropdown(menu, trigger);
                     console.log('打开下拉菜单');
                     menu.classList.add('show');
                     trigger.classList.add('active');
@@ -2163,51 +2200,11 @@
 
 
 
-
-
-
-        .order-btn.active {
-            background-color: rgba(58, 159, 196, 0.2);
-            color: #3a9fc4;
-            border-color: #3a9fc4;
-        }
-
-        .btn {
-            padding: 18px 32px;
-            border: none;
-            border-radius: 16px;
-            background: linear-gradient(to right, #4fc3f7, #29b6f6);
-            color: #fff;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            flex: 1;
-            max-width: 280px;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-        }
-
-        .btn:disabled {
-            background: linear-gradient(to right, #555, #666);
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 20px;
-        }
+        /* .btn 和 .controls 样式已在 styles/main.css 中定义 */
 
         @media (min-width: 768px) {
             .chord-type-container {
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(6, 1fr);
             }
 
             .settings-row {
@@ -2221,6 +2218,18 @@
             }
         }
 
+        @media (min-width: 1024px) {
+            .chord-type-container {
+                grid-template-columns: repeat(8, 1fr);
+            }
+        }
+
+        @media (min-width: 1440px) {
+            .chord-type-container {
+                grid-template-columns: repeat(10, 1fr);
+            }
+        }
+
         @media (max-width: 480px) {
             .container {
                 padding: 16px;
@@ -2230,10 +2239,7 @@
                 font-size: 24px;
             }
 
-            .btn {
-                padding: 16px 24px;
-                font-size: 16px;
-            }
+            /* .btn 响应式样式已在 styles/main.css 中定义 */
 
             .settings-section-title {
                 font-size: 16px;
@@ -2336,28 +2342,37 @@
         .sequence-items {
             display: flex;
             justify-content: center;
+            align-items: flex-start;
             flex-wrap: wrap;
-            gap: 6px;
-            padding: 10px 0;
+            gap: 8px;
+            padding: 10px;
             margin: 15px auto;
             width: 100%;
+            max-width: 100%;
         }
 
         .sequence-item {
             display: flex;
             align-items: center;
             justify-content: center;
+            text-align: center;
             font-size: 18px;
             font-weight: 700;
             color: #ff8a00;
             transition: all 0.3s ease;
-            padding: 8px;
+            padding: 8px 10px;
             border-radius: 6px;
             background: rgba(51, 65, 85, 0.9);
             min-width: 36px;
-            height: 36px;
+            max-width: 150px;
+            min-height: 36px;
+            height: auto;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-            flex: 0 1 auto;
+            flex: 0 0 auto;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+            line-height: 1.2;
         }
 
         .sequence-item.played {
@@ -2634,7 +2649,8 @@
             .sequence-item {
                 font-size: 25px;
                 min-width: 30px;
-                height: 34px;
+                min-height: 34px;
+                height: auto;
                 padding: 6px;
                 margin: 14px; /* 增加元素间margin */
             }
@@ -2863,10 +2879,294 @@
         .midi-slider-container:hover .midi-slider::before {
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
+
+        /* 全屏选择器样式 */
+        .fullscreen-selector {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2a 0%, #2c2c3c 100%);
+            z-index: 10000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fullscreen-selector-header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .fullscreen-selector-back {
+            background: rgba(58, 159, 196, 0.2);
+            border: 1px solid rgba(58, 159, 196, 0.4);
+            color: #3a9fc4;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .fullscreen-selector-back:hover {
+            background: rgba(58, 159, 196, 0.3);
+            border-color: #3a9fc4;
+            transform: translateX(-2px);
+        }
+
+        .fullscreen-selector-back:active {
+            transform: translateX(-4px);
+        }
+
+        .fullscreen-selector-title {
+            margin: 0;
+            font-size: 24px;
+            color: #3a9fc4;
+            font-weight: 600;
+        }
+
+        .fullscreen-selector-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        /* 选择项网格布局 */
+        .selector-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* 选择项卡片 */
+        .selector-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .selector-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(58, 159, 196, 0) 0%, rgba(58, 159, 196, 0.05) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .selector-item:hover {
+            border-color: #3a9fc4;
+            background: rgba(58, 159, 196, 0.1);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(58, 159, 196, 0.2);
+        }
+
+        .selector-item:hover::before {
+            opacity: 1;
+        }
+
+        .selector-item.active {
+            background: rgba(58, 159, 196, 0.2);
+            border-color: #3a9fc4;
+            box-shadow: 0 0 20px rgba(58, 159, 196, 0.4);
+        }
+
+        .selector-item-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .selector-item-desc {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            line-height: 1.3;
+        }
+
+        /* 分组标题 */
+        .selector-group-title {
+            grid-column: 1 / -1;
+            font-size: 14px;
+            color: #3a9fc4;
+            font-weight: 600;
+            margin: 12px 0 8px 0;
+            padding: 8px 12px;
+            background: rgba(58, 159, 196, 0.1);
+            border-left: 3px solid #3a9fc4;
+            border-radius: 6px;
+        }
+
+        .selector-group-title:first-child {
+            margin-top: 0;
+        }
+        
+        /* 分组容器 */
+        .selector-group {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        /* 搜索框样式 */
+        .selector-search-box {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto 20px auto;
+        }
+
+        .selector-search-input {
+            width: 100%;
+            padding: 12px 45px 12px 15px;
+            font-size: 16px;
+            border: 2px solid rgba(58, 159, 196, 0.3);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .selector-search-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .selector-search-input:focus {
+            border-color: #3a9fc4;
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 15px rgba(58, 159, 196, 0.3);
+        }
+
+        .selector-search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* 列表布局（用于乐曲选择） */
+        .selector-list {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .selector-list-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .selector-list-item:hover {
+            border-color: #3a9fc4;
+            background: rgba(58, 159, 196, 0.1);
+            transform: translateX(5px);
+        }
+
+        .selector-list-item.active {
+            background: rgba(58, 159, 196, 0.2);
+            border-color: #3a9fc4;
+        }
+
+        .selector-list-item-name {
+            font-size: 16px;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .selector-list-item-badge {
+            background: rgba(58, 159, 196, 0.3);
+            color: #3a9fc4;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .selector-list-item-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .selector-info-icon {
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+            transition: all 0.3s ease;
+            opacity: 0.7;
+        }
+
+        .selector-info-icon:hover {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .selector-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .fullscreen-selector-title {
+                font-size: 20px;
+            }
+
+            .fullscreen-selector-back {
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 
 <body>
+    <!-- 全屏弹出选择页面 -->
+    <div class="fullscreen-selector" id="fullscreenSelector" style="display: none;">
+        <div class="fullscreen-selector-header">
+            <button class="fullscreen-selector-back" id="fullscreenSelectorBack">
+                <span>←</span>
+                <span data-i18n-key="btn_back">返回</span>
+            </button>
+            <h2 class="fullscreen-selector-title" id="fullscreenSelectorTitle">选择</h2>
+        </div>
+        <div class="fullscreen-selector-content" id="fullscreenSelectorContent">
+            <!-- 内容将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
     <!-- 其他HTML内容保持不变... -->
     <div class="status-indicator status-ready" id="statusIndicator" data-i18n-key="status_ready">准备就绪</div>
 
@@ -3489,7 +3789,7 @@
                             <!-- 自定义调性下拉列表 -->
                             <div class="custom-dropdown" id="progressionKeyDropdown">
                                 <div class="dropdown-trigger">
-                                    <span class="dropdown-text">C 默认</span>
+                                    <span class="dropdown-text" data-i18n-key="key_c_default">C 默认</span>
                                     <span class="dropdown-arrow">▼</span>
                         </div>
                                 <ul class="dropdown-menu">
@@ -3524,7 +3824,7 @@
                 <!-- 找音练习设置 -->
                 <div class="settings-section pitch-finding-settings" style="display: none;">
                     <div class="settings-section-title">
-                        <i>🎯</i> <span data-i18n-key="nav_pitch_finding">音程练习设置</span>
+                        <i>🎯</i> <span data-i18n-key="settings_pitch_finding">音程练习设置</span>
                     </div>
 
                     <!-- 练习模式选择 -->
@@ -3847,6 +4147,20 @@
                         </div>
                     </div>
                     
+                    <!-- 和弦名显示设置 -->
+                    <div class="settings-section-title" style="margin-top: 20px;">
+                        <i>🎵</i> <span data-i18n-key="chord_name_display">和弦名显示</span>
+                    </div>
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span data-i18n-key="chord_name_display_hint">选择和弦名称的显示方式</span>
+                        </div>
+                        <div class="order-btn-container">
+                            <div class="order-btn chord-name-display-btn active" data-value="english" data-i18n-key="chord_name_english">英文名</div>
+                            <div class="order-btn chord-name-display-btn" data-value="symbols" data-i18n-key="chord_name_symbols">符号名</div>
+                        </div>
+                    </div>
+                    
                     <!-- 设置管理 -->
                     <div class="settings-section-title" style="margin-top: 20px;">
                         <i>😎</i> <span data-i18n-key="settings_management">设置管理</span>
@@ -3870,14 +4184,12 @@
 
                     <!-- CAGED练习模式选择 -->
                     <div class="settings-row">
-                        <div class="settings-label">
-                            <span data-i18n-key="caged_practice">CAGED练习</span>
-                        </div>
+
                         <div class="caged-toggle-container">
                             <label class="caged-slider-container">
                                 <input type="checkbox" id="cagedModeToggle" class="caged-slider-input">
                                 <span class="caged-slider"></span>
-                                <span class="caged-slider-text">CAGED练习</span>
+                                <span class="caged-slider-text" data-i18n-key="caged_practice_mode">CAGED练习模式</span>
                             </label>
                         </div>
                     </div>
@@ -3928,7 +4240,7 @@
                 <!-- 音阶设置 - 只在音阶练习标签页显示 -->
                 <div class="settings-section scale-settings" style="display: none;">
                     <div class="settings-section-title">
-                        <i>🎵</i> <span data-i18n-key="settings_scale">音阶设置</span>
+                        <i>🎵</i> <span data-i18n-key="settings_scale">音阶练习选项</span>
                     </div>
 
                     <div class="settings-row">
@@ -4512,15 +4824,15 @@
     <!-- 底部导航栏 -->
     <div class="bottom-nav">
         <div class="nav-item active" data-tab="scale">
-            <div class="nav-icon">🎵</div>
+            <div class="nav-icon">🎼</div>
             <div class="nav-label" data-i18n-key="nav_scale">音阶练习</div>
         </div>
         <div class="nav-item" data-tab="chord">
-            <div class="nav-icon">🎶</div>
+            <div class="nav-icon">🎹</div>
             <div class="nav-label" data-i18n-key="nav_chord">和弦练习</div>
         </div>
         <div class="nav-item" data-tab="progression">
-            <div class="nav-icon">🔄</div>
+            <div class="nav-icon">🎵</div>
             <div class="nav-label" data-i18n-key="nav_progression">和弦转换</div>
         </div>
         <div class="nav-item" data-tab="pitch-finding">
@@ -5245,7 +5557,9 @@
                 metronomeSoundEnabled: document.getElementById('metronomeSoundToggle').checked,
                 metronomeInterval: null,
                 // 和弦转换练习状态
-                isInProgressionSession: false // 是否在练习会话中
+                isInProgressionSession: false, // 是否在练习会话中
+                // 和弦名显示模式
+                chordNameDisplayMode: 'english' // 'english' 或 'symbols'
             };
 
             // 初始化练习设置
@@ -5310,6 +5624,9 @@
                     selectedDeviceId: selectedDeviceId,
                     inputGain: inputGain,
                     
+                    // 显示设置
+                    chordNameDisplayMode: state.chordNameDisplayMode,
+                    
                     // 版本信息（用于兼容性检查）
                     version: '1.0'
                 };
@@ -5343,6 +5660,7 @@
                         if (settings.metronomeSoundEnabled !== undefined) state.metronomeSoundEnabled = settings.metronomeSoundEnabled;
                         if (settings.selectedDeviceId !== undefined) selectedDeviceId = settings.selectedDeviceId;
                         if (settings.inputGain !== undefined) inputGain = settings.inputGain;
+                        if (settings.chordNameDisplayMode !== undefined) state.chordNameDisplayMode = settings.chordNameDisplayMode;
                         
                         // 更新界面元素
                         updateUIFromSettings();
@@ -5436,6 +5754,18 @@
                     inputGainEl.value = inputGain * 100;
                     inputGainValueEl.textContent = Math.round(inputGain * 100) + '%';
                 }
+                
+                // 更新和弦名显示按钮
+                const chordNameDisplayBtns = document.querySelectorAll('.chord-name-display-btn');
+                chordNameDisplayBtns.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.value === state.chordNameDisplayMode) {
+                        btn.classList.add('active');
+                    }
+                });
+                
+                // 更新和弦类型按钮的显示文本
+                updateChordTypeButtonTexts();
             }
             
             function resetSettings() {
@@ -5458,6 +5788,7 @@
                         state.metronomeSoundEnabled = true;
                         selectedDeviceId = 'default';
                         inputGain = 1.0;
+                        state.chordNameDisplayMode = 'english';
                         
                         updateUIFromSettings();
                         
@@ -8895,6 +9226,32 @@
                     });
                 });
 
+                // 和弦名显示模式按钮点击事件
+                const chordNameDisplayBtns = document.querySelectorAll('.chord-name-display-btn');
+                chordNameDisplayBtns.forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        chordNameDisplayBtns.forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        
+                        // 更新状态
+                        state.chordNameDisplayMode = this.dataset.value;
+                        
+                        // 更新和弦类型按钮的显示文本
+                        updateChordTypeButtonTexts();
+                        
+                        // 重新生成当前练习以应用新的显示模式
+                        const activeTab = document.querySelector('.settings-tab.active').dataset.tab;
+                        if (activeTab === 'chord') {
+                            generateChordExercise();
+                        } else if (activeTab === 'progression') {
+                            generateProgressionExercise();
+                        }
+                        
+                        // 保存设置
+                        saveSettings();
+                    });
+                });
+
                 // 和弦转换顺序按钮点击事件
                 const progressionOrderBtns = document.querySelectorAll('.progression-order-btn');
                 progressionOrderBtns.forEach(btn => {
@@ -10621,9 +10978,95 @@
                 return displayName.trim();
             }
 
+            // 获取和弦类型的显示名称
+            function getChordTypeDisplayName(chordType) {
+                const displayMode = state.chordNameDisplayMode || 'english';
+                
+                // 英文名称映射
+                const englishNames = {
+                    'major': 'Major',
+                    'minor': 'Minor',
+                    'diminished': 'Dim',
+                    'augmented': 'Aug',
+                    'major6': '6',
+                    'minor6': 'm6',
+                    'dominant7': '7',
+                    'major7': 'Maj7',
+                    'minor7': 'm7',
+                    'minor7b5': 'm7♭5',
+                    'diminished7': 'dim7',
+                    'dominant9': '9',
+                    'major9': 'Maj9',
+                    'minor9': 'm9',
+                    'dominant7sharp9': '7♯9',
+                    'dominant7flat9': '7♭9',
+                    'dominant11': '11',
+                    'minor11': 'm11',
+                    'dominant7sharp11': '7♯11',
+                    'dominant13': '13',
+                    'minor13': 'm13',
+                    'sus2': 'sus2',
+                    'sus4': 'sus4',
+                    '7sus2': '7sus2',
+                    '7sus4': '7sus4',
+                    'add9': 'add9',
+                    'madd9': 'madd9',
+                    '6add9': '6add9',
+                    'm6add9': 'm6add9'
+                };
+                
+                // 符号名称映射
+                const symbolNames = {
+                    'major': 'Major',
+                    'minor': '-',
+                    'diminished': '°',
+                    'augmented': '+',
+                    'major6': '6',
+                    'minor6': '-6',
+                    'dominant7': '7',
+                    'major7': '∆7',
+                    'minor7': '-7',
+                    'minor7b5': 'ø7',
+                    'diminished7': '°7',
+                    'dominant9': '9',
+                    'major9': '∆9',
+                    'minor9': '-9',
+                    'dominant7sharp9': '7♯9',
+                    'dominant7flat9': '7♭9',
+                    'dominant11': '11',
+                    'minor11': '-11',
+                    'dominant7sharp11': '7♯11',
+                    'dominant13': '13',
+                    'minor13': '-13',
+                    'sus2': 'sus2',
+                    'sus4': 'sus4',
+                    '7sus2': '7sus2',
+                    '7sus4': '7sus4',
+                    'add9': 'add9',
+                    'madd9': '-add9',
+                    '6add9': '6add9',
+                    'm6add9': '-6add9'
+                };
+                
+                const nameMap = displayMode === 'symbols' ? symbolNames : englishNames;
+                return nameMap[chordType] || chordType;
+            }
+
+            // 更新和弦类型按钮的显示文本
+            function updateChordTypeButtonTexts() {
+                const chordTypeBtns = document.querySelectorAll('.chord-type-btn');
+                chordTypeBtns.forEach(btn => {
+                    const chordType = btn.dataset.value;
+                    btn.textContent = getChordTypeDisplayName(chordType);
+                });
+            }
+
             // 格式化和弦符号
             function formatChordSymbol(rootNote, chordType) {
-                const suffixMap = {
+                const displayMode = state.chordNameDisplayMode || 'english';
+                
+                // 英文名称映射
+                const englishSuffixMap = {
                     // 基础三和弦
                     'major': '',
                     'minor': 'm',
@@ -10670,6 +11113,55 @@
                     'm6add9': 'm6add9'
                 };
                 
+                // 符号名称映射（用∆代替maj等）
+                const symbolSuffixMap = {
+                    // 基础三和弦
+                    'major': '',
+                    'minor': '-',
+                    'diminished': '°',
+                    'augmented': '+',
+                    
+                    // 六和弦
+                    'major6': '6',
+                    'minor6': '-6',
+                    
+                    // 七和弦
+                    'dominant7': '7',
+                    'major7': '∆7',
+                    'minor7': '-7',
+                    'minor7b5': 'ø7',
+                    'diminished7': '°7',
+                    
+                    // 九和弦
+                    'dominant9': '9',
+                    'major9': '∆9',
+                    'minor9': '-9',
+                    'dominant7sharp9': '7♯9',
+                    'dominant7flat9': '7♭9',
+                    
+                    // 十一和弦
+                    'dominant11': '11',
+                    'minor11': '-11',
+                    'dominant7sharp11': '7♯11',
+                    
+                    // 十三和弦
+                    'dominant13': '13',
+                    'minor13': '-13',
+                    
+                    // 挂留和弦
+                    'sus2': 'sus2',
+                    'sus4': 'sus4',
+                    '7sus2': '7sus2',
+                    '7sus4': '7sus4',
+                    
+                    // 加音和弦
+                    'add9': 'add9',
+                    'madd9': '-add9',
+                    '6add9': '6add9',
+                    'm6add9': '-6add9'
+                };
+                
+                const suffixMap = displayMode === 'symbols' ? symbolSuffixMap : englishSuffixMap;
                 return `${rootNote}${suffixMap[chordType] || ''}`;
             }
 
@@ -10956,6 +11448,11 @@
                 
                 // 初始化语言切换按钮
                 initLanguageButtons();
+                
+                // 初始化和弦类型按钮文本
+                setTimeout(() => {
+                    updateChordTypeButtonTexts();
+                }, 100);
             }
             
             // 等待DOM加载完成后再初始化应用
@@ -10970,6 +11467,832 @@
                 });
             }
         });
+    </script>
+    
+    <script>
+        // 全屏选择器功能
+        (function() {
+            const fullscreenSelector = document.getElementById('fullscreenSelector');
+            const fullscreenSelectorBack = document.getElementById('fullscreenSelectorBack');
+            const fullscreenSelectorTitle = document.getElementById('fullscreenSelectorTitle');
+            const fullscreenSelectorContent = document.getElementById('fullscreenSelectorContent');
+            
+            let currentSelectorType = null;
+            let currentCallback = null;
+            
+            // 打开全屏选择器
+            window.openFullscreenSelector = function(type, title, callback, selectId) {
+                currentSelectorType = type;
+                currentCallback = callback;
+                fullscreenSelectorTitle.textContent = title;
+                
+                // 根据类型生成不同的内容
+                if (type === 'progressionLevel') {
+                    generateProgressionLevelContent();
+                } else if (type === 'jazzStandard') {
+                    generateJazzStandardContent();
+                } else if (type === 'progressionKey') {
+                    generateProgressionKeyContent();
+                } else if (type === 'rootNote') {
+                    generateRootNoteContent(selectId || 'rootNote');
+                } else if (type === 'scaleType') {
+                    generateScaleTypeContent();
+                } else if (type === 'chordRootNote') {
+                    generateRootNoteContent(selectId || 'chordRootNote');
+                } else if (type === 'customChordRoot') {
+                    generateRootNoteContent('customChordRoot');
+                } else if (type === 'customChordType') {
+                    generateChordTypeContent();
+                } else if (type === 'pitchFindingTime') {
+                    generatePitchFindingTimeContent();
+                } else if (type === 'rootNoteSelect') {
+                    generateRootNoteSelectContent();
+                }
+                
+                fullscreenSelector.style.display = 'flex';
+            };
+            
+            // 关闭全屏选择器
+            function closeFullscreenSelector() {
+                fullscreenSelector.style.display = 'none';
+                currentSelectorType = null;
+                currentCallback = null;
+            }
+            
+            // 返回按钮事件
+            fullscreenSelectorBack.addEventListener('click', closeFullscreenSelector);
+            
+            // 生成练习等级选择内容
+            function generateProgressionLevelContent() {
+                const levelSelect = document.getElementById('progressionLevel');
+                const currentValue = levelSelect.value;
+                
+                const levels = {
+                    '单和弦音': [
+                        { value: 'single-root', text: '1', desc: '根音' },
+                        { value: 'single-3', text: '3', desc: '三音' },
+                        { value: 'single-5', text: '5', desc: '五音' },
+                        { value: 'single-7', text: '7', desc: '七音' }
+                    ],
+                    '双和弦音': [
+                        { value: 'double-root-3', text: '1,3', desc: '根音+三音' },
+                        { value: 'double-root-5', text: '1,5', desc: '根音+五音' },
+                        { value: 'double-root-7', text: '1,7', desc: '根音+七音' },
+                        { value: 'double-3-5', text: '3,5', desc: '三音+五音' },
+                        { value: 'double-3-7', text: '3,7', desc: '三音+七音' }
+                    ],
+                    '三和弦音': [
+                        { value: 'triple-root-3-5', text: '1,3,5', desc: '原位三和弦' },
+                        { value: 'triple-3-5-7', text: '3,5,7', desc: '三、五、七音' },
+                        { value: 'triple-random-inversion', text: '1,3,5 随机', desc: '随机转位' }
+                    ],
+                    '四和弦音': [
+                        { value: 'quad-root-3-5-7', text: '1,3,5,7', desc: '原位七和弦' },
+                        { value: 'quad-3-5-7-root', text: '3,5,7,1', desc: '第一转位' },
+                        { value: 'quad-5-7-root-3', text: '5,7,1,3', desc: '第二转位' },
+                        { value: 'quad-7-root-3-5', text: '7,1,3,5', desc: '第三转位' },
+                        { value: 'quad-random-inversion', text: '1,3,5,7 随机', desc: '随机转位' },
+                        { value: 'quad-root-3-5-7-root', text: '1,3,5,7,1', desc: '含高八度根音' }
+                    ],
+                    '全部和弦音': [
+                        { value: 'all-notes', text: '全部音', desc: '和弦所有音符' }
+                    ]
+                };
+                
+                let html = '<div class="selector-grid">';
+                
+                for (const [groupName, items] of Object.entries(levels)) {
+                    html += `<div class="selector-group-title">● ${groupName}</div>`;
+                    html += '<div class="selector-group">';
+                    items.forEach(item => {
+                        const isActive = item.value === currentValue ? 'active' : '';
+                        html += `
+                            <div class="selector-item ${isActive}" data-value="${item.value}">
+                                <div class="selector-item-title">${item.text}</div>
+                                <div class="selector-item-desc">${item.desc}</div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+                fullscreenSelectorContent.innerHTML = html;
+                
+                // 绑定点击事件
+                const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                items.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.selector-item-title').textContent;
+                        
+                        // 更新原生select
+                        levelSelect.value = value;
+                        
+                        // 更新自定义下拉框显示
+                        const customDropdown = document.getElementById('progressionLevelDropdown');
+                        if (customDropdown) {
+                            const trigger = customDropdown.querySelector('.dropdown-trigger .dropdown-text');
+                            if (trigger) {
+                                trigger.textContent = text;
+                            }
+                            
+                            // 更新active状态
+                            const allItems = customDropdown.querySelectorAll('.dropdown-item');
+                            allItems.forEach(item => item.classList.remove('active'));
+                            const activeItem = customDropdown.querySelector(`.dropdown-item[data-value="${value}"]`);
+                            if (activeItem) {
+                                activeItem.classList.add('active');
+                            }
+                        }
+                        
+                        // 触发change事件
+                        levelSelect.dispatchEvent(new Event('change'));
+                        
+                        if (currentCallback) {
+                            currentCallback(value, text);
+                        }
+                        
+                        closeFullscreenSelector();
+                    });
+                });
+                
+                // 滚动到当前选中的项
+                setTimeout(() => {
+                    const activeItem = fullscreenSelectorContent.querySelector('.selector-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+            
+            // 生成乐曲选择内容
+            function generateJazzStandardContent() {
+                const jazzStandardSelect = document.getElementById('jazzStandard');
+                const currentValue = jazzStandardSelect.value;
+                
+                // 按字母分组的歌曲
+                const groups = {};
+                const options = jazzStandardSelect.querySelectorAll('option');
+                
+                let currentGroup = '';
+                options.forEach(option => {
+                    const parent = option.parentElement;
+                    if (parent.tagName === 'OPTGROUP') {
+                        currentGroup = parent.label;
+                        if (!groups[currentGroup]) {
+                            groups[currentGroup] = [];
+                        }
+                        groups[currentGroup].push({
+                            value: option.value,
+                            text: option.textContent
+                        });
+                    }
+                });
+                
+                // 添加搜索框
+                let html = `
+                    <div class="selector-search-box">
+                        <input type="text" 
+                               id="songSearchInput" 
+                               class="selector-search-input" 
+                               placeholder="搜索歌曲名..." 
+                               autocomplete="off">
+                        <span class="selector-search-icon">🔍</span>
+                    </div>
+                    <div class="selector-list" id="songListContainer">
+                `;
+                
+                for (const [groupName, songs] of Object.entries(groups)) {
+                    html += `<div class="selector-group-title" data-group="${groupName}">● ${groupName}</div>`;
+                    songs.forEach(song => {
+                        const isActive = song.value === currentValue ? 'active' : '';
+                        html += `
+                            <div class="selector-list-item ${isActive}" data-value="${song.value}" data-song-name="${song.text}" data-group="${groupName}">
+                                <div class="selector-list-item-name">${song.text}</div>
+                                <div class="selector-list-item-info">
+                                    <div class="selector-list-item-badge">${groupName}</div>
+                                    <span class="selector-info-icon" data-song-info="${song.value}">ℹ️</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                html += '</div>';
+                fullscreenSelectorContent.innerHTML = html;
+                
+                // 绑定点击事件
+                const items = fullscreenSelectorContent.querySelectorAll('.selector-list-item');
+                items.forEach(item => {
+                    item.addEventListener('click', function(e) {
+                        // 如果点击的是信息图标，不执行选择操作
+                        if (e.target.classList.contains('selector-info-icon')) {
+                            return;
+                        }
+                        
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.selector-list-item-name').textContent;
+                        
+                        // 更新原生select
+                        jazzStandardSelect.value = value;
+                        
+                        // 更新自定义下拉框显示（如果存在）
+                        const customDropdown = document.getElementById('jazzStandardDropdown');
+                        if (customDropdown) {
+                            const trigger = customDropdown.querySelector('.dropdown-trigger .dropdown-text');
+                            if (trigger) {
+                                trigger.textContent = text;
+                            }
+                        }
+                        
+                        // 触发change事件
+                        jazzStandardSelect.dispatchEvent(new Event('change'));
+                        
+                        if (currentCallback) {
+                            currentCallback(value, text);
+                        }
+                        
+                        closeFullscreenSelector();
+                    });
+                });
+                
+                // 绑定信息图标点击事件
+                const infoIcons = fullscreenSelectorContent.querySelectorAll('.selector-info-icon');
+                infoIcons.forEach(icon => {
+                    icon.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const songName = this.dataset.songInfo;
+                        
+                        // 调用显示歌曲信息的函数
+                        if (typeof window.showSongInfo === 'function') {
+                            window.showSongInfo(songName);
+                        }
+                    });
+                });
+                
+                // 搜索功能
+                const searchInput = document.getElementById('songSearchInput');
+                if (searchInput) {
+                    searchInput.focus(); // 自动聚焦搜索框
+                    
+                    searchInput.addEventListener('input', function(e) {
+                        const searchTerm = e.target.value.toLowerCase().trim();
+                        const allItems = fullscreenSelectorContent.querySelectorAll('.selector-list-item');
+                        const allGroupTitles = fullscreenSelectorContent.querySelectorAll('.selector-group-title');
+                        
+                        if (!searchTerm) {
+                            // 清空搜索时显示所有项目
+                            allItems.forEach(item => item.style.display = '');
+                            allGroupTitles.forEach(title => title.style.display = '');
+                        } else {
+                            // 搜索匹配
+                            const visibleGroups = new Set();
+                            
+                            allItems.forEach(item => {
+                                const songName = item.dataset.songName.toLowerCase();
+                                if (songName.includes(searchTerm)) {
+                                    item.style.display = '';
+                                    visibleGroups.add(item.dataset.group);
+                                } else {
+                                    item.style.display = 'none';
+                                }
+                            });
+                            
+                            // 只显示有歌曲的分组标题
+                            allGroupTitles.forEach(title => {
+                                if (visibleGroups.has(title.dataset.group)) {
+                                    title.style.display = '';
+                                } else {
+                                    title.style.display = 'none';
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // 滚动到当前选中的项
+                setTimeout(() => {
+                    const activeItem = fullscreenSelectorContent.querySelector('.selector-list-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+            
+            // 生成调性选择内容
+            function generateProgressionKeyContent() {
+                const keySelect = document.getElementById('progressionKey');
+                const currentValue = keySelect.value;
+                
+                const keys = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
+                
+                // 获取当前选中乐曲的原调
+                const jazzStandardSelect = document.getElementById('jazzStandard');
+                const selectedSong = jazzStandardSelect.value;
+                
+                // 查找原调
+                let originalKey = 'C';
+                if (typeof jazzStandards !== 'undefined') {
+                    for (const letter in jazzStandards) {
+                        if (jazzStandards[letter][selectedSong]) {
+                            originalKey = jazzStandards[letter][selectedSong].key;
+                            break;
+                        }
+                    }
+                }
+                
+                let html = '<div class="selector-grid">';
+                
+                keys.forEach(key => {
+                    const isActive = key === currentValue ? 'active' : '';
+                    const isOriginal = key === originalKey;
+                    const displayText = isOriginal ? `${key} 默认` : key;
+                    const desc = isOriginal ? '歌曲原调' : '移调';
+                    
+                    html += `
+                        <div class="selector-item ${isActive}" data-value="${key}">
+                            <div class="selector-item-title">${displayText}</div>
+                            <div class="selector-item-desc">${desc}</div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                fullscreenSelectorContent.innerHTML = html;
+                
+                // 绑定点击事件
+                const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                items.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.selector-item-title').textContent;
+                        
+                        // 更新原生select
+                        keySelect.value = value;
+                        
+                        // 更新自定义下拉框显示
+                        const customDropdown = document.getElementById('progressionKeyDropdown');
+                        if (customDropdown) {
+                            const trigger = customDropdown.querySelector('.dropdown-trigger .dropdown-text');
+                            if (trigger) {
+                                trigger.textContent = text;
+                            }
+                        }
+                        
+                        // 触发change事件
+                        keySelect.dispatchEvent(new Event('change'));
+                        
+                        if (currentCallback) {
+                            currentCallback(value, text);
+                        }
+                        
+                        closeFullscreenSelector();
+                    });
+                });
+                
+                // 滚动到当前选中的项
+                setTimeout(() => {
+                    const activeItem = fullscreenSelectorContent.querySelector('.selector-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+            
+            // 生成根音选择内容（通用）
+            function generateRootNoteContent(selectId) {
+                const rootNoteSelect = document.getElementById(selectId);
+                const currentValue = rootNoteSelect.value;
+                
+                const notes = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
+                
+                let html = '<div class="selector-grid">';
+                
+                notes.forEach(note => {
+                    const isActive = note === currentValue ? 'active' : '';
+                    html += `
+                        <div class="selector-item ${isActive}" data-value="${note}">
+                            <div class="selector-item-title">${note}</div>
+                            <div class="selector-item-desc">调性</div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                fullscreenSelectorContent.innerHTML = html;
+                
+                // 绑定点击事件
+                const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                items.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const value = this.dataset.value;
+                        rootNoteSelect.value = value;
+                        rootNoteSelect.dispatchEvent(new Event('change'));
+                        
+                        if (currentCallback) {
+                            currentCallback(value, value);
+                        }
+                        
+                        closeFullscreenSelector();
+                    });
+                });
+                
+                // 滚动到当前选中项
+                setTimeout(() => {
+                    const activeItem = fullscreenSelectorContent.querySelector('.selector-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+            
+            // 生成音阶类型选择内容
+            function generateScaleTypeContent() {
+                const scaleTypeSelect = document.getElementById('scaleType');
+                const currentValue = scaleTypeSelect.value;
+                
+                const optgroups = scaleTypeSelect.querySelectorAll('optgroup');
+                const scaleGroups = {};
+                
+                optgroups.forEach(optgroup => {
+                    const groupName = optgroup.label;
+                    scaleGroups[groupName] = [];
+                    const options = optgroup.querySelectorAll('option');
+                    options.forEach(option => {
+                        scaleGroups[groupName].push({
+                            value: option.value,
+                            text: option.textContent
+                        });
+                    });
+                });
+                
+                let html = '<div class="selector-grid">';
+                
+                for (const [groupName, scales] of Object.entries(scaleGroups)) {
+                    html += `<div class="selector-group-title">● ${groupName}</div>`;
+                    html += '<div class="selector-group">';
+                    scales.forEach(scale => {
+                        const isActive = scale.value === currentValue ? 'active' : '';
+                        html += `
+                            <div class="selector-item ${isActive}" data-value="${scale.value}">
+                                <div class="selector-item-title">${scale.text}</div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+                fullscreenSelectorContent.innerHTML = html;
+                
+                // 绑定点击事件
+                const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                items.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.selector-item-title').textContent;
+                        
+                        scaleTypeSelect.value = value;
+                        scaleTypeSelect.dispatchEvent(new Event('change'));
+                        
+                        if (currentCallback) {
+                            currentCallback(value, text);
+                        }
+                        
+                        closeFullscreenSelector();
+                    });
+                });
+                
+                // 滚动到当前选中项
+                setTimeout(() => {
+                    const activeItem = fullscreenSelectorContent.querySelector('.selector-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+            
+            // 生成和弦类型选择内容
+            function generateChordTypeContent() {
+                const chordTypeSelect = document.getElementById('customChordType');
+                const currentValue = chordTypeSelect.value;
+                
+                const chordTypes = {
+                    '基础和弦': [
+                        { value: 'major', text: '大三和弦' },
+                        { value: 'minor', text: '小三和弦' },
+                        { value: 'diminished', text: '减三和弦' },
+                        { value: 'augmented', text: '增三和弦' }
+                    ],
+                    '六和弦': [
+                        { value: 'major6', text: '大六和弦' },
+                        { value: 'minor6', text: '小六和弦' }
+                    ],
+                    '七和弦': [
+                        { value: 'dominant7', text: '属七和弦' },
+                        { value: 'major7', text: '大七和弦' },
+                        { value: 'minor7', text: '小七和弦' },
+                        { value: 'minor7b5', text: '半减七和弦' },
+                        { value: 'diminished7', text: '减七和弦' }
+                    ],
+                    '扩展和弦': [
+                        { value: 'dominant9', text: '属九和弦' },
+                        { value: 'major9', text: '大九和弦' },
+                        { value: 'minor9', text: '小九和弦' },
+                        { value: 'dominant7sharp9', text: '属7♯9和弦' },
+                        { value: 'dominant7flat9', text: '属7♭9和弦' },
+                        { value: 'dominant11', text: '属11和弦' },
+                        { value: 'minor11', text: '小11和弦' },
+                        { value: 'dominant7sharp11', text: '属7♯11和弦' },
+                        { value: 'dominant13', text: '属13和弦' },
+                        { value: 'minor13', text: '小13和弦' }
+                    ],
+                    '挂留和弦': [
+                        { value: 'sus2', text: '挂二和弦' },
+                        { value: 'sus4', text: '挂四和弦' }
+                    ],
+                    '加音和弦': [
+                        { value: 'add9', text: '加九和弦' },
+                        { value: 'madd9', text: '小加九和弦' },
+                        { value: '6add9', text: '六加九和弦' },
+                        { value: 'm6add9', text: '小六加九和弦' }
+                    ]
+                };
+                
+                let html = '<div class="selector-grid">';
+                
+                for (const [groupName, chords] of Object.entries(chordTypes)) {
+                    html += `<div class="selector-group-title">● ${groupName}</div>`;
+                    html += '<div class="selector-group">';
+                    chords.forEach(chord => {
+                        const isActive = chord.value === currentValue ? 'active' : '';
+                        html += `
+                            <div class="selector-item ${isActive}" data-value="${chord.value}">
+                                <div class="selector-item-title">${chord.text}</div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+                fullscreenSelectorContent.innerHTML = html;
+                
+                // 绑定点击事件
+                const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                items.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.selector-item-title').textContent;
+                        
+                        chordTypeSelect.value = value;
+                        chordTypeSelect.dispatchEvent(new Event('change'));
+                        
+                        if (currentCallback) {
+                            currentCallback(value, text);
+                        }
+                        
+                        closeFullscreenSelector();
+                    });
+                });
+                
+                // 滚动到当前选中项
+                setTimeout(() => {
+                    const activeItem = fullscreenSelectorContent.querySelector('.selector-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+            
+            // 生成找音练习时间选择内容
+            function generatePitchFindingTimeContent() {
+                const timeSelect = document.getElementById('pitchFindingTime');
+                const currentValue = timeSelect.value;
+                
+                const times = [
+                    { value: '1', text: '1分钟', desc: '快速练习' },
+                    { value: '2', text: '2分钟', desc: '短时练习' },
+                    { value: '3', text: '3分钟', desc: '常规练习' },
+                    { value: '5', text: '5分钟', desc: '标准练习' },
+                    { value: '10', text: '10分钟', desc: '深度练习' },
+                    { value: '15', text: '15分钟', desc: '强化练习' },
+                    { value: '30', text: '30分钟', desc: '专业练习' }
+                ];
+                
+                let html = '<div class="selector-grid">';
+                
+                times.forEach(time => {
+                    const isActive = time.value === currentValue ? 'active' : '';
+                    html += `
+                        <div class="selector-item ${isActive}" data-value="${time.value}">
+                            <div class="selector-item-title">${time.text}</div>
+                            <div class="selector-item-desc">${time.desc}</div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                fullscreenSelectorContent.innerHTML = html;
+                
+                // 绑定点击事件
+                const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                items.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.selector-item-title').textContent;
+                        
+                        timeSelect.value = value;
+                        timeSelect.dispatchEvent(new Event('change'));
+                        
+                        if (currentCallback) {
+                            currentCallback(value, text);
+                        }
+                        
+                        closeFullscreenSelector();
+                    });
+                });
+                
+                // 滚动到当前选中项
+                setTimeout(() => {
+                    const activeItem = fullscreenSelectorContent.querySelector('.selector-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+            
+            // 生成根音选择内容（音程练习）
+            function generateRootNoteSelectContent() {
+                const rootNoteSelect = document.getElementById('rootNoteSelect');
+                const currentValue = rootNoteSelect.value;
+                
+                const notes = [
+                    { value: 'random', text: '随机', desc: '随机根音' },
+                    { value: 'C', text: 'C', desc: '' },
+                    { value: 'C♯', text: 'C♯', desc: '' },
+                    { value: 'D♭', text: 'D♭', desc: '' },
+                    { value: 'D', text: 'D', desc: '' },
+                    { value: 'D♯', text: 'D♯', desc: '' },
+                    { value: 'E♭', text: 'E♭', desc: '' },
+                    { value: 'E', text: 'E', desc: '' },
+                    { value: 'F', text: 'F', desc: '' },
+                    { value: 'F♯', text: 'F♯', desc: '' },
+                    { value: 'G♭', text: 'G♭', desc: '' },
+                    { value: 'G', text: 'G', desc: '' },
+                    { value: 'G♯', text: 'G♯', desc: '' },
+                    { value: 'A♭', text: 'A♭', desc: '' },
+                    { value: 'A', text: 'A', desc: '' },
+                    { value: 'A♯', text: 'A♯', desc: '' },
+                    { value: 'B♭', text: 'B♭', desc: '' },
+                    { value: 'B', text: 'B', desc: '' }
+                ];
+                
+                let html = '<div class="selector-grid">';
+                
+                notes.forEach(note => {
+                    const isActive = note.value === currentValue ? 'active' : '';
+                    html += `
+                        <div class="selector-item ${isActive}" data-value="${note.value}">
+                            <div class="selector-item-title">${note.text}</div>
+                            ${note.desc ? `<div class="selector-item-desc">${note.desc}</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                fullscreenSelectorContent.innerHTML = html;
+                
+                // 绑定点击事件
+                const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                items.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const value = this.dataset.value;
+                        const text = this.querySelector('.selector-item-title').textContent;
+                        
+                        rootNoteSelect.value = value;
+                        rootNoteSelect.dispatchEvent(new Event('change'));
+                        
+                        if (currentCallback) {
+                            currentCallback(value, text);
+                        }
+                        
+                        closeFullscreenSelector();
+                    });
+                });
+                
+                // 滚动到当前选中项
+                setTimeout(() => {
+                    const activeItem = fullscreenSelectorContent.querySelector('.selector-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+            
+            // 为select添加点击覆盖层的通用函数
+            function addSelectOverlay(selectId, type, title) {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+                
+                const wrapper = select.parentElement;
+                if (!wrapper) return;
+                
+                // 检查是否已经添加过覆盖层
+                if (wrapper.querySelector('.select-overlay')) return;
+                
+                const overlay = document.createElement('div');
+                overlay.className = 'select-overlay';
+                overlay.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    cursor: pointer;
+                    z-index: 1;
+                `;
+                
+                wrapper.style.position = 'relative';
+                wrapper.appendChild(overlay);
+                
+                overlay.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openFullscreenSelector(type, title, null, selectId);
+                });
+            }
+            
+            // 修改现有下拉框的点击事件
+            document.addEventListener('DOMContentLoaded', function() {
+                // 练习等级下拉框
+                const progressionLevelDropdown = document.getElementById('progressionLevelDropdown');
+                if (progressionLevelDropdown) {
+                    const trigger = progressionLevelDropdown.querySelector('.dropdown-trigger');
+                    if (trigger) {
+                        // 移除原有事件，添加新事件
+                        const newTrigger = trigger.cloneNode(true);
+                        trigger.parentNode.replaceChild(newTrigger, trigger);
+                        
+                        newTrigger.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openFullscreenSelector('progressionLevel', '练习等级', null);
+                        });
+                    }
+                }
+                
+                // 乐曲下拉框
+                const jazzStandardDropdown = document.getElementById('jazzStandardDropdown');
+                if (jazzStandardDropdown) {
+                    const trigger = jazzStandardDropdown.querySelector('.dropdown-trigger');
+                    if (trigger) {
+                        // 移除原有事件，添加新事件
+                        const newTrigger = trigger.cloneNode(true);
+                        trigger.parentNode.replaceChild(newTrigger, trigger);
+                        
+                        newTrigger.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openFullscreenSelector('jazzStandard', '选择乐曲', null);
+                        });
+                    }
+                }
+                
+                // 调性下拉框
+                const progressionKeyDropdown = document.getElementById('progressionKeyDropdown');
+                if (progressionKeyDropdown) {
+                    const trigger = progressionKeyDropdown.querySelector('.dropdown-trigger');
+                    if (trigger) {
+                        // 移除原有事件，添加新事件
+                        const newTrigger = trigger.cloneNode(true);
+                        trigger.parentNode.replaceChild(newTrigger, trigger);
+                        
+                        newTrigger.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openFullscreenSelector('progressionKey', '选择调性', null);
+                        });
+                    }
+                }
+                
+                // 音阶设置 - 根音选择
+                addSelectOverlay('rootNote', 'rootNote', '选择调性');
+                
+                // 音阶设置 - 音阶类型选择
+                addSelectOverlay('scaleType', 'scaleType', '选择音阶类型');
+                
+                // 和弦设置 - 和弦根音选择
+                addSelectOverlay('chordRootNote', 'chordRootNote', '选择和弦根音');
+                
+                // 找音练习 - 练习时间
+                addSelectOverlay('pitchFindingTime', 'pitchFindingTime', '选择练习时间');
+                
+                // 找音练习 - 根音设置
+                addSelectOverlay('rootNoteSelect', 'rootNoteSelect', '选择根音');
+            });
+        })();
     </script>
     
     <script>

@@ -460,15 +460,17 @@
 }
 
 /* 自定义下拉列表层级 */
-.custom-dropdown {
-    z-index: 2000 !important;
-    position: relative !important;
-}
-
+.custom-dropdown .dropdown-menu{
+    position: fixed !important;
+    z-index: 999999 !important;
+    top: auto !important;
+    left: auto !important;
+    margin-top: 4px;}
+/* 
 .dropdown-menu {
     z-index: 2000 !important;
     position: absolute !important;
-}
+} */
 
 /* 练习等级下拉框 - 自定义下拉框层级 */
 #progressionLevelDropdown {
@@ -1239,12 +1241,12 @@ input:checked+.slider:before {
     border: 1px solid #555;
     background-color: #2c2c3c;
     color: #aaa;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s;
-    min-width: 0;
+    min-width: 60px;
     white-space: nowrap;
 }
 
@@ -1284,62 +1286,44 @@ input:checked+.slider:before {
     color: #ffffff;
     box-shadow: 0 0 10px rgba(58, 159, 196, 0.3);
 }
-/* 主按钮样式 */
+/* 主按钮样式 - 简洁透明设计 */
 .btn {
     padding: 16px 28px;
-    border: none;
-    border-radius: 20px;
-    background: linear-gradient(135deg, #78dbff 0%, #ff77c6 50%, #7877c6 100%);
-    color: #fff;
+    border: 2px solid rgba(58, 159, 196, 0.5);
+    border-radius: 12px;
+    background: transparent;
+    color: #3a9fc4;
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 
-        0 8px 24px rgba(120, 219, 255, 0.3),
-        0 0 0 1px rgba(255, 255, 255, 0.1);
-    position: relative;
-    overflow: hidden;
+    transition: all 0.3s ease;
     letter-spacing: 0.5px;
     flex: 1;
     max-width: 280px;
-}
-
-.btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
+    backdrop-filter: blur(5px);
 }
 
 .btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 
-        0 12px 32px rgba(120, 219, 255, 0.4),
-        0 0 0 1px rgba(255, 255, 255, 0.2);
-}
-
-.btn:hover::before {
-    left: 100%;
+    background: rgba(58, 159, 196, 0.15);
+    border-color: #3a9fc4;
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(58, 159, 196, 0.3);
 }
 
 .btn:active {
-    transform: translateY(-1px);
-    box-shadow: 
-        0 6px 20px rgba(120, 219, 255, 0.3),
-        0 0 0 1px rgba(255, 255, 255, 0.1);
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(58, 159, 196, 0.2);
 }
 
 .btn:disabled {
-    background: linear-gradient(135deg, #444 0%, #555 50%, #444 100%);
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.3);
     cursor: not-allowed;
     opacity: 0.5;
     transform: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: none;
 }
 
 .controls {
@@ -1428,43 +1412,7 @@ input:checked+.slider:before {
     width: 100%;
 }
 
-.sequence-item {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-weight: 700;
-    color: #ff8a00;
-    transition: all 0.3s ease;
-    padding: 8px;
-    border-radius: 6px;
-    background: rgba(51, 65, 85, 0.9);
-    min-width: 36px;
-    max-width: 80px;
-    height: 36px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    flex: 0 0 auto;
-}
-
-.sequence-item.played {
-    color: #64748b !important;
-    background: rgba(30, 41, 59, 0.6) !important;
-    box-shadow: none !important;
-    border-color: rgba(100, 116, 139, 0.3);
-    transform: scale(0.95);
-}
-
-.sequence-item.current {
-    color: #38bdf8;
-    background: rgba(56, 189, 248, 0.15);
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
-    border-color: rgba(56, 189, 248, 0.3);
-    animation: pulse-glow 2s infinite;
-    transform-origin: center;
-    width: auto !important;
-    flex: 0 0 auto !important;
-    max-width: 80px !important;
-}
+/* .sequence-item 样式已移至 index.html 以支持文字换行和居中 */
 
 .next-exercise {
     display: flex;
@@ -1797,29 +1745,9 @@ input:checked+.slider:before {
     }
 }
 
-/* 响应式设计 */
-@media (min-width: 768px) {
-    .chord-type-container {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    
-    .settings-row {
-        flex-direction: row;
-        align-items: center;
-    }
-    
-    .settings-label {
-        min-width: 100px;
-        margin-bottom: 0;
-    }
-}
+/* 响应式设计 - 已移至 index.html */
 
-/* 手机横屏适配 - 调整sequence-item字体大小 */
-@media (max-height: 480px) and (orientation: landscape) {
-    .sequence-item {
-        font-size: 25px;
-    }
-}
+/* 手机横屏适配 - sequence-item样式已移至 index.html */
 
 /* 手机端优化 */
 @media (max-width: 768px) {
@@ -1879,27 +1807,14 @@ input:checked+.slider:before {
         gap: 4px;
     }
     
-    .chord-type-btn {
-        padding: 6px 2px;
-        font-size: 10px;
-        border-radius: 6px;
-        min-width: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    
+
     .progression-order-btn {
         padding: 8px 12px;
         font-size: 12px;
         border-radius: 12px;
     }
     
-    .sequence-item {
-        font-size: 24px;
-        padding: 8px 12px;
-        border-radius: 12px;
-    }
+    /* .sequence-item 样式已移至 index.html */
     
     .status-indicator {
         font-size: 14px;
