@@ -57,8 +57,16 @@
                     'chord_type_hint': '选择要练习的和弦类型',
                     'chord_order': '顺序',
                     'chord_order_hint': '选择和弦音符的演奏顺序',
-                    'chord_custom': '自定义和弦',
-                    'chord_select_hint': '点击选择要练习的和弦类型（可多选）',
+                    'chord_custom': '自定义和弦进行',
+                    
+                    // 和弦转位设置
+                    'chord_bass_note': '低音音符',
+                    'chord_bass_root': '根音',
+                    'chord_bass_3rd': '三音',
+                    'chord_bass_5th': '五音',
+                    'chord_bass_7th': '七音',
+                    'chord_bass_random': '随机',
+
                     
                     // 顺序按钮
                     'order_ascending': '上行',
@@ -171,6 +179,8 @@
                     'caged_show_fretboard': '显示指板',
                     'caged_show_fingering': '显示指法',
                     'caged_show_scale': '显示音阶',
+                    'caged_chord_practice': 'CAGED和弦练习',
+                    'caged_show_chord': '显示和弦',
                     'caged_c_shape': 'C形状',
                     'caged_a_shape': 'A形状',
                     'caged_g_shape': 'G形状',
@@ -377,8 +387,8 @@
                     'status_ready': 'Ready',
                     'lang_zh': '中文',
                     'lang_en': 'English',
-                    'nav_scale': 'Scale Practice',
-                    'nav_chord': 'Chord Practice',
+                    'nav_scale': 'Scale',
+                    'nav_chord': 'Chord',
                     'nav_progression': 'Changes',
                     'nav_pitch_finding': 'Note&Interval',
                     'settings_pitch_finding': 'Note&Interval Settings',
@@ -406,7 +416,15 @@
                     'chord_order': 'Order',
                     'chord_order_hint': 'Select chord note playing order',
                     'chord_custom': 'Custom Chords',
-                    'chord_select_hint': 'Click to select chord types to practice (multiple selection)',
+                    
+                    // 和弦转位设置
+                    'chord_bass_note': 'Bass Note',
+                    'chord_bass_root': 'Root',
+                    'chord_bass_3rd': '3rd',
+                    'chord_bass_5th': '5th',
+                    'chord_bass_7th': '7th',
+                    'chord_bass_random': 'Random',
+
                     
                     // 顺序按钮
                     'order_ascending': 'Ascending',
@@ -801,9 +819,6 @@
                 selectedShapes: ['C', 'A', 'G', 'E', 'D'], // 默认全部选中
                 currentKey: 'C',
                 practiceMode: 'connection', // 默认为形状连接
-                showFretboard: true,
-                showFingering: true,
-                showScale: true,
                 currentShape: 'C',
                 currentExercise: null,
                 currentScaleType: null, // 当前练习的音阶类型（用于保持一致性）
@@ -812,10 +827,27 @@
                 completedShapesInCurrentRound: [], // 当前轮次中已完成的形状
                 isNewRound: true // 标记是否开始新一轮练习
             };
+
+            // CAGED和弦练习状态
+            let cagedChordState = {
+                enabled: false,
+                practiceType: 'chord', // 固定为和弦练习
+                selectedShapes: ['C', 'A', 'G', 'E', 'D'], // 默认全部选中
+                currentKey: 'C',
+                practiceMode: 'connection', // 默认为形状连接
+                currentShape: 'C',
+                currentExercise: null,
+                currentChordType: null, // 当前练习的和弦类型（用于保持一致性）
+                currentRootNote: null, // 当前练习的根音（用于保持一致性）
+                isManualSwitch: false, // 标记是否为手动切换形状
+                completedShapesInCurrentRound: [], // 当前轮次中已完成的形状
+                isNewRound: true // 标记是否开始新一轮练习
+            };
             
-            // 将cagedState和cagedSystem暴露到全局作用域
+            // 将cagedState、cagedSystem、cagedChordState暴露到全局作用域
             window.cagedState = cagedState;
             window.cagedSystem = cagedSystem;
+            window.cagedChordState = cagedChordState;
 
             // MIDI设备状态
             let midiState = {
@@ -840,7 +872,7 @@
 
                     // 请求MIDI访问权限
                     const midiAccess = await navigator.requestMIDIAccess();
-                    midiState.midiAccess = midiAccess;
+                    window.midiState.midiAccess = midiAccess;
                     
                     // 监听MIDI设备连接/断开
                     midiAccess.onstatechange = handleMIDIStateChange;
@@ -867,10 +899,10 @@
 
             // 更新MIDI设备列表
             function updateMIDIDevices() {
-                if (!midiState.midiAccess) return;
+                if (!window.midiState.midiAccess) return;
                 
                 const devices = [];
-                for (const input of midiState.midiAccess.inputs.values()) {
+                for (const input of window.midiState.midiAccess.inputs.values()) {
                     if (input.state === 'connected') {
                         devices.push({
                             id: input.id,
@@ -881,7 +913,7 @@
                     }
                 }
                 
-                midiState.devices = devices;
+                window.midiState.devices = devices;
                 displayMIDIDevices();
             }
 
@@ -893,13 +925,13 @@
                 
                 if (!deviceInfo || !deviceStatus || !deviceList) return;
                 
-                if (midiState.devices.length > 0) {
-                    deviceStatus.textContent = `检测到 ${midiState.devices.length} 个MIDI设备`;
+                if (window.midiState.devices.length > 0) {
+                    deviceStatus.textContent = `检测到 ${window.midiState.devices.length} 个MIDI设备`;
                     deviceInfo.style.display = 'block';
                     
                     // 显示设备列表
                     deviceList.innerHTML = '';
-                    midiState.devices.forEach(device => {
+                    window.midiState.devices.forEach(device => {
                         const deviceItem = document.createElement('div');
                         deviceItem.className = 'midi-device-item';
                         deviceItem.textContent = `${device.name} (${device.manufacturer})`;
@@ -922,7 +954,7 @@
 
             // 处理MIDI输入
             function handleMIDIInput(event) {
-                if (!midiState.enabled) return;
+                if (!window.midiState.enabled) return;
                 
                 // 只处理音符开事件（Note On）
                 if (event.data[0] === 144 && event.data[2] > 0) {
@@ -953,9 +985,9 @@
                 const note = noteName.replace(/\d+$/, '');
                 
                 // 根据当前练习模式处理音符
-                if (window.cagedState && window.cagedState.enabled && state.cagedMode) {
+                if (window.cagedState && window.cagedState.enabled && window.cagedState.practiceMode) {
                     processCagedMIDINote(note);
-                } else if (state.pitchFindingMode) {
+                } else if (window.state && window.state.pitchFindingMode) {
                     processPitchFindingMIDINote(note);
                 } else {
                     processRegularMIDINote(note);
@@ -974,8 +1006,8 @@
 
             // 找音练习的MIDI处理
             function processPitchFindingMIDINote(note) {
-                const targetNote = state.currentNote;
-                if (isEquivalentNote(note, targetNote)) {
+                const targetNote = window.state ? window.state.currentNote : null;
+                if (targetNote && isEquivalentNote(note, targetNote)) {
                     handlePitchFindingCorrect();
                 }
             }
@@ -988,10 +1020,10 @@
 
             // 连接MIDI设备
             function connectMIDIDevices() {
-                if (!midiState.midiAccess) return;
+                if (!window.midiState.midiAccess) return;
                 
                 // 连接所有输入设备
-                for (const input of midiState.midiAccess.inputs.values()) {
+                for (const input of window.midiState.midiAccess.inputs.values()) {
                     if (input.state === 'connected') {
                         input.onmidimessage = handleMIDIInput;
                         console.log('已连接MIDI设备:', input.name);
@@ -1001,10 +1033,10 @@
 
             // 断开MIDI设备
             function disconnectMIDIDevices() {
-                if (!midiState.midiAccess) return;
+                if (!window.midiState.midiAccess) return;
                 
                 // 断开所有输入设备
-                for (const input of midiState.midiAccess.inputs.values()) {
+                for (const input of window.midiState.midiAccess.inputs.values()) {
                     input.onmidimessage = null;
                     console.log('已断开MIDI设备:', input.name);
                 }
@@ -3195,6 +3227,53 @@
             <!-- 设置内容区域 -->
             <div class="settings-content">
 
+                <!-- CAGED和弦练习设置 - 独立设置面板 -->
+                <div class="settings-section caged-chord-settings-section" style="display: none;">
+                    <div class="settings-section-title">
+                        <i>🎸</i> <span data-i18n-key="caged_chord_practice">CAGED和弦练习</span>
+                    </div>
+
+                    <!-- CAGED和弦练习模式选择 -->
+                    <div class="settings-row">
+                        <div class="caged-toggle-container">
+                            <label class="caged-slider-container">
+                                <input type="checkbox" id="cagedChordModeToggle" class="caged-slider-input">
+                                <span class="caged-slider"></span>
+                                <span class="caged-slider-text" data-i18n-key="caged_chord_practice">CAGED和弦练习</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- CAGED和弦设置选项 -->
+                    <div id="cagedChordSettings" class="caged-settings" style="display: none;">
+                        <!-- CAGED形状选择 -->
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span data-i18n-key="caged_shape">CAGED形状</span>
+                            </div>
+                            <div class="caged-shape-container">
+                                <div class="caged-shape-btn active" data-shape="C" data-i18n-key="caged_c_shape">C形状</div>
+                                <div class="caged-shape-btn active" data-shape="A" data-i18n-key="caged_a_shape">A形状</div>
+                                <div class="caged-shape-btn active" data-shape="G" data-i18n-key="caged_g_shape">G形状</div>
+                                <div class="caged-shape-btn active" data-shape="E" data-i18n-key="caged_e_shape">E形状</div>
+                                <div class="caged-shape-btn active" data-shape="D" data-i18n-key="caged_d_shape">D形状</div>
+                            </div>
+                        </div>
+
+                        <!-- CAGED和弦练习模式 -->
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span data-i18n-key="caged_mode">练习模式</span>
+                            </div>
+                            <div class="order-btn-container">
+                                <div class="order-btn caged-chord-mode-btn" data-mode="single" data-i18n-key="caged_single_shape">单个形状</div>
+                                <div class="order-btn caged-chord-mode-btn active" data-mode="connection" data-i18n-key="caged_shape_connection">形状连接</div>
+                                <div class="order-btn caged-chord-mode-btn" data-mode="random" data-i18n-key="caged_random_shapes">随机形状</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
 
                 <!-- 和弦设置 -->
                 <div class="settings-section chord-settings" style="display: none;">
@@ -3263,8 +3342,22 @@
                             <div class="chord-type-btn" data-value="6add9">6add9</div>
                             <div class="chord-type-btn" data-value="m6add9">m6add9</div>
                         </div>
-                        <div style="font-size: 12px; color: #94a3b8; margin-top: 8px; text-align: center;">
-                            <span data-i18n-key="chord_select_hint">点击选择要练习的和弦类型（可多选）</span>
+
+                    </div>
+
+                    <!-- 低音音符选择 -->
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            <span data-i18n-key="chord_bass_note">低音音符</span>
+                        </div>
+                        <div class="select-wrapper">
+                            <select id="chordBassNote">
+                                <option value="root" data-i18n-key="chord_bass_root">根音</option>
+                                <option value="3rd" data-i18n-key="chord_bass_3rd">三音</option>
+                                <option value="5th" data-i18n-key="chord_bass_5th">五音</option>
+                                <option value="7th" data-i18n-key="chord_bass_7th">七音</option>
+                                <option value="random" data-i18n-key="chord_bass_random">随机</option>
+                            </select>
                         </div>
                     </div>
 
@@ -3279,10 +3372,11 @@
                         </div>
                     </div>
 
+
                     <!-- 自定义和弦进行控件 -->
                     <div class="settings-row">
                         <div class="settings-label">
-                            <span data-i18n-key="chord_custom">自定义和弦</span>:
+                            <span data-i18n-key="chord_custom">自定义和弦进行</span>:
                         </div>
                         <label class="midi-slider-container">
                             <input type="checkbox" id="useCustomChords" class="midi-slider-input">
@@ -3365,6 +3459,7 @@
                                 border-color: #3a9fc4;
                             }
 
+
                             #customChordSequence {
                                 display: flex;
                                 flex-wrap: wrap;
@@ -3443,33 +3538,39 @@
                                 <option value="B" style="background: #2c2c3c; color: #fff;">B</option>
                             </select>
                             <select id="customChordType">
-                                <option value="major" data-i18n-key="chord_major" style="background: #2c2c3c; color: #fff;">大三和弦</option>
-                                <option value="minor" data-i18n-key="chord_minor" style="background: #2c2c3c; color: #fff;">小三和弦</option>
-                                <option value="diminished" data-i18n-key="chord_diminished" style="background: #2c2c3c; color: #fff;">减三和弦</option>
-                                <option value="augmented" data-i18n-key="chord_augmented" style="background: #2c2c3c; color: #fff;">增三和弦</option>
-                                <option value="major6" data-i18n-key="chord_major6" style="background: #2c2c3c; color: #fff;">大六和弦</option>
-                                <option value="minor6" data-i18n-key="chord_minor6" style="background: #2c2c3c; color: #fff;">小六和弦</option>
-                                <option value="dominant7" data-i18n-key="chord_dominant7" style="background: #2c2c3c; color: #fff;">属七和弦</option>
-                                <option value="major7" data-i18n-key="chord_major7" style="background: #2c2c3c; color: #fff;">大七和弦</option>
-                                <option value="minor7" data-i18n-key="chord_minor7" style="background: #2c2c3c; color: #fff;">小七和弦</option>
-                                <option value="minor7b5" data-i18n-key="chord_minor7b5" style="background: #2c2c3c; color: #fff;">半减七和弦</option>
-                                <option value="diminished7" data-i18n-key="chord_diminished7" style="background: #2c2c3c; color: #fff;">减七和弦</option>
-                                <option value="dominant9" data-i18n-key="chord_dominant9" style="background: #2c2c3c; color: #fff;">属九和弦</option>
-                                <option value="major9" data-i18n-key="chord_major9" style="background: #2c2c3c; color: #fff;">大九和弦</option>
-                                <option value="minor9" data-i18n-key="chord_minor9" style="background: #2c2c3c; color: #fff;">小九和弦</option>
-                                <option value="dominant7sharp9" data-i18n-key="chord_dominant7sharp9" style="background: #2c2c3c; color: #fff;">属7♯9和弦</option>
-                                <option value="dominant7flat9" style="background: #2c2c3c; color: #fff;">属7♭9和弦</option>
-                                <option value="dominant11" style="background: #2c2c3c; color: #fff;">属11和弦</option>
-                                <option value="minor11" style="background: #2c2c3c; color: #fff;">小11和弦</option>
-                                <option value="dominant7sharp11" style="background: #2c2c3c; color: #fff;">属7♯11和弦</option>
-                                <option value="dominant13" style="background: #2c2c3c; color: #fff;">属13和弦</option>
-                                <option value="minor13" style="background: #2c2c3c; color: #fff;">小13和弦</option>
-                                <option value="sus2" data-i18n-key="chord_sus2" style="background: #2c2c3c; color: #fff;">挂二和弦</option>
-                                <option value="sus4" data-i18n-key="chord_sus4" style="background: #2c2c3c; color: #fff;">挂四和弦</option>
-                                <option value="add9" data-i18n-key="chord_add9" style="background: #2c2c3c; color: #fff;">加九和弦</option>
-                                <option value="madd9" data-i18n-key="chord_madd9" style="background: #2c2c3c; color: #fff;">小加九和弦</option>
-                                <option value="6add9" data-i18n-key="chord_6add9" style="background: #2c2c3c; color: #fff;">六加九和弦</option>
-                                <option value="m6add9" data-i18n-key="chord_m6add9" style="background: #2c2c3c; color: #fff;">小六加九和弦</option>
+                                <option value="major" data-english="Major" data-symbol="M" style="background: #2c2c3c; color: #fff;">Major</option>
+                                <option value="minor" data-english="Minor" data-symbol="m" style="background: #2c2c3c; color: #fff;">Minor</option>
+                                <option value="diminished" data-english="Diminished" data-symbol="dim" style="background: #2c2c3c; color: #fff;">Diminished</option>
+                                <option value="augmented" data-english="Augmented" data-symbol="aug" style="background: #2c2c3c; color: #fff;">Augmented</option>
+                                <option value="major6" data-english="Major 6" data-symbol="6" style="background: #2c2c3c; color: #fff;">Major 6</option>
+                                <option value="minor6" data-english="Minor 6" data-symbol="m6" style="background: #2c2c3c; color: #fff;">Minor 6</option>
+                                <option value="dominant7" data-english="Dominant 7" data-symbol="7" style="background: #2c2c3c; color: #fff;">Dominant 7</option>
+                                <option value="major7" data-english="Major 7" data-symbol="M7" style="background: #2c2c3c; color: #fff;">Major 7</option>
+                                <option value="minor7" data-english="Minor 7" data-symbol="m7" style="background: #2c2c3c; color: #fff;">Minor 7</option>
+                                <option value="minor7b5" data-english="Minor 7♭5" data-symbol="m7♭5" style="background: #2c2c3c; color: #fff;">Minor 7♭5</option>
+                                <option value="diminished7" data-english="Diminished 7" data-symbol="dim7" style="background: #2c2c3c; color: #fff;">Diminished 7</option>
+                                <option value="dominant9" data-english="Dominant 9" data-symbol="9" style="background: #2c2c3c; color: #fff;">Dominant 9</option>
+                                <option value="major9" data-english="Major 9" data-symbol="M9" style="background: #2c2c3c; color: #fff;">Major 9</option>
+                                <option value="minor9" data-english="Minor 9" data-symbol="m9" style="background: #2c2c3c; color: #fff;">Minor 9</option>
+                                <option value="dominant7sharp9" data-english="Dominant 7♯9" data-symbol="7♯9" style="background: #2c2c3c; color: #fff;">Dominant 7♯9</option>
+                                <option value="dominant7flat9" data-english="Dominant 7♭9" data-symbol="7♭9" style="background: #2c2c3c; color: #fff;">Dominant 7♭9</option>
+                                <option value="dominant11" data-english="Dominant 11" data-symbol="11" style="background: #2c2c3c; color: #fff;">Dominant 11</option>
+                                <option value="minor11" data-english="Minor 11" data-symbol="m11" style="background: #2c2c3c; color: #fff;">Minor 11</option>
+                                <option value="dominant7sharp11" data-english="Dominant 7♯11" data-symbol="7♯11" style="background: #2c2c3c; color: #fff;">Dominant 7♯11</option>
+                                <option value="dominant13" data-english="Dominant 13" data-symbol="13" style="background: #2c2c3c; color: #fff;">Dominant 13</option>
+                                <option value="minor13" data-english="Minor 13" data-symbol="m13" style="background: #2c2c3c; color: #fff;">Minor 13</option>
+                                <option value="sus2" data-english="Sus 2" data-symbol="sus2" style="background: #2c2c3c; color: #fff;">Sus 2</option>
+                                <option value="sus4" data-english="Sus 4" data-symbol="sus4" style="background: #2c2c3c; color: #fff;">Sus 4</option>
+                                <option value="add9" data-english="Add 9" data-symbol="add9" style="background: #2c2c3c; color: #fff;">Add 9</option>
+                                <option value="madd9" data-english="Minor Add 9" data-symbol="madd9" style="background: #2c2c3c; color: #fff;">Minor Add 9</option>
+                                <option value="6add9" data-english="6 Add 9" data-symbol="6add9" style="background: #2c2c3c; color: #fff;">6 Add 9</option>
+                                <option value="m6add9" data-english="Minor 6 Add 9" data-symbol="m6add9" style="background: #2c2c3c; color: #fff;">Minor 6 Add 9</option>
+                            </select>
+                            <select id="customChordBass">
+                                <option value="root" data-i18n-key="chord_bass_root">根音</option>
+                                <option value="3rd" data-i18n-key="chord_bass_3rd">三音</option>
+                                <option value="5th" data-i18n-key="chord_bass_5th">五音</option>
+                                <option value="7th" data-i18n-key="chord_bass_7th">七音</option>
                             </select>
                             <button id="addCustomChord" data-i18n-key="btn_add_chord">添加和弦</button>
                         </div>
@@ -3824,7 +3925,7 @@
                 <!-- 找音练习设置 -->
                 <div class="settings-section pitch-finding-settings" style="display: none;">
                     <div class="settings-section-title">
-                        <i>🎯</i> <span data-i18n-key="settings_pitch_finding">音程练习设置</span>
+                        <i>📏</i> <span data-i18n-key="settings_pitch_finding">音程练习设置</span>
                     </div>
 
                     <!-- 练习模式选择 -->
@@ -4223,17 +4324,6 @@
                             </div>
                         </div>
 
-                        <!-- CAGED显示选项 -->
-                        <div class="settings-row">
-                            <div class="settings-label">
-                                <span data-i18n-key="caged_show_fretboard">显示选项</span>
-                            </div>
-                            <div class="caged-shape-container">
-                                <div class="caged-shape-btn active" id="cagedShowFretboard" data-option="fretboard" data-i18n-key="caged_show_fretboard">显示指板</div>
-                                <div class="caged-shape-btn active" id="cagedShowFingering" data-option="fingering" data-i18n-key="caged_show_fingering">显示指法</div>
-                                <div class="caged-shape-btn active" id="cagedShowScale" data-option="scale" data-i18n-key="caged_show_scale">显示音阶</div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -4797,9 +4887,7 @@
                             <div class="chord-type-btn" data-value="6add9">6add9</div>
                             <div class="chord-type-btn" data-value="m6add9">m6add9</div>
                         </div>
-                        <div style="font-size: 12px; color: #94a3b8; margin-top: 8px; text-align: center;">
-                            <span data-i18n-key="chord_select_hint">点击选择要练习的和弦类型（可多选）</span>
-                        </div>
+
                     </div>
 
                     <div class="settings-row">
@@ -4836,7 +4924,7 @@
             <div class="nav-label" data-i18n-key="nav_progression">和弦转换</div>
         </div>
         <div class="nav-item" data-tab="pitch-finding">
-            <div class="nav-icon">🎯</div>
+            <div class="nav-icon">📏</div>
             <div class="nav-label" data-i18n-key="nav_pitch_finding">音程练习</div>
         </div>
         <div class="nav-item" data-tab="device">
@@ -5010,7 +5098,15 @@
                 '6': 9,
                 '♯6': 10,
                 '♭7': 10,
-                '7': 11
+                '7': 11,
+                // 复合音程映射（9=2, 11=4, 13=6）
+                '♭9': 1,
+                '9': 2,
+                '♯9': 3,
+                '11': 4,
+                '♯11': 6,
+                '♭13': 8,
+                '13': 9
             };
 
             // 音名到半音数的映射（C = 0）
@@ -5104,20 +5200,20 @@
                 'diminished7': { name: '减七和弦', intervals: ['1', '♭3', '♭5', '6'] },
                 
                 // 九和弦
-                'dominant9': { name: '属九和弦', intervals: ['1', '3', '5', '♭7', '2'] },
-                'major9': { name: '大九和弦', intervals: ['1', '3', '5', '7', '2'] },
-                'minor9': { name: '小九和弦', intervals: ['1', '♭3', '5', '♭7', '2'] },
-                'dominant7sharp9': { name: '属7♯9和弦', intervals: ['1', '3', '5', '♭7', '♯2'] },
-                'dominant7flat9': { name: '属7♭9和弦', intervals: ['1', '3', '5', '♭7', '♭2'] },
+                'dominant9': { name: '属九和弦', intervals: ['1', '3', '5', '♭7', '9'] },
+                'major9': { name: '大九和弦', intervals: ['1', '3', '5', '7', '9'] },
+                'minor9': { name: '小九和弦', intervals: ['1', '♭3', '5', '♭7', '9'] },
+                'dominant7sharp9': { name: '属7♯9和弦', intervals: ['1', '3', '5', '♭7', '♯9'] },
+                'dominant7flat9': { name: '属7♭9和弦', intervals: ['1', '3', '5', '♭7', '♭9'] },
                 
                 // 十一和弦
-                'dominant11': { name: '属11和弦', intervals: ['1', '3', '5', '♭7', '2', '4'] },
-                'minor11': { name: '小11和弦', intervals: ['1', '♭3', '5', '♭7', '2', '4'] },
-                'dominant7sharp11': { name: '属7♯11和弦', intervals: ['1', '3', '5', '♭7', '♯4'] },
+                'dominant11': { name: '属11和弦', intervals: ['1', '3', '5', '♭7', '9', '11'] },
+                'minor11': { name: '小11和弦', intervals: ['1', '♭3', '5', '♭7', '9', '11'] },
+                'dominant7sharp11': { name: '属7♯11和弦', intervals: ['1', '3', '5', '♭7', '♯11'] },
                 
                 // 十三和弦
-                'dominant13': { name: '属13和弦', intervals: ['1', '3', '5', '♭7', '2', '6'] },
-                'minor13': { name: '小13和弦', intervals: ['1', '♭3', '5', '♭7', '2', '6'] },
+                'dominant13': { name: '属13和弦', intervals: ['1', '3', '5', '♭7', '9', '13'] },
+                'minor13': { name: '小13和弦', intervals: ['1', '♭3', '5', '♭7', '9', '13'] },
                 
                 // 挂留和弦
                 'sus2': { name: '挂二和弦', intervals: ['1', '2', '5'] },
@@ -7374,14 +7470,22 @@
                         const chords = Array.from(chordItems).map(item => {
                             const root = item.querySelector('.remove-chord').dataset.root;
                             const type = item.querySelector('.remove-chord').dataset.type;
-                            return { root, type };
+                            const bass = item.querySelector('.remove-chord').dataset.bass || 'root';
+                            return { root, type, bass };
                         });
 
                         const currentIndex = state.customChordIndex !== undefined ? state.customChordIndex : 0;
                         const nextIndex = (currentIndex + 1) % chords.length;
                         const nextChord = chords[nextIndex];
 
-                        state.nextExerciseInfo = formatChordSymbol(nextChord.root, nextChord.type);                        state.nextExerciseIntervals = [...chordTypes[nextChord.type].intervals];
+                        // 应用转位设置
+                        let intervals = [...chordTypes[nextChord.type].intervals];
+                        if (nextChord.bass && nextChord.bass !== 'root') {
+                            intervals = applyChordInversion(intervals, nextChord.bass);
+                        }
+                        
+                        state.nextExerciseInfo = getInversionChordName(nextChord.root, nextChord.type, nextChord.bass || 'root');
+                        state.nextExerciseIntervals = intervals;
                     } else {
                         // 常规和弦模式 - 实时获取当前选中的和弦类型
                         let rootNote = chordRootNoteEl.value;
@@ -7406,6 +7510,16 @@
                         const order = activeOrderBtn ? activeOrderBtn.dataset.value : 'ordered';
 
                         let intervals = [...chordTypes[chordType].intervals];
+                        
+                        // 处理转位和弦
+                        const bassNoteSelect = document.getElementById('chordBassNote');
+                        if (bassNoteSelect) {
+                            const bassNote = bassNoteSelect.value;
+                            if (bassNote !== 'root') {
+                                intervals = applyChordInversion(intervals, bassNote);
+                            }
+                        }
+                        
                         if (order === 'reverse') {
                             // 下行模式：倒序排列
                             intervals = intervals.reverse();
@@ -7416,7 +7530,9 @@
                             }
                         }
 
-                        const chordSymbol = formatChordSymbol(rootNote, chordType);
+                        // 获取转位和弦名称
+                        const bassNote = bassNoteSelect ? bassNoteSelect.value : 'root';
+                        const chordSymbol = getInversionChordName(rootNote, chordType, bassNote);
                         state.nextExerciseInfo = chordSymbol;
                         state.nextExerciseIntervals = intervals;
                     }
@@ -7454,8 +7570,12 @@
             // 更新下一个练习显示
             function updateNextExerciseDisplay() {
                 if (state.nextExerciseInfo) {
-                    // 只显示调性和音阶名/和弦名，不显示音级结构
-                        nextExerciseEl.innerHTML = state.nextExerciseInfo;
+                    // 显示调性和音阶名/和弦名以及音级结构
+                    let displayText = state.nextExerciseInfo;
+                    if (state.nextExerciseIntervals && state.nextExerciseIntervals.length > 0) {
+                        displayText += ' ' + state.nextExerciseIntervals.join(' ');
+                    }
+                    nextExerciseEl.innerHTML = displayText;
                 } else {
                     nextExerciseEl.innerHTML = '-';
                 }
@@ -7554,6 +7674,12 @@
                     console.error('CAGED系统数据未正确加载');
                     return;
                 }
+                
+                // 隐藏乐曲名显示
+                const songTitleDisplayEl = document.getElementById('songTitleDisplay');
+                if (songTitleDisplayEl) {
+                    songTitleDisplayEl.style.display = 'none';
+                }
 
                 // 如果不是手动切换且是第一次生成练习，重置轮次状态
                 if (!window.cagedState.isManualSwitch && 
@@ -7651,10 +7777,6 @@
                 // 生成CAGED下一题预览
                 generateCagedNextExercise();
                 
-                // 如果启用指板显示，显示CAGED形状
-                if (window.cagedState.showFretboard) {
-                    displayCagedFretboard();
-                }
             }
 
             // 形状连接练习
@@ -7731,10 +7853,6 @@
                 // 生成CAGED下一题预览
                 generateCagedNextExercise();
                 
-                // 如果启用指板显示，显示两个形状
-                if (window.cagedState.showFretboard) {
-                    displayCagedFretboard();
-                }
             }
 
             // 随机形状练习
@@ -7815,10 +7933,6 @@
                 // 生成CAGED下一题预览
                 generateCagedNextExercise();
                 
-                // 如果启用指板显示，显示CAGED形状
-                if (window.cagedState.showFretboard) {
-                    displayCagedFretboard();
-                }
             }
 
             // 生成CAGED下一题预览
@@ -8186,50 +8300,6 @@
                 });
             }
 
-            // 显示CAGED指板
-            function displayCagedFretboard() {
-                const fretboardContainer = document.getElementById('fretboardContainer');
-                if (!fretboardContainer) return;
-                
-                // 清除之前的CAGED显示
-                const existingCaged = fretboardContainer.querySelectorAll('.caged-shape-highlight, .caged-fingering');
-                existingCaged.forEach(el => el.remove());
-                
-                const shape = window.cagedSystem.shapes[window.cagedState.currentShape];
-                const key = window.cagedState.currentKey;
-                
-                // 计算调性偏移
-                const keyOffsets = { 
-                    'C': 0, 'C♯': 1, 'D': 2, 'D♯': 3, 'E': 4, 'F': 5, 
-                    'F♯': 6, 'G': 7, 'G♯': 8, 'A': 9, 'A♯': 10, 'B': 11 
-                };
-                const keyOffset = keyOffsets[key] || 0;
-                
-                // 显示CAGED形状
-                shape.positions.forEach((pos, index) => {
-                    const adjustedFret = pos.fret + keyOffset;
-                    if (adjustedFret >= 0 && adjustedFret <= 12) {
-                        // 创建形状高亮
-                        const highlight = document.createElement('div');
-                        highlight.className = 'caged-shape-highlight';
-                        highlight.style.left = `${adjustedFret * 40 + 20}px`;
-                        highlight.style.top = `${pos.string * 30 + 10}px`;
-                        highlight.style.width = '20px';
-                        highlight.style.height = '20px';
-                        fretboardContainer.appendChild(highlight);
-                        
-                        // 如果启用指法显示，显示指法数字
-                        if (window.cagedState.showFingering) {
-                            const fingering = document.createElement('div');
-                            fingering.className = 'caged-fingering';
-                            fingering.textContent = pos.finger;
-                            fingering.style.left = `${adjustedFret * 40 + 20}px`;
-                            fingering.style.top = `${pos.string * 30 + 10}px`;
-                            fretboardContainer.appendChild(fingering);
-                        }
-                    }
-                });
-            }
 
             // 生成音阶练习
             function generateScaleExercise() {
@@ -8523,6 +8593,12 @@
                 // 显示下一题按钮
                 document.querySelector('.pitch-finding-next-btn-container').style.display = 'flex';
                 
+                // 隐藏乐曲名显示
+                const songTitleDisplayEl = document.getElementById('songTitleDisplay');
+                if (songTitleDisplayEl) {
+                    songTitleDisplayEl.style.display = 'none';
+                }
+                
                 // 启动计时器
                 startPitchFindingTimer(practiceTime);
                 
@@ -8654,9 +8730,291 @@
                 practiceScreen.click();
             }
 
+            // 生成CAGED和弦练习
+            function generateCagedChordExercise() {
+                try {
+                    if (!window.cagedChordState || !window.cagedChordState.enabled) {
+                        console.error('CAGED和弦练习未启用');
+                        return;
+                    }
+
+                    if (!window.cagedSystem || !window.cagedSystem.shapes) {
+                        console.error('CAGED系统数据未正确加载');
+                        return;
+                    }
+                    
+                    // 隐藏乐曲名显示
+                    const songTitleDisplayEl = document.getElementById('songTitleDisplay');
+                    if (songTitleDisplayEl) {
+                        songTitleDisplayEl.style.display = 'none';
+                    }
+
+                    // 如果不是手动切换且是第一次生成练习，重置轮次状态
+                    if (!window.cagedChordState.isManualSwitch && 
+                        (!window.cagedChordState.currentChordType || !window.cagedChordState.currentRootNote)) {
+                        window.cagedChordState.completedShapesInCurrentRound = [];
+                        window.cagedChordState.isNewRound = true;
+                        console.log('开始新的CAGED和弦练习，重置轮次状态');
+                    }
+
+                    // 根据练习模式生成练习
+                    switch (window.cagedChordState.practiceMode) {
+                        case 'single':
+                            generateSingleCagedChordExercise();
+                            break;
+                        case 'connection':
+                            generateCagedChordConnectionExercise();
+                            break;
+                        case 'random':
+                            generateRandomCagedChordExercise();
+                            break;
+                        default:
+                            generateSingleCagedChordExercise();
+                    }
+                } catch (error) {
+                    console.error('生成CAGED和弦练习失败:', error);
+                    updateStatusIndicator('CAGED和弦练习生成失败: ' + error.message, 'error');
+                }
+            }
+
+            // 单个CAGED形状和弦练习
+            function generateSingleCagedChordExercise() {
+                const selectedShapes = window.cagedChordState.selectedShapes;
+                if (selectedShapes.length === 0) {
+                    console.warn('没有选中任何CAGED形状');
+                    return;
+                }
+
+                // 选择当前形状
+                let currentShapeName = window.cagedChordState.currentShape;
+                if (!selectedShapes.includes(currentShapeName)) {
+                    currentShapeName = selectedShapes[0];
+                    window.cagedChordState.currentShape = currentShapeName;
+                }
+
+                // 获取根音
+                let key = window.cagedChordState.currentKey;
+                if (key === 'random') {
+                    const keys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+                    key = keys[Math.floor(Math.random() * keys.length)];
+                    window.cagedChordState.currentKey = key;
+                }
+
+                // 获取和弦类型
+                const activeChordTypes = document.querySelectorAll('.chord-type-btn.active');
+                let chordType = 'major';
+                if (activeChordTypes.length > 0) {
+                    const selectedChordTypes = Array.from(activeChordTypes).map(btn => btn.dataset.value);
+                    chordType = selectedChordTypes[Math.floor(Math.random() * selectedChordTypes.length)];
+                }
+
+                // 如果是手动切换或在同一轮练习中，保持当前和弦类型
+                if (window.cagedChordState.isManualSwitch || !window.cagedChordState.isNewRound) {
+                    if (window.cagedChordState.currentChordType) {
+                        chordType = window.cagedChordState.currentChordType;
+                        console.log('保持当前和弦类型:', chordType);
+                    }
+                } else {
+                    // 新一轮练习，可以重新选择和弦类型
+                    window.cagedChordState.currentChordType = chordType;
+                }
+                
+                // 标记不再是新一轮
+                window.cagedChordState.isNewRound = false;
+                
+                // 更新目标音程显示
+                const targetIntervalEl = document.getElementById('targetInterval');
+                const chordSymbol = formatChordSymbol(key, chordType);
+                targetIntervalEl.textContent = chordSymbol;
+                
+                // 生成CAGED和弦序列
+                state.currentIntervals = [...chordTypes[chordType].intervals];
+                state.cagedMode = true;
+                state.cagedShape = window.cagedChordState.currentShape;
+                state.cagedKey = window.cagedChordState.currentKey;
+                state.cagedPracticeType = window.cagedChordState.practiceType;
+                state.chordType = chordType;
+                
+                displaySequence();
+                
+                // 生成CAGED下一题预览
+                generateCagedChordNextExercise();
+                
+            }
+
+            // CAGED形状连接和弦练习
+            function generateCagedChordConnectionExercise() {
+                const selectedShapes = window.cagedChordState.selectedShapes;
+                if (selectedShapes.length === 0) {
+                    console.warn('没有选中任何CAGED形状');
+                    return;
+                }
+
+                // 选择下一个形状
+                let currentShapeName = window.cagedChordState.currentShape;
+                const currentIndex = selectedShapes.indexOf(currentShapeName);
+                const nextIndex = (currentIndex + 1) % selectedShapes.length;
+                const nextShapeName = selectedShapes[nextIndex];
+                
+                window.cagedChordState.currentShape = nextShapeName;
+
+                // 获取根音
+                let key = window.cagedChordState.currentKey;
+                if (key === 'random') {
+                    const keys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+                    key = keys[Math.floor(Math.random() * keys.length)];
+                    window.cagedChordState.currentKey = key;
+                }
+
+                // 获取和弦类型
+                const activeChordTypes = document.querySelectorAll('.chord-type-btn.active');
+                let chordType = 'major';
+                if (activeChordTypes.length > 0) {
+                    const selectedChordTypes = Array.from(activeChordTypes).map(btn => btn.dataset.value);
+                    chordType = selectedChordTypes[Math.floor(Math.random() * selectedChordTypes.length)];
+                }
+
+                // 如果是手动切换或在同一轮练习中，保持当前和弦类型
+                if (window.cagedChordState.isManualSwitch || !window.cagedChordState.isNewRound) {
+                    if (window.cagedChordState.currentChordType) {
+                        chordType = window.cagedChordState.currentChordType;
+                        console.log('保持当前和弦类型:', chordType);
+                    }
+                } else {
+                    // 新一轮练习，可以重新选择和弦类型
+                    window.cagedChordState.currentChordType = chordType;
+                }
+                
+                // 标记不再是新一轮
+                window.cagedChordState.isNewRound = false;
+                
+                // 更新目标音程显示
+                const targetIntervalEl = document.getElementById('targetInterval');
+                const chordSymbol = formatChordSymbol(key, chordType);
+                targetIntervalEl.textContent = chordSymbol;
+                
+                // 生成CAGED和弦序列
+                state.currentIntervals = [...chordTypes[chordType].intervals];
+                state.cagedMode = true;
+                state.cagedShape = window.cagedChordState.currentShape;
+                state.cagedKey = window.cagedChordState.currentKey;
+                state.cagedPracticeType = window.cagedChordState.practiceType;
+                state.chordType = chordType;
+                
+                displaySequence();
+                
+                // 生成CAGED下一题预览
+                generateCagedChordNextExercise();
+                
+            }
+
+            // 随机CAGED形状和弦练习
+            function generateRandomCagedChordExercise() {
+                const selectedShapes = window.cagedChordState.selectedShapes;
+                if (selectedShapes.length === 0) {
+                    console.warn('没有选中任何CAGED形状');
+                    return;
+                }
+
+                // 随机选择形状
+                const randomShapeName = selectedShapes[Math.floor(Math.random() * selectedShapes.length)];
+                window.cagedChordState.currentShape = randomShapeName;
+
+                // 获取根音
+                let key = window.cagedChordState.currentKey;
+                if (key === 'random') {
+                    const keys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+                    key = keys[Math.floor(Math.random() * keys.length)];
+                }
+                
+                // 更新CAGED状态中的调性（保持同步）
+                window.cagedChordState.currentKey = key;
+                
+                // 获取和弦类型
+                const activeChordTypes = document.querySelectorAll('.chord-type-btn.active');
+                let chordType = 'major';
+                if (activeChordTypes.length > 0) {
+                    const selectedChordTypes = Array.from(activeChordTypes).map(btn => btn.dataset.value);
+                    chordType = selectedChordTypes[Math.floor(Math.random() * selectedChordTypes.length)];
+                }
+
+                // 如果是手动切换或在同一轮练习中，保持当前和弦类型
+                if (window.cagedChordState.isManualSwitch || !window.cagedChordState.isNewRound) {
+                    if (window.cagedChordState.currentChordType) {
+                        chordType = window.cagedChordState.currentChordType;
+                        console.log('保持当前和弦类型:', chordType);
+                    }
+                } else {
+                    // 新一轮练习，可以重新选择和弦类型
+                    window.cagedChordState.currentChordType = chordType;
+                }
+                
+                // 标记不再是新一轮
+                window.cagedChordState.isNewRound = false;
+                
+                // 更新目标音程显示
+                const targetIntervalEl = document.getElementById('targetInterval');
+                const chordSymbol = formatChordSymbol(key, chordType);
+                targetIntervalEl.textContent = chordSymbol;
+                
+                // 生成CAGED和弦序列
+                state.currentIntervals = [...chordTypes[chordType].intervals];
+                state.cagedMode = true;
+                state.cagedShape = randomShapeName;
+                state.cagedKey = window.cagedChordState.currentKey;
+                state.cagedPracticeType = window.cagedChordState.practiceType;
+                state.chordType = chordType;
+                
+                displaySequence();
+                
+                // 生成CAGED下一题预览
+                generateCagedChordNextExercise();
+                
+            }
+
+            // 生成CAGED和弦下一题预览
+            function generateCagedChordNextExercise() {
+                if (!window.cagedChordState || !window.cagedChordState.enabled) {
+                    return;
+                }
+                
+                const selectedShapes = window.cagedChordState.selectedShapes;
+                const currentShape = window.cagedChordState.currentShape;
+                const currentIndex = selectedShapes.indexOf(currentShape);
+                
+                // 获取下一个形状
+                let nextShapeName;
+                if (window.cagedChordState.practiceMode === 'random') {
+                    // 随机模式：随机选择一个形状
+                    nextShapeName = selectedShapes[Math.floor(Math.random() * selectedShapes.length)];
+                } else {
+                    // 单个形状或连接模式：按顺序循环
+                    const nextIndex = (currentIndex + 1) % selectedShapes.length;
+                    nextShapeName = selectedShapes[nextIndex];
+                }
+                
+                const nextShape = window.cagedSystem.shapes[nextShapeName];
+                const key = window.cagedChordState.currentKey;
+                const chordType = state.chordType || 'major';
+                
+                // 设置下一题信息
+                const chordSymbol = formatChordSymbol(key, chordType);
+                state.nextExerciseInfo = chordSymbol;
+                state.nextExerciseIntervals = [...chordTypes[chordType].intervals];
+                
+                updateNextExerciseDisplay();
+            }
+
+
             // 生成和弦练习
             function generateChordExercise() {
                 try {
+                    // 检查是否启用CAGED和弦练习模式
+                    if (window.cagedChordState && window.cagedChordState.enabled) {
+                        generateCagedChordExercise();
+                        return;
+                    }
+                    
                     // 重置CAGED模式状态（确保不使用CAGED音频处理）
                     state.cagedMode = false;
                     
@@ -8664,6 +9022,12 @@
                     const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
                     if (cagedShapeDisplay) {
                         cagedShapeDisplay.style.display = 'none';
+                    }
+                    
+                    // 隐藏乐曲名显示
+                    const songTitleDisplayEl = document.getElementById('songTitleDisplay');
+                    if (songTitleDisplayEl) {
+                        songTitleDisplayEl.style.display = 'none';
                     }
                     
                     // 清除之前的状态信息，确保从当前选中的和弦类型生成
@@ -8677,7 +9041,8 @@
                         const chords = Array.from(chordItems).map(item => {
                             const root = item.querySelector('.remove-chord').dataset.root;
                             const type = item.querySelector('.remove-chord').dataset.type;
-                            return { root, type };
+                            const bass = item.querySelector('.remove-chord').dataset.bass || 'root';
+                            return { root, type, bass };
                         });
 
                         // 按顺序练习自定义和弦序列
@@ -8686,6 +9051,7 @@
 
                         state.rootNote = chord.root;
                         state.chordType = chord.type;
+                        state.bassNote = chord.bass || 'root';
                         
                         // 检查和弦类型是否存在
                         if (!chordTypes[state.chordType]) {
@@ -8693,6 +9059,20 @@
                         }
                         
                         state.currentIntervals = [...chordTypes[state.chordType].intervals];
+                        
+                        // 处理转位和弦
+                        if (state.bassNote !== 'root') {
+                            state.currentIntervals = applyChordInversion(state.currentIntervals, state.bassNote);
+                        }
+
+                    // 处理转位和弦
+                    const bassNoteSelect = document.getElementById('chordBassNote');
+                    if (bassNoteSelect) {
+                        const bassNote = bassNoteSelect.value;
+                        if (bassNote !== 'root') {
+                            state.currentIntervals = applyChordInversion(state.currentIntervals, bassNote);
+                        }
+                    }
 
                     const activeChordOrderBtn = document.querySelector('.chord-order-btn.active');
                     const order = activeChordOrderBtn ? activeChordOrderBtn.dataset.value : 'ordered';
@@ -8706,7 +9086,9 @@
                         }
                     }
 
-                    const chordSymbol = formatChordSymbol(state.rootNote, state.chordType);
+                    // 获取转位和弦名称
+                    const bassNote = state.bassNote || (bassNoteSelect ? bassNoteSelect.value : 'root');
+                    const chordSymbol = getInversionChordName(state.rootNote, state.chordType, bassNote);
                     // 只显示和弦名称，不显示音级结构
                     targetIntervalEl.textContent = chordSymbol;
                     targetIntervalEl.innerHTML = chordSymbol; // 确保只显示和弦名称
@@ -8754,6 +9136,7 @@
                     return;
                 }
 
+                // 直接使用原始音程进行显示（保持复合音程9、11、13等）
                 state.currentIntervals.forEach((interval, index) => {
                     const span = document.createElement('div');
                     span.className = 'sequence-item';
@@ -9117,6 +9500,10 @@
                         if (pitchFindingSettings) {
                             pitchFindingSettings.style.display = 'none';
                         }
+                        const cagedChordSettingsSection = document.querySelector('.caged-chord-settings-section');
+                        if (cagedChordSettingsSection) {
+                            cagedChordSettingsSection.style.display = 'none';
+                        }
                         const cagedSettingsSection = document.querySelector('.caged-settings-section');
                         if (cagedSettingsSection) {
                             cagedSettingsSection.style.display = 'none';
@@ -9132,6 +9519,10 @@
                             updateArpeggioButtons();
                         } else if (tabName === 'chord') {
                             chordSettings.style.display = 'block';
+                            const cagedChordSettingsSection = document.querySelector('.caged-chord-settings-section');
+                            if (cagedChordSettingsSection) {
+                                cagedChordSettingsSection.style.display = 'block';
+                            }
                             // 更新音阶练习按钮显示，确保移除动态按钮
                             updateArpeggioButtons();
                         } else if (tabName === 'progression') {
@@ -9240,7 +9631,7 @@
                         updateChordTypeButtonTexts();
                         
                         // 重新生成当前练习以应用新的显示模式
-                        const activeTab = document.querySelector('.settings-tab.active').dataset.tab;
+                        const activeTab = document.querySelector('.nav-item.active').dataset.tab;
                         if (activeTab === 'chord') {
                             generateChordExercise();
                         } else if (activeTab === 'progression') {
@@ -9341,8 +9732,11 @@
                 const intervalToSemitones = {
                     '1': 0, '♭2': 1, '2': 2, '♯2': 3, '♭3': 3, '3': 4, '4': 5,
                     '♯4': 6, '♭5': 6, '5': 7, '♯5': 8, '♭6': 8, '6': 9, '♯6': 10,
-                    '♭7': 10, '7': 11, '♭♭7': 10, '♭9': 1, '9': 2, '♯9': 3,
-                    '11': 5, '♯11': 6, '♭13': 8, '13': 9
+                    '♭7': 10, '7': 11, '♭♭7': 10, 
+                    // 复合音程映射（9=2, 11=4, 13=6）
+                    '♭9': 1, '9': 2, '♯9': 3,
+                    '11': 4, '♯11': 6, 
+                    '♭13': 8, '13': 9
                 };
                 
                 // 音程练习相关函数
@@ -9354,6 +9748,12 @@
                     const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
                     if (cagedShapeDisplay) {
                         cagedShapeDisplay.style.display = 'none';
+                    }
+                    
+                    // 隐藏乐曲名显示
+                    const songTitleDisplayEl = document.getElementById('songTitleDisplay');
+                    if (songTitleDisplayEl) {
+                        songTitleDisplayEl.style.display = 'none';
                     }
                     
                     // 清理sequence-item的CSS状态
@@ -9753,6 +10153,12 @@
                             nextBtnContainer.style.display = 'none';
                         }
                         
+                        // 隐藏乐曲名显示
+                        const songTitleDisplayEl = document.getElementById('songTitleDisplay');
+                        if (songTitleDisplayEl) {
+                            songTitleDisplayEl.style.display = 'none';
+                        }
+                        
                         // 恢复练习容器显示
                         const exerciseContainer = document.querySelector('.exercise-container');
                         if (exerciseContainer) {
@@ -9797,6 +10203,56 @@
                 const cagedModeToggle = document.getElementById('cagedModeToggle');
                 const cagedSettings = document.getElementById('cagedSettings');
                 
+                // CAGED和弦练习设置事件监听器
+                const cagedChordModeToggle = document.getElementById('cagedChordModeToggle');
+                const cagedChordSettings = document.getElementById('cagedChordSettings');
+                
+                // CAGED和弦练习模式切换
+                if (cagedChordModeToggle) {
+                    // 初始化滑块状态
+                    cagedChordModeToggle.checked = window.cagedChordState.enabled;
+                    if (cagedChordSettings) {
+                        cagedChordSettings.style.display = window.cagedChordState.enabled ? 'block' : 'none';
+                    }
+                    
+                    cagedChordModeToggle.addEventListener('change', function() {
+                        window.cagedChordState.enabled = this.checked;
+                        if (cagedChordSettings) {
+                            cagedChordSettings.style.display = this.checked ? 'block' : 'none';
+                        }
+                        saveSettings();
+                    });
+                }
+                
+                // CAGED和弦形状选择
+                const cagedChordShapeBtns = document.querySelectorAll('#cagedChordSettings .caged-shape-btn');
+                cagedChordShapeBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        this.classList.toggle('active');
+                        const shape = this.dataset.shape;
+                        if (this.classList.contains('active')) {
+                            if (!window.cagedChordState.selectedShapes.includes(shape)) {
+                                window.cagedChordState.selectedShapes.push(shape);
+                            }
+                        } else {
+                            window.cagedChordState.selectedShapes = window.cagedChordState.selectedShapes.filter(s => s !== shape);
+                        }
+                        saveSettings();
+                    });
+                });
+                
+                // CAGED和弦练习模式选择
+                const cagedChordModeBtns = document.querySelectorAll('.caged-chord-mode-btn');
+                cagedChordModeBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        cagedChordModeBtns.forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        window.cagedChordState.practiceMode = this.dataset.mode;
+                        saveSettings();
+                    });
+                });
+                
+                
                 if (cagedModeToggle) {
                     // 初始化滑块状态
                     cagedModeToggle.checked = window.cagedState.enabled;
@@ -9817,14 +10273,14 @@
                 const midiToggle = document.getElementById('midiToggle');
                 if (midiToggle) {
                     // 初始化滑块状态
-                    midiToggle.checked = midiState.enabled;
+                    midiToggle.checked = window.midiState.enabled;
                     
                     midiToggle.addEventListener('change', async function() {
                         if (this.checked) {
                             // 启用MIDI
                             const success = await initializeMIDI();
                             if (success) {
-                                midiState.enabled = true;
+                                window.midiState.enabled = true;
                                 
                                 // 连接所有MIDI输入设备
                                 connectMIDIDevices();
@@ -9835,7 +10291,7 @@
                             }
                         } else {
                             // 禁用MIDI
-                            midiState.enabled = false;
+                            window.midiState.enabled = false;
                             
                             // 断开所有MIDI输入设备
                             disconnectMIDIDevices();
@@ -9875,37 +10331,6 @@
                     });
                 });
 
-                // CAGED显示选项按钮
-                const cagedShowFretboard = document.getElementById('cagedShowFretboard');
-                const cagedShowFingering = document.getElementById('cagedShowFingering');
-                const cagedShowScale = document.getElementById('cagedShowScale');
-                
-                if (cagedShowFretboard) {
-                    cagedShowFretboard.addEventListener('click', function() {
-                        console.log('CAGED显示指板按钮被点击，当前状态:', this.classList.contains('active'));
-                        this.classList.toggle('active');
-                        window.cagedState.showFretboard = this.classList.contains('active');
-                        console.log('切换后状态:', this.classList.contains('active'), 'cagedState.showFretboard:', window.cagedState.showFretboard);
-                    });
-                }
-                
-                if (cagedShowFingering) {
-                    cagedShowFingering.addEventListener('click', function() {
-                        console.log('CAGED显示指法按钮被点击，当前状态:', this.classList.contains('active'));
-                        this.classList.toggle('active');
-                        window.cagedState.showFingering = this.classList.contains('active');
-                        console.log('切换后状态:', this.classList.contains('active'), 'cagedState.showFingering:', window.cagedState.showFingering);
-                    });
-                }
-                
-                if (cagedShowScale) {
-                    cagedShowScale.addEventListener('click', function() {
-                        console.log('CAGED显示音阶按钮被点击，当前状态:', this.classList.contains('active'));
-                        this.classList.toggle('active');
-                        window.cagedState.showScale = this.classList.contains('active');
-                        console.log('切换后状态:', this.classList.contains('active'), 'cagedState.showScale:', window.cagedState.showScale);
-                    });
-                }
                 
                 // 练习界面中的CAGED形状按钮点击事件（手动切换形状）
                 const practiceShapeButtons = document.querySelectorAll('.caged-shape-btn-display');
@@ -10140,23 +10565,39 @@
             const saveCustomChords = document.getElementById('saveCustomChords');
             const loadCustomChords = document.getElementById('loadCustomChords');
             const sequenceName = document.getElementById('sequenceName');
-
             // 自定义和弦开关控制
             useCustomChords.addEventListener('change', function () {
                 customChordsControls.style.display = this.checked ? 'block' : 'none';
             });
 
+            // 更新自定义和弦类型下拉框显示
+            function updateCustomChordTypeDisplay() {
+                const options = customChordType.querySelectorAll('option');
+                options.forEach(option => {
+                    const englishName = option.dataset.english;
+                    const symbolName = option.dataset.symbol;
+                    
+                    if (state.chordNameDisplayMode === 'english') {
+                        option.textContent = englishName;
+                    } else {
+                        option.textContent = symbolName;
+                    }
+                });
+            }
+
             // 添加自定义和弦
             addCustomChord.addEventListener('click', function () {
                 const root = customChordRoot.value;
                 const type = customChordType.value;
-                const chordName = `${root}${type === 'major' ? '' : type === 'minor' ? 'm' : type === 'dominant7' ? '7' : type === 'major7' ? 'maj7' : type === 'minor7' ? 'm7' : type === 'sus2' ? 'sus2' : 'sus4'}`;
+                const bass = customChordBass.value;
+                const chordName = getChordTypeDisplayName(type);
+                const fullChordName = getInversionChordName(root, type, bass);
 
                 const chordItem = document.createElement('div');
                 chordItem.className = 'chord-item';
                 chordItem.innerHTML = `
-                    <span class="chord-name">${chordName}</span>
-                    <button class="remove-chord" data-root="${root}" data-type="${type}">×</button>
+                    <span class="chord-name">${fullChordName}</span>
+                    <button class="remove-chord" data-root="${root}" data-type="${type}" data-bass="${bass}">×</button>
                 `;
 
                 customChordSequence.appendChild(chordItem);
@@ -10180,7 +10621,8 @@
                 chordElements.forEach(el => {
                     const root = el.querySelector('.remove-chord').dataset.root;
                     const type = el.querySelector('.remove-chord').dataset.type;
-                    chords.push({ root, type });
+                    const bass = el.querySelector('.remove-chord').dataset.bass || 'root';
+                    chords.push({ root, type, bass });
                 });
 
                 const name = sequenceName.value || '未命名序列';
@@ -10433,6 +10875,15 @@
 
                     state.currentIntervals = [...chordTypes[chordType].intervals];
 
+                    // 处理转位和弦
+                    const bassNoteSelect = document.getElementById('chordBassNote');
+                    if (bassNoteSelect) {
+                        const bassNote = bassNoteSelect.value;
+                        if (bassNote !== 'root') {
+                            state.currentIntervals = applyChordInversion(state.currentIntervals, bassNote);
+                        }
+                    }
+
                     const activeChordOrderBtn = document.querySelector('.chord-order-btn.active');
                     const order = activeChordOrderBtn ? activeChordOrderBtn.dataset.value : 'ordered';
                     if (order === 'reverse') {
@@ -10445,7 +10896,9 @@
                         }
                     }
 
-                    const chordSymbol = formatChordSymbol(rootNote, chordType);
+                    // 获取转位和弦名称
+                    const bassNote = bassNoteSelect ? bassNoteSelect.value : 'root';
+                    const chordSymbol = getInversionChordName(rootNote, chordType, bassNote);
                     // 只显示和弦名称，不显示音级结构
                     targetIntervalEl.textContent = chordSymbol;
                     targetIntervalEl.innerHTML = chordSymbol; // 确保只显示和弦名称
@@ -11059,6 +11512,108 @@
                     const chordType = btn.dataset.value;
                     btn.textContent = getChordTypeDisplayName(chordType);
                 });
+                
+                // 更新自定义和弦下拉框显示
+                updateCustomChordTypeDisplay();
+            }
+
+            // 将复合音程转换为单音程（用于显示和识别）
+            function convertCompoundIntervals(intervals) {
+                // 复合音程在八度内应该显示为对应的单音程
+                const compoundToSimple = {
+                    '9': '2',      // 九度 = 二度
+                    '♯9': '♯2',    // 升九度 = 升二度
+                    '♭9': '♭2',    // 降九度 = 降二度
+                    '11': '4',     // 十一度 = 四度
+                    '♯11': '♯4',   // 升十一度 = 升四度
+                    '♭11': '♭4',   // 降十一度 = 降四度
+                    '13': '6',     // 十三度 = 六度
+                    '♯13': '♯6',   // 升十三度 = 升六度
+                    '♭13': '♭6'    // 降十三度 = 降六度
+                };
+                
+                return intervals.map(interval => {
+                    return compoundToSimple[interval] || interval;
+                });
+            }
+
+            // 应用和弦转位
+            function applyChordInversion(intervals, bassNote) {
+                if (bassNote === 'root') {
+                    return intervals;
+                }
+                
+                const intervalMap = {
+                    '3rd': '3',
+                    '5th': '5', 
+                    '7th': '7'
+                };
+                
+                const targetInterval = intervalMap[bassNote];
+                if (!targetInterval) {
+                    return intervals;
+                }
+                
+                // 找到目标音程在数组中的位置
+                const targetIndex = intervals.indexOf(targetInterval);
+                if (targetIndex === -1) {
+                    return intervals;
+                }
+                
+                // 对于转位和弦，我们需要重新排列音程
+                // 第一转位（三音在低音）：3, 5, 7, 1
+                // 第二转位（五音在低音）：5, 7, 1, 3  
+                // 第三转位（七音在低音）：7, 1, 3, 5
+                const newIntervals = [...intervals];
+                const targetIntervalValue = newIntervals.splice(targetIndex, 1)[0];
+                
+                // 根据转位类型重新排列音程
+                if (bassNote === '3rd') {
+                    // 第一转位：3, 5, 7, 1 (如果有的话)
+                    newIntervals.unshift(targetIntervalValue);
+                } else if (bassNote === '5th') {
+                    // 第二转位：5, 7, 1, 3 (如果有的话)
+                    newIntervals.unshift(targetIntervalValue);
+                } else if (bassNote === '7th') {
+                    // 第三转位：7, 1, 3, 5 (如果有的话)
+                    newIntervals.unshift(targetIntervalValue);
+                }
+                
+                return newIntervals;
+            }
+
+            // 获取转位和弦的显示名称
+            function getInversionChordName(rootNote, chordType, bassNote) {
+                if (bassNote === 'root') {
+                    return formatChordSymbol(rootNote, chordType);
+                }
+                
+                // 计算低音音符
+                const intervalMap = {
+                    '3rd': 3,
+                    '5th': 5,
+                    '7th': 7
+                };
+                
+                const semitoneOffset = intervalMap[bassNote];
+                if (!semitoneOffset) {
+                    return formatChordSymbol(rootNote, chordType);
+                }
+                
+                // 计算低音音符
+                const rootSemitones = noteToSemitones[rootNote] || 0;
+                const bassSemitones = (rootSemitones + semitoneOffset) % 12;
+                const bassNoteName = Object.keys(noteToSemitones).find(note => 
+                    noteToSemitones[note] === bassSemitones
+                );
+                
+                if (!bassNoteName) {
+                    return formatChordSymbol(rootNote, chordType);
+                }
+                
+                // 返回斜线和弦格式 (如 C/E)
+                const chordSymbol = formatChordSymbol(rootNote, chordType);
+                return `${chordSymbol}/${bassNoteName}`;
             }
 
             // 格式化和弦符号
@@ -11454,6 +12009,9 @@
                     updateChordTypeButtonTexts();
                 }, 100);
             }
+            
+            // 将state暴露到全局作用域
+            window.state = state;
             
             // 等待DOM加载完成后再初始化应用
             if (document.readyState === 'complete' || document.readyState === 'interactive') {

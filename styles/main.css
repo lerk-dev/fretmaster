@@ -1230,13 +1230,13 @@ input:checked+.slider:before {
 /* 和弦类型按钮样式 */
 .chord-type-container {
     display: grid;
-    grid-template-columns: repeat(4, minmax(min-content, 1fr));
+    grid-template-columns: repeat(8, minmax(min-content, 1fr));
     gap: 8px;
     width: 100%;
 }
 
 .chord-type-btn {
-    padding: 6px 4px;
+    padding: 8px 6px;
     border-radius: 6px;
     border: 1px solid #555;
     background-color: #2c2c3c;
@@ -1262,6 +1262,7 @@ input:checked+.slider:before {
     display: flex;
     gap: 8px;
     width: 100%;
+    flex-wrap: wrap;
 }
 
 .order-btn {
@@ -1763,6 +1764,7 @@ input:checked+.slider:before {
     
     h1 {
         font-size: 28px;
+        margin-top: 20px;
         margin-bottom: 8px;
     }
     
@@ -1803,7 +1805,7 @@ input:checked+.slider:before {
     }
     
     .chord-type-container {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         gap: 4px;
     }
     
@@ -1857,7 +1859,7 @@ input:checked+.slider:before {
     }
     
     .chord-type-container {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 2px;
     }
 }
@@ -1865,7 +1867,7 @@ input:checked+.slider:before {
 /* 极小屏幕优化 (320px以下) */
 @media (max-width: 320px) {
     .chord-type-container {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 1px;
     }
     
@@ -2019,7 +2021,7 @@ input:checked+.slider:before {
 .fretboard-container {
     position: relative;
     width: 100%;
-    max-width: 800px;
+    max-width: 1200px;
     height: 180px;
     background-color: #222;
     border-radius: 8px;
@@ -2348,9 +2350,6 @@ input:checked+.slider:before {
         max-width: 300px;
     }
     
-    .current-note-display {
-        font-size: clamp(36px, 6vw, 48px);
-    }
     
     .fretboard-container {
         height: 150px;
