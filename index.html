@@ -11543,41 +11543,47 @@
                     return intervals;
                 }
                 
-                const intervalMap = {
-                    '3rd': '3',
-                    '5th': '5', 
-                    '7th': '7'
-                };
+                // 找到目标音程（支持变化音程）
+                let targetInterval = null;
+                let targetIndex = -1;
                 
-                const targetInterval = intervalMap[bassNote];
-                if (!targetInterval) {
+                if (bassNote === '3rd') {
+                    // 查找三度音程（可能是3, ♭3, ♯3等）
+                    for (let i = 0; i < intervals.length; i++) {
+                        if (intervals[i].includes('3')) {
+                            targetInterval = intervals[i];
+                            targetIndex = i;
+                            break;
+                        }
+                    }
+                } else if (bassNote === '5th') {
+                    // 查找五度音程（可能是5, ♭5, ♯5等）
+                    for (let i = 0; i < intervals.length; i++) {
+                        if (intervals[i].includes('5')) {
+                            targetInterval = intervals[i];
+                            targetIndex = i;
+                            break;
+                        }
+                    }
+                } else if (bassNote === '7th') {
+                    // 查找七度音程（可能是7, ♭7, ♯7等）
+                    for (let i = 0; i < intervals.length; i++) {
+                        if (intervals[i].includes('7')) {
+                            targetInterval = intervals[i];
+                            targetIndex = i;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!targetInterval || targetIndex === -1) {
                     return intervals;
                 }
                 
-                // 找到目标音程在数组中的位置
-                const targetIndex = intervals.indexOf(targetInterval);
-                if (targetIndex === -1) {
-                    return intervals;
-                }
-                
-                // 对于转位和弦，我们需要重新排列音程
-                // 第一转位（三音在低音）：3, 5, 7, 1
-                // 第二转位（五音在低音）：5, 7, 1, 3  
-                // 第三转位（七音在低音）：7, 1, 3, 5
+                // 创建新的音程数组，将目标音程移到前面
                 const newIntervals = [...intervals];
                 const targetIntervalValue = newIntervals.splice(targetIndex, 1)[0];
-                
-                // 根据转位类型重新排列音程
-                if (bassNote === '3rd') {
-                    // 第一转位：3, 5, 7, 1 (如果有的话)
-                    newIntervals.unshift(targetIntervalValue);
-                } else if (bassNote === '5th') {
-                    // 第二转位：5, 7, 1, 3 (如果有的话)
-                    newIntervals.unshift(targetIntervalValue);
-                } else if (bassNote === '7th') {
-                    // 第三转位：7, 1, 3, 5 (如果有的话)
-                    newIntervals.unshift(targetIntervalValue);
-                }
+                newIntervals.unshift(targetIntervalValue);
                 
                 return newIntervals;
             }
@@ -11588,17 +11594,28 @@
                     return formatChordSymbol(rootNote, chordType);
                 }
                 
-                // 计算低音音符
-                const intervalMap = {
-                    '3rd': 3,
-                    '5th': 5,
-                    '7th': 7
-                };
-                
-                const semitoneOffset = intervalMap[bassNote];
-                if (!semitoneOffset) {
+                // 获取和弦的音程结构
+                const chordIntervals = chordTypes[chordType]?.intervals;
+                if (!chordIntervals) {
                     return formatChordSymbol(rootNote, chordType);
                 }
+                
+                // 找到目标音程
+                let targetInterval = null;
+                if (bassNote === '3rd') {
+                    targetInterval = chordIntervals.find(interval => interval.includes('3'));
+                } else if (bassNote === '5th') {
+                    targetInterval = chordIntervals.find(interval => interval.includes('5'));
+                } else if (bassNote === '7th') {
+                    targetInterval = chordIntervals.find(interval => interval.includes('7'));
+                }
+                
+                if (!targetInterval) {
+                    return formatChordSymbol(rootNote, chordType);
+                }
+                
+                // 计算低音音符的半音偏移
+                const semitoneOffset = intervalToSemitones[targetInterval] || 0;
                 
                 // 计算低音音符
                 const rootSemitones = noteToSemitones[rootNote] || 0;
