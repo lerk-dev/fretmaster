@@ -213,7 +213,6 @@
                     'scale_pentatonic_major': '大调五声音阶',
                     'scale_pentatonic_minor': '小调五声音阶',
                     'scale_blues': '蓝调音阶',
-                    'scale_chromatic': '半音阶',
                     
                     // 和弦转换设置
                     'progression_settings': '转换设置',
@@ -536,7 +535,6 @@
                     'scale_pentatonic_major': 'Major Pentatonic',
                     'scale_pentatonic_minor': 'Minor Pentatonic',
                     'scale_blues': 'Blues Scale',
-                    'scale_chromatic': 'Chromatic Scale',
                     
                     // 和弦转换设置
                     'progression_settings': 'Progression Settings',
@@ -2679,12 +2677,12 @@
             }
             
             .sequence-item {
-                font-size: 25px;
+                font-size: 24px;
                 min-width: 30px;
                 min-height: 34px;
                 height: auto;
                 padding: 6px;
-                margin: 14px; /* 增加元素间margin */
+
             }
             
             .next-exercise {
@@ -4512,7 +4510,6 @@
                         'wholeTone': { name: 'Whole Tone - 1 2 3 ♯4 ♯5 ♯6', intervals: ['1', '2', '3', '♯4', '♯5', '♯6'] },
                         'diminished': { name: 'Diminished (Half-Whole) - 1 ♭2 ♭3 3 ♯4 5 6 ♭7', intervals: ['1', '♭2', '♭3', '3', '♯4', '5', '6', '♭7'] },
                         'diminishedWhole': { name: 'Diminished (Whole-Half) - 1 2 ♭3 ♯4 ♯5 6 7', intervals: ['1', '2', '♭3', '♯4', '♯5', '6', '7'] },
-                        'chromatic': { name: 'Chromatic - 1 ♭2 2 ♭3 3 4 ♯4 5 ♭6 6 ♭7 7', intervals: ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'] },
                         
                         // 异国风格音阶
                         'arabic': { name: 'Arabic - 1 ♭2 3 4 5 ♭6 ♭7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '♭7'] },
@@ -5164,7 +5161,6 @@
                 'wholeTone': { name: 'Whole Tone - 1 2 3 ♯4 ♯5 ♯6', intervals: ['1', '2', '3', '♯4', '♯5', '♯6'] },
                 'diminished': { name: 'Diminished (Half-Whole) - 1 ♭2 ♭3 3 ♯4 5 6 ♭7', intervals: ['1', '♭2', '♭3', '3', '♯4', '5', '6', '♭7'] },
                 'diminishedWhole': { name: 'Diminished (Whole-Half) - 1 2 ♭3 ♯4 ♯5 6 7', intervals: ['1', '2', '♭3', '♯4', '♯5', '6', '7'] },
-                'chromatic': { name: 'Chromatic - 1 ♭2 2 ♭3 3 4 ♯4 5 ♭6 6 ♭7 7', intervals: ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'] },
                 
                 // 异国风格音阶
                 'arabic': { name: 'Arabic - 1 ♭2 3 4 5 ♭6 ♭7', intervals: ['1', '♭2', '3', '4', '5', '♭6', '♭7'] },
@@ -7223,6 +7219,17 @@
                 });
             }
 
+            // 通用函数：重置CAGED模式状态
+            function resetCagedModeState() {
+                state.cagedMode = false;
+                
+                // 隐藏CAGED形状显示区域
+                const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
+                if (cagedShapeDisplay) {
+                    cagedShapeDisplay.style.display = 'none';
+                }
+            }
+
             // 预生成下一个练习
             function generateNextExercise() {
                 const activeTab = document.querySelector('.nav-item.active').dataset.tab;
@@ -7571,11 +7578,11 @@
             function updateNextExerciseDisplay() {
                 if (state.nextExerciseInfo) {
                     // 显示调性和音阶名/和弦名以及音级结构
-                    let displayText = state.nextExerciseInfo;
+                    let displayHTML = state.nextExerciseInfo;
                     if (state.nextExerciseIntervals && state.nextExerciseIntervals.length > 0) {
-                        displayText += ' ' + state.nextExerciseIntervals.join(' ');
+                        displayHTML += '<br><span style="font-size: 14px; color: #94a3b8;">' + state.nextExerciseIntervals.join(' ') + '</span>';
                     }
-                    nextExerciseEl.innerHTML = displayText;
+                    nextExerciseEl.innerHTML = displayHTML;
                 } else {
                     nextExerciseEl.innerHTML = '-';
                 }
@@ -8303,14 +8310,7 @@
 
             // 生成音阶练习
             function generateScaleExercise() {
-                // 重置CAGED模式状态（确保不使用CAGED音频处理）
-                state.cagedMode = false;
-                
-                // 隐藏CAGED形状显示区域（因为这是普通音阶练习）
-                const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
-                if (cagedShapeDisplay) {
-                    cagedShapeDisplay.style.display = 'none';
-                }
+                resetCagedModeState();
                 
                 let rootNote = rootNoteEl.value;
                 if (rootNote === 'random') {
@@ -8518,14 +8518,7 @@
 
             // 生成找音练习
             function generatePitchFindingExercise() {
-                // 重置CAGED模式状态（确保不使用CAGED音频处理）
-                state.cagedMode = false;
-                
-                // 隐藏CAGED形状显示区域（因为这是找音练习）
-                const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
-                if (cagedShapeDisplay) {
-                    cagedShapeDisplay.style.display = 'none';
-                }
+                resetCagedModeState();
                 
                 // 清理sequence-item的CSS状态
                 const sequenceItems = document.querySelectorAll('.sequence-item');
@@ -9015,14 +9008,7 @@
                         return;
                     }
                     
-                    // 重置CAGED模式状态（确保不使用CAGED音频处理）
-                    state.cagedMode = false;
-                    
-                    // 隐藏CAGED形状显示区域（因为这是和弦练习）
-                    const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
-                    if (cagedShapeDisplay) {
-                        cagedShapeDisplay.style.display = 'none';
-                    }
+                    resetCagedModeState();
                     
                     // 隐藏乐曲名显示
                     const songTitleDisplayEl = document.getElementById('songTitleDisplay');
@@ -9741,14 +9727,7 @@
                 
                 // 音程练习相关函数
                 function generateIntervalExercise() {
-                    // 重置CAGED模式状态（确保不使用CAGED音频处理）
-                    state.cagedMode = false;
-                    
-                    // 隐藏CAGED形状显示区域（因为这是音程练习）
-                    const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
-                    if (cagedShapeDisplay) {
-                        cagedShapeDisplay.style.display = 'none';
-                    }
+                    resetCagedModeState();
                     
                     // 隐藏乐曲名显示
                     const songTitleDisplayEl = document.getElementById('songTitleDisplay');
@@ -10920,14 +10899,7 @@
 
             // 生成和弦转换练习
             function generateProgressionExercise() {
-                // 重置CAGED模式状态（确保不使用CAGED音频处理）
-                state.cagedMode = false;
-                
-                // 隐藏CAGED形状显示区域（因为这是和弦转换练习）
-                const cagedShapeDisplay = document.getElementById('cagedShapeDisplay');
-                if (cagedShapeDisplay) {
-                    cagedShapeDisplay.style.display = 'none';
-                }
+                resetCagedModeState();
                 
                 const jazzStandardEl = document.getElementById('jazzStandard');
                 const progressionKeyEl = document.getElementById('progressionKey');

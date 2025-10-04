@@ -1,22 +1,61 @@
 /* 全局样式 - 现代简约卡片风格 */
 
+/* CSS变量定义 */
+:root {
+    --bg-glass: rgba(30, 41, 59, 0.3);
+    --bg-glass-hover: rgba(30, 41, 59, 0.5);
+    --bg-white-glass: rgba(255, 255, 255, 0.1);
+    --bg-white-glass-hover: rgba(255, 255, 255, 0.2);
+    --bg-white-glass-disabled: rgba(255, 255, 255, 0.05);
+    --border-glass: rgba(255, 255, 255, 0.1);
+    --border-glass-hover: rgba(255, 255, 255, 0.2);
+    --border-glass-strong: rgba(255, 255, 255, 0.4);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-disabled: rgba(255, 255, 255, 0.3);
+    --radius-small: 4px;
+    --radius-medium: 8px;
+    --radius-large: 12px;
+    --radius-xl: 20px;
+    --transition: all 0.3s ease;
+}
+
+/* 通用玻璃效果样式类 */
+.glass-bg {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-medium);
+}
+
+.glass-bg-strong {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-medium);
+}
+
+.glass-bg-hover {
+    background: var(--bg-glass-hover);
+    border: 1px solid var(--border-glass-hover);
+    border-radius: var(--radius-medium);
+}
+
 /* CAGED练习样式 */
 .caged-settings-section {
     margin-top: 16px;
     padding: 16px;
-    background: rgba(30, 41, 59, 0.3);
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-glass);
+    border-radius: var(--radius-large);
+    border: 1px solid var(--border-glass);
 }
 
 /* CAGED形状显示区域 */
 .caged-shape-display {
     /* background: linear-gradient(135deg, rgba(51, 65, 85, 0.95), rgba(71, 85, 105, 0.95)); */
-    border-radius: 20px;
+    border-radius: var(--radius-xl);
     padding: 20px;
     margin-bottom: 10px;
     text-align: center;
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    border: 2px solid var(--border-glass);
 }
 
 
@@ -31,22 +70,22 @@
     width: 45px;
     height: 45px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: var(--bg-white-glass);
+    border: 2px solid var(--border-glass-hover);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 18px;
     font-weight: 600;
-    color: #e2e8f0;
+    color: var(--text-primary);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--transition);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .caged-shape-btn-display:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.4);
+    background: var(--bg-white-glass-hover);
+    border-color: var(--border-glass-strong);
     transform: scale(1.05);
 }
 
