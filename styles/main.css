@@ -2,6 +2,46 @@
 
 /* CSS变量定义 */
 :root {
+    /* 现代设计系统 - 浅色主题变量 */
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-200: #bfdbfe;
+    --primary-300: #93c5fd;
+    --primary-400: #60a5fa;
+    --primary-500: #3b82f6;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --primary-800: #1e40af;
+    --primary-900: #1e3a8a;
+
+    --gray-50: #f8fafc;
+    --gray-100: #f1f5f9;
+    --gray-200: #e2e8f0;
+    --gray-300: #cbd5e1;
+    --gray-400: #94a3b8;
+    --gray-500: #64748b;
+    --gray-600: #475569;
+    --gray-700: #334155;
+    --gray-800: #1e293b;
+    --gray-900: #0f172a;
+
+    --success-50: #ecfdf5;
+    --success-100: #d1fae5;
+    --success-500: #10b981;
+    --success-600: #059669;
+    --success-700: #047857;
+
+    --warning-50: #fffbeb;
+    --warning-100: #fef3c7;
+    --warning-500: #f59e0b;
+    --warning-600: #d97706;
+
+    --error-50: #fef2f2;
+    --error-100: #fee2e2;
+    --error-500: #ef4444;
+    --error-600: #dc2626;
+
+    /* 兼容性变量 */
     --bg-glass: rgba(30, 41, 59, 0.3);
     --bg-glass-hover: rgba(30, 41, 59, 0.5);
     --bg-white-glass: rgba(255, 255, 255, 0.1);
@@ -13,11 +53,38 @@
     --text-primary: #e2e8f0;
     --text-secondary: #94a3b8;
     --text-disabled: rgba(255, 255, 255, 0.3);
-    --radius-small: 4px;
-    --radius-medium: 8px;
-    --radius-large: 12px;
-    --radius-xl: 20px;
-    --transition: all 0.3s ease;
+
+    /* 现代设计令牌 */
+    --radius-xs: 2px;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+    --radius-3xl: 24px;
+    --radius-full: 9999px;
+
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+
+    --transition-fast: 150ms ease;
+    --transition-normal: 300ms ease;
+    --transition-slow: 500ms ease;
+
+    /* 兼容性别名 */
+    --radius-small: var(--radius-sm);
+    --radius-medium: var(--radius-md);
+    --radius-large: var(--radius-lg);
+    --radius-xl: var(--radius-xl);
+    --transition: var(--transition-normal);
+
+    /* 深色主题变量 */
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #1a1a1a;
 }
 
 /* 通用玻璃效果样式类 */
@@ -48,6 +115,212 @@
     border: 1px solid var(--border-glass);
 }
 
+/* 歌曲信息对话框样式 */
+.song-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.song-info-title {
+    margin: 0;
+    color: #3a9fc4;
+    font-size: 24px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.song-info-section {
+    margin-bottom: 16px;
+}
+
+.song-info-subtitle {
+    color: #60a5fa;
+    margin: 0 0 8px 0;
+    font-size: 16px;
+}
+
+.song-info-content {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 12px;
+    border-radius: 8px;
+}
+
+.song-info-content p {
+    margin: 4px 0;
+}
+
+.song-chord-progression {
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.song-info-footer {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.select-song-btn {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.chord-sequence-empty {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+/* 通用隐藏样式 - 但允许JavaScript通过style.display覆盖 */
+.hidden {
+    display: none;
+}
+
+/* 选项样式 */
+.styled-option {
+    background: #2c2c3c;
+    color: #fff;
+}
+
+.styled-optgroup {
+    background: #1a1a2a;
+    color: #3a9fc4;
+    font-weight: bold;
+}
+
+/* 加载练习按钮 */
+.load-practice-btn {
+    background: linear-gradient(135deg, #3a9fc4, #2d7a9c);
+    color: white;
+}
+
+/* 音高显示相关 */
+.confidence-fill {
+    width: 0%;
+}
+
+/* 设置区域间距 */
+.settings-section-spacing {
+    margin-top: 20px;
+}
+
+/* 选项元素通用样式 */
+select option {
+    background: #2c2c3c;
+    color: #fff;
+}
+
+select optgroup {
+    background: #1a1a2a;
+    color: #3a9fc4;
+    font-weight: bold;
+}
+
+/* 设备设置相关样式 */
+.device-settings-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.audio-device-select {
+    width: 70%;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.refresh-device-btn {
+    width: auto;
+    padding: 4px 8px;
+    font-size: 11px;
+    margin-left: 10px;
+    min-width: 80px;
+}
+
+.settings-row-spacing {
+    margin-top: 12px;
+}
+
+.settings-flex {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+}
+
+.settings-flex-item {
+    flex: 1;
+}
+
+/* 音量设置相关样式 */
+.volume-label {
+    min-width: 40px;
+    text-align: right;
+    font-size: 14px;
+}
+
+.settings-row-bottom {
+    margin-bottom: 12px;
+}
+
+/* 节拍器相关样式 */
+.metronome-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.metronome-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.metronome-right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 60%;
+    margin-left: auto;
+}
+
+.time-label {
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.time-slider {
+    width: 65%;
+    margin-right: 3px;
+}
+
+.time-display {
+    min-width: 50px;
+    text-align: right;
+    font-size: 14px;
+}
+
 /* CAGED形状显示区域 */
 .caged-shape-display {
     /* background: linear-gradient(135deg, rgba(51, 65, 85, 0.95), rgba(71, 85, 105, 0.95)); */
@@ -70,22 +343,22 @@
     width: 45px;
     height: 45px;
     border-radius: 50%;
-    background: var(--bg-white-glass);
-    border: 2px solid var(--border-glass-hover);
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 18px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: #e2e8f0;
     cursor: pointer;
     transition: var(--transition);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .caged-shape-btn-display:hover {
-    background: var(--bg-white-glass-hover);
-    border-color: var(--border-glass-strong);
+    background: rgba(30, 41, 59, 0.4);
+    border-color: rgba(58, 159, 196, 0.5);
     transform: scale(1.05);
 }
 
@@ -116,6 +389,542 @@
     color: rgba(255, 255, 255, 0.3);
     cursor: not-allowed;
     opacity: 0.5;
+}
+
+/* 弹过的按钮 - 透明背景 */
+.caged-shape-btn-display.played {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
+    opacity: 0.6;
+    transform: none;
+}
+
+.caged-shape-btn-display.played:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.6);
+    opacity: 0.8;
+    transform: scale(1.02);
+}
+
+/* 主题按钮样式 */
+.theme-btn {
+    background: var(--bg-white-glass);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+    padding: 8px 16px;
+    border-radius: var(--radius-medium);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.theme-btn:hover {
+    background: var(--bg-white-glass-hover);
+    border-color: var(--border-glass-hover);
+    transform: translateY(-1px);
+}
+
+.theme-btn.active {
+    background: var(--btn-primary-bg);
+    border-color: var(--btn-primary-border);
+    color: var(--btn-primary-text);
+    box-shadow: var(--shadow-medium);
+}
+
+/* 浅色主题特定样式 */
+[data-theme="light"] {
+    /* 页面背景 - 更清晰的渐变 */
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+[data-theme="light"] .glass-bg {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .glass-bg-strong {
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .glass-bg-hover {
+    background: rgba(255, 255, 255, 1.0);
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* 浅色主题下的按钮样式 */
+[data-theme="light"] .btn {
+    background: #ffffff;
+    border: 2px solid #2563eb;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+[data-theme="light"] .btn:hover {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #1d4ed8;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    transform: translateY(-1px);
+}
+
+/* 浅色主题下的设置面板 */
+[data-theme="light"] .settings-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .settings-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+/* 浅色主题下的导航栏 */
+[data-theme="light"] .bottom-nav {
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .nav-item {
+    color: #64748b;
+    font-weight: 500;
+}
+
+[data-theme="light"] .nav-item.active {
+    color: #2563eb;
+    background: #eff6ff;
+    border-radius: 8px;
+}
+
+/* 浅色主题下的下拉菜单 */
+[data-theme="light"] .dropdown-content {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
+[data-theme="light"] .dropdown-option {
+    color: #1e293b;
+    font-weight: 500;
+}
+
+[data-theme="light"] .dropdown-option:hover {
+    background: #f1f5f9;
+    color: #2563eb;
+}
+
+/* 浅色主题下的输入控件 */
+[data-theme="light"] input[type="range"] {
+    background: #e2e8f0;
+    border-radius: 4px;
+}
+
+[data-theme="light"] select {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    color: #1e293b;
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+[data-theme="light"] select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+}
+
+/* 浅色主题下的强玻璃效果 */
+[data-theme="light"] .glass-bg-strong {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* 浅色主题下的悬停玻璃效果 */
+[data-theme="light"] .glass-bg-hover {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* 浅色主题下的CAGED形状按钮 */
+[data-theme="light"] .caged-shape-btn-display:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="light"] .caged-shape-btn-display.current {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-color: #3b82f6;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="light"] .caged-shape-btn-display.played {
+    background: transparent;
+    border-color: rgba(0, 0, 0, 0.1);
+    color: rgba(0, 0, 0, 0.4);
+    opacity: 0.6;
+}
+
+[data-theme="light"] .caged-shape-btn-display.played:hover {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.2);
+    color: rgba(0, 0, 0, 0.6);
+    opacity: 0.8;
+}
+
+/* 浅色主题下的MIDI设备信息 */
+[data-theme="light"] .midi-device-info {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    color: var(--text-primary);
+}
+
+/* 浅色主题下的自定义下拉框触发器 */
+[data-theme="light"] .dropdown-trigger {
+    background: var(--bg-white-glass);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .dropdown-trigger:hover {
+    border-color: var(--border-glass-hover);
+    background: var(--bg-white-glass-hover);
+}
+
+[data-theme="light"] .dropdown-trigger.active {
+    border-color: var(--info-color);
+    background: var(--bg-white-glass-hover);
+}
+
+/* 浅色主题下的滚动条 */
+[data-theme="light"] .dropdown-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .dropdown-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* 浅色主题下的CAGED设置 */
+[data-theme="light"] .caged-settings {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+
+/* 浅色主题下的序列显示 */
+[data-theme="light"] .sequence-display {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: var(--text-primary);
+}
+
+/* 浅色主题下的练习容器 */
+[data-theme="light"] .practice-container {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: var(--text-primary);
+}
+
+/* 浅色主题下的自定义和弦列表 */
+[data-theme="light"] .custom-chord-list {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* 浅色主题下的指板信息标签 */
+[data-theme="light"] .fretboard-info-label {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: var(--text-secondary);
+}
+
+/* 浅色主题下的指板信息提示 */
+[data-theme="light"] .fretboard-info-tooltip {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: var(--text-secondary);
+}
+
+/* 浅色主题下的更多元素 */
+[data-theme="light"] .song-info-content {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .select-song-btn {
+    background: var(--btn-primary-bg);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    color: var(--btn-primary-text);
+}
+
+[data-theme="light"] .styled-option {
+    background: var(--bg-white-glass);
+    color: var(--text-primary);
+    border: 1px solid var(--border-glass);
+}
+
+[data-theme="light"] .styled-optgroup {
+    background: var(--bg-white-glass-hover);
+    color: var(--info-color);
+    font-weight: bold;
+    border: 1px solid var(--border-glass);
+}
+
+[data-theme="light"] .load-practice-btn {
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+}
+
+[data-theme="light"] select option {
+    background: var(--bg-white-glass);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] select optgroup {
+    background: var(--bg-white-glass-hover);
+    color: var(--info-color);
+    font-weight: bold;
+}
+
+[data-theme="light"] .caged-toggle-btn {
+    background: var(--btn-primary-bg);
+    border: 2px solid var(--btn-primary-border);
+    color: var(--btn-primary-text);
+}
+
+[data-theme="light"] .caged-toggle-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
+}
+
+[data-theme="light"] .caged-toggle-btn.active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #34d399;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="light"] .midi-toggle-btn {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    border: 2px solid #a78bfa;
+    color: #ffffff;
+}
+
+[data-theme="light"] .midi-toggle-btn:hover {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    border-color: #8b5cf6;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
+}
+
+[data-theme="light"] .midi-toggle-btn.active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #34d399;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* 浅色主题下的练习界面 */
+[data-theme="light"] #practiceScreen {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+[data-theme="light"] .exercise-container {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .settings-tabs {
+    background: #ffffff;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+[data-theme="light"] .settings-tab:hover {
+    background: #f1f5f9;
+    color: #2563eb;
+}
+
+[data-theme="light"] .settings-tab.active {
+    background: #ffffff;
+    border-bottom-color: #2563eb;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+/* 浅色主题下的选择框 */
+[data-theme="light"] select {
+    background: var(--bg-white-glass);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] select option {
+    background-color: var(--bg-white-glass);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] select optgroup {
+    background-color: var(--bg-white-glass-hover);
+    color: var(--info-color);
+    font-weight: bold;
+}
+
+/* 浅色主题下的开关按钮 */
+[data-theme="light"] .slider {
+    background-color: var(--border-glass);
+}
+
+[data-theme="light"] input:checked + .slider {
+    background-color: var(--info-color);
+}
+
+[data-theme="light"] .midi-slider {
+    background-color: var(--border-glass);
+}
+
+[data-theme="light"] .midi-slider-input:checked + .midi-slider {
+    background-color: var(--info-color);
+}
+
+/* 浅色主题下的各种按钮 */
+[data-theme="light"] .order-btn,
+[data-theme="light"] .caged-shape-btn {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    color: #475569;
+    font-weight: 600;
+}
+
+[data-theme="light"] .order-btn:hover,
+[data-theme="light"] .caged-shape-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #1e293b;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .order-btn.active,
+[data-theme="light"] .caged-shape-btn.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+[data-theme="light"] .practice-mode-btn {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    color: #475569;
+    font-weight: 600;
+}
+
+[data-theme="light"] .practice-mode-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #1e293b;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .practice-mode-btn.active {
+    background: #10b981;
+    border-color: #10b981;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* 浅色主题下的输入控件 */
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="number"] {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    color: #1e293b;
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+[data-theme="light"] input[type="text"]:focus,
+[data-theme="light"] input[type="number"]:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+}
+
+/* 浅色主题下的自定义和弦相关 */
+[data-theme="light"] .custom-chord-add select {
+    background: var(--bg-white-glass);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .custom-chord-add button {
+    background: var(--btn-primary-bg);
+    border: none;
+    border-radius: 8px;
+    color: var(--btn-primary-text);
+}
+
+[data-theme="light"] .custom-chord-actions button {
+    background: var(--bg-white-glass);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .custom-chord-actions button:hover {
+    background: var(--bg-white-glass-hover);
+    border-color: var(--border-glass-hover);
+}
+
+/* 浅色主题下的模态框 */
+[data-theme="light"] .modal-overlay {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .modal-content {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #1e293b;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* 浅色主题下的指板 */
+[data-theme="light"] .fretboard {
+    background-color: #ffffff;
+    border: 2px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .fretboard-fret[data-fret="0"] {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 浅色主题下的音高显示 */
+[data-theme="light"] .pitch-display {
+    background: var(--bg-white-glass);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+}
+
+/* 浅色主题下的提示信息 */
+[data-theme="light"] .hint-box {
+    background: rgba(59, 130, 246, 0.05);
+    border: 1px solid rgba(59, 130, 246, 0.1);
+    color: var(--text-primary);
 }
 
 /* CAGED开关按钮样式 */
@@ -603,33 +1412,8 @@
     margin-top: 8px;
 }
 
-.caged-shape-btn {
-    padding: 8px 16px;
-    background: rgba(51, 65, 85, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #e2e8f0;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 14px;
-    font-weight: 500;
-    text-align: center;
-    min-width: 40px;
-}
 
-.caged-shape-btn:hover {
-    background: rgba(58, 159, 196, 0.3);
-    border-color: rgba(58, 159, 196, 0.5);
-    transform: translateY(-1px);
-}
-
-.caged-shape-btn.active {
-    background: rgba(58, 159, 196, 0.6);
-    border-color: rgba(58, 159, 196, 0.8);
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(58, 159, 196, 0.3);
-}
-
+.caged-shape-btn,
 .caged-type-btn, .caged-mode-btn {
     padding: 8px 16px;
     background: rgba(51, 65, 85, 0.8);
@@ -644,12 +1428,14 @@
     min-width: 80px;
 }
 
+.caged-shape-btn:hover,
 .caged-type-btn:hover, .caged-mode-btn:hover {
     background: rgba(58, 159, 196, 0.3);
     border-color: rgba(58, 159, 196, 0.5);
     transform: translateY(-1px);
 }
 
+.caged-shape-btn.active,
 .caged-type-btn.active, .caged-mode-btn.active {
     background: rgba(58, 159, 196, 0.6);
     border-color: rgba(58, 159, 196, 0.8);
@@ -795,7 +1581,7 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background: 
+    background:
         radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
         radial-gradient(circle at 80% 80%, rgba(147, 51, 234, 0.06) 0%, transparent 60%),
         radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
@@ -867,7 +1653,7 @@ body::after {
     opacity: 0.8;
     border-radius: 20px;
     padding: 32px;
-    box-shadow: 
+    box-shadow:
         0 25px 50px rgba(0, 0, 0, 0.15),
         0 0 0 1px rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
@@ -1160,9 +1946,9 @@ select {
     padding: 8px !important;
     width: 100% !important;
     font-size: 14px !important;
-    line-height: normal !important;
+    /* line-height: normal !important; */
     height: auto !important;
-    min-height: 40px !important;
+    min-height: 20px !important;
 }
 
 #scaleType:focus {
@@ -1279,7 +2065,7 @@ input:checked+.slider:before {
     border-radius: 6px;
     border: 1px solid #555;
     background-color: #2c2c3c;
-    color: #aaa;
+    color: #ffffff !important;
     font-size: 13px;
     font-weight: 500;
     text-align: center;
@@ -1287,6 +2073,7 @@ input:checked+.slider:before {
     transition: all 0.2s;
     min-width: 60px;
     white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .chord-type-btn.active {
@@ -1336,7 +2123,7 @@ input:checked+.slider:before {
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s ease, visibility 0.3s ease, opacity 0.3s ease;
     letter-spacing: 0.5px;
     flex: 1;
     max-width: 280px;
@@ -1919,6 +2706,8 @@ input:checked+.slider:before {
         overflow: hidden;
         text-overflow: ellipsis;
         line-height: 1.2;
+        color: #ffffff !important;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     }
     
     /* 小屏幕下的内联提示优化 */
@@ -2394,3 +3183,350 @@ input:checked+.slider:before {
         height: 150px;
     }
 }
+
+/* 下拉多选框样式 */
+.multiselect-dropdown {
+    position: relative;
+    width: 100%;
+    z-index: 9999998;
+}
+
+.dropdown-trigger {
+    background: var(--bg-white-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-medium);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.dropdown-trigger:hover {
+    background: var(--bg-white-glass-hover);
+    border-color: var(--border-glass-hover);
+}
+
+.dropdown-display {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    justify-content: space-between;
+}
+
+.selected-text {
+    color: var(--text-primary);
+    font-size: 14px;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 8px;
+    min-width: 0;
+}
+
+.dropdown-arrow {
+    color: var(--text-secondary);
+    font-size: 12px;
+    transition: transform 0.3s ease;
+    flex-shrink: 0;
+    margin-left: 0;
+}
+
+.dropdown-trigger.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-content {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-medium);
+    margin-top: 4px;
+    z-index: 9999999;
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+    transform: translateZ(0);
+}
+
+.dropdown-content.show {
+    display: block;
+}
+
+.dropdown-controls {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border-bottom: 1px solid var(--border-glass);
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: var(--radius-small);
+    background: var(--bg-white-glass);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition);
+    flex: 1;
+}
+
+.dropdown-btn:hover {
+    background: var(--bg-white-glass-hover);
+    border-color: var(--border-glass-hover);
+}
+
+.dropdown-groups {
+    padding: 8px 0;
+}
+
+.dropdown-group {
+    margin-bottom: 4px;
+}
+
+.group-header {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0;
+    padding: 8px 12px 4px 12px;
+    background: rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.dropdown-option {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+}
+
+.dropdown-option:hover {
+    background: var(--bg-white-glass-hover);
+}
+
+.dropdown-option input[type="checkbox"] {
+    margin: 0 8px 0 0;
+    accent-color: #3b82f6;
+}
+
+.option-text {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    gap: 8px;
+}
+
+.scale-name {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.scale-structure {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 4px;
+    border-radius: var(--radius-small);
+    white-space: nowrap;
+}
+
+.dropdown-option input[type="checkbox"]:checked + .option-text .scale-name {
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .dropdown-content {
+        max-height: 300px;
+    }
+
+    .dropdown-controls {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .option-text {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+
+    .scale-structure {
+        align-self: flex-end;
+    }
+
+    .scale-name {
+        font-size: 13px;
+    }
+
+    .scale-structure {
+        font-size: 10px;
+    }
+}
+
+/* 滚动条样式 */
+.dropdown-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dropdown-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.dropdown-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.dropdown-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* 新增工具类 - 用于替换内联样式 */
+/* 容器布局类 */
+.flex-container {
+    display: flex;
+}
+
+.flex-gap-sm {
+    gap: 8px;
+}
+
+.flex-gap-md {
+    gap: 15px;
+}
+
+.flex-gap-lg {
+    gap: 10px;
+}
+
+.flex-align-center {
+    align-items: center;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
+/* 按钮样式 */
+.btn-lang {
+    flex: 1;
+    padding: 12px;
+    font-size: 14px;
+}
+
+.btn-danger {
+    flex: 1;
+    padding: 12px;
+    background: linear-gradient(to right, #ef4444, #dc2626);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+/* 文本样式 */
+.text-sm {
+    font-size: 14px;
+}
+
+.text-xs {
+    font-size: 12px;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-secondary {
+    color: #94a3b8;
+}
+
+/* 间距类 */
+.ml-md {
+    margin-left: 20px;
+}
+
+.mb-sm {
+    margin-bottom: 12px;
+}
+
+.mt-md {
+    margin-top: 20px;
+}
+
+.mt-sm {
+    margin-top: 8px;
+}
+
+/* 尺寸类 */
+.min-w-sm {
+    min-width: 25px;
+}
+
+/* 开关标签样式 */
+.switch-label {
+    font-size: 14px;
+}
+
+/* 杂项类 */
+.hidden-select {
+    display: none;
+}
+
+.confidence-fill-zero {
+    width: 0% !important;
+}
+
+.confidence-fill-dynamic {
+    /* 动态设置宽度 */
+}
+
+.hidden-display {
+    display: none;
+}
+
+.recommendations-title {
+    margin: 0 0 15px 0;
+    color: #ffffff;
+    font-size: 1.1em;
+}
+
+.mic-permission-title {
+    margin-bottom: 10px;
+    font-size: 18px;
+}
+
+.interval-gray {
+    color: #888;
+}
+
+.next-exercise-text {
+    font-size: 14px;
+    color: #94a3b8;
+}
+
