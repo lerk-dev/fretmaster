@@ -2,22 +2,22 @@
 class PitchDetectionProcessor extends AudioWorkletProcessor {
     constructor() {
         super();
-        
+
         // 音高检测参数
-        this.bufferSize = 4096;
-        this.sampleRate = 48000;
-        this.buffer = new Float32Array(this.bufferSize);
+        this.audioBufferSize = 4096;  // 音频缓冲区大小
+        this.sampleRate = sampleRate;  // 使用正确的采样率
+        this.buffer = new Float32Array(this.audioBufferSize);
         this.bufferIndex = 0;
         this.isBufferFull = false;
-        
+
         // YIN算法参数
         this.threshold = 0.15;
         this.probabilityCliff = 0.1;
-        
+
         // 音高检测状态
         this.lastPitch = null;
         this.pitchBuffer = [];
-        this.bufferSize = 3;
+        this.pitchBufferSize = 3;  // 音高缓冲区大小
         
         // 处理音频数据
         this.port.onmessage = (event) => {
@@ -47,7 +47,7 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
             this.buffer[this.bufferIndex] = inputChannel[i];
             this.bufferIndex++;
             
-            if (this.bufferIndex >= this.bufferSize) {
+            if (this.bufferIndex >= this.audioBufferSize) {
                 this.bufferIndex = 0;
                 this.isBufferFull = true;
                 
@@ -76,7 +76,7 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
                     data: {
                         frequency: filteredPitch.frequency,
                         probability: filteredPitch.probability,
-                        timestamp: globalThis.currentTime || 0
+                        timestamp: currentTime  // AudioWorklet全局可用currentTime
                     }
                 });
             }
@@ -149,12 +149,12 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
         
         // 添加到缓冲区
         this.pitchBuffer.push(pitchResult.frequency);
-        if (this.pitchBuffer.length > this.bufferSize) {
+        if (this.pitchBuffer.length > this.pitchBufferSize) {
             this.pitchBuffer.shift();
         }
-        
+
         // 如果缓冲区未满，返回null
-        if (this.pitchBuffer.length < this.bufferSize) return null;
+        if (this.pitchBuffer.length < this.pitchBufferSize) return null;
         
         // 计算中位数以提高稳定性
         const sortedBuffer = [...this.pitchBuffer].sort((a, b) => a - b);
