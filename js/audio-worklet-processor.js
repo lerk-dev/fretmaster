@@ -10,19 +10,21 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
         this.bufferIndex = 0;
         this.isBufferFull = false;
 
-        // YIN算法参数 - 匹配ScriptProcessorNode
+        // YIN算法参数 - 优化低频检测
         this.threshold = 0.1;
         this.probabilityCliff = 0.1;
         this.lowFreqThreshold = 0.05;
         this.lowFreqProbabilityCliff = 0.05;
         this.isLowFrequencyTarget = false;
 
-        // 音高检测状态
+        // 低频检测优化参数
+        this.minFrequency = 70;   // 最低检测频率
+        this.maxFrequency = 1000; // 最高检测频率
+
+        // 音高检测状态 - 添加信号检测
         this.lastPitch = null;
-        this.pitchBuffer = [];
-        this.pitchBufferSize = 8;  // 增大音高缓冲区以提高稳定性
-        this.stableCount = 0;      // 稳定计数器
-        this.lastStablePitch = null;
+        this.signalThreshold = 0.01; // 信号强度阈值
+        this.minRMS = 0.005; // 最小RMS值
         
         // 处理音频数据
         this.port.onmessage = (event) => {
@@ -51,48 +53,107 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         const input = inputs[0];
         if (!input || input.length === 0) return true;
-        
+
         const inputChannel = input[0];
         if (!inputChannel) return true;
-        
+
+        // 调试：定期发送音频信号强度到主线程
+        if (Math.random() < 0.01) { // 1%概率发送调试信息
+            let sum = 0;
+            for (let i = 0; i < Math.min(100, inputChannel.length); i++) {
+                sum += Math.abs(inputChannel[i]);
+            }
+            const avgAmplitude = sum / Math.min(100, inputChannel.length);
+            this.port.postMessage({
+                type: 'debug',
+                data: {
+                    amplitude: avgAmplitude,
+                    hasSignal: avgAmplitude > 0.001,
+                    bufferSize: this.audioBufferSize,
+                    bufferIndex: this.bufferIndex
+                }
+            });
+        }
+
         // 收集音频数据到缓冲区
         for (let i = 0; i < inputChannel.length; i++) {
             this.buffer[this.bufferIndex] = inputChannel[i];
             this.bufferIndex++;
-            
+
             if (this.bufferIndex >= this.audioBufferSize) {
                 this.bufferIndex = 0;
                 this.isBufferFull = true;
-                
+
                 // 执行音高检测
                 this.detectPitch();
             }
         }
-        
+
         return true; // 保持处理器活跃
     }
     
     detectPitch() {
         if (!this.isBufferFull) return;
-        
+
+        // 计算信号强度 (RMS)
+        let sumSquares = 0;
+        for (let i = 0; i < this.buffer.length; i++) {
+            sumSquares += this.buffer[i] * this.buffer[i];
+        }
+        const rms = Math.sqrt(sumSquares / this.buffer.length);
+
+        // 如果信号太弱，不进行音高检测
+        if (rms < this.minRMS) {
+            this.port.postMessage({
+                type: 'signalDebug',
+                data: {
+                    rms: rms,
+                    hasSignal: false,
+                    message: '信号太弱，跳过音高检测'
+                }
+            });
+            return;
+        }
+
         // 使用YIN算法检测音高
         const yinResult = this.yinAlgorithm(this.buffer);
-        
+
+        // 直接发送原始结果，不做任何过滤
         if (yinResult && yinResult.frequency > 0) {
-            // 应用滤波和稳定性检查
-            const filteredPitch = this.applyFilter(yinResult);
-            
-            if (filteredPitch) {
-                // 发送检测结果到主线程
+            // 将频率转换为最接近的音符
+            const A4 = 440;
+            const semitonesFromA4 = 12 * Math.log2(yinResult.frequency / A4);
+            const noteNumber = Math.round(semitonesFromA4 + 69);
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const detectedNote = noteNames[(noteNumber - 1) % 12];
+
+            // 额外检查：过滤掉可能的误检测
+            if (rms < 0.02 && yinResult.frequency > 300) {
+                // 信号弱但频率高，可能是误检测
                 this.port.postMessage({
-                    type: 'pitchDetected',
+                    type: 'signalDebug',
                     data: {
-                        frequency: filteredPitch.frequency,
-                        probability: filteredPitch.probability,
-                        timestamp: currentTime  // AudioWorklet全局可用currentTime
+                        rms: rms,
+                        frequency: yinResult.frequency,
+                        hasSignal: false,
+                        message: '信号弱但频率高，可能是误检测'
                     }
                 });
+                return;
             }
+
+            // 直接输出原始检测结果
+            this.port.postMessage({
+                type: 'pitchDetected',
+                data: {
+                    frequency: yinResult.frequency,
+                    probability: yinResult.probability,
+                    timestamp: currentTime,
+                    detectedNote: detectedNote,
+                    isRaw: true,  // 标记为原始结果
+                    rms: rms      // 添加信号强度信息
+                }
+            });
         }
     }
     
@@ -124,104 +185,64 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
             }
         }
         
-        // 寻找第一个低于阈值的tau
-        let tauEstimate = -1;
+        // 寻找全局最小值，而不仅仅是第一个低于阈值的点
+        let tauMin = 1;
+        let minValue = d[1];
         for (let tau = 1; tau < halfN; tau++) {
-            if (d[tau] < this.threshold) {
-                tauEstimate = tau;
-                break;
+            if (d[tau] < minValue) {
+                minValue = d[tau];
+                tauMin = tau;
             }
         }
-        
-        if (tauEstimate === -1) return null;
-        
-        // 抛物线插值
-        let betterTau = tauEstimate;
-        if (tauEstimate > 0 && tauEstimate < halfN - 1) {
-            const s0 = d[tauEstimate - 1];
-            const s1 = d[tauEstimate];
-            const s2 = d[tauEstimate + 1];
-            const denom = (s0 + s2 - 2 * s1);
-            if (denom !== 0) {
-                const delta = (s0 - s2) / (2 * denom);
-                betterTau = tauEstimate + delta;
+
+        // 确保最小值低于阈值
+        if (minValue >= this.threshold) return null;
+
+        // 改进的抛物线插值
+        let betterTau = tauMin;
+        if (tauMin > 1 && tauMin < halfN - 1) {
+            const s0 = d[tauMin - 1];
+            const s1 = d[tauMin];
+            const s2 = d[tauMin + 1];
+            const a = 0.5 * s0 - s1 + 0.5 * s2;
+            const b = 0.5 * s2 - 0.5 * s0;
+
+            if (a !== 0) {
+                const delta = -b / (2 * a);
+                // 限制插值范围，避免过度外推
+                if (Math.abs(delta) <= 1) {
+                    betterTau = tauMin + delta;
+                }
             }
         }
-        
+
+        // 确保tau在合理范围内
+        betterTau = Math.max(1, Math.min(halfN - 1, betterTau));
+
         const frequency = this.sampleRate / betterTau;
-        const probability = Math.max(0, Math.min(1, 1 - d[tauEstimate]));
-        
+        const probability = Math.max(0, Math.min(1, 1 - minValue));
+
+        // 频率范围检查
+        if (frequency < this.minFrequency || frequency > this.maxFrequency) {
+            return null;
+        }
+
+        // 低频检测优化（特别是F音区域：174Hz, 349Hz, 698Hz）
+        if (frequency > 150 && frequency < 400) {
+            // 对于低频，使用更严格的概率要求
+            if (probability < this.probabilityCliff * 1.2) return null;
+        }
+
         if (probability < this.probabilityCliff) return null;
-        
+
         return { frequency, probability };
     }
     
-    // 应用滤波和稳定性检查
-    applyFilter(pitchResult) {
-        if (!pitchResult) return null;
-
-        // 添加到缓冲区
-        this.pitchBuffer.push(pitchResult.frequency);
-        if (this.pitchBuffer.length > this.pitchBufferSize) {
-            this.pitchBuffer.shift();
-        }
-
-        // 如果缓冲区未满，返回null
-        if (this.pitchBuffer.length < this.pitchBufferSize) return null;
-
-        // 计算中位数以提高稳定性
-        const sortedBuffer = [...this.pitchBuffer].sort((a, b) => a - b);
-        const median = sortedBuffer[Math.floor(sortedBuffer.length / 2)];
-
-        // 检查频率是否在合理范围内
-        if (median < 50 || median > 2000) return null;
-
-        // 计算标准差以评估稳定性
-        const variance = this.pitchBuffer.reduce((sum, val) => sum + Math.pow(val - median, 2), 0) / this.pitchBuffer.length;
-        const standardDeviation = Math.sqrt(variance);
-
-        // 如果标准差太大，说明数据不稳定
-        if (standardDeviation > median * 0.05) { // 5% 的容差
-            this.stableCount = 0;
-            return null;
-        }
-
-        // 检查是否与上次稳定音高连续
-        if (this.lastStablePitch) {
-            const pitchDiff = Math.abs(median - this.lastStablePitch.frequency);
-            if (pitchDiff < 50) { // 半音内认为是连续音
-                this.stableCount++;
-            } else {
-                this.stableCount = 1; // 新音高
-            }
-        } else {
-            this.stableCount = 1;
-        }
-
-        // 只有连续稳定3次以上才输出结果
-        if (this.stableCount < 3) {
-            return null;
-        }
-
-        // 应用更平滑的滤波
-        const smoothedFrequency = this.lastStablePitch ?
-            this.lastStablePitch.frequency * 0.7 + median * 0.3 : median;
-
-        this.lastStablePitch = {
-            frequency: smoothedFrequency,
-            probability: pitchResult.probability
-        };
-
-        return this.lastStablePitch;
-    }
-    
+  
     reset() {
         this.bufferIndex = 0;
         this.isBufferFull = false;
-        this.pitchBuffer = [];
         this.lastPitch = null;
-        this.stableCount = 0;
-        this.lastStablePitch = null;
     }
 }
 

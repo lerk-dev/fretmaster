@@ -7437,35 +7437,7 @@
                     gainNode = audioContext.createGain();
                     gainNode.gain.value = inputGain;
 
-                    // 使用AudioWorklet替代ScriptProcessorNode
-                    try {
-                        // 检查是否在file://协议下运行
-                        if (window.location.protocol === 'file:') {
-                            console.warn('检测到file://协议，AudioWorklet可能因CORS限制无法加载，直接使用ScriptProcessorNode');
-                            throw new Error('CORS限制：file://协议不支持AudioWorklet');
-                        }
-
-                        // 加载AudioWorklet模块
-                        await audioContext.audioWorklet.addModule('js/audio-worklet-processor.js');
-                        
-                        // 创建AudioWorkletNode
-                        audioWorkletNode = new AudioWorkletNode(audioContext, 'pitch-detection-processor');
-                        
-                        // 监听音高检测结果
-                        audioWorkletNode.port.onmessage = handlePitchDetectionResult;
-                        
-                        microphone = audioContext.createMediaStreamSource(mediaStream);
-
-                        // 连接音频节点：麦克风 -> 增益 -> 分析器 -> AudioWorklet -> 输出
-                        microphone.connect(gainNode);
-                        gainNode.connect(analyser);
-                        gainNode.connect(audioWorkletNode);
-                        audioWorkletNode.connect(audioContext.destination);
-                        
-                        console.log('AudioWorklet初始化成功');
-                    } catch (workletError) {
-                        console.warn('AudioWorklet不支持，回退到ScriptProcessorNode:', workletError);
-                        // 回退到ScriptProcessorNode
+                    // 默认使用ScriptProcessorNode（稳定性更好）
                     javascriptNode = audioContext.createScriptProcessor(4096, 1, 1);
                     javascriptNode.onaudioprocess = processAudio;
 
@@ -7474,7 +7446,8 @@
                     gainNode.connect(analyser);
                     analyser.connect(javascriptNode);
                     javascriptNode.connect(audioContext.destination);
-                    }
+
+                    console.log('ScriptProcessorNode初始化成功');
 
                     isRecording = true;
                     state.microphoneInitialized = true;
@@ -7510,29 +7483,7 @@
                 analyser = audioContext.createAnalyser();
                 analyser.fftSize = 4096;
                 
-                // 尝试使用AudioWorklet，失败则回退到ScriptProcessorNode
-                try {
-                    // 检查是否在file://协议下运行
-                    if (window.location.protocol === 'file:') {
-                        console.warn('提示：AudioWorklet需要HTTP服务器环境。如需更好的性能，请：');
-                        console.warn('1. 运行: python -m http.server 8000');
-                        console.warn('2. 访问: http://localhost:8000');
-                        console.warn('当前回退到ScriptProcessorNode（兼容性更好）');
-                        throw new Error('需要HTTP服务器环境以启用AudioWorklet');
-                    }
-
-                    await audioContext.audioWorklet.addModule('js/audio-worklet-processor.js');
-                    audioWorkletNode = new AudioWorkletNode(audioContext, 'pitch-detection-processor');
-                    audioWorkletNode.port.onmessage = handlePitchDetectionResult;
-                    
-                    microphone = audioContext.createMediaStreamSource(mediaStream);
-                    microphone.connect(analyser);
-                    microphone.connect(audioWorkletNode);
-                    audioWorkletNode.connect(audioContext.destination);
-                    
-                    console.log('兼容模式AudioWorklet初始化成功');
-                } catch (workletError) {
-                    console.warn('兼容模式AudioWorklet失败，使用ScriptProcessorNode:', workletError);
+                // 兼容模式也使用ScriptProcessorNode（最稳定的方案）
                 javascriptNode = audioContext.createScriptProcessor(4096, 1, 1);
                 javascriptNode.onaudioprocess = processAudio;
 
@@ -7540,7 +7491,8 @@
                 microphone.connect(analyser);
                 analyser.connect(javascriptNode);
                 javascriptNode.connect(audioContext.destination);
-                }
+
+                console.log('兼容模式ScriptProcessorNode初始化成功');
 
                 isRecording = true;
                 state.microphoneInitialized = true;
@@ -8356,12 +8308,66 @@
             // 处理AudioWorklet的音高检测结果
             function handlePitchDetectionResult(event) {
                 if (!isRecording || state.isAnswered || (state.enableCooldown && state.isCoolingDown)) return;
-                
+
                 const { type, data } = event.data;
-                
+
+                // 处理调试信息
+                if (type === 'debug') {
+                    console.log('AudioWorklet Debug:', data);
+                    if (data.hasSignal) {
+                        console.log('AudioWorklet: 检测到音频信号，振幅:', data.amplitude.toFixed(6));
+                    } else {
+                        console.log('AudioWorklet: 无音频信号');
+                    }
+                    return;
+                }
+
+                // 处理YIN算法调试信息
+                if (type === 'yinDebug') {
+                    console.log('YIN算法结果:', data);
+                    if (data.hasResult && data.frequency > 0) {
+                        console.log(`YIN检测到音高: ${data.frequency.toFixed(2)}Hz, 音符: ${data.detectedNote}, 概率: ${data.probability.toFixed(3)}`);
+
+                        // 计算标准音高对比
+                        const noteFrequencies = {
+                            'C': [130.81, 261.63, 523.25],  // C3, C4, C5
+                            'B': [123.47, 246.94, 493.88],  // B2, B3, B4
+                        };
+
+                        console.log(`C音标准频率: ${noteFrequencies.C.join('Hz, ')}Hz`);
+                        console.log(`B音标准频率: ${noteFrequencies.B.join('Hz, ')}Hz`);
+
+                        // 计算偏差
+                        const closestC = noteFrequencies.C.reduce((prev, curr) =>
+                            Math.abs(curr - data.frequency) < Math.abs(prev - data.frequency) ? curr : prev
+                        );
+                        const closestB = noteFrequencies.B.reduce((prev, curr) =>
+                            Math.abs(curr - data.frequency) < Math.abs(prev - data.frequency) ? curr : prev
+                        );
+
+                        console.log(`与C音偏差: ${Math.abs(data.frequency - closestC).toFixed(2)}Hz`);
+                        console.log(`与B音偏差: ${Math.abs(data.frequency - closestB).toFixed(2)}Hz`);
+                    } else {
+                        console.log('YIN未检测到有效音高，阈值:', data.threshold);
+                    }
+                    return;
+                }
+
+                // 处理信号调试信息
+                if (type === 'signalDebug') {
+                    console.log(`信号检测: RMS=${data.rms.toFixed(6)}, ${data.message}`);
+                    return;
+                }
+
                 if (type === 'pitchDetected') {
-                    const { frequency, probability } = data;
-                    
+                    const { frequency, probability, detectedNote, isRaw, rms } = data;
+
+                    if (isRaw) {
+                        console.log(`AudioWorklet原始音高: ${frequency.toFixed(2)}Hz (${detectedNote}), 概率: ${probability.toFixed(3)}, RMS: ${(rms || 0).toFixed(4)}`);
+                    } else {
+                        console.log('AudioWorklet: 检测到音高', frequency.toFixed(2) + 'Hz, 概率:', probability.toFixed(3));
+                    }
+
                     // 根据当前练习模式处理检测到的音高
                     if (window.cagedState && window.cagedState.enabled && state.cagedMode) {
                         processCagedAudioWithFrequency(frequency, probability);
