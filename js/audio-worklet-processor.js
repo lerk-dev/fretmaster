@@ -4,15 +4,18 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
         super();
 
         // 音高检测参数
-        this.audioBufferSize = 4096;  // 音频缓冲区大小
+        this.audioBufferSize = 4096;  // 音频缓冲区大小 - 匹配ScriptProcessorNode
         this.sampleRate = sampleRate;  // 使用正确的采样率
         this.buffer = new Float32Array(this.audioBufferSize);
         this.bufferIndex = 0;
         this.isBufferFull = false;
 
-        // YIN算法参数
-        this.threshold = 0.15;
+        // YIN算法参数 - 匹配ScriptProcessorNode
+        this.threshold = 0.1;
         this.probabilityCliff = 0.1;
+        this.lowFreqThreshold = 0.05;
+        this.lowFreqProbabilityCliff = 0.05;
+        this.isLowFrequencyTarget = false;
 
         // 音高检测状态
         this.lastPitch = null;
@@ -29,6 +32,14 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
                 case 'updateConfig':
                     this.threshold = data.threshold || this.threshold;
                     this.probabilityCliff = data.probabilityCliff || this.probabilityCliff;
+                    if (data.isLowFrequencyTarget !== undefined) {
+                        this.isLowFrequencyTarget = data.isLowFrequencyTarget;
+                        // 动态调整参数
+                        if (this.isLowFrequencyTarget) {
+                            this.threshold = this.lowFreqThreshold;
+                            this.probabilityCliff = this.lowFreqProbabilityCliff;
+                        }
+                    }
                     break;
                 case 'reset':
                     this.reset();
