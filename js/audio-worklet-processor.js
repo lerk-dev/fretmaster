@@ -17,7 +17,9 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
         // 音高检测状态
         this.lastPitch = null;
         this.pitchBuffer = [];
-        this.pitchBufferSize = 3;  // 音高缓冲区大小
+        this.pitchBufferSize = 8;  // 增大音高缓冲区以提高稳定性
+        this.stableCount = 0;      // 稳定计数器
+        this.lastStablePitch = null;
         
         // 处理音频数据
         this.port.onmessage = (event) => {
@@ -146,7 +148,7 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
     // 应用滤波和稳定性检查
     applyFilter(pitchResult) {
         if (!pitchResult) return null;
-        
+
         // 添加到缓冲区
         this.pitchBuffer.push(pitchResult.frequency);
         if (this.pitchBuffer.length > this.pitchBufferSize) {
@@ -155,18 +157,51 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
 
         // 如果缓冲区未满，返回null
         if (this.pitchBuffer.length < this.pitchBufferSize) return null;
-        
+
         // 计算中位数以提高稳定性
         const sortedBuffer = [...this.pitchBuffer].sort((a, b) => a - b);
         const median = sortedBuffer[Math.floor(sortedBuffer.length / 2)];
-        
+
         // 检查频率是否在合理范围内
         if (median < 50 || median > 2000) return null;
-        
-        return {
-            frequency: median,
+
+        // 计算标准差以评估稳定性
+        const variance = this.pitchBuffer.reduce((sum, val) => sum + Math.pow(val - median, 2), 0) / this.pitchBuffer.length;
+        const standardDeviation = Math.sqrt(variance);
+
+        // 如果标准差太大，说明数据不稳定
+        if (standardDeviation > median * 0.05) { // 5% 的容差
+            this.stableCount = 0;
+            return null;
+        }
+
+        // 检查是否与上次稳定音高连续
+        if (this.lastStablePitch) {
+            const pitchDiff = Math.abs(median - this.lastStablePitch.frequency);
+            if (pitchDiff < 50) { // 半音内认为是连续音
+                this.stableCount++;
+            } else {
+                this.stableCount = 1; // 新音高
+            }
+        } else {
+            this.stableCount = 1;
+        }
+
+        // 只有连续稳定3次以上才输出结果
+        if (this.stableCount < 3) {
+            return null;
+        }
+
+        // 应用更平滑的滤波
+        const smoothedFrequency = this.lastStablePitch ?
+            this.lastStablePitch.frequency * 0.7 + median * 0.3 : median;
+
+        this.lastStablePitch = {
+            frequency: smoothedFrequency,
             probability: pitchResult.probability
         };
+
+        return this.lastStablePitch;
     }
     
     reset() {
@@ -174,6 +209,8 @@ class PitchDetectionProcessor extends AudioWorkletProcessor {
         this.isBufferFull = false;
         this.pitchBuffer = [];
         this.lastPitch = null;
+        this.stableCount = 0;
+        this.lastStablePitch = null;
     }
 }
 
