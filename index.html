@@ -225,6 +225,11 @@
                     'btn_back': '返回主菜单',
                     'btn_cancel': '取消',
                     'btn_confirm': '确认',
+
+                    // 调式选择控制按钮
+                    'select_all': '全选',
+                    'deselect_all': '全不选',
+                    'random_select': '随机选择',
                     'btn_delete': '删除',
                     'btn_edit': '编辑',
                     'btn_add': '添加',
@@ -454,7 +459,7 @@
                     'pitch_finding_practice_complete': '练习完成',
                     'pitch_finding_next_interval': '下一题间隔',
                     'pitch_finding_next_interval_hint': '答对后自动进入下一题的时间间隔',
-                    'pitch_finding_no_auto': '不自动',
+                    'pitch_finding_no_auto': '手动',
                     'pitch_finding_2_seconds': '2秒',
                     'pitch_finding_3_seconds': '3秒',
                     'pitch_finding_5_seconds': '5秒',
@@ -729,6 +734,11 @@
                     'btn_back': 'Back to Main Menu',
                     'btn_cancel': 'Cancel',
                     'btn_confirm': 'Confirm',
+
+                    // 调式选择控制按钮
+                    'select_all': 'Select All',
+                    'deselect_all': 'Deselect All',
+                    'random_select': 'Random Select',
                     'btn_delete': 'Delete',
                     'btn_edit': 'Edit',
                     'btn_add': 'Add',
@@ -7892,21 +7902,31 @@
                 const isFretboardVisible = fretboardContainer && fretboardContainer.style.display !== 'none';
                 
                 // 动态设置延迟时间：
-                // - 如果指板隐藏，立即进入下一题（100ms最小延迟避免闪烁）
-                // - 如果指板显示，使用设置的延迟时间或默认1.5秒
+                // - 指板隐藏时：立即自动进入下一题（忽略手动模式设置）
+                // - 指板显示且手动模式：不自动切换，等待用户手动操作
+                // - 指板显示且自动模式：使用设置的延迟时间
                 let delayTime;
                 if (!isFretboardVisible) {
-                    delayTime = 100; // 指板隐藏时几乎立即切换
+                    // 指板隐藏时立即自动切换（100ms最小延迟避免闪烁）
+                    delayTime = 100;
+                    console.log(`找音练习指板隐藏: 立即自动切换下一题`);
+                } else if (intervalSeconds === 0) {
+                    // 指板显示且手动模式：不设置自动切换
+                    delayTime = 0;
+                    console.log(`找音练习指板显示且手动模式: 不自动切换下一题，等待用户操作`);
                 } else {
-                    delayTime = intervalSeconds > 0 ? intervalSeconds * 1000 : 1500; // 指板显示时使用设置的延迟
+                    // 指板显示且自动模式：使用设置的延迟时间
+                    delayTime = intervalSeconds * 1000;
+                    console.log(`找音练习指板显示且自动模式: 延迟${delayTime}ms切换下一题`);
                 }
-                
-                console.log(`找音练习延迟设置: 指板显示=${isFretboardVisible}, 延迟时间=${delayTime}ms`);
-                
+
+                if (delayTime > 0) {
+                    console.log(`找音练习设置自动延迟: ${delayTime}ms`);
                     // 设置自动进入下一题的定时器
                     state.pitchFindingNextTimeout = setTimeout(() => {
                         generateNextPitchFindingQuestion();
-                }, delayTime);
+                    }, delayTime);
+                }
             }
             
             // 生成下一个找音练习题目
@@ -8150,21 +8170,31 @@
                 const intervalSeconds = selectedIntervalBtn ? parseInt(selectedIntervalBtn.dataset.value) : 0;
                 
                 // 动态设置延迟时间：
-                // - 如果指板隐藏，立即进入下一题（100ms最小延迟避免闪烁）
-                // - 如果指板显示，使用设置的延迟时间或默认2秒
+                // - 指板隐藏时：立即自动进入下一题（忽略手动模式设置）
+                // - 指板显示且手动模式：不自动切换，等待用户手动操作
+                // - 指板显示且自动模式：使用设置的延迟时间
                 let delayTime;
                 if (!isFretboardVisible) {
-                    delayTime = 100; // 指板隐藏时几乎立即切换
+                    // 指板隐藏时立即自动切换（100ms最小延迟避免闪烁）
+                    delayTime = 100;
+                    console.log(`音程练习指板隐藏: 立即自动切换下一题`);
+                } else if (intervalSeconds === 0) {
+                    // 指板显示且手动模式：不设置自动切换
+                    delayTime = 0;
+                    console.log(`音程练习指板显示且手动模式: 不自动切换下一题，等待用户操作`);
                 } else {
-                    delayTime = intervalSeconds > 0 ? intervalSeconds * 1000 : 2000; // 指板显示时使用设置的延迟
+                    // 指板显示且自动模式：使用设置的延迟时间
+                    delayTime = intervalSeconds * 1000;
+                    console.log(`音程练习指板显示且自动模式: 延迟${delayTime}ms切换下一题`);
                 }
-                
-                console.log(`音程练习延迟设置: 指板显示=${isFretboardVisible}, 延迟时间=${delayTime}ms`);
-                
-                // 延迟进入下一题
-                setTimeout(() => {
-                    generateNextIntervalExercise();
-                }, delayTime);
+
+                if (delayTime > 0) {
+                    console.log(`音程练习自动延迟: 指板显示=${isFretboardVisible}, 延迟时间=${delayTime}ms`);
+                    // 设置音程练习延迟定时器
+                    state.intervalNextTimeout = setTimeout(() => {
+                        generateNextIntervalExercise();
+                    }, delayTime);
+                }
             }
 
             // 在指板上显示音程位置的函数
@@ -11441,6 +11471,12 @@
                 function generateIntervalExercise() {
                     resetCagedModeState();
 
+                    // 清除之前的定时器
+                    if (state.intervalNextTimeout) {
+                        clearTimeout(state.intervalNextTimeout);
+                        state.intervalNextTimeout = null;
+                    }
+
                     // 设置音程练习模式
                     window.state.intervalExerciseMode = true;
                     window.state.pitchFindingMode = false;
@@ -11597,6 +11633,12 @@
                 
                 // 生成下一题音程练习（不重新启动计时器）
                 function generateNextIntervalExercise() {
+                    // 清除之前的定时器
+                    if (state.intervalNextTimeout) {
+                        clearTimeout(state.intervalNextTimeout);
+                        state.intervalNextTimeout = null;
+                    }
+
                     if (!state.currentIntervalExercise) return;
                     
                     const exercise = state.currentIntervalExercise;
@@ -11676,20 +11718,49 @@
                 function hideFretboardForPractice() {
                     const fretboardContainer = document.getElementById('fretboardContainer');
                     const fretboardFooter = document.getElementById('fretboardFooter');
-                    
+
                     if (fretboardContainer && fretboardFooter) {
                         fretboardContainer.style.display = 'none';
                         fretboardFooter.style.display = 'none';
-                        
+
                         // 清除指板高亮
                         clearFretboardHighlights();
-                        
+
                         // 设置指板隐藏状态
                         state.fretboardVisible = false;
                         console.log('指板已隐藏');
-                        
-                        // 如果当前有正在等待的延迟，重新设置延迟时间
-                        updateCurrentDelay();
+
+                        // 隐藏指板时立即进入下一题（如果当前练习已完成）
+                        const activeTab = document.querySelector('.nav-item.active');
+                        if (activeTab && activeTab.dataset.tab === 'pitch-finding') {
+                            const practiceMode = document.querySelector('.practice-mode-btn.active');
+
+                            if (practiceMode && practiceMode.dataset.mode === 'interval') {
+                                // 音程练习模式
+                                if (state.currentIntervalExercise && state.currentIntervalExercise.answered) {
+                                    console.log('隐藏指板，音程练习立即进入下一题');
+                                    // 清除延迟
+                                    if (state.intervalNextTimeout) {
+                                        clearTimeout(state.intervalNextTimeout);
+                                        state.intervalNextTimeout = null;
+                                    }
+                                    // 立即进入下一题
+                                    generateNextIntervalExercise();
+                                }
+                            } else {
+                                // 单音练习模式
+                                if (state.pitchFindingAnswered) {
+                                    console.log('隐藏指板，单音练习立即进入下一题');
+                                    // 清除延迟
+                                    if (state.pitchFindingNextTimeout) {
+                                        clearTimeout(state.pitchFindingNextTimeout);
+                                        state.pitchFindingNextTimeout = null;
+                                    }
+                                    // 立即进入下一题
+                                    generateNextPitchFindingQuestion();
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -11713,24 +11784,67 @@
                         // 重新计算延迟时间
                         let delayTime;
                         if (!isFretboardVisible) {
-                            delayTime = 100; // 指板隐藏时几乎立即切换
+                            // 指板隐藏时立即自动切换（忽略手动模式设置）
+                            delayTime = 100;
+                            console.log(`重新设置找音练习指板隐藏: 立即自动切换下一题`);
+                        } else if (intervalSeconds === 0) {
+                            // 指板显示且手动模式：不设置自动切换
+                            delayTime = 0;
+                            console.log(`重新设置找音练习指板显示且手动模式: 取消自动切换，等待用户操作`);
                         } else {
-                            delayTime = intervalSeconds > 0 ? intervalSeconds * 1000 : 1500; // 指板显示时使用设置的延迟
+                            // 指板显示且自动模式：使用设置的延迟时间
+                            delayTime = intervalSeconds * 1000;
+                            console.log(`重新设置找音练习指板显示且自动模式: 延迟${delayTime}ms`);
                         }
-                        
-                        console.log(`重新设置找音练习延迟: 指板显示=${isFretboardVisible}, 新延迟时间=${delayTime}ms`);
-                        
-                        // 重新设置延迟
-                        state.pitchFindingNextTimeout = setTimeout(() => {
-                            generateNextPitchFindingQuestion();
-                        }, delayTime);
+
+                        if (delayTime > 0) {
+                            console.log(`重新设置找音练习延迟: 指板显示=${isFretboardVisible}, 新延迟时间=${delayTime}ms`);
+                            // 重新设置延迟
+                            state.pitchFindingNextTimeout = setTimeout(() => {
+                                generateNextPitchFindingQuestion();
+                            }, delayTime);
+                        }
                     }
                     
                     // 检查是否有正在进行的音程练习延迟
-                    if (state.currentIntervalExercise && state.currentIntervalExercise.answered) {
-                        console.log('检测到音程练习可能正在延迟中');
-                        // 注意：音程练习使用的是匿名setTimeout，无法直接取消
-                        // 但新的延迟逻辑会在下次答题时生效
+                    if (state.intervalNextTimeout && state.currentIntervalExercise && state.currentIntervalExercise.answered) {
+                        console.log('检测到音程练习延迟，重新设置延迟时间');
+
+                        // 清除当前的延迟
+                        clearTimeout(state.intervalNextTimeout);
+                        state.intervalNextTimeout = null;
+
+                        // 获取当前设置
+                        const selectedIntervalBtn = document.querySelector('.pitch-finding-interval-btn.active');
+                        const intervalSeconds = selectedIntervalBtn ? parseInt(selectedIntervalBtn.dataset.value) : 0;
+
+                        // 检查指板是否显示
+                        const fretboardContainer = document.getElementById('fretboardContainer');
+                        const isFretboardVisible = fretboardContainer && fretboardContainer.style.display !== 'none';
+
+                        // 重新计算延迟时间
+                        let delayTime;
+                        if (!isFretboardVisible) {
+                            // 指板隐藏时立即自动切换（忽略手动模式设置）
+                            delayTime = 100;
+                            console.log(`重新设置音程练习指板隐藏: 立即自动切换下一题`);
+                        } else if (intervalSeconds === 0) {
+                            // 指板显示且手动模式：不设置自动切换
+                            delayTime = 0;
+                            console.log(`重新设置音程练习指板显示且手动模式: 取消自动切换，等待用户操作`);
+                        } else {
+                            // 指板显示且自动模式：使用设置的延迟时间
+                            delayTime = intervalSeconds * 1000;
+                            console.log(`重新设置音程练习指板显示且自动模式: 延迟${delayTime}ms`);
+                        }
+
+                        if (delayTime > 0) {
+                            console.log(`重新设置音程练习延迟: 指板显示=${isFretboardVisible}, 新延迟时间=${delayTime}ms`);
+                            // 重新设置延迟
+                            state.intervalNextTimeout = setTimeout(() => {
+                                generateNextIntervalExercise();
+                            }, delayTime);
+                        }
                     }
                 }
                 
@@ -11775,19 +11889,19 @@
                 function clearFretboardHighlights() {
                     const fretboard = document.getElementById('fretboard');
                     if (!fretboard) return;
-                    
+
                     const frets = fretboard.querySelectorAll('.fretboard-fret');
                     frets.forEach(fret => {
                         fret.style.backgroundColor = '';
                         fret.style.boxShadow = '';
-                        
+
                         // 移除音程标记
                         const intervalDisplay = fret.querySelector('.interval-display');
                         if (intervalDisplay) {
                             intervalDisplay.remove();
                         }
                     });
-                    
+
                     // 清除CAGED相关元素（重要：防止在非CAGED练习中显示）
                     const fretboardContainer = document.getElementById('fretboardContainer');
                     if (fretboardContainer) {
@@ -11797,6 +11911,17 @@
                             console.log('音程练习 - 清除CAGED元素:', cagedElements.length, '个');
                         }
                     }
+
+                    // 恢复所有被隐藏的空弦音名
+                    const hiddenMarkers = document.querySelectorAll('.fret-marker.hidden');
+                    hiddenMarkers.forEach(marker => {
+                        const originalNote = marker.dataset.originalNote;
+                        if (originalNote) {
+                            marker.textContent = originalNote;
+                            marker.classList.remove('hidden');
+                            delete marker.dataset.originalNote;
+                        }
+                    });
                 }
                 
 
@@ -14001,13 +14126,18 @@
                     const dropdown = document.getElementById('scaleTypeDropdown');
                     const content = document.getElementById('scaleTypeDropdownContent');
 
-                    // 下拉框点击事件 - 使用捕获阶段确保优先处理
+                    // 下拉框点击事件 - 使用全屏选择器
                     if (dropdown) {
                         dropdown.addEventListener('click', (e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             e.stopImmediatePropagation();
-                            this.toggleDropdown();
+                            // 打开全屏选择器而不是原来的下拉框
+                            if (typeof openFullscreenSelector === 'function') {
+                                openFullscreenSelector('scaleType', '选择调式', null);
+                            } else {
+                                this.toggleDropdown(); // 备用方案
+                            }
                         }, true);
                     }
 
@@ -15042,69 +15172,214 @@
             }
             
             // 生成音阶类型选择内容
+            // 生成音阶类型选择内容（多选模式）
             function generateScaleTypeContent() {
-                const scaleTypeSelect = document.getElementById('scaleType');
-                const currentValue = scaleTypeSelect.value;
-                
-                const optgroups = scaleTypeSelect.querySelectorAll('optgroup');
-                const scaleGroups = {};
-                
-                optgroups.forEach(optgroup => {
-                    const groupName = optgroup.label;
-                    scaleGroups[groupName] = [];
-                    const options = optgroup.querySelectorAll('option');
-                    options.forEach(option => {
-                        scaleGroups[groupName].push({
-                            value: option.value,
-                            text: option.textContent
-                        });
-                    });
-                });
-                
+                // 获取当前已选中的调式
+                const currentSelectedScales = window.ScaleTypeManager ?
+                    Array.from(window.ScaleTypeManager.selectedScales) : ['major'];
+
+                // 添加控制按钮到header
+                const fullscreenSelectorHeader = document.querySelector('.fullscreen-selector-header');
+                const originalButtons = fullscreenSelectorHeader.innerHTML;
+
+                // 添加控制按钮
+                fullscreenSelectorHeader.innerHTML = `
+                    <button class="fullscreen-selector-back" id="fullscreenSelectorBack">
+                        <span>←</span>
+                        <span data-i18n-key="btn_back">返回</span>
+                    </button>
+                    <h2 class="fullscreen-selector-title" id="fullscreenSelectorTitle">选择调式</h2>
+                    <div class="scale-controls" style="margin-left: auto; display: flex; gap: 8px;">
+                        <button class="scale-control-btn" id="selectAllScales" data-i18n-key="select_all">全选</button>
+                        <button class="scale-control-btn" id="deselectAllScales" data-i18n-key="deselect_all">全不选</button>
+                        <button class="scale-control-btn" id="randomSelectScales" data-i18n-key="random_select">随机选择</button>
+                    </div>
+                `;
+
+                // 使用window.scaleTypes对象组织音阶类型数据
+                const scaleGroups = {
+                    '基本调式': [
+                        { value: 'major', title: 'Major', desc: '1 2 3 4 5 6 7' },
+                        { value: 'minor', title: 'Minor', desc: '1 2 ♭3 4 5 ♭6 ♭7' }
+                    ],
+                    '教会调式 (Church Modes)': [
+                        { value: 'ionian', title: 'Ionian', desc: '1 2 3 4 5 6 7' },
+                        { value: 'dorian', title: 'Dorian', desc: '1 2 ♭3 4 5 6 ♭7' },
+                        { value: 'phrygian', title: 'Phrygian', desc: '1 ♭2 ♭3 4 5 ♭6 ♭7' },
+                        { value: 'lydian', title: 'Lydian', desc: '1 2 3 ♯4 5 6 7' },
+                        { value: 'mixolydian', title: 'Mixolydian', desc: '1 2 3 4 5 6 ♭7' },
+                        { value: 'aeolian', title: 'Aeolian', desc: '1 2 ♭3 4 5 ♭6 ♭7' },
+                        { value: 'locrian', title: 'Locrian', desc: '1 ♭2 ♭3 4 ♭5 ♭6 ♭7' }
+                    ],
+                    '和声小调系列': [
+                        { value: 'harmonicMinor', title: 'Harmonic Minor', desc: '1 2 ♭3 4 5 ♭6 7' },
+                        { value: 'dorianSharp2', title: 'Dorian ♯2', desc: '1 ♯2 3 4 5 6 ♭7' },
+                        { value: 'phrygianMajor', title: 'Phrygian Major', desc: '1 ♭2 3 4 5 ♭6 ♭7' },
+                        { value: 'lydianSharp2', title: 'Lydian ♯2', desc: '1 ♯2 3 ♯4 5 6 7' },
+                        { value: 'mixolydianFlat6', title: 'Mixolydian ♭6', desc: '1 2 3 4 5 ♭6 ♭7' },
+                        { value: 'lydianFlat2', title: 'Lydian ♭2', desc: '1 ♭2 3 ♯4 5 6 7' },
+                        { value: 'superLocrianDiminished', title: 'Super Locrian Dim', desc: '1 ♭2 ♭3 ♭4 ♭5 ♭6 6' }
+                    ],
+                    '旋律小调系列': [
+                        { value: 'melodicMinor', title: 'Melodic Minor', desc: '1 2 ♭3 4 5 6 7' },
+                        { value: 'melodicMinorDescending', title: 'Melodic Minor Desc', desc: '1 ♭7 ♭6 5 4 ♭3 2 1' },
+                        { value: 'dorianFlat2', title: 'Dorian ♭2', desc: '1 ♭2 ♭3 4 5 6 ♭7' },
+                        { value: 'lydianAugmented', title: 'Lydian Augmented', desc: '1 2 3 ♯4 ♯5 6 7' },
+                        { value: 'lydianFlat7', title: 'Lydian ♭7', desc: '1 2 3 ♯4 5 6 ♭7' },
+                        { value: 'aeolianFlat5', title: 'Aeolian ♭5', desc: '1 2 ♭3 4 ♭5 ♭6 ♭7' },
+                        { value: 'superLocrian', title: 'Super Locrian', desc: '1 ♭2 ♭3 ♭4 ♭5 ♭6 ♭7' }
+                    ],
+                    '五声音阶': [
+                        { value: 'majorPentatonic', title: 'Major Pentatonic', desc: '1 2 3 5 6' },
+                        { value: 'minorPentatonic', title: 'Minor Pentatonic', desc: '1 ♭3 4 5 ♭7' },
+                        { value: 'dorianPentatonic', title: 'Dorian Pentatonic', desc: '1 2 ♭3 5 6' },
+                        { value: 'phrygianPentatonic', title: 'Phrygian Pentatonic', desc: '1 ♭2 4 5 ♭6' },
+                        { value: 'mixolydianPentatonic', title: 'Mixolydian Pentatonic', desc: '1 2 3 5 ♭7' }
+                    ],
+                    '布鲁斯音阶': [
+                        { value: 'blues', title: 'Blues', desc: '1 ♭3 4 ♯4 5 ♭7' },
+                        { value: 'majorBlues', title: 'Major Blues', desc: '1 2 ♭3 3 5 6' }
+                    ],
+                    '特殊音阶': [
+                        { value: 'wholeTone', title: 'Whole Tone', desc: '1 2 3 ♯4 ♯5 ♯6' },
+                        { value: 'diminished', title: 'Diminished HW', desc: '1 ♭2 ♭3 3 ♯4 5 6 ♭7' },
+                        { value: 'diminishedWhole', title: 'Diminished WH', desc: '1 2 ♭3 ♯4 ♯5 6 7' },
+                        { value: 'arabic', title: 'Arabic', desc: '1 ♭2 3 4 5 ♭6 ♭7' },
+                        { value: 'gypsy', title: 'Gypsy', desc: '1 ♭2 3 4 5 ♭6 7' },
+                        { value: 'japanese', title: 'Japanese', desc: '1 ♭2 4 5 ♭6' },
+                        { value: 'egyptian', title: 'Egyptian', desc: '1 2 4 5 ♭7' },
+                        { value: 'hungarian', title: 'Hungarian', desc: '1 ♯2 3 ♯4 5 ♭6 7' },
+                        { value: 'persian', title: 'Persian', desc: '1 ♭2 3 4 ♭5 ♭6 7' },
+                        { value: 'byzantine', title: 'Byzantine', desc: '1 ♭2 3 4 5 ♭6 7' },
+                        { value: 'enigmatic', title: 'Enigmatic', desc: '1 ♭2 3 ♯4 ♯5 ♯6 7' },
+                        { value: 'neapolitan', title: 'Neapolitan', desc: '1 ♭2 ♭3 4 5 ♭6 7' },
+                        { value: 'spanish', title: 'Spanish', desc: '1 ♭2 3 4 5 ♭6 ♭7' }
+                    ]
+                };
+
                 let html = '<div class="selector-grid">';
-                
+
                 for (const [groupName, scales] of Object.entries(scaleGroups)) {
                     html += `<div class="selector-group-title">● ${groupName}</div>`;
                     html += '<div class="selector-group">';
                     scales.forEach(scale => {
-                        const isActive = scale.value === currentValue ? 'active' : '';
+                        const isActive = currentSelectedScales.includes(scale.value) ? 'active' : '';
                         html += `
                             <div class="selector-item ${isActive}" data-value="${scale.value}">
-                                <div class="selector-item-title">${scale.text}</div>
+                                <div class="selector-item-title">${scale.title}</div>
+                                <div class="selector-item-desc">${scale.desc}</div>
                             </div>
                         `;
                     });
                     html += '</div>';
                 }
-                
+
                 html += '</div>';
                 fullscreenSelectorContent.innerHTML = html;
-                
-                // 绑定点击事件
+
+                // 绑定控制按钮事件
+                const allScales = [];
+                for (const scales of Object.values(scaleGroups)) {
+                    allScales.push(...scales.map(s => s.value));
+                }
+
+                document.getElementById('selectAllScales').addEventListener('click', () => {
+                    const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                    items.forEach(item => item.classList.add('active'));
+                    if (window.ScaleTypeManager) {
+                        window.ScaleTypeManager.selectedScales.clear();
+                        allScales.forEach(scale => window.ScaleTypeManager.selectedScales.add(scale));
+                        window.ScaleTypeManager.updateHiddenSelect();
+                        window.ScaleTypeManager.updateDisplayText();
+                        window.ScaleTypeManager.updateArpeggioButtons();
+                    }
+                });
+
+                document.getElementById('deselectAllScales').addEventListener('click', () => {
+                    const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                    items.forEach(item => item.classList.remove('active'));
+                    if (window.ScaleTypeManager) {
+                        window.ScaleTypeManager.selectedScales.clear();
+                        window.ScaleTypeManager.updateHiddenSelect();
+                        window.ScaleTypeManager.updateDisplayText();
+                        window.ScaleTypeManager.updateArpeggioButtons();
+                    }
+                });
+
+                document.getElementById('randomSelectScales').addEventListener('click', () => {
+                    const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
+                    items.forEach(item => item.classList.remove('active'));
+
+                    // 随机选择3-8个调式
+                    const randomCount = Math.floor(Math.random() * 6) + 3;
+                    const shuffled = [...allScales].sort(() => Math.random() - 0.5);
+                    const selected = shuffled.slice(0, randomCount);
+
+                    items.forEach(item => {
+                        if (selected.includes(item.dataset.value)) {
+                            item.classList.add('active');
+                        }
+                    });
+
+                    if (window.ScaleTypeManager) {
+                        window.ScaleTypeManager.selectedScales.clear();
+                        selected.forEach(scale => window.ScaleTypeManager.selectedScales.add(scale));
+                        window.ScaleTypeManager.updateHiddenSelect();
+                        window.ScaleTypeManager.updateDisplayText();
+                        window.ScaleTypeManager.updateArpeggioButtons();
+                    }
+                });
+
+                // 绑定调式选择点击事件（多选模式）
                 const items = fullscreenSelectorContent.querySelectorAll('.selector-item');
                 items.forEach(item => {
                     item.addEventListener('click', function() {
                         const value = this.dataset.value;
-                        const text = this.querySelector('.selector-item-title').textContent;
-                        
-                        scaleTypeSelect.value = value;
-                        scaleTypeSelect.dispatchEvent(new Event('change'));
-                        
-                        if (currentCallback) {
-                            currentCallback(value, text);
+
+                        // 切换选中状态
+                        this.classList.toggle('active');
+
+                        // 更新ScaleTypeManager的状态
+                        if (window.ScaleTypeManager) {
+                            if (this.classList.contains('active')) {
+                                window.ScaleTypeManager.selectedScales.add(value);
+                            } else {
+                                window.ScaleTypeManager.selectedScales.delete(value);
+                            }
+                            window.ScaleTypeManager.updateHiddenSelect();
+                            window.ScaleTypeManager.updateDisplayText();
+                            window.ScaleTypeManager.updateArpeggioButtons();
                         }
-                        
-                        closeFullscreenSelector();
                     });
                 });
-                
-                // 滚动到当前选中项
+
+                // 滚动到第一个选中项
                 setTimeout(() => {
                     const activeItem = fullscreenSelectorContent.querySelector('.selector-item.active');
                     if (activeItem) {
                         activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 }, 100);
+
+                // 返回时恢复原始header
+                const originalBackHandler = fullscreenSelectorBack.onclick;
+                const newBackHandler = function() {
+                    // 恢复原始header内容
+                    fullscreenSelectorHeader.innerHTML = originalButtons;
+                    // 重新绑定返回按钮
+                    const backBtn = fullscreenSelectorHeader.querySelector('.fullscreen-selector-back');
+                    if (backBtn) {
+                        backBtn.addEventListener('click', originalBackHandler);
+                    }
+                    // 关闭选择器
+                    closeFullscreenSelector();
+                };
+
+                // 重新绑定返回按钮
+                const backBtn = fullscreenSelectorHeader.querySelector('.fullscreen-selector-back');
+                if (backBtn) {
+                    backBtn.addEventListener('click', newBackHandler);
+                }
             }
             
             // 生成和弦类型选择内容
@@ -15459,8 +15734,7 @@
                 // 音阶设置 - 根音选择
                 addSelectOverlay('rootNote', 'rootNote', '选择调性');
 
-                // 音阶设置 - 音阶类型选择 - 移除覆盖层，使用自定义下拉框
-                // addSelectOverlay('scaleType', 'scaleType', '选择音阶类型');
+                // 音阶设置 - 音阶类型选择 - 已在ScaleTypeManager中处理全屏选择器
                 
                 // 和弦设置 - 和弦根音选择
                 addSelectOverlay('chordRootNote', 'chordRootNote', '选择和弦根音');

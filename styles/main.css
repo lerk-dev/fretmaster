@@ -3206,6 +3206,69 @@ input:checked+.slider:before {
     min-width: 0; /* 允许收缩 */
 }
 
+/* 调式选择触发器高度调整 - 强制设置以覆盖所有其他样式 */
+#scaleTypeDropdown .dropdown-trigger {
+    height: 44px !important; /* 固定高度，与和弦进行练习等级trigger相同 */
+    min-height: 44px !important;
+    max-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    padding: 0 !important; /* 移除trigger本身的padding */
+    overflow: hidden !important; /* 防止内容溢出 */
+}
+
+#scaleTypeDropdown .dropdown-display {
+    height: 100% !important; /* 使用父容器的全部高度 */
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 !important; /* 移除padding，让trigger直接控制内容 */
+    box-sizing: border-box !important;
+    margin: 0 !important;
+}
+
+#scaleTypeDropdown .selected-text {
+    line-height: 1.2 !important; /* 减小行高 */
+    margin: 0 !important; /* 移除默认margin */
+    padding: 0 !important;
+    height: auto !important;
+    display: inline-block !important;
+    vertical-align: middle !important; /* 垂直居中对齐 */
+}
+
+#scaleTypeDropdown .dropdown-arrow {
+    margin: 0 !important;
+    line-height: 1 !important;
+    vertical-align: middle !important; /* 垂直居中对齐 */
+}
+
+/* 调式选择容器高度控制 */
+#scaleTypeDropdown.multiselect-dropdown {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    overflow: hidden !important;
+}
+
+/* 调式选择控制按钮样式 */
+.scale-control-btn {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 4px;
+    color: #3b82f6;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.scale-control-btn:hover {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.6);
+    transform: translateY(-1px);
+}
+
 .dropdown-trigger {
     background: var(--bg-white-glass);
     border: 1px solid var(--border-glass);
