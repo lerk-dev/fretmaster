@@ -249,12 +249,22 @@ select optgroup {
     border-radius: 4px;
 }
 
-.refresh-device-btn {
-    width: auto;
-    padding: 4px 8px;
-    font-size: 11px;
+#refreshDevicesBtn {
+    width: 20%;
+    padding: 11px 10px;
+    font-size: 14px;
     margin-left: 10px;
-    min-width: 80px;
+    line-height: 1.2;
+    height: auto;
+    min-height: auto;
+    border: 2px solid rgba(58, 159, 196, 0.5);
+    border-radius: 12px;
+    background: transparent;
+    color: #3a9fc4;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
 }
 
 .settings-row-spacing {
@@ -1833,6 +1843,9 @@ h1::before {
     flex-direction: column;
     gap: 8px;
     margin-bottom: 12px;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .settings-label {
@@ -3188,7 +3201,9 @@ input:checked+.slider:before {
 .multiselect-dropdown {
     position: relative;
     width: 100%;
+    max-width: 100%;
     z-index: 9999998;
+    min-width: 0; /* 允许收缩 */
 }
 
 .dropdown-trigger {
@@ -3197,6 +3212,9 @@ input:checked+.slider:before {
     border-radius: var(--radius-medium);
     cursor: pointer;
     transition: var(--transition);
+    min-width: 0; /* 允许收缩到内容大小 */
+    width: 100%; /* 使用父容器的全部宽度 */
+    box-sizing: border-box; /* 包含边框和内边距 */
 }
 
 .dropdown-trigger:hover {
@@ -3209,6 +3227,8 @@ input:checked+.slider:before {
     align-items: center;
     padding: 12px;
     justify-content: space-between;
+    width: 100%;
+    min-width: 0;
 }
 
 .selected-text {
@@ -3220,6 +3240,7 @@ input:checked+.slider:before {
     text-overflow: ellipsis;
     padding-right: 8px;
     min-width: 0;
+    max-width: calc(100% - 28px); /* 20px箭头宽度 + 8px间距 */
 }
 
 .dropdown-arrow {
@@ -3228,6 +3249,11 @@ input:checked+.slider:before {
     transition: transform 0.3s ease;
     flex-shrink: 0;
     margin-left: 0;
+    width: 20px; /* 固定宽度 */
+    text-align: right; /* 右对齐 */
+    display: flex;
+    justify-content: flex-end; /* 内容右对齐 */
+    align-items: center;
 }
 
 .dropdown-trigger.active .dropdown-arrow {
@@ -3356,8 +3382,9 @@ input:checked+.slider:before {
     }
 
     .dropdown-controls {
-        flex-direction: column;
+        flex-direction: row;
         gap: 6px;
+        flex-wrap: wrap;
     }
 
     .option-text {

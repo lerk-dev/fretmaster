@@ -1784,8 +1784,43 @@
                     `;
                     
                     // 构建和弦进行显示
-                    const chordsDisplay = songData.chords.join(' - ');
-                    
+                    let chordsDisplay;
+                    if (songName.includes('练习') && songName.includes('个调')) {
+                        // 练习曲目：显示详细的和弦循环信息
+                        const circleOfFifthsReverse = ['A', 'D', 'G', 'C', 'F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'B', 'E'];
+
+                        if (songName.includes('Maj7') && !songName.includes('#11') && !songName.includes('#5')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}Maj7`).join(' → ');
+                        } else if (songName.includes('Min7') && !songName.includes('b5') && !songName.includes('Maj7')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}m7`).join(' → ');
+                        } else if (songName.includes('Sus4b9')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}sus4(b9)`).join(' → ');
+                        } else if (songName.includes('Maj7#11')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}Maj7(#11)`).join(' → ');
+                        } else if (songName.includes('7sus4') && !songName.includes('b9') && !songName.includes('13')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}7sus4`).join(' → ');
+                        } else if (songName.includes('Dom7')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}7`).join(' → ');
+                        } else if (songName.includes('Min7b5') && !songName.includes('♮9')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}m7(b5)`).join(' → ');
+                        } else if (songName.includes('MinMaj7')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}m(Maj7)`).join(' → ');
+                        } else if (songName.includes('13sus4b9')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}13sus4(b9)`).join(' → ');
+                        } else if (songName.includes('Maj7#5')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}Maj7(#5)`).join(' → ');
+                        } else if (songName.includes('7#11') && !songName.includes('13')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}7(#11)`).join(' → ');
+                        } else if (songName.includes('Min7b5♮9')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}m7(b5,♮9)`).join(' → ');
+                        } else if (songName.includes('13b9')) {
+                            chordsDisplay = circleOfFifthsReverse.map(key => `${key}13(b9)`).join(' → ');
+                        }
+                    } else {
+                        // 普通歌曲：显示标准和弦进行
+                        chordsDisplay = songData.chords.join(' - ');
+                    }
+
                     // 获取歌曲信息，提供默认值
                     const info = songData.info || {
                         composer: '未知',
@@ -1824,6 +1859,15 @@
                             <h3 class="song-info-subtitle" data-i18n-key="song_description">曲目介绍</h3>
                             <div class="song-info-content">
                                 ${info.description}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        ${info.details ? `
+                        <div class="song-info-section">
+                            <h3 class="song-info-subtitle">练习说明</h3>
+                            <div class="song-info-content">
+                                ${info.details}
                             </div>
                         </div>
                         ` : ''}
@@ -4971,6 +5015,21 @@
                                     <option value="Very Early" >Very Early</option>
                                     <option value="Virgo" >Virgo</option>
                                 </optgroup>
+                                <optgroup label="练习" >
+                                    <option value="练习1 - Maj7和弦(12个调)" >练习1 - Maj7和弦(12个调)</option>
+                                    <option value="练习2 - Min7和弦(12个调)" >练习2 - Min7和弦(12个调)</option>
+                                    <option value="练习3 - Sus4b9和弦(12个调)" >练习3 - Sus4b9和弦(12个调)</option>
+                                    <option value="练习4 - Maj7#11和弦(12个调)" >练习4 - Maj7#11和弦(12个调)</option>
+                                    <option value="练习5 - 7sus4和弦(12个调)" >练习5 - 7sus4和弦(12个调)</option>
+                                    <option value="练习5a - Dom7和弦(12个调)" >练习5a - Dom7和弦(12个调)</option>
+                                    <option value="练习6 - Min7b5和弦(12个调)" >练习6 - Min7b5和弦(12个调)</option>
+                                    <option value="练习7 - MinMaj7和弦(12个调)" >练习7 - MinMaj7和弦(12个调)</option>
+                                    <option value="练习8 - 13sus4b9和弦(12个调)" >练习8 - 13sus4b9和弦(12个调)</option>
+                                    <option value="练习9 - Maj7#5和弦(12个调)" >练习9 - Maj7#5和弦(12个调)</option>
+                                    <option value="练习10 - 7#11和弦(12个调)" >练习10 - 7#11和弦(12个调)</option>
+                                    <option value="练习11 - Min7b5♮9和弦(12个调)" >练习11 - Min7b5♮9和弦(12个调)</option>
+                                    <option value="练习12 - 13b9和弦(12个调)" >练习12 - 13b9和弦(12个调)</option>
+                                </optgroup>
                             </select>
                             
                             <!-- 自定义乐曲下拉列表 - 将通过JavaScript动态生成 -->
@@ -6363,7 +6422,17 @@
                 'add9': { name: '加九和弦', intervals: ['1', '3', '5', '9'] },
                 'madd9': { name: '小加九和弦', intervals: ['1', '♭3', '5', '9'] },
                 '6add9': { name: '六加九和弦', intervals: ['1', '3', '5', '6', '9'] },
-                'm6add9': { name: '小六加九和弦', intervals: ['1', '♭3', '5', '6', '9'] }
+                'm6add9': { name: '小六加九和弦', intervals: ['1', '♭3', '5', '6', '9'] },
+
+                // 复杂和弦类型 - 用于练习曲目
+                'sus4b9': { name: '挂留四降九和弦', intervals: ['1', '4', '5', '♭9'] },
+                '13sus4b9': { name: '十三挂留四降九和弦', intervals: ['1', '4', '5', '♭7', '9', '13'] },
+                'Maj7#11': { name: '大七升十一和弦', intervals: ['1', '3', '5', '7', '♯11'] },
+                'Maj7#5': { name: '大七升五和弦', intervals: ['1', '3', '♯5', '7'] },
+                '7#11': { name: '属七升十一和弦', intervals: ['1', '3', '5', '♭7', '♯11'] },
+                'MinMaj7': { name: '小大七和弦', intervals: ['1', '♭3', '5', '7'] },
+                'Min7b5♮9': { name: '小七降五自然九和弦', intervals: ['1', '♭3', '♭5', '♭7', '9'] },
+                '13b9': { name: '十三降九和弦', intervals: ['1', '3', '5', '♭7', '♭9', '13'] }
             };
 
             // 经典爵士乐歌曲和弦进行（基于音级储存）
@@ -6693,6 +6762,164 @@
                     'Virgo': {
                         key: 'A',
                         chords: ['Im7', 'IVm7', 'Im7', 'Im7', 'IIm7♭5', 'V7', 'Im7', 'Im7']
+                    }
+                },
+                '练习': {
+                    '练习1 - Maj7和弦(12个调)': {
+                        key: 'A',
+                        chords: ['IM7', 'IV7', 'V7', 'IM7'], // 简化的和弦进行示例
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'Maj7和弦五度圈循环练习。从AMaj7开始，按照五度圈倒序方向（A-D-G-C-F-B♭-E♭-A♭-D♭-G♭-B-E）进行12个调的Maj7和弦练习。每个和弦持续一个小节，共48小节的完整循环。适合练习大七和弦在不同调中的指法和声音色彩。',
+                            details: '五度圈倒序进行：AMaj7 → DMaj7 → GMaj7 → CMaj7 → FMaj7 → B♭Maj7 → E♭Maj7 → A♭Maj7 → D♭Maj7 → G♭Maj7 → BMaj7 → EMaj7 → 回到AMaj7。每个调的Maj7和弦练习帮助你掌握不同调性下的声音特点。'
+                        }
+                    },
+                    '练习2 - Min7和弦(12个调)': {
+                        key: 'A',
+                        chords: ['Im7', 'IVm7', 'Vm7', 'Im7'], // 简化的和弦进行示例
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'Min7和弦五度圈循环练习。从Am7开始，按照五度圈倒序方向（A-D-G-C-F-B♭-E♭-A♭-D♭-G♭-B-E）进行12个调的小七和弦练习。每个和弦持续一个小节，共48小节的完整循环。适合练习小七和弦在不同调中的指法和声音色彩。',
+                            details: '五度圈倒序进行：Am7 → Dm7 → Gm7 → Cm7 → Fm7 → B♭m7 → E♭m7 → A♭m7 → D♭m7 → G♭m7 → Bm7 → Em7 → 回到Am7。每个调的小七和弦练习帮助你掌握不同调性下的和声色彩。'
+                        }
+                    },
+                    '练习3 - Sus4b9和弦(12个调)': {
+                        key: 'A',
+                        chords: ['Isus4(b9)', 'IVsus4(b9)', 'Vsus4(b9)', 'Isus4(b9)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'Sus4(b9)和弦五度圈循环练习。从Asus4(b9)开始，按照五度圈倒序方向进行12个调的挂留四和弦加降九音练习。这个和弦组合具有紧张和解决的强烈倾向性，适合练习爵士和声的张力处理。',
+                            details: '五度圈倒序进行：Asus4(b9) → Dsus4(b9) → Gsus4(b9) → Csus4(b9) → Fsus4(b9) → B♭sus4(b9) → E♭sus4(b9) → A♭sus4(b9) → D♭sus4(b9) → G♭sus4(b9) → Bsus4(b9) → Esus4(b9) → 回到Asus4(b9)。'
+                        }
+                    },
+                    '练习4 - Maj7#11和弦(12个调)': {
+                        key: 'A',
+                        chords: ['IMaj7(#11)', 'IVMaj7(#11)', 'VMaj7(#11)', 'IMaj7(#11)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'Maj7(#11)和弦五度圈循环练习。从AMaj7(#11)开始，按照五度圈倒序方向进行12个调的升十一音大七和弦练习。这个和弦具有强烈的Lydian调式色彩，是现代爵士和声的重要元素。',
+                            details: '五度圈倒序进行：AMaj7(#11) → DMaj7(#11) → GMaj7(#11) → CMaj7(#11) → FMaj7(#11) → B♭Maj7(#11) → E♭Maj7(#11) → A♭Maj7(#11) → D♭Maj7(#11) → G♭Maj7(#11) → BMaj7(#11) → EMaj7(#11) → 回到AMaj7(#11)。'
+                        }
+                    },
+                    '练习5 - 7sus4和弦(12个调)': {
+                        key: 'A',
+                        chords: ['I7sus4', 'IV7sus4', 'V7sus4', 'I7sus4'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: '7sus4和弦五度圈循环练习。从A7sus4开始，按照五度圈倒序方向进行12个调的属七挂留四和弦练习。这个和弦在不解决前保持高度张力，是爵士即兴的常用手法。',
+                            details: '五度圈倒序进行：A7sus4 → D7sus4 → G7sus4 → C7sus4 → F7sus4 → B♭7sus4 → E♭7sus4 → A♭7sus4 → D♭7sus4 → G♭7sus4 → B7sus4 → E7sus4 → 回到A7sus4。'
+                        }
+                    },
+                    '练习5a - Dom7和弦(12个调)': {
+                        key: 'A',
+                        chords: ['I7', 'IV7', 'V7', 'I7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'Dom7和弦五度圈循环练习。从A7开始，按照五度圈倒序方向进行12个调的属七和弦练习。属七和弦是布鲁斯和爵士音乐的核心，掌握其循环对于理解功能性和声至关重要。',
+                            details: '五度圈倒序进行：A7 → D7 → G7 → C7 → F7 → B♭7 → E♭7 → A♭7 → D♭7 → G♭7 → B7 → E7 → 回到A7。'
+                        }
+                    },
+                    '练习6 - Min7b5和弦(12个调)': {
+                        key: 'A',
+                        chords: ['Im7(b5)', 'IVm7(b5)', 'Vm7(b5)', 'Im7(b5)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'Min7(b5)和弦五度圈循环练习。从Am7(b5)开始，按照五度圈倒序方向进行12个调的小七降五和弦练习。这个和弦是小调和声和减音阶的重要组成部分，具有强烈的紧张感。',
+                            details: '五度圈倒序进行：Am7(b5) → Dm7(b5) → Gm7(b5) → Cm7(b5) → Fm7(b5) → B♭m7(b5) → E♭m7(b5) → A♭m7(b5) → D♭m7(b5) → G♭m7(b5) → Bm7(b5) → Em7(b5) → 回到Am7(b5)。'
+                        }
+                    },
+                    '练习7 - MinMaj7和弦(12个调)': {
+                        key: 'A',
+                        chords: ['Im(Maj7)', 'IVm(Maj7)', 'Vm(Maj7)', 'Im(Maj7)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'MinMaj7和弦五度圈循环练习。从Am(Maj7)开始，按照五度圈倒序方向进行12个调的小大七和弦练习。这个和弦具有独特的神秘色彩，是小调和声和旋律小调音阶的代表性和弦。',
+                            details: '五度圈倒序进行：Am(Maj7) → Dm(Maj7) → Gm(Maj7) → Cm(Maj7) → Fm(Maj7) → B♭m(Maj7) → E♭m(Maj7) → A♭m(Maj7) → D♭m(Maj7) → G♭m(Maj7) → Bm(Maj7) → Em(Maj7) → 回到Am(Maj7)。'
+                        }
+                    },
+                    '练习8 - 13sus4b9和弦(12个调)': {
+                        key: 'A',
+                        chords: ['I13sus4(b9)', 'IV13sus4(b9)', 'V13sus4(b9)', 'I13sus4(b9)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: '13sus4(b9)和弦五度圈循环练习。从A13sus4(b9)开始，按照五度圈倒序方向进行12个调的十三挂留四降九和弦练习。这是一个复杂的延伸和弦，结合了多个音程层次，适合高级和声练习。',
+                            details: '五度圈倒序进行：A13sus4(b9) → D13sus4(b9) → G13sus4(b9) → C13sus4(b9) → F13sus4(b9) → B♭13sus4(b9) → E♭13sus4(b9) → A♭13sus4(b9) → D♭13sus4(b9) → G♭13sus4(b9) → B13sus4(b9) → E13sus4(b9) → 回到A13sus4(b9)。'
+                        }
+                    },
+                    '练习9 - Maj7#5和弦(12个调)': {
+                        key: 'A',
+                        chords: ['IMaj7(#5)', 'IVMaj7(#5)', 'VMaj7(#5)', 'IMaj7(#5)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'Maj7(#5)和弦五度圈循环练习。从AMaj7(#5)开始，按照五度圈倒序方向进行12个调的升五大七和弦练习。这个和弦具有增三和弦的色彩，适合练习调性和声的扩展。',
+                            details: '五度圈倒序进行：AMaj7(#5) → DMaj7(#5) → GMaj7(#5) → CMaj7(#5) → FMaj7(#5) → B♭Maj7(#5) → E♭Maj7(#5) → A♭Maj7(#5) → D♭Maj7(#5) → G♭Maj7(#5) → BMaj7(#5) → EMaj7(#5) → 回到AMaj7(#5)。'
+                        }
+                    },
+                    '练习10 - 7#11和弦(12个调)': {
+                        key: 'A',
+                        chords: ['I7(#11)', 'IV7(#11)', 'V7(#11)', 'I7(#11)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: '7#11和弦五度圈循环练习。从A7(#11)开始，按照五度圈倒序方向进行12个调的升十一音属七和弦练习。这个和弦融合了属功能和Lydian色彩，是现代爵士的重要和声词汇。',
+                            details: '五度圈倒序进行：A7(#11) → D7(#11) → G7(#11) → C7(#11) → F7(#11) → B♭7(#11) → E♭7(#11) → A♭7(#11) → D♭7(#11) → G♭7(#11) → B7(#11) → E7(#11) → 回到A7(#11)。'
+                        }
+                    },
+                    '练习11 - Min7b5♮9和弦(12个调)': {
+                        key: 'A',
+                        chords: ['Im7(b5,♮9)', 'IVm7(b5,♮9)', 'Vm7(b5,♮9)', 'Im7(b5,♮9)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: 'Min7(b5,♮9)和弦五度圈循环练习。从Am7(b5,♮9)开始，按照五度圈倒序方向进行12个调的小七降五自然九和弦练习。这个和弦结合了减音程和自然音，创造出独特的和声张力。',
+                            details: '五度圈倒序进行：Am7(b5,♮9) → Dm7(b5,♮9) → Gm7(b5,♮9) → Cm7(b5,♮9) → Fm7(b5,♮9) → B♭m7(b5,♮9) → E♭m7(b5,♮9) → A♭m7(b5,♮9) → D♭m7(b5,♮9) → G♭m7(b5,♮9) → Bm7(b5,♮9) → Em7(b5,♮9) → 回到Am7(b5,♮9)。'
+                        }
+                    },
+                    '练习12 - 13b9和弦(12个调)': {
+                        key: 'A',
+                        chords: ['I13(b9)', 'IV13(b9)', 'V13(b9)', 'I13(b9)'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: '和弦循环练习',
+                            tempo: 'Medium',
+                            description: '13(b9)和弦五度圈循环练习。从A13(b9)开始，按照五度圈倒序方向进行12个调的十三降九和弦练习。这是一个复杂的属功能和弦，结合了多个音程层次，适合高级爵士和声练习。',
+                            details: '五度圈倒序进行：A13(b9) → D13(b9) → G13(b9) → C13(b9) → F13(b9) → B♭13(b9) → E♭13(b9) → A♭13(b9) → D♭13(b9) → G♭13(b9) → B13(b9) → E13(b9) → 回到A13(b9)。'
+                        }
                     }
                 }
             };
@@ -10836,6 +11063,16 @@
                             }
                         }
                     }
+
+                    // 验证音阶设置
+                    if (activeTab === 'scale') {
+                        // 检查是否选择了调式
+                        const checkboxes = document.querySelectorAll('.dropdown-option input[type="checkbox"]:checked');
+                        if (checkboxes.length === 0) {
+                            alert('请选择要练习的调式！');
+                            return;
+                        }
+                    }
                     
                     updateStatusIndicator('正在启动麦克风...', 'recording');
 
@@ -12262,26 +12499,82 @@
 
                 // 获取原调和音级和弦进行
                 const originalKey = songData.key;
-                const degreeChords = [...songData.chords];
-                
-                // 调性转换
                 let chords = [];
-                const selectedKey = progressionKeyEl.value;
-                
-                // 移调到目标调
-                chords = degreeChords.map(degreeChord => 
-                    transposeChordFromDegree(degreeChord, originalKey, selectedKey)
-                );
 
-                
+                // 检查是否是练习曲目
+                if (selectedSong.includes('练习') && selectedSong.includes('个调')) {
+                    console.log('检测到练习曲目，生成和弦循环');
+
+                    const circleOfFifthsReverse = ['A', 'D', 'G', 'C', 'F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'B', 'E'];
+
+                    if (selectedSong.includes('Maj7') && !selectedSong.includes('#11') && !selectedSong.includes('#5')) {
+                        // Maj7和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}Maj7`);
+                    } else if (selectedSong.includes('Min7') && !selectedSong.includes('b5') && !selectedSong.includes('Maj7')) {
+                        // Min7和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}m7`);
+                    } else if (selectedSong.includes('Sus4b9')) {
+                        // Sus4b9和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}sus4(b9)`);
+                    } else if (selectedSong.includes('Maj7#11')) {
+                        // Maj7#11和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}Maj7(#11)`);
+                    } else if (selectedSong.includes('7sus4') && !selectedSong.includes('b9') && !selectedSong.includes('13')) {
+                        // 7sus4和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}7sus4`);
+                    } else if (selectedSong.includes('Dom7')) {
+                        // Dom7和弦练习（7和弦）
+                        chords = circleOfFifthsReverse.map(key => `${key}7`);
+                    } else if (selectedSong.includes('Min7b5') && !selectedSong.includes('♮9')) {
+                        // Min7b5和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}m7(b5)`);
+                    } else if (selectedSong.includes('MinMaj7')) {
+                        // MinMaj7和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}m(Maj7)`);
+                    } else if (selectedSong.includes('13sus4b9')) {
+                        // 13sus4b9和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}13sus4(b9)`);
+                    } else if (selectedSong.includes('Maj7#5')) {
+                        // Maj7#5和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}Maj7(#5)`);
+                    } else if (selectedSong.includes('7#11') && !selectedSong.includes('13')) {
+                        // 7#11和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}7(#11)`);
+                    } else if (selectedSong.includes('Min7b5♮9')) {
+                        // Min7b5♮9和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}m7(b5,♮9)`);
+                    } else if (selectedSong.includes('13b9')) {
+                        // 13b9和弦练习
+                        chords = circleOfFifthsReverse.map(key => `${key}13(b9)`);
+                    }
+
+                    console.log(`生成的${selectedSong}和弦循环：`, chords);
+
+                } else {
+                    // 普通歌曲处理
+                    const degreeChords = [...songData.chords];
+                    const selectedKey = progressionKeyEl.value;
+
+                    // 移调到目标调
+                    chords = degreeChords.map(degreeChord =>
+                        transposeChordFromDegree(degreeChord, originalKey, selectedKey)
+                    );
+                }
+
+    
                 // 显示调性转换信息（调试用）
-                const keyInfo = selectedKey === originalKey ? 
-                    `原调：${originalKey}` : 
-                    `${originalKey} → ${selectedKey}`;
-                console.log(`歌曲：${selectedSong}`);
-                console.log(`调性转换：${keyInfo}`);
-                console.log(`音级和弦：`, degreeChords);
-                console.log(`转换后和弦：`, chords);
+                if (selectedSong.includes('练习') && selectedSong.includes('个调')) {
+                    console.log(`练习曲目：${selectedSong}`);
+                    console.log(`和弦循环：`, chords);
+                } else {
+                    const keyInfo = selectedKey === originalKey ?
+                        `原调：${originalKey}` :
+                        `${originalKey} → ${selectedKey}`;
+                    console.log(`歌曲：${selectedSong}`);
+                    console.log(`调性转换：${keyInfo}`);
+                    console.log(`音级和弦：`, songData.chords);
+                    console.log(`转换后和弦：`, chords);
+                }
 
                 // 应用和弦进行的顺序设置（顺序按钮控制整个和弦进行的顺序）
                 const activeOrderBtn = document.querySelector('.progression-order-btn.active');
@@ -13740,11 +14033,6 @@
                             } else {
                                 this.selectedScales.delete(checkbox.value);
                             }
-                            // 至少保留一个选项
-                            if (this.selectedScales.size === 0) {
-                                checkbox.checked = true;
-                                this.selectedScales.add(checkbox.value);
-                            }
                             this.updateHiddenSelect();
                             this.updateDisplayText();
                             this.updateArpeggioButtons();
@@ -13834,12 +14122,6 @@
                         checkbox.checked = false;
                     });
                     this.selectedScales.clear();
-                    // 至少保留一个默认选项
-                    const firstCheckbox = document.querySelector('.dropdown-option input[type="checkbox"]');
-                    if (firstCheckbox) {
-                        firstCheckbox.checked = true;
-                        this.selectedScales.add(firstCheckbox.value);
-                    }
                     this.updateHiddenSelect();
                     this.updateDisplayText();
                     this.updateArpeggioButtons();
@@ -13883,9 +14165,24 @@
                         if (this.selectedScales.size === 0) {
                             displayText.textContent = '选择调式...';
                         } else {
-                            // 显示所有选中的调式名称
-                            const selectedNames = Array.from(this.selectedScales).map(scale => this.getScaleDisplayName(scale));
-                            displayText.textContent = selectedNames.join(', ');
+                            // 根据选择数量决定显示方式
+                            if (this.selectedScales.size <= 2) {
+                                // 1-2个调式，显示完整信息（包含音级结构）
+                                const selectedNames = Array.from(this.selectedScales).map(scale => this.getScaleDisplayName(scale));
+                                displayText.textContent = selectedNames.join(', ');
+                            } else {
+                                // 超过2个调式，只显示调式名（不包含音级结构）
+                                const selectedShortNames = Array.from(this.selectedScales).map(scale => this.getScaleShortName(scale));
+
+                                if (this.selectedScales.size <= 5) {
+                                    // 3-5个调式，显示全部简称
+                                    displayText.textContent = selectedShortNames.join(', ');
+                                } else {
+                                    // 超过5个，显示前几个 + "等N个"
+                                    const firstFew = selectedShortNames.slice(0, 4);
+                                    displayText.textContent = `${firstFew.join(', ')} 等${this.selectedScales.size}个`;
+                                }
+                            }
                         }
                     }
                 },
@@ -13927,6 +14224,29 @@
                         'blues': 'Blues - 1 ♭3 4 ♯4 5 ♭7',
                         'wholeTone': 'Whole Tone - 1 2 3 ♯4 ♯5 ♯6',
                         'diminished': 'Diminished - 1 ♭2 ♭3 3 ♯4 5 6 ♭7'
+                    };
+                    return scaleNames[scaleType] || scaleType;
+                },
+
+                // 获取调式简称（不包含音级结构）
+                getScaleShortName(scaleType) {
+                    const scaleNames = {
+                        'major': 'Major',
+                        'minor': 'Minor',
+                        'ionian': 'Ionian',
+                        'dorian': 'Dorian',
+                        'phrygian': 'Phrygian',
+                        'lydian': 'Lydian',
+                        'mixolydian': 'Mixolydian',
+                        'aeolian': 'Aeolian',
+                        'locrian': 'Locrian',
+                        'harmonicMinor': 'Harmonic Minor',
+                        'melodicMinor': 'Melodic Minor',
+                        'majorPentatonic': 'Major Pentatonic',
+                        'minorPentatonic': 'Minor Pentatonic',
+                        'blues': 'Blues',
+                        'wholeTone': 'Whole Tone',
+                        'diminished': 'Diminished'
                     };
                     return scaleNames[scaleType] || scaleType;
                 },
