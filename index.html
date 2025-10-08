@@ -1378,23 +1378,98 @@
 
             // MIDI音符号转换为音符名称
             function midiToNoteName(midiNumber) {
-                const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+                const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
                 const octave = Math.floor(midiNumber / 12) - 1;
                 const noteIndex = midiNumber % 12;
                 return noteNames[noteIndex] + octave;
+            }
+
+            // 判断两个音符是否等价（考虑升号和降号）
+            function isEquivalentNote(note1, note2) {
+                if (note1 === note2) return true;
+
+                // 定义等价的音符对
+                const equivalentPairs = [
+                    ['C♯', 'D♭'], ['D♯', 'E♭'], ['F♯', 'G♭'],
+                    ['G♯', 'A♭'], ['A♯', 'B♭']
+                ];
+
+                for (const pair of equivalentPairs) {
+                    if ((note1 === pair[0] && note2 === pair[1]) ||
+                        (note1 === pair[1] && note2 === pair[0])) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            // 音级到半音数的映射
+            const intervalToSemitones = {
+                '1': 0, '♭2': 1, '2': 2, '♯2': 3, '♭3': 3, '3': 4, '4': 5,
+                '♯4': 6, '♭5': 6, '5': 7, '♯5': 8, '♭6': 8, '6': 9, '♯6': 10,
+                '♭7': 10, '7': 11, '♭♭7': 10,
+                // 复合音程映射（9=2, 11=4, 13=6）
+                '♭9': 1, '9': 2, '♯9': 3,
+                '11': 4, '♯11': 6,
+                '♭13': 8, '13': 9
+            };
+
+            // 音符到半音数的映射
+            const noteToSemitones = {
+                'C': 0, 'C♯': 1, 'D♭': 1, 'D': 2, 'D♯': 3, 'E♭': 3, 'E': 4,
+                'F': 5, 'F♯': 6, 'G♭': 6, 'G': 7, 'G♯': 8, 'A♭': 8,
+                'A': 9, 'A♯': 10, 'B♭': 10, 'B': 11
+            };
+
+            // 半音数到音符的映射
+            const semitonesToNoteName = {
+                0: 'C', 1: 'C♯', 2: 'D', 3: 'D♯', 4: 'E', 5: 'F',
+                6: 'F♯', 7: 'G', 8: 'G♯', 9: 'A', 10: 'A♯', 11: 'B'
+            };
+
+            // 更新正确答案显示
+            function updateCorrectAnswerDisplay() {
+                // 这个函数应该已经在原代码中定义
+                if (typeof window.updateCorrectAnswerDisplay === 'function') {
+                    window.updateCorrectAnswerDisplay();
+                }
             }
 
             // 处理MIDI音符检测
             function processMIDINote(noteName) {
                 // 提取音符名称（去掉八度）
                 const note = noteName.replace(/\d+$/, '');
-                
-                // 根据当前练习模式处理音符
+
+                console.log('MIDI路由处理: 音符=' + note +
+                    ', pitchFindingMode=' + (window.state ? window.state.pitchFindingMode : 'undefined') +
+                    ', currentIntervalExercise=' + (window.state && window.state.currentIntervalExercise ? 'true' : 'false') +
+                    ', currentSequence=' + (window.state && window.state.currentSequence ? `[${window.state.currentSequence.join(', ')}]` : 'undefined') +
+                    ', currentNote=' + (window.state ? window.state.currentNote : 'undefined'));
+
+                // 根据当前练习模式处理音符 - 与processAudio相同的路由逻辑
                 if (window.cagedState && window.cagedState.enabled && window.cagedState.practiceMode) {
+                    console.log('MIDI路由: 转到CAGED练习处理');
                     processCagedMIDINote(note);
                 } else if (window.state && window.state.pitchFindingMode) {
+                    // 找音练习模式（优先级高于音程练习）
+                    console.log('MIDI路由: 转到找音练习处理');
+                    processPitchFindingMIDINote(note);
+                } else if (window.state && window.state.currentIntervalExercise) {
+                    // 音程练习模式
+                    console.log('MIDI路由: 转到音程练习处理');
+                    processIntervalExerciseMIDINote(note);
+                } else if (window.state && window.state.currentSequence && window.state.currentSequence.length > 0) {
+                    // 序列练习模式 - 明确检查序列练习状态
+                    console.log('MIDI路由: 转到序列练习处理');
+                    processSequenceMIDINote(note);
+                } else if (window.state && window.state.currentNote) {
+                    // 常规音高练习模式
+                    console.log('MIDI路由: 转到常规音高练习处理');
                     processPitchFindingMIDINote(note);
                 } else {
+                    // 其他模式
+                    console.log('MIDI路由: 转到其他模式处理');
                     processRegularMIDINote(note);
                 }
             }
@@ -1411,16 +1486,98 @@
 
             // 找音练习的MIDI处理
             function processPitchFindingMIDINote(note) {
-                const targetNote = window.state ? window.state.currentNote : null;
-                if (targetNote && isEquivalentNote(note, targetNote)) {
-                    handlePitchFindingCorrect();
+                console.log('找音练习MIDI处理:', note);
+                if (!window.state) return;
+
+                const targetNote = window.state.currentNote;
+                if (!targetNote) return;
+
+                console.log('目标音符:', targetNote, '找音模式:', window.state.pitchFindingMode);
+
+                // 检查是否在找音练习模式且已经答对了
+                if (window.state.pitchFindingAnswered) return;
+
+                // 检查是否在常规练习模式且已经答对了
+                if (window.state.isAnswered) return;
+
+                if (isEquivalentNote(note, targetNote)) {
+                    console.log(`找音练习: 音符 ${note} 匹配目标音符 ${targetNote}`);
+                    if (window.state.pitchFindingMode) {
+                        // 找音练习模式：直接调用主要的handlePitchFindingCorrect函数
+                        console.log('找音练习MIDI: 调用handlePitchFindingCorrect');
+                        if (typeof handlePitchFindingCorrect === 'function') {
+                            handlePitchFindingCorrect();
+                        } else if (typeof window.handlePitchFindingCorrect === 'function') {
+                            window.handlePitchFindingCorrect();
+                        } else {
+                            console.error('找音练习MIDI: handlePitchFindingCorrect函数不可用');
+                        }
+                    } else {
+                        // 常规练习模式：执行本地版本的handleCorrectAnswer逻辑
+                        console.log('找音练习MIDI: 执行本地handleCorrectAnswer');
+                        if (window.state) {
+                            window.state.correctCount++;
+                            window.state.currentStep++;
+                            const justDone = window.state.currentStep - 1;
+
+                            const el = document.querySelector(`.sequence-item[data-index="${justDone}"]`);
+                            if (el) {
+                                el.classList.remove('current');
+                                el.classList.add('played');
+                                console.log('找音练习MIDI: 已标记音级为已播放', justDone);
+                            }
+
+                            // 检查是否完成整个序列
+                            if (window.state.currentStep >= window.state.currentSequence.length) {
+                                window.state.isAnswered = true;
+                                console.log('找音练习MIDI: 序列完成');
+
+                                // 延迟生成下一题
+                                setTimeout(() => {
+                                    console.log('找音练习MIDI: 尝试生成下一题');
+
+                                    // 重置必要的状态以便生成新题目
+                                    if (window.state) {
+                                        window.state.isAnswered = false;
+                                        window.state.currentStep = 0;
+                                        console.log('找音练习MIDI: 已重置状态');
+                                    }
+
+                                    try {
+                                        if (typeof window.generateExercise === 'function') {
+                                            window.generateExercise();
+                                        } else if (typeof generateExercise === 'function') {
+                                            generateExercise();
+                                        } else {
+                                            console.error('找音练习MIDI: generateExercise函数不可用');
+                                            // 尝试手动触发开始按钮
+                                            const startBtn = document.getElementById('startBtn');
+                                            if (startBtn && !window.state.isRecording) {
+                                                console.log('找音练习MIDI: 尝试点击开始按钮');
+                                                startBtn.click();
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error('找音练习MIDI: 生成下一题时出错:', error);
+                                    }
+                                }, 1000);
+                            } else {
+                                // 标记下一个音级为当前
+                                const next = document.querySelector(`.sequence-item[data-index="${window.state.currentStep}"]`);
+                                if (next) {
+                                    next.classList.add('current');
+                                    console.log('找音练习MIDI: 已标记下一个音级为当前', window.state.currentStep);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
             // 常规练习的MIDI处理
             function processRegularMIDINote(note) {
                 // 检查是否在音程练习模式
-                if (window.state && window.state.intervalExerciseMode) {
+                if (window.state && window.state.currentIntervalExercise) {
                     processIntervalExerciseMIDINote(note);
                     return;
                 }
@@ -1437,19 +1594,134 @@
                     return;
                 }
 
+        
                 console.log('常规练习MIDI音符:', note);
             }
 
             // 音程练习的MIDI处理
             function processIntervalExerciseMIDINote(note) {
-                if (!window.state || !window.state.intervalExerciseMode) return;
+                console.log('音程练习MIDI处理:', note);
+                if (!window.state || !window.state.currentIntervalExercise) return;
 
-                const intervalState = window.state.intervalState;
-                if (!intervalState || intervalState.answered) return;
+                const exercise = window.state.currentIntervalExercise;
+                if (!exercise || exercise.answered) return;
 
-                const targetNote = getCurrentIntervalTargetNote();
-                if (targetNote && isEquivalentNote(note, targetNote)) {
-                    handleIntervalExerciseCorrect();
+                // 检查弹对的音符是哪个音程
+                const intervals = exercise.currentInterval.split(' ');
+                const rootNote = exercise.rootNote;
+
+                console.log('检查音程:', intervals, '根音:', rootNote);
+
+                for (const interval of intervals) {
+                    if (exercise.completedIntervals && exercise.completedIntervals.includes(interval)) {
+                        continue; // 跳过已经完成的音程
+                    }
+
+                    const intervalNoteValue = noteToSemitones[rootNote] + intervalToSemitones[interval];
+                    const intervalNoteName = semitonesToNoteName[intervalNoteValue % 12];
+
+                    console.log(`音程 ${interval}: 期望音符 ${intervalNoteName}, 收到音符 ${note}`);
+
+                    if (isEquivalentNote(note, intervalNoteName)) {
+                        console.log(`音程练习: 音符 ${note} 匹配音程 ${interval}`);
+
+                        // 执行本地版本的handleIntervalPartialCorrect逻辑
+                        if (window.state.currentIntervalExercise) {
+                            const exercise = window.state.currentIntervalExercise;
+
+                            // 初始化已完成的音程数组
+                            if (!exercise.completedIntervals) {
+                                exercise.completedIntervals = [];
+                            }
+
+                            // 检查这个音程是否已经弹对过了
+                            if (exercise.completedIntervals.includes(interval)) {
+                                console.log(`音程 ${interval} 已经弹对过了，忽略重复`);
+                                return;
+                            }
+
+                            // 添加到已完成列表
+                            exercise.completedIntervals.push(interval);
+                            console.log(`音程练习: 音程 ${interval} 已标记为完成`, exercise.completedIntervals);
+
+                            // 更新显示，将弹对的音程变灰
+                            const intervalDisplay = document.getElementById('intervalExerciseDisplay');
+                            if (intervalDisplay) {
+                                // 查找当前题目显示元素并更新
+                                const currentInterval = intervalDisplay.querySelector('.current-interval');
+                                if (currentInterval) {
+                                    const intervalSpans = currentInterval.querySelectorAll('span');
+                                    intervalSpans.forEach(span => {
+                                        if (span.textContent.trim() === interval) {
+                                            span.style.opacity = '0.3';
+                                            span.style.textDecoration = 'line-through';
+                                        }
+                                    });
+                                }
+                            }
+
+                            // 检查是否所有音程都弹对了
+                            const intervals = exercise.currentInterval.split(' ');
+                            if (exercise.completedIntervals.length >= intervals.length) {
+                                console.log('音程练习: 所有音程都弹对了，完成题目');
+                                exercise.answered = true;
+
+                                // 显示完成提示
+                                const statusIndicator = document.getElementById('statusIndicator');
+                                if (statusIndicator) {
+                                    statusIndicator.textContent = '音程练习完成！';
+                                    statusIndicator.className = 'status-indicator success';
+                                    setTimeout(() => {
+                                        if (window.isRecording) {
+                                            statusIndicator.textContent = '录音中...';
+                                            statusIndicator.className = 'status-indicator recording';
+                                        }
+                                    }, 1500);
+                                }
+
+                                // 获取下一题间隔时间设置
+                                const intervalSecondsSelect = document.getElementById('intervalSeconds');
+                                let delayTime = 2000; // 默认2秒
+
+                                if (intervalSecondsSelect) {
+                                    const intervalSeconds = parseInt(intervalSecondsSelect.value);
+                                    if (intervalSeconds === 0) {
+                                        delayTime = 0; // 手动模式
+                                    } else {
+                                        delayTime = intervalSeconds * 1000;
+                                    }
+                                }
+
+                                // 检查指板是否隐藏，隐藏则立即进入下一题
+                                const fretboardContainer = document.getElementById('fretboardContainer');
+                                const isFretboardVisible = fretboardContainer && fretboardContainer.style.display !== 'none';
+
+                                if (!isFretboardVisible) {
+                                    delayTime = 100; // 隐藏指板时快速进入下一题
+                                } else if (delayTime === 0) {
+                                    // 手动模式且显示指板，不自动进入下一题
+                                    console.log('音程练习MIDI: 手动模式，等待用户手动进入下一题');
+                                    return;
+                                }
+
+                                // 设置定时器进入下一题
+                                if (window.state.intervalNextTimeout) {
+                                    clearTimeout(window.state.intervalNextTimeout);
+                                }
+
+                                window.state.intervalNextTimeout = setTimeout(() => {
+                                    if (typeof generateNextIntervalExercise === 'function') {
+                                        generateNextIntervalExercise();
+                                    } else if (typeof window.generateNextIntervalExercise === 'function') {
+                                        window.generateNextIntervalExercise();
+                                    } else {
+                                        console.error('音程练习MIDI: generateNextIntervalExercise函数不可用');
+                                    }
+                                }, delayTime);
+                            }
+                        }
+                        break;
+                    }
                 }
             }
 
@@ -1459,7 +1731,64 @@
 
                 const targetNote = window.state.currentNote;
                 if (isEquivalentNote(note, targetNote)) {
-                    handleCorrectAnswer();
+                    console.log('音高检测MIDI: 音符匹配，执行本地handleCorrectAnswer');
+
+                    // 执行本地版本的handleCorrectAnswer逻辑
+                    if (window.state && window.state.currentSequence && window.state.currentSequence.length > 0) {
+                        window.state.correctCount++;
+                        window.state.currentStep++;
+                        const justDone = window.state.currentStep - 1;
+
+                        const el = document.querySelector(`.sequence-item[data-index="${justDone}"]`);
+                        if (el) {
+                            el.classList.remove('current');
+                            el.classList.add('played');
+                            console.log('音高检测MIDI: 已标记音级为已播放', justDone);
+                        }
+
+                        // 检查是否完成整个序列
+                        if (window.state.currentStep >= window.state.currentSequence.length) {
+                            window.state.isAnswered = true;
+                            console.log('音高检测MIDI: 序列完成');
+
+                            // 延迟生成下一题
+                            setTimeout(() => {
+                                console.log('音高检测MIDI: 尝试生成下一题');
+
+                                // 重置必要的状态以便生成新题目
+                                if (window.state) {
+                                    window.state.isAnswered = false;
+                                    window.state.currentStep = 0;
+                                    console.log('音高检测MIDI: 已重置状态');
+                                }
+
+                                try {
+                                    if (typeof window.generateExercise === 'function') {
+                                        window.generateExercise();
+                                    } else if (typeof generateExercise === 'function') {
+                                        generateExercise();
+                                    } else {
+                                        console.error('音高检测MIDI: generateExercise函数不可用');
+                                        // 尝试手动触发开始按钮
+                                        const startBtn = document.getElementById('startBtn');
+                                        if (startBtn && !window.state.isRecording) {
+                                            console.log('音高检测MIDI: 尝试点击开始按钮');
+                                            startBtn.click();
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error('音高检测MIDI: 生成下一题时出错:', error);
+                                }
+                            }, 1000);
+                        } else {
+                            // 标记下一个音级为当前
+                            const next = document.querySelector(`.sequence-item[data-index="${window.state.currentStep}"]`);
+                            if (next) {
+                                next.classList.add('current');
+                                console.log('音高检测MIDI: 已标记下一个音级为当前', window.state.currentStep);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1469,6 +1798,105 @@
 
                 // 这里可以添加自定义和弦练习的MIDI处理逻辑
                 console.log('自定义和弦练习MIDI音符:', note);
+            }
+
+            // 序列练习的MIDI处理
+            function processSequenceMIDINote(note) {
+                if (!window.state || !window.state.currentSequence || window.state.isAnswered ||
+                    (window.state.enableCooldown && window.state.isCoolingDown)) return;
+
+                if (window.state.currentStep >= window.state.currentSequence.length) return;
+
+                const currentInterval = window.state.currentSequence[window.state.currentStep];
+                if (!currentInterval || !intervalToSemitones.hasOwnProperty(currentInterval)) {
+                    console.error('序列练习MIDI处理: 未知的音级', currentInterval);
+                    return;
+                }
+
+                // 计算当前步骤的目标音符
+                const rootValue = noteToSemitones[window.state.rootNote];
+                const targetSemitone = (rootValue + intervalToSemitones[currentInterval]) % 12;
+                const targetNote = semitonesToNoteName[targetSemitone];
+
+                console.log(`序列练习MIDI: 当前音级=${currentInterval}, 目标音符=${targetNote}, 收到音符=${note}`);
+
+                if (isEquivalentNote(note, targetNote)) {
+                    console.log('序列练习MIDI: 音符匹配，执行本地handleCorrectAnswer');
+
+                    // 执行本地版本的handleCorrectAnswer逻辑
+                    if (window.state) {
+                        window.state.correctCount++;
+                        window.state.currentStep++;
+                        const justDone = window.state.currentStep - 1;
+
+                        const el = document.querySelector(`.sequence-item[data-index="${justDone}"]`);
+                        if (el) {
+                            el.classList.remove('current');
+                            el.classList.add('played');
+                            console.log('序列练习MIDI: 已标记音级为已播放', justDone);
+                        }
+
+                        // 检查是否完成整个序列
+                        if (window.state.currentStep >= window.state.currentSequence.length) {
+                            window.state.isAnswered = true;
+                            console.log('序列练习MIDI: 序列完成');
+
+                            // 根据设置决定是否进入冷却期
+                            if (window.state.enableCooldown) {
+                                window.state.isCoolingDown = true;
+                                if (window.state.cooldownTimeout) {
+                                    clearTimeout(window.state.cooldownTimeout);
+                                }
+                                window.state.cooldownTimeout = setTimeout(() => {
+                                    window.state.isCoolingDown = false;
+                                }, window.state.cooldownDuration);
+                            }
+
+                            // 根据设置决定延迟时间
+                            let delayTime = 0; // 默认无延迟
+                            if (window.state.enableFixedDelay) {
+                                delayTime = window.state.fixedDelayDuration;
+                            }
+
+                            // 延迟生成下一题
+                            setTimeout(() => {
+                                console.log('序列练习MIDI: 尝试生成下一题');
+
+                                // 重置必要的状态以便生成新题目
+                                if (window.state) {
+                                    window.state.isAnswered = false;
+                                    window.state.currentStep = 0;
+                                    console.log('序列练习MIDI: 已重置状态');
+                                }
+
+                                try {
+                                    if (typeof window.generateExercise === 'function') {
+                                        window.generateExercise();
+                                    } else if (typeof generateExercise === 'function') {
+                                        generateExercise();
+                                    } else {
+                                        console.error('序列练习MIDI: generateExercise函数不可用');
+                                        // 尝试手动触发开始按钮
+                                        const startBtn = document.getElementById('startBtn');
+                                        if (startBtn && !window.state.isRecording) {
+                                            console.log('序列练习MIDI: 尝试点击开始按钮');
+                                            startBtn.click();
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error('序列练习MIDI: 生成下一题时出错:', error);
+                                }
+                            }, delayTime);
+                        } else {
+                            // 标记下一个音级为当前
+                            const next = document.querySelector(`.sequence-item[data-index="${window.state.currentStep}"]`);
+                            if (next) {
+                                next.classList.add('current');
+                                console.log('序列练习MIDI: 已标记下一个音级为当前', window.state.currentStep);
+                            }
+                        }
+                    }
+                }
             }
 
             // 获取当前音程练习的目标音符
@@ -7886,21 +8314,21 @@
             // 处理找音练习正确答案
             function handlePitchFindingCorrect() {
                 if (state.pitchFindingAnswered) return;
-                
+
                 state.pitchFindingAnswered = true;
                 state.pitchFindingCorrect = true;
-                
+
                 // 在指板上显示该音符的所有位置
                 showNoteOnFretboard(state.currentNote);
-                
+
                 // 获取下一题间隔时间设置
                 const selectedIntervalBtn = document.querySelector('.pitch-finding-interval-btn.active');
                 const intervalSeconds = selectedIntervalBtn ? parseInt(selectedIntervalBtn.dataset.value) : 0;
-                
+
                 // 检查指板是否显示
                 const fretboardContainer = document.getElementById('fretboardContainer');
                 const isFretboardVisible = fretboardContainer && fretboardContainer.style.display !== 'none';
-                
+
                 // 动态设置延迟时间：
                 // - 指板隐藏时：立即自动进入下一题（忽略手动模式设置）
                 // - 指板显示且手动模式：不自动切换，等待用户手动操作
@@ -7928,6 +8356,9 @@
                     }, delayTime);
                 }
             }
+
+            // 暴露到全局作用域，让MIDI处理可以访问
+            window.handlePitchFindingCorrect = handlePitchFindingCorrect;
             
             // 生成下一个找音练习题目
             function generateNextPitchFindingQuestion() {
@@ -8308,16 +8739,14 @@
                 console.log('当前目标音符:', state.currentNote);
                 
                 if (state.pitchFindingAnswered) return;
-                
+
                 const yinResult = Pitchfinder.YIN({ threshold: 0.1, probabilityCliff: 0.1 })(inputData);
                 if (!yinResult || !yinResult.frequency) {
                     console.log('YIN检测失败或无频率');
                     return;
                 }
-                
+
                 const energy = rms(inputData);
-                console.log('检测到频率:', yinResult.frequency.toFixed(2), 'Hz, 能量:', energy.toFixed(4));
-                
                 if (energy < 0.002) {
                     console.log('能量过低，忽略');
                     return;
@@ -8454,7 +8883,7 @@
                 
                 if (detectedNote === targetNote || isEquivalentNote(detectedNote, targetNote)) {
                     // 音程练习答对
-                    handleIntervalExerciseCorrect();
+                    handleIntervalPartialCorrect(exercise.targetInterval);
                 } else {
                     // 显示当前检测到的音符
                     updatePitchDisplay(frequency, 0, probability);
