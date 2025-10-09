@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#0f0f0f">
     <meta name="msapplication-navbutton-color" content="#0f0f0f">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title data-i18n-key="page_title">🎸 吉他练习工具 v0.361</title>
+    <title data-i18n-key="page_title">🎸 吉他练习工具 v2.0</title>
     <!-- ml5.js库 - 用于CREPE音高检测算法 -->
     <script src="js/ml5.min.js"></script>
 
@@ -1384,9 +1384,24 @@
                 return noteNames[noteIndex] + octave;
             }
 
+            // 从音符中提取纯音符名（去掉八度）
+            function extractPureNoteName(fullNote) {
+                const match = fullNote.match(/^([CDEFGAB][♯♭]?)/);
+                return match ? match[1] : fullNote;
+            }
+
             // 判断两个音符是否等价（考虑升号和降号）
             function isEquivalentNote(note1, note2) {
                 if (note1 === note2) return true;
+
+                // 分离音符名和八度
+                const extractNoteName = (fullNote) => {
+                    const match = fullNote.match(/^([CDEFGAB][♯♭]?\d*)/);
+                    return match ? match[1] : fullNote;
+                };
+
+                const note1Name = extractNoteName(note1);
+                const note2Name = extractNoteName(note2);
 
                 // 定义等价的音符对
                 const equivalentPairs = [
@@ -1395,8 +1410,8 @@
                 ];
 
                 for (const pair of equivalentPairs) {
-                    if ((note1 === pair[0] && note2 === pair[1]) ||
-                        (note1 === pair[1] && note2 === pair[0])) {
+                    if ((note1Name === pair[0] && note2Name === pair[1]) ||
+                        (note1Name === pair[1] && note2Name === pair[0])) {
                         return true;
                     }
                 }
@@ -1451,14 +1466,14 @@
                 if (window.cagedState && window.cagedState.enabled && window.cagedState.practiceMode) {
                     console.log('MIDI路由: 转到CAGED练习处理');
                     processCagedMIDINote(note);
-                } else if (window.state && window.state.pitchFindingMode) {
-                    // 找音练习模式（优先级高于音程练习）
-                    console.log('MIDI路由: 转到找音练习处理');
-                    processPitchFindingMIDINote(note);
                 } else if (window.state && window.state.currentIntervalExercise) {
-                    // 音程练习模式
+                    // 音程练习模式（优先级高于找音练习）
                     console.log('MIDI路由: 转到音程练习处理');
                     processIntervalExerciseMIDINote(note);
+                } else if (window.state && window.state.pitchFindingMode) {
+                    // 找音练习模式
+                    console.log('MIDI路由: 转到找音练习处理');
+                    processPitchFindingMIDINote(note);
                 } else if (window.state && window.state.currentSequence && window.state.currentSequence.length > 0) {
                     // 序列练习模式 - 明确检查序列练习状态
                     console.log('MIDI路由: 转到序列练习处理');
@@ -1503,6 +1518,9 @@
                 if (isEquivalentNote(note, targetNote)) {
                     console.log(`找音练习: 音符 ${note} 匹配目标音符 ${targetNote}`);
                     if (window.state.pitchFindingMode) {
+                        // 显示正确的反馈
+                        showMIDIPitchFeedback(note, targetNote, true);
+
                         // 找音练习模式：直接调用主要的handlePitchFindingCorrect函数
                         console.log('找音练习MIDI: 调用handlePitchFindingCorrect');
                         if (typeof handlePitchFindingCorrect === 'function') {
@@ -1571,7 +1589,60 @@
                             }
                         }
                     }
+                } else {
+                    // 音符不匹配，提供视觉反馈
+                    console.log(`找音练习MIDI: 音符 ${note} 不匹配目标音符 ${targetNote}`);
+
+                    // 为找音练习模式提供不正确的反馈
+                    if (window.state.pitchFindingMode) {
+                        // 显示不正确的反馈，类似于音频输入的处理
+                        showMIDIPitchFeedback(note, targetNote, false);
+                    }
                 }
+            }
+
+            // MIDI音高反馈函数
+            function showMIDIPitchFeedback(detectedNote, targetNote, isCorrect) {
+                console.log(`MIDI音高反馈: 检测到 ${detectedNote}, 目标 ${targetNote}, 正确: ${isCorrect}`);
+
+                // 更新音高显示，提供类似于音频输入的反馈
+                const pitchDisplay = document.getElementById('pitchDisplay');
+                if (pitchDisplay) {
+                    if (isCorrect) {
+                        // 正确音符 - 显示绿色反馈
+                        pitchDisplay.innerHTML = `
+                            <div class="pitch-info correct">
+                                <span class="detected-note">${detectedNote}</span>
+                                <span class="correct-indicator">✓</span>
+                            </div>
+                        `;
+                        pitchDisplay.style.backgroundColor = 'rgba(0, 255, 0, 0.2)';
+
+                        // 2秒后清除反馈
+                        setTimeout(() => {
+                            pitchDisplay.innerHTML = '';
+                            pitchDisplay.style.backgroundColor = '';
+                        }, 2000);
+                    } else {
+                        // 错误音符 - 显示红色反馈和目标音符提示
+                        pitchDisplay.innerHTML = `
+                            <div class="pitch-info incorrect">
+                                <span class="detected-note" style="color: #ff4444;">${detectedNote}</span>
+                                <span class="target-hint">→ ${targetNote}</span>
+                            </div>
+                        `;
+                        pitchDisplay.style.backgroundColor = 'rgba(255, 68, 68, 0.2)';
+
+                        // 3秒后清除反馈
+                        setTimeout(() => {
+                            pitchDisplay.innerHTML = '';
+                            pitchDisplay.style.backgroundColor = '';
+                        }, 3000);
+                    }
+                }
+
+                // 也显示MIDI输入反馈
+                showMIDIInputFeedback(detectedNote, 127); // 使用最大力度表示
             }
 
             // 常规练习的MIDI处理
@@ -1620,9 +1691,12 @@
                     const intervalNoteValue = noteToSemitones[rootNote] + intervalToSemitones[interval];
                     const intervalNoteName = semitonesToNoteName[intervalNoteValue % 12];
 
-                    console.log(`音程 ${interval}: 期望音符 ${intervalNoteName}, 收到音符 ${note}`);
+                    // 从MIDI输入的音符中提取纯音符名（去掉八度）
+                    const inputNoteName = extractPureNoteName(note);
 
-                    if (isEquivalentNote(note, intervalNoteName)) {
+                    console.log(`音程 ${interval}: 期望音符 ${intervalNoteName}, 收到音符 ${note}, 提取音符名 ${inputNoteName}`);
+
+                    if (isEquivalentNote(inputNoteName, intervalNoteName)) {
                         console.log(`音程练习: 音符 ${note} 匹配音程 ${interval}`);
 
                         // 执行本地版本的handleIntervalPartialCorrect逻辑
@@ -1644,21 +1718,8 @@
                             exercise.completedIntervals.push(interval);
                             console.log(`音程练习: 音程 ${interval} 已标记为完成`, exercise.completedIntervals);
 
-                            // 更新显示，将弹对的音程变灰
-                            const intervalDisplay = document.getElementById('intervalExerciseDisplay');
-                            if (intervalDisplay) {
-                                // 查找当前题目显示元素并更新
-                                const currentInterval = intervalDisplay.querySelector('.current-interval');
-                                if (currentInterval) {
-                                    const intervalSpans = currentInterval.querySelectorAll('span');
-                                    intervalSpans.forEach(span => {
-                                        if (span.textContent.trim() === interval) {
-                                            span.style.opacity = '0.3';
-                                            span.style.textDecoration = 'line-through';
-                                        }
-                                    });
-                                }
-                            }
+                            // 使用全局函数更新显示，将弹对的音程变灰
+                            updateIntervalDisplay(interval);
 
                             // 检查是否所有音程都弹对了
                             const intervals = exercise.currentInterval.split(' ');
@@ -1723,6 +1784,23 @@
                         break;
                     }
                 }
+
+                // 如果没有匹配任何音程，提供不正确的反馈
+                if (window.state.currentIntervalExercise && !window.state.currentIntervalExercise.answered) {
+                    console.log(`音程练习MIDI: 音符 ${note} 不匹配任何目标音程`);
+
+                    // 获取第一个未完成的音程作为目标显示
+                    const intervals = exercise.currentInterval.split(' ');
+                    const nextInterval = intervals.find(interval =>
+                        !exercise.completedIntervals.includes(interval)
+                    );
+
+                    if (nextInterval) {
+                        const intervalNoteValue = noteToSemitones[rootNote] + intervalToSemitones[nextInterval];
+                        const intervalNoteName = semitonesToNoteName[intervalNoteValue % 12];
+                        showMIDIPitchFeedback(note, intervalNoteName, false);
+                    }
+                }
             }
 
             // 音高检测练习的MIDI处理
@@ -1732,6 +1810,9 @@
                 const targetNote = window.state.currentNote;
                 if (isEquivalentNote(note, targetNote)) {
                     console.log('音高检测MIDI: 音符匹配，执行本地handleCorrectAnswer');
+
+                    // 显示正确的反馈
+                    showMIDIPitchFeedback(note, targetNote, true);
 
                     // 执行本地版本的handleCorrectAnswer逻辑
                     if (window.state && window.state.currentSequence && window.state.currentSequence.length > 0) {
@@ -1789,6 +1870,12 @@
                             }
                         }
                     }
+                } else {
+                    // 音符不匹配，提供视觉反馈
+                    console.log(`音高检测MIDI: 音符 ${note} 不匹配目标音符 ${targetNote}`);
+
+                    // 显示不正确的反馈
+                    showMIDIPitchFeedback(note, targetNote, false);
                 }
             }
 
@@ -1818,9 +1905,12 @@
                 const targetSemitone = (rootValue + intervalToSemitones[currentInterval]) % 12;
                 const targetNote = semitonesToNoteName[targetSemitone];
 
-                console.log(`序列练习MIDI: 当前音级=${currentInterval}, 目标音符=${targetNote}, 收到音符=${note}`);
+                // 从MIDI输入的音符中提取纯音符名（去掉八度）
+                const inputNoteName = extractPureNoteName(note);
 
-                if (isEquivalentNote(note, targetNote)) {
+                console.log(`序列练习MIDI: 当前音级=${currentInterval}, 目标音符=${targetNote}, 收到音符=${note}, 提取音符名=${inputNoteName}`);
+
+                if (isEquivalentNote(inputNoteName, targetNote)) {
                     console.log('序列练习MIDI: 音符匹配，执行本地handleCorrectAnswer');
 
                     // 执行本地版本的handleCorrectAnswer逻辑
@@ -7946,13 +8036,13 @@
                     audioWorkletNode.disconnect();
                     audioWorkletNode = null;
                 }
-                
+
                 // 清理ScriptProcessorNode（兼容模式）
                 if (javascriptNode) {
                     javascriptNode.disconnect();
                     javascriptNode = null;
                 }
-                
+
                 if (analyser) {
                     analyser.disconnect();
                 }
@@ -7964,6 +8054,39 @@
                 }
 
                 isRecording = false;
+
+                // 清理所有练习状态，确保MIDI路由正确
+                console.log('停止录音: 清理所有练习状态');
+                if (window.state) {
+                    // 清理音程练习状态
+                    if (window.state.currentIntervalExercise) {
+                        console.log('停止录音: 清理音程练习状态');
+                        window.state.currentIntervalExercise = null;
+                    }
+
+                    // 清理CAGED练习状态
+                    if (window.cagedState && window.cagedState.enabled) {
+                        console.log('停止录音: 清理CAGED练习状态');
+                        window.cagedState.enabled = false;
+                        window.cagedState.practiceMode = false;
+                    }
+
+                    // 清理自定义和弦模式状态
+                    window.state.isCustomChordMode = false;
+
+                    // 清理找音练习的答题状态
+                    window.state.pitchFindingAnswered = false;
+
+                    // 清理序列练习状态
+                    window.state.currentSequence = null;
+                    window.state.currentStep = 0;
+                    window.state.isAnswered = false;
+
+                    // 清理音高检测状态
+                    window.state.currentNote = null;
+                    window.state.isAnswered = false;
+                    window.state.pitchFindingMode = false;
+                }
             }
 
             // 完全关闭麦克风（退出应用时使用）
@@ -8294,20 +8417,29 @@
             // 判断两个音符是否等价（考虑升号和降号）
             function isEquivalentNote(note1, note2) {
                 if (note1 === note2) return true;
-                
+
+                // 分离音符名和八度
+                const extractNoteName = (fullNote) => {
+                    const match = fullNote.match(/^([CDEFGAB][♯♭]?\d*)/);
+                    return match ? match[1] : fullNote;
+                };
+
+                const note1Name = extractNoteName(note1);
+                const note2Name = extractNoteName(note2);
+
                 // 定义等价的音符对
                 const equivalentPairs = [
-                    ['C♯', 'D♭'], ['D♯', 'E♭'], ['F♯', 'G♭'], 
+                    ['C♯', 'D♭'], ['D♯', 'E♭'], ['F♯', 'G♭'],
                     ['G♯', 'A♭'], ['A♯', 'B♭']
                 ];
-                
+
                 for (const pair of equivalentPairs) {
-                    if ((note1 === pair[0] && note2 === pair[1]) || 
-                        (note1 === pair[1] && note2 === pair[0])) {
+                    if ((note1Name === pair[0] && note2Name === pair[1]) ||
+                        (note1Name === pair[1] && note2Name === pair[0])) {
                         return true;
                     }
                 }
-                
+
                 return false;
             }
             
@@ -8554,31 +8686,8 @@
                 }
             }
 
-            // 更新音程显示，将弹对的音程变灰
-            function updateIntervalDisplay(completedInterval) {
-                const intervalDisplay = document.getElementById('intervalExerciseDisplay');
-                if (!intervalDisplay) return;
-                
-                // 查找当前题目显示元素并更新
-                const currentInterval = intervalDisplay.querySelector('.current-interval');
-                if (currentInterval) {
-                    const intervals = state.currentIntervalExercise.currentInterval.split(' ');
-                    const completedIntervals = state.currentIntervalExercise.completedIntervals || [];
-                    
-                    // 重新构建当前题目显示，已完成的音程用灰色显示
-                    const displayText = intervals.map(interval => {
-                        if (completedIntervals.includes(interval)) {
-                            return `<span style="color: #888;">${interval}</span>`;
-                        } else {
-                            return interval;
-                        }
-                    }).join(' ');
-                    
-                    currentInterval.innerHTML = displayText;
-                }
-                
-                console.log(`音程显示已更新，已完成: ${state.currentIntervalExercise.completedIntervals.join(', ')}`);
-            }
+            // 更新音程显示，将弹对的音程变灰 - 移动到全局作用域
+            // 函数定义已移动到全局作用域（见底部）
 
             // 处理音程练习完全正确的函数（所有音程都弹对了）
             function handleIntervalFullyCorrect() {
@@ -10756,7 +10865,14 @@
                 
                 // 启动计时器
                 startPitchFindingTimer(practiceTime);
-                
+  
+                // 清理可能残留的音程练习显示元素
+                const intervalDisplay = document.getElementById('intervalExerciseDisplay');
+                if (intervalDisplay) {
+                    intervalDisplay.remove();
+                    console.log('开始找音练习 - 已清理残留的interval-exercise-display元素');
+                }
+
                 // 设置音高检测回调
                 state.pitchFindingMode = true;
                 state.pitchFindingCorrect = false;
@@ -11669,6 +11785,50 @@
                         // 为当前点击的导航项添加active状态
                         this.classList.add('active');
 
+                        // 清理练习状态，确保MIDI路由正确
+                        console.log('导航切换: 清理练习状态，切换到', tabName);
+                        if (window.state) {
+                            // 清理音程练习状态
+                            if (window.state.currentIntervalExercise) {
+                                console.log('导航切换: 清理音程练习状态');
+                                window.state.currentIntervalExercise = null;
+                            }
+
+                            // 清理CAGED练习状态
+                            if (window.cagedState && window.cagedState.enabled) {
+                                console.log('导航切换: 清理CAGED练习状态');
+                                window.cagedState.enabled = false;
+                                window.cagedState.practiceMode = false;
+                            }
+
+                            // 清理自定义和弦模式状态（如果不是切换到和弦进行标签页）
+                            if (tabName !== 'progression' && window.state.isCustomChordMode) {
+                                console.log('导航切换: 清理自定义和弦模式状态');
+                                window.state.isCustomChordMode = false;
+                            }
+
+                            // 清理找音练习的答题状态
+                            if (window.state.pitchFindingAnswered) {
+                                window.state.pitchFindingAnswered = false;
+                            }
+
+                            // 清理序列练习状态
+                            if (window.state.currentSequence && tabName !== 'scale') {
+                                console.log('导航切换: 清理序列练习状态');
+                                window.state.currentSequence = null;
+                                window.state.currentStep = 0;
+                                window.state.isAnswered = false;
+                            }
+
+                            // 清理音高检测状态
+                            if (window.state.currentNote && tabName !== 'pitch-finding') {
+                                console.log('导航切换: 清理音高检测状态');
+                                window.state.currentNote = null;
+                                window.state.isAnswered = false;
+                                window.state.pitchFindingMode = false;
+                            }
+                        }
+
                         // 默认隐藏所有设置区域
                         scaleSettings.style.display = 'none';
                         chordSettings.style.display = 'none';
@@ -11957,6 +12117,14 @@
                         window.state.intervalExerciseMode = false;
                         window.state.pitchFindingMode = false;
                         console.log('音程练习退出 - 重置练习模式状态');
+
+                        // 清理音程练习显示元素
+                        const intervalDisplay = document.getElementById('intervalExerciseDisplay');
+                        if (intervalDisplay) {
+                            intervalDisplay.remove();
+                            console.log('音程练习退出 - 已清理interval-exercise-display元素');
+                        }
+
                         // 停止录音并返回主页面
                         stopRecording();
                         practiceScreen.style.display = 'none';
@@ -12414,6 +12582,13 @@
                         stopRecording();
                         stopMetronome();
                         //releaseWakeLock();
+
+                        // 清理练习显示元素
+                        const intervalDisplay = document.getElementById('intervalExerciseDisplay');
+                        if (intervalDisplay) {
+                            intervalDisplay.remove();
+                            console.log('退出练习 - 已清理interval-exercise-display元素');
+                        }
 
                         // 重置练习模式状态
                         window.state.intervalExerciseMode = false;
@@ -13078,6 +13253,7 @@
 
                 // 获取原调和音级和弦进行
                 const originalKey = songData.key;
+                const selectedKey = progressionKeyEl.value; // 提前定义selectedKey，确保在所有分支中都可用
                 let chords = [];
 
                 // 检查是否是练习曲目
@@ -13132,7 +13308,6 @@
                 } else {
                     // 普通歌曲处理
                     const degreeChords = [...songData.chords];
-                    const selectedKey = progressionKeyEl.value;
 
                     // 移调到目标调
                     chords = degreeChords.map(degreeChord =>
@@ -14941,6 +15116,41 @@
                 });
             }
         });
+
+        // 全局函数：更新音程显示，将弹对的音程变灰
+        window.updateIntervalDisplay = function(completedInterval) {
+            console.log(`updateIntervalDisplay: 更新音程 ${completedInterval} 的显示`);
+            const intervalDisplay = document.getElementById('intervalExerciseDisplay');
+            if (!intervalDisplay) {
+                console.log('updateIntervalDisplay: 未找到 intervalExerciseDisplay 元素');
+                return;
+            }
+
+            // 查找当前题目显示元素并更新
+            const currentInterval = intervalDisplay.querySelector('.current-interval');
+            if (currentInterval) {
+                const intervals = state.currentIntervalExercise.currentInterval.split(' ');
+                const completedIntervals = state.currentIntervalExercise.completedIntervals || [];
+
+                console.log(`updateIntervalDisplay: 所有音程=${intervals}, 已完成=${completedIntervals}`);
+
+                // 重新构建当前题目显示，已完成的音程用灰色显示
+                const displayText = intervals.map(interval => {
+                    if (completedIntervals.includes(interval)) {
+                        return `<span style="color: #888; opacity: 0.3;">${interval}</span>`;
+                    } else {
+                        return interval;
+                    }
+                }).join(' ');
+
+                console.log(`updateIntervalDisplay: 新显示内容=${displayText}`);
+                currentInterval.innerHTML = displayText;
+            } else {
+                console.log('updateIntervalDisplay: 未找到 .current-interval 元素');
+            }
+
+            console.log(`音程显示已更新，已完成: ${state.currentIntervalExercise.completedIntervals.join(', ')}`);
+        };
     </script>
     
     <script>
