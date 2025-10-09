@@ -1217,6 +1217,15 @@
             // 处理MIDI设备状态变化
             function handleMIDIStateChange(event) {
                 console.log('MIDI设备状态变化:', event.port.name, event.port.state);
+
+                // 如果当前连接的设备被断开，清理状态
+                if (event.port.state === 'disconnected' && window.midiState.currentDevice === event.port.id) {
+                    console.log('当前连接的MIDI设备已断开:', event.port.name);
+                    window.midiState.currentDevice = null;
+                    window.midiState.isConnected = false;
+                    updateMIDIStatus(`设备 ${event.port.name} 已断开`, false);
+                }
+
                 updateMIDIDevices();
             }
 
@@ -1243,7 +1252,10 @@
                 }
 
                 window.midiState.devices = devices;
-                window.midiState.isConnected = connectedCount > 0;
+                // 不自动设置连接状态，等待用户选择设备
+                if (!window.midiState.currentDevice) {
+                    window.midiState.isConnected = false;
+                }
 
                 displayMIDIDevices();
                 updateMIDIConnectionStatus(connectedCount);
@@ -1254,9 +1266,18 @@
                 const deviceStatus = document.getElementById('midiDeviceStatus');
                 if (!deviceStatus) return;
 
-                if (connectedCount > 0) {
-                    deviceStatus.textContent = `已连接 ${connectedCount} 个MIDI设备`;
+                if (window.midiState.currentDevice && window.midiState.isConnected) {
+                    // 找到当前连接的设备名称
+                    const currentDevice = window.midiState.devices.find(device => device.id === window.midiState.currentDevice);
+                    if (currentDevice) {
+                        deviceStatus.textContent = `已连接: ${currentDevice.name}`;
+                    } else {
+                        deviceStatus.textContent = '已连接 1 个MIDI设备';
+                    }
                     deviceStatus.className = 'midi-device-status connected';
+                } else if (connectedCount > 0) {
+                    deviceStatus.textContent = `检测到 ${connectedCount} 个MIDI设备，请选择连接`;
+                    deviceStatus.className = 'midi-device-status disconnected';
                 } else {
                     deviceStatus.textContent = '未检测到MIDI设备';
                     deviceStatus.className = 'midi-device-status disconnected';
@@ -1268,24 +1289,89 @@
                 const deviceInfo = document.getElementById('midiDeviceInfo');
                 const deviceStatus = document.getElementById('midiDeviceStatus');
                 const deviceList = document.getElementById('midiDeviceList');
-                
+
                 if (!deviceInfo || !deviceStatus || !deviceList) return;
-                
+
                 if (window.midiState.devices.length > 0) {
                     deviceStatus.textContent = `检测到 ${window.midiState.devices.length} 个MIDI设备`;
                     deviceInfo.style.display = 'block';
-                    
+
                     // 显示设备列表
                     deviceList.innerHTML = '';
                     window.midiState.devices.forEach(device => {
                         const deviceItem = document.createElement('div');
                         deviceItem.className = 'midi-device-item';
-                        deviceItem.textContent = `${device.name} (${device.manufacturer})`;
+
+                        // 设备信息
+                        const deviceInfo = document.createElement('div');
+                        deviceInfo.className = 'midi-device-info';
+                        deviceInfo.textContent = `${device.name} (${device.manufacturer})`;
+
+                        // 选择按钮
+                        const selectButton = document.createElement('button');
+                        selectButton.className = 'midi-device-select-btn';
+                        selectButton.textContent = window.midiState.currentDevice === device.id ? '已连接' : '连接';
+                        selectButton.disabled = window.midiState.currentDevice === device.id;
+
+                        // 连接状态指示器
+                        const statusIndicator = document.createElement('span');
+                        statusIndicator.className = 'midi-device-status-indicator';
+                        if (window.midiState.currentDevice === device.id) {
+                            statusIndicator.textContent = '●';
+                            statusIndicator.style.color = '#10b981';
+                        } else {
+                            statusIndicator.textContent = '○';
+                            statusIndicator.style.color = '#9ca3af';
+                        }
+
+                        // 添加点击事件
+                        selectButton.addEventListener('click', () => selectMIDIDevice(device));
+
+                        // 组装设备项
+                        deviceItem.appendChild(statusIndicator);
+                        deviceItem.appendChild(deviceInfo);
+                        deviceItem.appendChild(selectButton);
                         deviceList.appendChild(deviceItem);
                     });
                 } else {
                     deviceStatus.textContent = '未检测到MIDI设备';
                     deviceInfo.style.display = 'none';
+                }
+            }
+
+            // 选择MIDI设备
+            function selectMIDIDevice(device) {
+                console.log('选择MIDI设备:', device.name, 'ID:', device.id);
+
+                // 如果已经连接了设备，先断开
+                if (window.midiState.currentDevice) {
+                    disconnectMIDIDevices();
+                }
+
+                // 设置当前设备
+                window.midiState.currentDevice = device.id;
+
+                // 只连接选中的设备
+                connectMIDIDevice(device);
+
+                // 更新设备显示
+                displayMIDIDevices();
+
+                // 更新状态
+                updateMIDIStatus(`已连接到 ${device.name}`, true);
+            }
+
+            // 连接指定的MIDI设备
+            function connectMIDIDevice(device) {
+                if (!device || !device.input) return;
+
+                try {
+                    device.input.onmidimessage = handleMIDIInput;
+                    window.midiState.isConnected = true;
+                    console.log('已连接MIDI设备:', device.name, 'ID:', device.id);
+                } catch (error) {
+                    console.error('连接MIDI设备失败:', device.name, error);
+                    window.midiState.isConnected = false;
                 }
             }
 
@@ -1831,6 +1917,21 @@
                         if (window.state.currentStep >= window.state.currentSequence.length) {
                             window.state.isAnswered = true;
                             console.log('音高检测MIDI: 序列完成');
+                            console.log('音高检测MIDI: 序列完成时的 progressionIndex', window.state.progressionIndex);
+
+                            // 检查是否是和弦进行练习
+                            const activeTab = document.querySelector('.nav-item.active');
+                            const isProgressionMode = activeTab && activeTab.dataset.tab === 'progression' &&
+                                                     window.state.progressionChords && window.state.progressionChords.length > 0;
+
+                            console.log('音高检测MIDI: 检查练习模式', {
+                                activeTab: activeTab ? activeTab.dataset.tab : 'none',
+                                isProgressionMode,
+                                progressionIndex: window.state.progressionIndex,
+                                totalChords: window.state.progressionChords ? window.state.progressionChords.length : 0,
+                                currentChord: window.state.progressionChords && window.state.progressionChords[window.state.progressionIndex],
+                                stateKeys: Object.keys(window.state).filter(key => key.includes('progression'))
+                            });
 
                             // 延迟生成下一题
                             setTimeout(() => {
@@ -1844,9 +1945,17 @@
                                 }
 
                                 try {
-                                    if (typeof window.generateExercise === 'function') {
+                                    if (isProgressionMode && typeof window.generateNextProgressionChord === 'function') {
+                                        console.log('音高检测MIDI: 使用和弦进行模式，调用 generateNextProgressionChord');
+                                        window.generateNextProgressionChord();
+                                    } else if (activeTab && activeTab.dataset.tab === 'progression' && typeof window.generateNextProgressionChord === 'function') {
+                                        console.log('音高检测MIDI: 备选检测 - 标签页是progression，调用 generateNextProgressionChord');
+                                        window.generateNextProgressionChord();
+                                    } else if (typeof window.generateExercise === 'function') {
+                                        console.log('音高检测MIDI: 使用普通模式，调用 generateExercise');
                                         window.generateExercise();
                                     } else if (typeof generateExercise === 'function') {
+                                        console.log('音高检测MIDI: 使用本地 generateExercise');
                                         generateExercise();
                                     } else {
                                         console.error('音高检测MIDI: generateExercise函数不可用');
@@ -1930,6 +2039,7 @@
                         if (window.state.currentStep >= window.state.currentSequence.length) {
                             window.state.isAnswered = true;
                             console.log('序列练习MIDI: 序列完成');
+                            console.log('序列练习MIDI: 序列完成时的 progressionIndex', window.state.progressionIndex);
 
                             // 根据设置决定是否进入冷却期
                             if (window.state.enableCooldown) {
@@ -1951,6 +2061,12 @@
                             // 延迟生成下一题
                             setTimeout(() => {
                                 console.log('序列练习MIDI: 尝试生成下一题');
+                                console.log('序列练习MIDI: 当前状态检查', {
+                                    progressionChords: window.state.progressionChords,
+                                    progressionIndex: window.state.progressionIndex,
+                                    activeTab: document.querySelector('.nav-item.active')?.dataset.tab
+                                });
+                                console.log('序列练习MIDI: 调用 generateNextProgressionChord 前的索引', window.state.progressionIndex);
 
                                 // 重置必要的状态以便生成新题目
                                 if (window.state) {
@@ -1960,9 +2076,26 @@
                                 }
 
                                 try {
-                                    if (typeof window.generateExercise === 'function') {
+                                    // 检查是否是和弦进行练习
+                                    const activeTab = document.querySelector('.nav-item.active');
+                                    const isProgressionMode = activeTab && activeTab.dataset.tab === 'progression' &&
+                                                             window.state.progressionChords && window.state.progressionChords.length > 0;
+
+                                    console.log('序列练习MIDI: 检查是否为和弦进行模式', {
+                                        activeTab: activeTab ? activeTab.dataset.tab : 'none',
+                                        isProgressionMode,
+                                        progressionIndex: window.state.progressionIndex,
+                                        totalChords: window.state.progressionChords ? window.state.progressionChords.length : 0
+                                    });
+
+                                    if (isProgressionMode && typeof window.generateNextProgressionChord === 'function') {
+                                        console.log('序列练习MIDI: 检测到和弦进行模式，调用 generateNextProgressionChord');
+                                        window.generateNextProgressionChord();
+                                    } else if (typeof window.generateExercise === 'function') {
+                                        console.log('序列练习MIDI: 使用普通模式，调用 generateExercise');
                                         window.generateExercise();
                                     } else if (typeof generateExercise === 'function') {
+                                        console.log('序列练习MIDI: 使用本地 generateExercise');
                                         generateExercise();
                                     } else {
                                         console.error('序列练习MIDI: generateExercise函数不可用');
@@ -2007,46 +2140,46 @@
                 return semitonesToNoteName(targetSemitone);
             }
 
-            // 连接MIDI设备
+            // 连接MIDI设备（现在只是显示设备，等待用户选择）
             function connectMIDIDevices() {
                 if (!window.midiState.midiAccess) return;
 
-                let connectedCount = 0;
-
-                // 连接所有输入设备
-                for (const input of window.midiState.midiAccess.inputs.values()) {
-                    if (input.state === 'connected') {
-                        try {
-                            input.onmidimessage = handleMIDIInput;
-                            connectedCount++;
-                            console.log('已连接MIDI设备:', input.name, 'ID:', input.id);
-                        } catch (error) {
-                            console.error('连接MIDI设备失败:', input.name, error);
-                        }
-                    }
-                }
-
-                window.midiState.isConnected = connectedCount > 0;
-                console.log(`成功连接 ${connectedCount} 个MIDI设备`);
+                // 不再自动连接所有设备，而是显示可用设备列表
+                console.log('MIDI设备已就绪，请选择要连接的设备');
 
                 // 更新状态显示
-                updateMIDIConnectionStatus(connectedCount);
+                updateMIDIConnectionStatus(0);
+
+                // 显示设备列表，让用户选择
+                displayMIDIDevices();
             }
 
             // 断开MIDI设备
             function disconnectMIDIDevices() {
                 if (!window.midiState.midiAccess) return;
-                
+
                 // 断开所有输入设备
                 for (const input of window.midiState.midiAccess.inputs.values()) {
                     input.onmidimessage = null;
                     console.log('已断开MIDI设备:', input.name);
                 }
+
+                // 清理当前设备选择
+                window.midiState.currentDevice = null;
+                window.midiState.isConnected = false;
+                console.log('已断开所有MIDI设备');
+
+                // 更新状态显示
+                updateMIDIConnectionStatus(0);
+
+                // 更新设备显示
+                displayMIDIDevices();
             }
 
             // 将MIDI设备连接函数暴露到全局作用域
             window.connectMIDIDevices = connectMIDIDevices;
             window.disconnectMIDIDevices = disconnectMIDIDevices;
+            window.updateMIDIDevices = updateMIDIDevices;
             function positionDropdown(menu, trigger) {
                 const rect = trigger.getBoundingClientRect();
                 menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
@@ -4265,6 +4398,60 @@
 
         .midi-device-status.disconnected {
             color: #f87171;
+        }
+
+        /* MIDI 设备选择样式 */
+        .midi-device-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .midi-device-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .midi-device-info {
+            flex: 1;
+            font-size: 14px;
+            color: #e2e8f0;
+            margin: 0 10px;
+        }
+
+        .midi-device-status-indicator {
+            font-size: 12px;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        .midi-device-select-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 60px;
+        }
+
+        .midi-device-select-btn:hover:not(:disabled) {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .midi-device-select-btn:disabled {
+            background: #10b981;
+            cursor: default;
+            opacity: 0.8;
         }
 
         /* 全屏选择器样式 */
@@ -9337,35 +9524,175 @@
                 }
 
                 requestAnimationFrame(() => {
-                    if (state.currentStep >= state.currentSequence.length) {
-                        state.isAnswered = true;
+                    // 检查是否是和弦进行练习
+                    const activeTab = document.querySelector('.nav-item.active').dataset.tab;
+                    const isProgressionMode = activeTab === 'progression' && state.progressionChords;
 
-                        // 根据设置决定是否进入冷却期
-                        if (state.enableCooldown) {
-                            state.isCoolingDown = true;
-                            if (state.cooldownTimeout) {
-                                clearTimeout(state.cooldownTimeout);
+                    console.log('handleCorrectAnswer: 检查练习模式', {
+                        activeTab,
+                        isProgressionMode,
+                        progressionIndex: state.progressionIndex,
+                        totalChords: state.progressionChords ? state.progressionChords.length : 0,
+                        currentChord: state.progressionChords && state.progressionChords[state.progressionIndex],
+                        chordIntervals: state.currentSequence
+                    });
+
+                    if (isProgressionMode) {
+                        // 和弦进行模式：检查是否完成当前和弦
+                        const currentChord = state.progressionChords[state.progressionIndex];
+                        const chordIntervals = state.currentSequence || [];
+
+                        console.log('和弦进行练习完成:', {
+                            currentChord,
+                            currentStep: state.currentStep,
+                            totalIntervals: chordIntervals.length,
+                            progressionIndex: state.progressionIndex
+                        });
+
+                        if (state.currentStep >= chordIntervals.length) {
+                            state.isAnswered = true;
+
+                            // 根据设置决定是否进入冷却期
+                            if (state.enableCooldown) {
+                                state.isCoolingDown = true;
+                                if (state.cooldownTimeout) {
+                                    clearTimeout(state.cooldownTimeout);
+                                }
+                                state.cooldownTimeout = setTimeout(() => {
+                                    state.isCoolingDown = false;
+                                }, state.cooldownDuration);
                             }
-                            state.cooldownTimeout = setTimeout(() => {
-                                state.isCoolingDown = false;
-                            }, state.cooldownDuration);
-                        }
 
-                        // 根据设置决定延迟时间
-                        let delayTime = 0; // 默认无延迟
-                        if (state.enableFixedDelay) {
-                            delayTime = state.fixedDelayDuration;
-                        }
+                            // 根据设置决定延迟时间
+                            let delayTime = 0; // 默认无延迟
+                            if (state.enableFixedDelay) {
+                                delayTime = state.fixedDelayDuration;
+                            }
 
-                        // 延迟生成下一题，给用户停止弹奏的时间
-                        setTimeout(() => {
-                            generateExercise();
-                        }, delayTime);
+                            // 延迟进入下一个和弦
+                            setTimeout(() => {
+                                generateNextProgressionChord();
+                            }, delayTime);
+                        } else {
+                            const next = document.querySelector(`.sequence-item[data-index="${state.currentStep}"]`);
+                            if (next) next.classList.add('current');
+                        }
                     } else {
-                        const next = document.querySelector(`.sequence-item[data-index="${state.currentStep}"]`);
-                        if (next) next.classList.add('current');
+                        // 普通序列练习模式
+                        if (state.currentStep >= state.currentSequence.length) {
+                            state.isAnswered = true;
+
+                            // 根据设置决定是否进入冷却期
+                            if (state.enableCooldown) {
+                                state.isCoolingDown = true;
+                                if (state.cooldownTimeout) {
+                                    clearTimeout(state.cooldownTimeout);
+                                }
+                                state.cooldownTimeout = setTimeout(() => {
+                                    state.isCoolingDown = false;
+                                }, state.cooldownDuration);
+                            }
+
+                            // 根据设置决定延迟时间
+                            let delayTime = 0; // 默认无延迟
+                            if (state.enableFixedDelay) {
+                                delayTime = state.fixedDelayDuration;
+                            }
+
+                            // 延迟生成下一题，给用户停止弹奏的时间
+                            setTimeout(() => {
+                                generateExercise();
+                            }, delayTime);
+                        } else {
+                            const next = document.querySelector(`.sequence-item[data-index="${state.currentStep}"]`);
+                            if (next) next.classList.add('current');
+                        }
                     }
                 });
+            }
+
+            // 生成和弦进行的下一个和弦
+            function generateNextProgressionChord() {
+                console.log('generateNextProgressionChord: === 开始调用 ===');
+                console.log('generateNextProgressionChord: 调用时间', new Date().toISOString());
+                console.log('generateNextProgressionChord: 进入下一个和弦');
+                console.log('generateNextProgressionChord: 当前进度', {
+                    progressionIndex: state.progressionIndex,
+                    totalChords: state.progressionChords ? state.progressionChords.length : 0,
+                    currentChord: state.progressionChords && state.progressionChords[state.progressionIndex],
+                    allChords: state.progressionChords
+                });
+
+                if (!state.progressionChords || state.progressionChords.length === 0) {
+                    console.error('generateNextProgressionChord: 没有和弦进行数据');
+                    return;
+                }
+
+                // 递增索引到下一个和弦
+                console.log('generateNextProgressionChord: 递增前索引', state.progressionIndex);
+                state.progressionIndex++;
+                console.log('generateNextProgressionChord: 递增后索引', state.progressionIndex);
+
+                const enableRepeatEl = document.getElementById('enableRepeat');
+
+                // 检查是否已完成所有和弦
+                if (state.progressionIndex >= state.progressionChords.length) {
+                    const isRepeatEnabled = enableRepeatEl.checked;
+                    if (isRepeatEnabled) {
+                        console.log('generateNextProgressionChord: 重复练习，重置索引到 0');
+                        state.progressionIndex = 0; // 重新开始
+                    } else {
+                        console.log('generateNextProgressionChord: 练习完成，退出');
+
+                        // 确保最后一个和弦的下一个显示为空白
+                        state.nextExerciseInfo = '';
+                        state.nextExerciseIntervals = '';
+                        updateNextExerciseDisplay();
+                        console.log('generateNextProgressionChord: 已设置下一个和弦显示为空白');
+
+                        // 重置自定义和弦模式状态（退出练习时立即重置）
+                        state.isCustomChordMode = false;
+                        console.log('自定义和弦练习完成退出 - 重置 state.isCustomChordMode = false');
+
+                        // 清空自定义和弦相关状态
+                        // useCustomChords 开关已移除
+
+                        // 清空全局自定义和弦序列
+                        window.customChordSequence = [];
+                        console.log('练习完成 - 清空自定义和弦序列');
+
+                        // 清空和弦进行状态
+                        state.progressionChords = null;
+                        state.progressionSong = null;
+                        state.progressionOrder = null;
+                        state.progressionKey = null;
+                        state.progressionLevel = null;
+                        state.progressionIndex = 0;
+
+                        // 直接退出练习界面，不弹出提示窗口
+                        stopRecording();
+                        stopMetronome();
+                        practiceScreen.style.display = 'none';
+                        document.getElementById('pitchDisplay').style.display = 'none';
+                        mainScreen.style.display = 'block';
+                        updateStatusIndicator('练习已完成', 'ready');
+
+                        // 重置所有练习模式状态
+                        window.state.intervalExerciseMode = false;
+                        window.state.pitchFindingMode = false;
+                        state.isInProgressionSession = false;
+                        return;
+                    }
+                }
+
+                // 生成当前索引的和弦练习
+                console.log('generateNextProgressionChord: 生成索引', state.progressionIndex, '的和弦练习');
+                console.log('generateNextProgressionChord: 调用前状态', {
+                    progressionIndex: state.progressionIndex,
+                    progressionChords: state.progressionChords,
+                    totalChords: state.progressionChords ? state.progressionChords.length : 0
+                });
+                generateCurrentProgressionChord();
             }
 
             // 通用函数：重置CAGED模式状态
@@ -9606,7 +9933,7 @@
                             if (isRepeatEnabled) {
                                 nextIndex = 0; // 重新开始
                             } else {
-                                state.nextExerciseInfo = '练习完成';
+                                state.nextExerciseInfo = '';
                                 state.nextExerciseIntervals = [];
                                 return;
                             }
@@ -9732,15 +10059,24 @@
             }
             // 更新下一个练习显示
             function updateNextExerciseDisplay() {
+                console.log('updateNextExerciseDisplay: 更新显示', {
+                    nextExerciseInfo: state.nextExerciseInfo,
+                    nextExerciseIntervals: state.nextExerciseIntervals,
+                    nextExerciseEl: nextExerciseEl
+                });
+
                 if (state.nextExerciseInfo) {
                     // 显示调性和音阶名/和弦名以及音级结构
                     let displayHTML = state.nextExerciseInfo;
                     if (state.nextExerciseIntervals && state.nextExerciseIntervals.length > 0) {
                         displayHTML += '<br><span style="font-size: 14px; color: #94a3b8;">' + state.nextExerciseIntervals.join(' ') + '</span>';
                     }
+                    console.log('updateNextExerciseDisplay: 显示内容', displayHTML);
                     nextExerciseEl.innerHTML = displayHTML;
                 } else {
-                    nextExerciseEl.innerHTML = '-';
+                    // 最后一个和弦或没有下一个练习时显示空白
+                    console.log('updateNextExerciseDisplay: 显示空白');
+                    nextExerciseEl.innerHTML = '';
                 }
             }
 
@@ -12312,6 +12648,8 @@
                 
                 // 将函数暴露到全局作用域
                 window.generateNextIntervalExercise = generateNextIntervalExercise;
+                window.generateExercise = generateExercise;
+                window.generateNextProgressionChord = generateNextProgressionChord;
                 
                 // 显示指板功能
                 function showFretboardForPractice() {
@@ -12737,9 +13075,14 @@
                             const success = await initializeMIDI();
                             if (success) {
                                 window.midiState.enabled = true;
-                                
-                                // 连接所有MIDI输入设备
-                                connectMIDIDevices();
+
+                                // 显示可用设备列表，等待用户选择
+                                console.log('MIDI已启用，请选择要连接的设备');
+                                if (typeof window.updateMIDIDevices === 'function') {
+                                    window.updateMIDIDevices(); // 这个函数会调用 displayMIDIDevices 和 updateMIDIConnectionStatus
+                                } else {
+                                    console.error('updateMIDIDevices 函数未找到');
+                                }
                             } else {
                                 // 如果初始化失败，取消选中状态
                                 this.checked = false;
@@ -13465,13 +13808,24 @@
                 targetIntervalEl.innerHTML = currentChord; // 确保只显示和弦名称，不显示音级结构
                 displaySequence();
 
-                // 准备下一个和弦（保持相同的顺序）
-                const nextIndex = (state.progressionIndex + 1) % chords.length;
+                // 准备下一个和弦
                 const isRepeatEnabled = enableRepeatEl.checked;
-                
-                if (isRepeatEnabled || nextIndex !== 0) {
+                const isLastChord = state.progressionIndex >= chords.length - 1;
+
+                console.log('generateCurrentProgressionChord: 下一个和弦检查', {
+                    currentIndex: state.progressionIndex,
+                    totalChords: chords.length,
+                    isLastChord,
+                    isRepeatEnabled,
+                    shouldShowNext: isRepeatEnabled || !isLastChord
+                });
+
+                if (isRepeatEnabled || !isLastChord) {
+                    // 如果启用重复或者不是最后一个和弦，显示下一个和弦
+                    const nextIndex = state.progressionIndex + 1;
                     const nextChord = chords[nextIndex];
                     state.nextExerciseInfo = nextChord; // 只显示和弦名
+                    console.log('generateCurrentProgressionChord: 显示下一个和弦', nextChord);
                     
                     // 为下一个和弦生成音程
                     const level = progressionLevelEl.value;
@@ -13508,28 +13862,34 @@
                         state.nextExerciseIntervals = getIntervalsForLevel(level, nextType);
                     }
                 } else {
-                    state.nextExerciseInfo = '练习完成';
+                    state.nextExerciseInfo = '';
                     state.nextExerciseIntervals = [];
                 }
                 
                 // 更新下一题显示
                 updateNextExerciseDisplay();
 
-                // 更新索引准备下一题
-                // 修复：只有在成功显示当前和弦后才递增索引
-                // 这样可以确保第一次调用时显示第一个和弦
-                if (state.progressionIndex < chords.length) {
-                    state.progressionIndex++;
-                }
+                // 注意：索引递增由 generateNextProgressionChord 处理，这里不递增
             }
             
             // 生成当前和弦进行练习
             function generateCurrentProgressionChord() {
+                console.log('generateCurrentProgressionChord: 开始生成当前和弦');
+                console.log('generateCurrentProgressionChord: 被调用时的索引', state.progressionIndex);
+                console.log('generateCurrentProgressionChord: 完整状态', {
+                    progressionIndex: state.progressionIndex,
+                    totalChords: state.progressionChords ? state.progressionChords.length : 0,
+                    currentChord: state.progressionChords && state.progressionChords[state.progressionIndex],
+                    allChords: state.progressionChords,
+                    progressionSong: state.progressionSong,
+                    progressionKey: state.progressionKey
+                });
+
                 if (!state.progressionChords || state.progressionChords.length === 0) {
                     console.error('没有可用的和弦进行数据');
                     return;
                 }
-                
+
                 const progressionLevelEl = document.getElementById('progressionLevel');
                 const enableRepeatEl = document.getElementById('enableRepeat');
                 const targetIntervalEl = document.getElementById('targetInterval');
@@ -13576,10 +13936,12 @@
                 }
 
                 const currentChord = state.progressionChords[state.progressionIndex];
+                console.log('generateCurrentProgressionChord: 当前和弦', currentChord, '索引', state.progressionIndex);
                 const { root, type } = parseChordSymbol(currentChord);
 
                 state.rootNote = root;
                 state.chordType = type;
+                console.log('generateCurrentProgressionChord: 设置和弦', { root, type });
 
                 // 根据练习等级生成音程
                 const level = progressionLevelEl.value;
@@ -13659,19 +14021,12 @@
                         state.nextExerciseIntervals = getIntervalsForLevel(level, nextType);
                     }
                 } else {
-                    state.nextExerciseInfo = '练习完成';
+                    state.nextExerciseInfo = '';
                     state.nextExerciseIntervals = [];
                 }
                 
                 // 更新下一题显示
                 updateNextExerciseDisplay();
-
-                // 更新索引准备下一题
-                // 修复：只有在成功显示当前和弦后才递增索引
-                // 这样可以确保第一次调用时显示第一个和弦
-                if (state.progressionIndex < state.progressionChords.length) {
-                    state.progressionIndex++;
-                }
             }
             
             // 根据练习等级获取对应的音程
