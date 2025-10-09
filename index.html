@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#0f0f0f">
     <meta name="msapplication-navbutton-color" content="#0f0f0f">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title data-i18n-key="page_title">🎸 吉他练习工具 v0.36</title>
+    <title data-i18n-key="page_title">🎸 吉他练习工具 v2.0</title>
     <!-- ml5.js库 - 用于CREPE音高检测算法 -->
     <script src="js/ml5.min.js"></script>
 
@@ -9281,16 +9281,18 @@
                         rootNote = notes[Math.floor(Math.random() * notes.length)];
                     }
 
-                    let scaleType = scaleTypeEl.value;
-                    if (scaleType === 'random') {
-                        // 使用多选调式选择器的随机功能
-                        scaleType = window.getRandomSelectedScaleType ?
-                            window.getRandomSelectedScaleType() :
-                            (function() {
-                                const types = Object.keys(scaleTypes);
-                                return types[Math.floor(Math.random() * types.length)];
-                            })();
-                    }
+                    let scaleType = 'random'; // 在多选模式下，总是使用随机选择
+                    // 使用多选调式选择器的随机功能
+                    scaleType = window.getRandomSelectedScaleType ?
+                        window.getRandomSelectedScaleType() :
+                        (function() {
+                            const types = Object.keys(scaleTypes);
+                            return types[Math.floor(Math.random() * types.length)];
+                        })();
+
+                    // 保存预选的调式，确保实际生成下一题时使用相同的调式
+                    state.nextScaleType = scaleType;
+                    state.nextRootNote = rootNote;
 
                     // 获取方向
                     const activeOrderBtn = document.querySelector('.scale-order-btn.active');
@@ -9648,6 +9650,10 @@
                 state.nextExerciseInfo = '';
                 state.nextExerciseIntervals = [];
                 state.chordType = ''; // 清除之前的和弦类型
+
+                // 清除预选的调式和根音，确保新一轮练习重新随机选择
+                state.nextScaleType = null;
+                state.nextRootNote = null;
                 
                 // 清理sequence-item的CSS状态
                 const sequenceItems = document.querySelectorAll('.sequence-item');
@@ -10447,16 +10453,28 @@
             // 生成音阶练习
             function generateScaleExercise() {
                 resetCagedModeState();
-                
+
                 let rootNote = rootNoteEl.value;
                 if (rootNote === 'random') {
-                    const notes = Object.keys(noteToSemitones).filter(n => n.length <= 2);
-                    rootNote = notes[Math.floor(Math.random() * notes.length)];
+                    // 如果有预选的根音（从generateNextExercise设置的），使用预选的根音
+                    if (state.nextRootNote) {
+                        rootNote = state.nextRootNote;
+                        console.log('使用预选的根音:', rootNote);
+                    } else {
+                        // 否则重新随机选择
+                        const notes = Object.keys(noteToSemitones).filter(n => n.length <= 2);
+                        rootNote = notes[Math.floor(Math.random() * notes.length)];
+                    }
                 }
                 state.rootNote = rootNote;
 
-                let scaleType = scaleTypeEl.value;
-                if (scaleType === 'random') {
+                // 在多选模式下，总是使用随机选择
+                let scaleType;
+                // 如果有预选的调式（从generateNextExercise设置的），使用预选的调式
+                if (state.nextScaleType) {
+                    scaleType = state.nextScaleType;
+                } else {
+                    // 否则重新随机选择
                     scaleType = window.getRandomSelectedScaleType ?
                         window.getRandomSelectedScaleType() :
                         (function() {
@@ -10465,6 +10483,10 @@
                         })();
                 }
                 state.scaleType = scaleType;
+
+                // 清除预选的调式，因为已经使用过了
+                state.nextScaleType = null;
+                state.nextRootNote = null;
 
                 // 获取练习序列类型
                 const arpeggioTypeButtons = document.querySelectorAll('.scale-arpeggio-btn');
@@ -11530,8 +11552,7 @@
                     // 验证音阶设置
                     if (activeTab === 'scale') {
                         // 检查是否选择了调式
-                        const checkboxes = document.querySelectorAll('.dropdown-option input[type="checkbox"]:checked');
-                        if (checkboxes.length === 0) {
+                        if (window.ScaleTypeManager && window.ScaleTypeManager.selectedScales.size === 0) {
                             alert('请选择要练习的调式！');
                             return;
                         }
@@ -14544,9 +14565,23 @@
 
                 // 检查初始调式
                 checkInitialScale() {
-                    const majorCheckbox = document.querySelector('.dropdown-option input[value="major"]');
-                    if (majorCheckbox) {
-                        majorCheckbox.checked = true;
+                    // 清空selectedScales，然后根据实际复选框状态重新设置
+                    this.selectedScales.clear();
+
+                    const checkboxes = document.querySelectorAll('.dropdown-option input[type="checkbox"]');
+                    checkboxes.forEach(checkbox => {
+                        if (checkbox.checked) {
+                            this.selectedScales.add(checkbox.value);
+                        }
+                    });
+
+                    // 如果没有选中的，默认选中major
+                    if (this.selectedScales.size === 0) {
+                        const majorCheckbox = document.querySelector('.dropdown-option input[value="major"]');
+                        if (majorCheckbox) {
+                            majorCheckbox.checked = true;
+                            this.selectedScales.add('major');
+                        }
                     }
                 },
 
