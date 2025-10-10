@@ -14065,10 +14065,13 @@
                 if (!chordTypes[chordType]) {
                     return intervals;
                 }
-                
+
                 const chordIntervals = chordTypes[chordType].intervals;
                 const adjustedIntervals = [];
-                
+
+                // 检查是否是sus4类型的和弦
+                const isSus4Chord = chordType.includes('sus4');
+
                 for (const interval of intervals) {
                     if (chordIntervals.includes(interval)) {
                         // 如果和弦包含这个音程，直接使用
@@ -14076,24 +14079,24 @@
                     } else {
                         // 如果和弦不包含这个音程，寻找替代
                         let replacement = null;
-                        
+
                         switch (interval) {
                             case '3':
                                 // 3度音程的替代
-                                if (chordIntervals.includes('2')) {
+                                if (isSus4Chord && chordIntervals.includes('4')) {
+                                    replacement = '4'; // sus4和弦：4音是正确的，不是替代
+                                } else if (chordIntervals.includes('2')) {
                                     replacement = '2'; // sus2和弦用2替代3
-                                } else if (chordIntervals.includes('4')) {
-                                    replacement = '4'; // sus4和弦用4替代3
                                 } else if (chordIntervals.includes('♭3')) {
                                     replacement = '♭3'; // 小和弦用♭3替代3
                                 }
                                 break;
                             case '♭3':
                                 // ♭3度音程的替代
-                                if (chordIntervals.includes('2')) {
+                                if (isSus4Chord && chordIntervals.includes('4')) {
+                                    replacement = '4'; // sus4和弦：4音是正确的，不是替代
+                                } else if (chordIntervals.includes('2')) {
                                     replacement = '2'; // sus2和弦用2替代♭3
-                                } else if (chordIntervals.includes('4')) {
-                                    replacement = '4'; // sus4和弦用4替代♭3
                                 } else if (chordIntervals.includes('3')) {
                                     replacement = '3'; // 大和弦用3替代♭3
                                 }
@@ -14750,6 +14753,15 @@
                     'sus4': 'sus4',
                     '7sus2': '7sus2',
                     '7sus4': '7sus4',
+                    'sus4(b9)': 'sus4b9',
+                    '13sus4(b9)': '13sus4b9',
+                    'Maj7(#11)': 'Maj7#11',
+                    'Maj7(#5)': 'Maj7#5',
+                    '7(#11)': '7#11',
+                    'Min7b5♮9': 'Min7b5♮9',
+                    'm7(b5,♮9)': 'Min7b5♮9',
+                    'm7(b5)': 'minor7b5',
+                    '13(b9)': '13b9',
                     'add9': 'add9',
                     'madd9': 'madd9',
                     '6add9': '6add9',
@@ -15623,6 +15635,117 @@
                 }
             }
 
+            // 创建半透明信息小窗
+            function showInfoPopup(element, descKey, buttonText) {
+                const infoText = window.t ? window.t(descKey) : descKey;
+
+                // 移除已存在的小窗
+                removeInfoPopup();
+
+                // 创建小窗元素
+                const popup = document.createElement('div');
+                popup.className = 'info-popup-overlay';
+                popup.innerHTML = `
+                    <div class="info-popup">
+                        <div class="info-popup-header">
+                            <h4>${buttonText}</h4>
+                            <button class="info-popup-close">&times;</button>
+                        </div>
+                        <div class="info-popup-content">
+                            ${getMelodicStructureDescription(descKey)}
+                        </div>
+                    </div>
+                `;
+
+                // 添加到页面
+                document.body.appendChild(popup);
+
+                // 绑定关闭事件
+                const closeBtn = popup.querySelector('.info-popup-close');
+                const overlay = popup;
+
+                closeBtn.addEventListener('click', removeInfoPopup);
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) {
+                        removeInfoPopup();
+                    }
+                });
+
+                // ESC键关闭
+                const escHandler = (e) => {
+                    if (e.key === 'Escape') {
+                        removeInfoPopup();
+                        document.removeEventListener('keydown', escHandler);
+                    }
+                };
+                document.addEventListener('keydown', escHandler);
+            }
+
+            // 移除信息小窗
+            function removeInfoPopup() {
+                const popup = document.querySelector('.info-popup-overlay');
+                if (popup) {
+                    popup.remove();
+                }
+            }
+
+            // 获取旋律结构的详细说明
+            function getMelodicStructureDescription(descKey) {
+                const descriptions = {
+                    'root_to_third': '根音到三音的旋律进行。这是最基本的旋律结构，帮助建立和弦的基本性质。适合初学者练习音高识别和听觉记忆。',
+
+                    'root_to_fifth': '根音到五音的旋律进行。五音是和弦的稳定音，这个进行有助于理解和弦框架和和声基础。',
+
+                    'third_to_fifth': '三音到五音的旋律进行。专注于和弦内音的连接，培养对和弦色彩变化的敏感度。',
+
+                    'root_third_fifth_line': '根音-三音-五音的线性进行。完整的和弦内音旋律线，帮助理解和弦的完整结构和声部进行。',
+
+                    'random_inversions': '随机转位练习。随机排列和弦内音，培养灵活的音高识别能力和适应不同旋律进行的能力。',
+
+                    'fifth_to_seventh': '五音到七音的旋律进行。七音是和弦的特征音，这个练习有助于掌握七和弦的色彩和张力。',
+
+                    'seventh_to_ninth': '七音到九音的旋律进行。九音是延伸音，这个练习帮助理解现代和声中的复杂音程关系。',
+
+                    'fifth_to_ninth': '五音到九音的跳进。大跳音程练习，培养对大跳音程的精确掌握和音准控制。',
+
+                    'fifth_seventh_ninth_line': '五音-七音-九音的线性进行。高级延伸音旋律线，适合练习复杂的和声听觉和旋律构建。',
+
+                    'stepwise_voice_leading': '级进连接。使用相邻音程的最平滑声部进行，培养自然流畅的旋律感。',
+
+                    'common_tone_voice_leading': '共同音保持。在和弦变化中保持共同音，创造稳定性和连续性。',
+
+                    'contrary_motion_voice_leading': '反向进行。声部朝相反方向移动，创造动态对比和戏剧性效果。',
+
+                    'parallel_motion_voice_leading': '平行进行。声部同方向移动，保持相同的音程关系，创造统一感。',
+
+                    'sus4_to_sus2': 'Sus4到Sus2的解决。从四度挂留到二度挂留，体验不同挂留音的解决感。',
+
+                    'sus4_to_third': 'Sus4到三音的解决。经典的挂留解决，创造期待和满足的音乐张力。',
+
+                    'sus2_to_third': 'Sus2到三音的解决。二度挂留的解决，提供不同的色彩变化。',
+
+                    'suspension_resolution_chain': '挂留解决链。连续的挂留和解决，培养对和声流动的理解。',
+
+                    'triadic_chord_scales': '三和弦音阶。基于三和弦结构的音阶进行，建立扎实的和声基础。',
+
+                    'seventh_chord_scales': '七和弦音阶。包含七音的音阶结构，适合爵士和现代音乐。',
+
+                    'extended_chord_scales': '扩展和弦音阶。包含九音、十一音等延伸音的复杂音阶。',
+
+                    'modal_chord_scales': '调式和弦音阶。基于各种调式的音阶进行，拓展调性思维。',
+
+                    'diatonic_passing_tones': '自然经过音。使用调内音作为经过音，创造流畅的旋律连接。',
+
+                    'chromatic_passing_tones': '半音经过音。使用半音作为经过音，增加色彩和表现力。',
+
+                    'enclosure_passing_tones': '包围音。从目标音的上下方接近目标音，创造强烈的方向性。',
+
+                    'appoggiatura_passing_tones': '装饰音。延迟解决到目标音，增加装饰性和表现力。'
+                };
+
+                return descriptions[descKey] || infoText || '暂无说明';
+            }
+
             // 简单方案3: 在选择器顶部显示说明区域
             let currentTopDescription = null;
             function showTopDescription(descKey, buttonText) {
@@ -15823,7 +15946,7 @@
                     const descKey = icon.getAttribute('data-info');
                     showNativeTooltip(icon, descKey);
 
-                    // 点击使用方案2：在按钮下方展开说明
+                    // 点击显示半透明信息小窗
                     icon.addEventListener('click', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -15831,11 +15954,8 @@
                         const descKey = this.getAttribute('data-info');
                         const buttonText = this.previousElementSibling.textContent;
 
-                        // 方案2：展开说明
-                        toggleDescription(this, descKey);
-
-                        // 或者使用方案3：在顶部显示（取消下面的注释，注释上面的方案2）
-                        // showTopDescription(descKey, buttonText);
+                        // 显示半透明信息小窗
+                        showInfoPopup(this, descKey, buttonText);
                     });
                 });
 
@@ -15885,11 +16005,8 @@
                             const descKey = this.getAttribute('data-info');
                             const buttonText = this.previousElementSibling.textContent;
 
-                            // 方案2：展开说明
-                            toggleDescription(this, descKey);
-
-                            // 或者使用方案3：在顶部显示
-                            // showTopDescription(descKey, buttonText);
+                            // 显示半透明信息小窗
+                            showInfoPopup(this, descKey, buttonText);
                         });
                     });
                 }

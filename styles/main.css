@@ -3620,3 +3620,144 @@ input:checked+.slider:before {
     color: #94a3b8;
 }
 
+/* 半透明信息小窗样式 */
+.info-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+}
+
+.info-popup {
+    background: rgba(30, 30, 35, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    animation: slideIn 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(20, 20, 25, 0.9);
+}
+
+.info-popup-header h4 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.info-popup-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #b0b0b0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.info-popup-close:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.info-popup-content {
+    padding: 20px 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #e0e0e0;
+}
+
+.info-popup-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.info-popup-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.info-popup-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.info-popup-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px) scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* 深色主题适配 */
+@media (prefers-color-scheme: dark) {
+    .info-popup {
+        background: rgba(30, 30, 40, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .info-popup-header {
+        background: rgba(30, 30, 40, 0.8);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .info-popup-header h4 {
+        color: #ecf0f1;
+    }
+
+    .info-popup-close {
+        color: #bdc3c7;
+    }
+
+    .info-popup-close:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #ecf0f1;
+    }
+
+    .info-popup-content {
+        color: #ecf0f1;
+    }
+}
+
