@@ -1284,7 +1284,19 @@
                 }
             }
 
-            // 显示MIDI设备信息
+            // 强制显示MIDI设备信息区域
+            function showMIDIDeviceInfo() {
+                const deviceInfo = document.getElementById('midiDeviceInfo');
+                if (deviceInfo) {
+                    deviceInfo.style.display = 'block';
+                    deviceInfo.classList.remove('hidden');
+                }
+            }
+
+            // 将showMIDIDeviceInfo函数暴露到全局作用域
+            window.showMIDIDeviceInfo = showMIDIDeviceInfo;
+
+          // 显示MIDI设备信息
             function displayMIDIDevices() {
                 const deviceInfo = document.getElementById('midiDeviceInfo');
                 const deviceStatus = document.getElementById('midiDeviceStatus');
@@ -1292,9 +1304,11 @@
 
                 if (!deviceInfo || !deviceStatus || !deviceList) return;
 
+                // 始终显示设备信息区域，让用户知道MIDI的状态
+                showMIDIDeviceInfo();
+
                 if (window.midiState.devices.length > 0) {
                     deviceStatus.textContent = `检测到 ${window.midiState.devices.length} 个MIDI设备`;
-                    deviceInfo.style.display = 'block';
 
                     // 显示设备列表
                     deviceList.innerHTML = '';
@@ -1335,7 +1349,8 @@
                     });
                 } else {
                     deviceStatus.textContent = '未检测到MIDI设备';
-                    deviceInfo.style.display = 'none';
+                    // 保持设备信息区域显示，让用户知道当前状态
+                    deviceList.innerHTML = '<div class="midi-device-item">请确保MIDI设备已连接并刷新页面</div>';
                 }
             }
 
@@ -13071,6 +13086,15 @@
                     
                     midiToggle.addEventListener('change', async function() {
                         if (this.checked) {
+                            // 立即显示MIDI设备信息区域，让用户知道系统正在尝试连接
+                            showMIDIDeviceInfo();
+
+                            // 显示正在初始化的状态
+                            const deviceStatus = document.getElementById('midiDeviceStatus');
+                            const deviceList = document.getElementById('midiDeviceList');
+                            if (deviceStatus) deviceStatus.textContent = '正在初始化MIDI...';
+                            if (deviceList) deviceList.innerHTML = '<div class="midi-device-item">正在扫描MIDI设备...</div>';
+
                             // 启用MIDI
                             const success = await initializeMIDI();
                             if (success) {
@@ -13091,9 +13115,15 @@
                         } else {
                             // 禁用MIDI
                             window.midiState.enabled = false;
-                            
+
                             // 断开所有MIDI输入设备
                             disconnectMIDIDevices();
+
+                            // 隐藏MIDI设备信息区域
+                            const deviceInfo = document.getElementById('midiDeviceInfo');
+                            if (deviceInfo) {
+                                deviceInfo.classList.add('hidden');
+                            }
                         }
                     });
                 }
