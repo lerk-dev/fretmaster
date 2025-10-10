@@ -1169,18 +1169,6 @@
                         return false;
                     }
 
-                    // 检查是否在Android设备上
-                    const isAndroid = /Android/i.test(navigator.userAgent);
-
-                    // Android设备额外检查
-                    if (isAndroid) {
-                        const supportedBrowsers = /Chrome|Edge/i.test(navigator.userAgent);
-                        if (!supportedBrowsers) {
-                            updateMIDIStatus('Android设备需要Chrome或Edge浏览器支持MIDI', false);
-                            return false;
-                        }
-                    }
-
                     // 请求MIDI访问权限
                     const midiAccess = await navigator.requestMIDIAccess({ sysex: false });
                     window.midiState.midiAccess = midiAccess;
@@ -1225,27 +1213,6 @@
 
             // 将MIDI函数暴露到全局作用域
             window.initializeMIDI = initializeMIDI;
-
-            // 检查MIDI兼容性的函数
-            function checkMIDICompatibility() {
-                const isAndroid = /Android/i.test(navigator.userAgent);
-                const isChrome = /Chrome/i.test(navigator.userAgent);
-
-                if (isAndroid && !isChrome) {
-                    // 隐藏或禁用MIDI开关
-                    const midiToggle = document.getElementById('midiToggle');
-                    if (midiToggle) {
-                        midiToggle.disabled = true;
-                        midiToggle.parentElement.style.opacity = '0.5';
-                        midiToggle.parentElement.title = 'Android设备需要Chrome浏览器支持MIDI功能';
-                    }
-                    return false;
-                }
-                return true;
-            }
-
-            // 将兼容性检查函数暴露到全局作用域
-            window.checkMIDICompatibility = checkMIDICompatibility;
 
             // 处理MIDI设备状态变化
             function handleMIDIStateChange(event) {
@@ -2189,40 +2156,24 @@
 
             // 断开MIDI设备
             function disconnectMIDIDevices() {
-                try {
-                    if (window.midiState.midiAccess) {
-                        // 断开所有输入设备
-                        for (const input of window.midiState.midiAccess.inputs.values()) {
-                            if (input.onmidimessage) {
-                                input.onmidimessage = null;
-                            }
-                            console.log('已断开MIDI设备:', input.name);
-                        }
-                    }
+                if (!window.midiState.midiAccess) return;
 
-                    // 重置所有MIDI状态
-                    window.midiState.currentDevice = null;
-                    window.midiState.isConnected = false;
-                    window.midiState.lastNote = null;
-                    window.midiState.lastVelocity = 0;
-                    window.midiState.lastTimestamp = 0;
-
-                    // 清理MIDI访问对象
-                    if (window.midiState.midiAccess) {
-                        window.midiState.midiAccess.onstatechange = null;
-                        window.midiState.midiAccess = null;
-                    }
-
-                    console.log('已断开所有MIDI设备');
-
-                    // 更新状态显示
-                    updateMIDIConnectionStatus(0);
-
-                    // 更新设备显示
-                    displayMIDIDevices();
+                // 断开所有输入设备
+                for (const input of window.midiState.midiAccess.inputs.values()) {
+                    input.onmidimessage = null;
+                    console.log('已断开MIDI设备:', input.name);
                 }
-            } catch (error) {
-                console.error('断开MIDI设备时出错:', error);
+
+                // 清理当前设备选择
+                window.midiState.currentDevice = null;
+                window.midiState.isConnected = false;
+                console.log('已断开所有MIDI设备');
+
+                // 更新状态显示
+                updateMIDIConnectionStatus(0);
+
+                // 更新设备显示
+                displayMIDIDevices();
             }
 
             // 将MIDI设备连接函数暴露到全局作用域
@@ -13119,47 +13070,32 @@
                     midiToggle.checked = window.midiState.enabled;
                     
                     midiToggle.addEventListener('change', async function() {
-                        try {
-                            if (this.checked) {
-                                // 添加延迟以避免快速切换导致的问题
-                                await new Promise(resolve => setTimeout(resolve, 100));
+                        if (this.checked) {
+                            // 启用MIDI
+                            const success = await initializeMIDI();
+                            if (success) {
+                                window.midiState.enabled = true;
 
-                                // 启用MIDI
-                                const success = await initializeMIDI();
-                                if (success) {
-                                    window.midiState.enabled = true;
-
-                                    // 显示可用设备列表，等待用户选择
-                                    console.log('MIDI已启用，请选择要连接的设备');
-                                    if (typeof window.updateMIDIDevices === 'function') {
-                                        window.updateMIDIDevices(); // 这个函数会调用 displayMIDIDevices 和 updateMIDIConnectionStatus
-                                    } else {
-                                        console.error('updateMIDIDevices 函数未找到');
-                                    }
+                                // 显示可用设备列表，等待用户选择
+                                console.log('MIDI已启用，请选择要连接的设备');
+                                if (typeof window.updateMIDIDevices === 'function') {
+                                    window.updateMIDIDevices(); // 这个函数会调用 displayMIDIDevices 和 updateMIDIConnectionStatus
                                 } else {
-                                    // 如果初始化失败，取消选中状态
-                                    this.checked = false;
-                                    // 使用更友好的提示方式替代alert
-                                    updateMIDIStatus('无法启用MIDI设备，请检查浏览器支持或设备连接', false);
+                                    console.error('updateMIDIDevices 函数未找到');
                                 }
                             } else {
-                                // 禁用MIDI
-                                window.midiState.enabled = false;
-
-                                // 断开所有MIDI输入设备
-                                disconnectMIDIDevices();
+                                // 如果初始化失败，取消选中状态
+                                this.checked = false;
+                                alert('无法启用MIDI设备，请检查浏览器支持或设备连接');
                             }
-                        } catch (error) {
-                            console.error('MIDI开关切换失败:', error);
-                            this.checked = false;
-                            updateMIDIStatus('MIDI功能切换失败', false);
+                        } else {
+                            // 禁用MIDI
+                            window.midiState.enabled = false;
+                            
+                            // 断开所有MIDI输入设备
+                            disconnectMIDIDevices();
                         }
                     });
-                }
-
-                // 检查MIDI兼容性
-                if (typeof window.checkMIDICompatibility === 'function') {
-                    window.checkMIDICompatibility();
                 }
 
                 // CAGED练习类型固定为音阶练习，无需事件监听器
