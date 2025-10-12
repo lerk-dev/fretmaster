@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -8,10 +8,8 @@
     <meta name="theme-color" content="#0f0f0f">
     <meta name="msapplication-navbutton-color" content="#0f0f0f">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title data-i18n-key="page_title">🎸 吉他练习工具 v2.0</title>
-    <!-- ml5.js库 - 用于CREPE音高检测算法 -->
-    <script src="js/ml5.min.js"></script>
-
+    <title data-i18n-key="page_title">🎸 吉他练习工具 v3.7</title>
+    
     
     <!-- 引入外部CSS文件 -->
     <link rel="stylesheet" href="styles/main.css">
@@ -150,26 +148,33 @@
 
                     // 新增选项描述翻译
                     'root_to_third': '1,2,3,5 on major/dominant chords\n1,3,4,5 on minor chords\n1,2,4,5 on sus chords\n1,2,3,5 on diminished chords\n(No altered 5ths on dominant chords)',
-                    'root_to_fifth': '根音到五音的旋律线',
-                    'third_to_fifth': '三音到五音的旋律线',
-                    'root_third_fifth_line': '根音三音五音连接线',
-                    'random_inversions': '随机转位进行',
-                    'fifth_to_seventh': '五音到七音的旋律线',
-                    'seventh_to_ninth': '七音到九音的旋律线',
-                    'fifth_to_ninth': '五音到九音的旋律线',
-                    'fifth_seventh_ninth_line': '五音七音九音连接线',
-                    'stepwise_voice_leading': '级进式的声部进行',
-                    'common_tone_voice_leading': '保持共同音的声部进行',
-                    'contrary_motion_voice_leading': '反向声部进行',
-                    'parallel_motion_voice_leading': '平行声部进行',
-                    'sus4_to_sus2': 'Sus4挂留到Sus2挂留',
-                    'sus4_to_third': 'Sus4挂留解决到三音',
-                    'sus2_to_third': 'Sus2挂留解决到三音',
-                    'suspension_resolution_chain': '挂留解决链条',
-                    'triadic_chord_scales': '基于三和弦的和弦音阶',
-                    'seventh_chord_scales': '基于七和弦的和弦音阶',
-                    'extended_chord_scales': '基于扩展和弦的和弦音阶',
-                    'modal_chord_scales': '调式和弦音阶',
+                    'root_to_fifth': '2,1,5,3 on major/dominant chords\n3,1,5,4 on minor chords\n2,1,4,5 on sus chords\n2,1,5,3 on diminished chords\n(No altered 5ths on dominant chords)',
+                    'third_to_fifth': '3,5,2,1 on major/dominant chords\n4,5,3,1 on minor chords\n4,5,2,1 on sus chords\n3,5,2,1 on diminished chords\n(No altered 5ths on dominant chords)',
+                    'root_third_fifth_line': '5,1,2,3 on major/dominant chords\n5,1,3,4 on minor chords\n5,1,2,4 on sus chords\n5,1,2,3 on diminished chords\n(No altered 6ths on dominant chords)',
+                    'random_inversions': 'Random inversions of: 1,2,3,5 on major/dominant chords\n1,3,4,5 on minor chords\n1,2,4,5 on sus chords\n1,2,3,5 on diminished chords\n(No altered 5ths on dominant chords)',
+                    'melodic_structure_6': '5,6,7,2 on major/dominant chords\n5,7,1,2 on minor chords\n5,6,7,1 on diminished chords',
+                    'melodic_structure_7': '6,5,2,7 on major/dominant chords\n7,5,2,1 on minor chords\n6,5,1,7 on diminished chords',
+                    'melodic_structure_8': '7,2,6,5 on major/dominant chords\n1,2,7,5 on minor chords\n6,1,7,5 on diminished chords',
+                    'melodic_structure_9': '2,7,6,5 on major/dominant chords\n2,1,7,5 on minor chords\n2,7,1,6 on diminished chords',
+                    'melodic_structure_10': 'Random inversions of: 5,6,7,2 on major/dominant chords\n5,7,1,2 on minor chords\n5,6,7,1 on diminished chords',
+                                        'voice_led_structure_1': '3,2,1,7 on minor/dominant/major chords\n4,2,1,7 on sus chords\n3,2,1,6 on diminished chords',
+                    'voice_led_structure_2': '3,2,1,7 on minor chords\n3,5,7,2 on dominant chords\n5,1,2,3 on major chords\n4,5,7,2 on sus chords\n3,2,1,6 on diminished chords',
+                    'voice_led_structure_3': '1,3,5,7 on minor chords\n3,2,1,7 on dominant/major chords\n4,2,1,7 on sus chords\n3,2,1,6 on diminished chords',
+                    'voice_led_structure_4': '1,3,5,7 on minor chords\n3,5,7,2 on dominant chords\n3,2,1,7 on major chords\n4,5,7,2 on sus chords\n3,2,1,6 on diminished chords',
+                    'voice_led_structure_5': '5,3,1,7 on minor chords\n3,5,7,2 on dominant chords\n3,2,1,7 on major chords\n4,5,7,2 on sus chords\n3,2,1,6 on diminished chords',
+                                        'suspended_2_resolution': 'Sus2 resolving to 3 then 1',
+                    'suspended_4_resolution': 'Sus4 resolving to 3 then 1',
+                                        'chord_scale_root_to_root': 'All chord scale notes from root through octave',
+                    'chord_scale_3rd_to_3rd': 'All chord scale notes from 3rd through octave',
+                    'chord_scale_5th_to_5th': 'All chord scale notes from 5th through octave',
+                    'chord_scale_7th_to_7th': 'All chord scale notes from 7th through octave',
+                    'chord_scale_random_chord_tone': 'All chord scale notes from random chord tone',
+                    'chord_scale_random_scale_tone': 'All chord scale notes from random scale tone',
+                    'passing_note_scale_root_to_root': 'All chord scale notes with passing notes from root to root',
+                    'passing_note_scale_3rd_to_3rd': 'All chord scale notes with passing notes from 3rd to 3rd',
+                    'passing_note_scale_5th_to_5th': 'All chord scale notes with passing notes from 5th to 5th',
+                    'passing_note_scale_6th_7th_to_6th_7th': 'All chord scale notes with passing notes from 6th to 6th or 7th to 7th',
+                    'passing_note_scale_random_chord_tone': 'All chord scale notes with passing notes from random chord tone',
                     'diatonic_passing_tones': '自然音阶经过音',
                     'chromatic_passing_tones': '半音经过音',
                     'enclosure_passing_tones': '包围音经过技巧',
@@ -658,27 +663,38 @@
                     'all_chord_notes_desc': 'All chord notes',
 
                     // New option descriptions
-                    'root_to_third': 'Melodic line from root to third',
-                    'root_to_fifth': 'Melodic line from root to fifth',
-                    'third_to_fifth': 'Melodic line from third to fifth',
-                    'root_third_fifth_line': 'Root-third-fifth connection line',
-                    'random_inversions': 'Random inversions progression',
-                    'fifth_to_seventh': 'Melodic line from fifth to seventh',
-                    'seventh_to_ninth': 'Melodic line from seventh to ninth',
-                    'fifth_to_ninth': 'Melodic line from fifth to ninth',
-                    'fifth_seventh_ninth_line': 'Fifth-seventh-ninth connection line',
+                    'root_to_third': '1,2,3,5 on major/dominant chords\n1,3,4,5 on minor chords\n1,2,4,5 on sus chords\n1,2,3,5 on diminished chords\n(No altered 5ths on dominant chords)',
+                    'root_to_fifth': '2,1,5,3 on major/dominant chords\n3,1,5,4 on minor chords\n2,1,4,5 on sus chords\n2,1,5,3 on diminished chords\n(No altered 5ths on dominant chords)',
+                    'third_to_fifth': '3,5,2,1 on major/dominant chords\n4,5,3,1 on minor chords\n4,5,2,1 on sus chords\n3,5,2,1 on diminished chords\n(No altered 5ths on dominant chords)',
+                    'root_third_fifth_line': '5,1,2,3 on major/dominant chords\n5,1,3,4 on minor chords\n5,1,2,4 on sus chords\n5,1,2,3 on diminished chords\n(No altered 6ths on dominant chords)',
+                    'random_inversions': 'Random inversions of: 1,2,3,5 on major/dominant chords\n1,3,4,5 on minor chords\n1,2,4,5 on sus chords\n1,2,3,5 on diminished chords\n(No altered 5ths on dominant chords)',
+                    'melodic_structure_6': '5,6,7,2 on major/dominant chords\n5,7,1,2 on minor chords\n5,6,7,1 on diminished chords',
+                    'melodic_structure_7': '6,5,2,7 on major/dominant chords\n7,5,2,1 on minor chords\n6,5,1,7 on diminished chords',
+                    'melodic_structure_8': '7,2,6,5 on major/dominant chords\n1,2,7,5 on minor chords\n6,1,7,5 on diminished chords',
+                    'melodic_structure_9': '2,7,6,5 on major/dominant chords\n2,1,7,5 on minor chords\n2,7,1,6 on diminished chords',
+                    'melodic_structure_10': 'Random inversions of: 5,6,7,2 on major/dominant chords\n5,7,1,2 on minor chords\n5,6,7,1 on diminished chords',
                     'stepwise_voice_leading': 'Stepwise voice leading',
                     'common_tone_voice_leading': 'Common tone voice leading',
                     'contrary_motion_voice_leading': 'Contrary motion voice leading',
                     'parallel_motion_voice_leading': 'Parallel motion voice leading',
-                    'sus4_to_sus2': 'Sus4 suspension to Sus2 suspension',
-                    'sus4_to_third': 'Sus4 suspension resolves to third',
-                    'sus2_to_third': 'Sus2 suspension resolves to third',
-                    'suspension_resolution_chain': 'Suspension resolution chain',
-                    'triadic_chord_scales': 'Triad-based chord scales',
-                    'seventh_chord_scales': 'Seventh chord-based scales',
-                    'extended_chord_scales': 'Extended chord-based scales',
-                    'modal_chord_scales': 'Modal chord scales',
+                    'voice_led_structure_1': '3,2,1,7 on minor/dominant/major chords\n4,2,1,7 on sus chords\n3,2,1,6 on diminished chords',
+                    'voice_led_structure_2': '3,2,1,7 on minor chords\n3,5,7,2 on dominant chords\n5,1,2,3 on major chords\n4,5,7,2 on sus chords\n3,2,1,6 on diminished chords',
+                    'voice_led_structure_3': '1,3,5,7 on minor chords\n3,2,1,7 on dominant/major chords\n4,2,1,7 on sus chords\n3,2,1,6 on diminished chords',
+                    'voice_led_structure_4': '1,3,5,7 on minor chords\n3,5,7,2 on dominant chords\n3,2,1,7 on major chords\n4,5,7,2 on sus chords\n3,2,1,6 on diminished chords',
+                    'voice_led_structure_5': '5,3,1,7 on minor chords\n3,5,7,2 on dominant chords\n3,2,1,7 on major chords\n4,5,7,2 on sus chords\n3,2,1,6 on diminished chords',
+                                        'suspended_2_resolution': 'Sus2 resolving to 3 then 1',
+                    'suspended_4_resolution': 'Sus4 resolving to 3 then 1',
+                                        'chord_scale_root_to_root': 'All chord scale notes from root through octave',
+                    'chord_scale_3rd_to_3rd': 'All chord scale notes from 3rd through octave',
+                    'chord_scale_5th_to_5th': 'All chord scale notes from 5th through octave',
+                    'chord_scale_7th_to_7th': 'All chord scale notes from 7th through octave',
+                    'chord_scale_random_chord_tone': 'All chord scale notes from random chord tone',
+                    'chord_scale_random_scale_tone': 'All chord scale notes from random scale tone',
+                    'passing_note_scale_root_to_root': 'All chord scale notes with passing notes from root to root',
+                    'passing_note_scale_3rd_to_3rd': 'All chord scale notes with passing notes from 3rd to 3rd',
+                    'passing_note_scale_5th_to_5th': 'All chord scale notes with passing notes from 5th to 5th',
+                    'passing_note_scale_6th_7th_to_6th_7th': 'All chord scale notes with passing notes from 6th to 6th or 7th to 7th',
+                    'passing_note_scale_random_chord_tone': 'All chord scale notes with passing notes from random chord tone',
                     'diatonic_passing_tones': 'Diatonic passing tones',
                     'chromatic_passing_tones': 'Chromatic passing tones',
                     'enclosure_passing_tones': 'Enclosure passing techniques',
@@ -1602,7 +1618,7 @@
 
             // 找音练习的MIDI处理
             function processPitchFindingMIDINote(note) {
-                console.log('找音练习MIDI处理:', note);
+                // console.log('找音练习MIDI处理:', note);
                 if (!window.state) return;
 
                 const targetNote = window.state.currentNote;
@@ -2490,6 +2506,13 @@
                         } else if (songName.includes('13b9')) {
                             chordsDisplay = circleOfFifthsReverse.map(key => `${key}13(b9)`).join(' → ');
                         }
+                    } else if (songName.includes('练习')) {
+                        // 和弦进行练习：显示具体的和弦进行
+                        if (songData.chords && Array.isArray(songData.chords)) {
+                            chordsDisplay = songData.chords.join(' - ');
+                        } else {
+                            chordsDisplay = '和弦进行练习';
+                        }
                     } else {
                         // 普通歌曲：显示标准和弦进行
                         chordsDisplay = songData.chords.join(' - ');
@@ -2626,21 +2649,57 @@
 
                 // 打开弹窗
                 openBtn.addEventListener('click', () => {
+                    // 确保弹窗存在
+                    if (!dialog) {
+                        console.error('自定义和弦弹窗元素未找到');
+                        return;
+                    }
+
+                    // 显示弹窗
                     dialog.classList.add('active');
+                    dialog.style.display = 'flex';
+
+                    // 更新和弦序列显示
                     updateChordSequenceDisplay();
                 });
 
                 // 关闭弹窗
-                closeBtn.addEventListener('click', () => {
-                    dialog.classList.remove('active');
-                });
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if (dialog) {
+                            dialog.classList.remove('active');
+                            dialog.style.display = 'none';
+                        }
+                    });
+                }
 
                 // 点击背景关闭弹窗
-                dialog.addEventListener('click', (e) => {
-                    if (e.target === dialog) {
+                if (dialog) {
+                    dialog.addEventListener('click', (e) => {
+                        if (e.target === dialog) {
+                            console.log('点击背景关闭自定义和弦弹窗');
+                            dialog.classList.remove('active');
+                            dialog.style.display = 'none';
+                        }
+                    });
+                }
+
+                // ESC键关闭弹窗
+                const escHandler = (e) => {
+                    if (e.key === 'Escape' && dialog && dialog.classList.contains('active')) {
+                        console.log('ESC键关闭自定义和弦弹窗');
                         dialog.classList.remove('active');
+                        dialog.style.display = 'none';
                     }
-                });
+                };
+
+                document.addEventListener('keydown', escHandler);
+
+                // 保存ESC处理器引用以便清理
+                dialog.escHandler = escHandler;
 
                 // 根音选择
                 const rootNoteGrid = document.getElementById('rootNoteGrid');
@@ -2795,6 +2854,59 @@
                 }
             }
 
+            // 重置自定义和弦练习模式状态（不清空序列）
+            window.resetCustomChordMode = function() {
+                if (window.state) {
+                    window.state.isCustomChordMode = false;
+                    // console.log('重置自定义和弦模式状态，保留和弦序列');
+                }
+            };
+
+            // 检查并重新初始化自定义和弦按钮
+            window.ensureCustomChordButton = function() {
+                const openBtn = document.getElementById('openCustomChordsDialog');
+                const dialog = document.getElementById('customChordsDialog');
+                const closeBtn = document.getElementById('closeCustomChordsDialog');
+
+                if (!openBtn || !dialog) return;
+
+                // 重新绑定打开按钮事件
+                if (!openBtn.hasAttribute('data-custom-chord-initialized')) {
+                    openBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // 显示弹窗
+                        dialog.classList.add('active');
+                        dialog.style.display = 'flex';
+
+                        // 更新和弦序列显示
+                        if (typeof updateChordSequenceDisplay === 'function') {
+                            updateChordSequenceDisplay();
+                        }
+                    });
+
+                    // 标记为已初始化
+                    openBtn.setAttribute('data-custom-chord-initialized', 'true');
+                }
+
+                // 重新绑定关闭按钮事件
+                if (closeBtn && !closeBtn.hasAttribute('data-close-btn-initialized')) {
+                    closeBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if (dialog) {
+                            dialog.classList.remove('active');
+                            dialog.style.display = 'none';
+                        }
+                    });
+
+                    // 标记为已初始化
+                    closeBtn.setAttribute('data-close-btn-initialized', 'true');
+                }
+            };
+
             // 获取音名从根音和音级
             function getBassNoteName(rootNote, bassType, chordType) {
                 const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
@@ -2860,7 +2972,10 @@
 
             // 格式化和弦显示
             function formatChordDisplay(chord) {
-                const typeMap = {
+                const displayMode = state.chordNameDisplayMode || 'english';
+
+                // 英文符号映射
+                const englishTypeMap = {
                     'major': '',
                     'minor': 'm',
                     'diminished': 'dim',
@@ -2890,11 +3005,48 @@
                     'm6add9': 'm6add9'
                 };
 
+                // 中文符号映射
+                const chineseTypeMap = {
+                    'major': '大三和弦',
+                    'minor': '小三和弦',
+                    'diminished': '减三和弦',
+                    'augmented': '增三和弦',
+                    'major6': '大六和弦',
+                    'minor6': '小六和弦',
+                    'dominant7': '属七和弦',
+                    'major7': '大七和弦',
+                    'minor7': '小七和弦',
+                    'minor7b5': '小七降五和弦',
+                    'diminished7': '减七和弦',
+                    'dominant9': '属九和弦',
+                    'major9': '大九和弦',
+                    'minor9': '小九和弦',
+                    'dominant7sharp9': '属七升九和弦',
+                    'dominant7flat9': '属七降九和弦',
+                    'dominant11': '属十一和弦',
+                    'minor11': '小十一和弦',
+                    'dominant7sharp11': '属七升十一和弦',
+                    'dominant13': '属十三和弦',
+                    'minor13': '小十三和弦',
+                    'sus2': '挂二和弦',
+                    'sus4': '挂四和弦',
+                    'add9': '加九和弦',
+                    'madd9': '小加九和弦',
+                    '6add9': '大六加九和弦',
+                    'm6add9': '小六加九和弦'
+                };
+
+                const typeMap = displayMode === 'chinese' ? chineseTypeMap : englishTypeMap;
+
                 let chordText = chord.root + (typeMap[chord.type] || '');
 
                 if (chord.bass !== 'root') {
                     const bassNoteName = getBassNoteName(chord.root, chord.bass, chord.type);
-                    chordText += `/${bassNoteName}`;
+                    if (displayMode === 'chinese') {
+                        chordText += `/${bassNoteName}音`;
+                    } else {
+                        chordText += `/${bassNoteName}`;
+                    }
                 }
 
                 return chordText;
@@ -4492,9 +4644,49 @@
             padding: 15px 20px;
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 15px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .fullscreen-selector-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .fullscreen-selector-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sort-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sort-label {
+            color: #888;
+            font-size: 14px;
+        }
+
+        .sort-select {
+            background: rgba(58, 159, 196, 0.2);
+            border: 1px solid rgba(58, 159, 196, 0.4);
+            color: #3a9fc4;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .sort-select:hover {
+            background: rgba(58, 159, 196, 0.3);
+            border-color: rgba(58, 159, 196, 0.6);
         }
 
         .fullscreen-selector-back {
@@ -4740,6 +4932,33 @@
             .fullscreen-selector-back {
                 padding: 6px 12px;
                 font-size: 14px;
+            }
+
+            .fullscreen-selector-header {
+                
+                gap: 10px;
+                align-items: stretch;
+            }
+
+            .sort-controls {
+                justify-content: center;
+            }
+
+            .sort-select {
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+
+            .sort-label {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sort-controls {
+                flex-direction: column;
+                gap: 5px;
+                align-items: center;
             }
         }
 
@@ -5196,11 +5415,24 @@
     <!-- 全屏弹出选择页面 -->
     <div class="fullscreen-selector" id="fullscreenSelector">
         <div class="fullscreen-selector-header">
-            <button class="fullscreen-selector-back" id="fullscreenSelectorBack">
-                <span>←</span>
-                <span data-i18n-key="btn_back">返回</span>
-            </button>
-            <h2 class="fullscreen-selector-title" id="fullscreenSelectorTitle">选择</h2>
+            <div class="fullscreen-selector-left">
+                <button class="fullscreen-selector-back" id="fullscreenSelectorBack">
+                    <span>←</span>
+                    <span data-i18n-key="btn_back">返回</span>
+                </button>
+                <h2 class="fullscreen-selector-title" id="fullscreenSelectorTitle">选择</h2>
+            </div>
+            <div class="fullscreen-selector-right">
+                <div class="sort-controls" id="sortControls" style="display: none;">
+                    <span class="sort-label">排序:</span>
+                    <select class="sort-select" id="sortBySelect">
+                        <option value="title-asc">标题 A-Z</option>
+                        <option value="title-desc">标题 Z-A</option>
+                        <option value="style-asc">风格 A-Z</option>
+                        <option value="style-desc">风格 Z-A</option>
+                    </select>
+                </div>
+            </div>
         </div>
         <div class="fullscreen-selector-content" id="fullscreenSelectorContent">
             <!-- 内容将通过JavaScript动态生成 -->
@@ -5744,19 +5976,44 @@
                                     <option value="Virgo" >Virgo</option>
                                 </optgroup>
                                 <optgroup label="练习" >
-                                    <option value="练习1 - Maj7和弦(12个调)" >练习1 - Maj7和弦(12个调)</option>
-                                    <option value="练习2 - Min7和弦(12个调)" >练习2 - Min7和弦(12个调)</option>
-                                    <option value="练习3 - Sus4b9和弦(12个调)" >练习3 - Sus4b9和弦(12个调)</option>
-                                    <option value="练习4 - Maj7#11和弦(12个调)" >练习4 - Maj7#11和弦(12个调)</option>
-                                    <option value="练习5 - 7sus4和弦(12个调)" >练习5 - 7sus4和弦(12个调)</option>
-                                    <option value="练习5a - Dom7和弦(12个调)" >练习5a - Dom7和弦(12个调)</option>
-                                    <option value="练习6 - Min7b5和弦(12个调)" >练习6 - Min7b5和弦(12个调)</option>
-                                    <option value="练习7 - MinMaj7和弦(12个调)" >练习7 - MinMaj7和弦(12个调)</option>
-                                    <option value="练习8 - 13sus4b9和弦(12个调)" >练习8 - 13sus4b9和弦(12个调)</option>
-                                    <option value="练习9 - Maj7#5和弦(12个调)" >练习9 - Maj7#5和弦(12个调)</option>
+                                    <option value="练习01 - Maj7和弦(12个调)" >练习01 - Maj7和弦(12个调)</option>
+                                    <option value="练习02 - Min7和弦(12个调)" >练习02 - Min7和弦(12个调)</option>
+                                    <option value="练习03 - Sus4b9和弦(12个调)" >练习03 - Sus4b9和弦(12个调)</option>
+                                    <option value="练习04 - Maj7#11和弦(12个调)" >练习04 - Maj7#11和弦(12个调)</option>
+                                    <option value="练习05 - 7sus4和弦(12个调)" >练习05 - 7sus4和弦(12个调)</option>
+                                    <option value="练习05a - Dom7和弦(12个调)" >练习05a - Dom7和弦(12个调)</option>
+                                    <option value="练习06 - Min7b5和弦(12个调)" >练习06 - Min7b5和弦(12个调)</option>
+                                    <option value="练习07 - MinMaj7和弦(12个调)" >练习07 - MinMaj7和弦(12个调)</option>
+                                    <option value="练习08 - 13sus4b9和弦(12个调)" >练习08 - 13sus4b9和弦(12个调)</option>
+                                    <option value="练习09 - Maj7#5和弦(12个调)" >练习09 - Maj7#5和弦(12个调)</option>
                                     <option value="练习10 - 7#11和弦(12个调)" >练习10 - 7#11和弦(12个调)</option>
                                     <option value="练习11 - Min7b5♮9和弦(12个调)" >练习11 - Min7b5♮9和弦(12个调)</option>
                                     <option value="练习12 - 13b9和弦(12个调)" >练习12 - 13b9和弦(12个调)</option>
+                                    <option value="练习13 - Major II-V-I (Single Key)">练习13 - Major II-V-I (Single Key)</option>
+                                    <option value="练习14 - Minor II-V-I (Single Key)">练习14 - Minor II-V-I (Single Key)</option>
+                                    <option value="练习15 - Major II-V-I (altered V) Single Key">练习15 - Major II-V-I (altered V) Single Key</option>
+                                    <option value="练习16 - Major II-V-I (All 12 Keys)">练习16 - Major II-V-I (All 12 Keys)</option>
+                                    <option value="练习17 - Minor II-V-I(All 12 Keys)">练习17 - Minor II-V-I(All 12 Keys)</option>
+                                    <option value="练习18 - Major II-V-I w/Tritone Subs (12 Keys)">练习18 - Major II-V-I w/Tritone Subs (12 Keys)</option>
+                                    <option value="练习19 - Minor II-V-I w/Tritone Subs (12 Keys)">练习19 - Minor II-V-I w/Tritone Subs (12 Keys)</option>
+                                    <option value="练习20 - Major Key I-IV-V-I (All 12 Keys)">练习20 - Major Key I-IV-V-I (All 12 Keys)</option>
+                                    <option value="练习21- Major Key I-VI-IV-V (All 12 Keys)">练习21- Major Key I-VI-IV-V (All 12 Keys)</option>
+                                    <option value="练习22 - Major I-VI-II-V (All 12 Keys)">练习22 - Major I-VI-II-V (All 12 Keys)</option>
+                                    <option value="练习23 - Minor I-VI-II-V (All 12 Keys)">练习23 - Minor I-VI-II-V (All 12 Keys)</option>
+                                    <option value="练习24 -I Dim-1 Maj7">练习24 -I Dim-1 Maj7</option>
+                                    <option value="练习25 - VII Dim- IMaj7">练习25 - VII Dim- IMaj7</option>
+                                    <option value="练习26 - Major Key Diatonic 7th Chords">练习26 - Major Key Diatonic 7th Chords</option>
+                                    <option value="练习27 - Basic Blues Progression (Quick IV)">练习27 - Basic Blues Progression (Quick IV)</option>
+                                    <option value="练习28 - Jazz Blues">练习28 - Jazz Blues</option>
+                                    <option value="练习29 - Rhythm Changes">练习29 - Rhythm Changes</option>
+                                    <option value="练习30 - Tadd Dameron Progression">练习30 - Tadd Dameron Progression</option>
+                                    <option value="练习31- Modal Progression 1">练习31- Modal Progression 1</option>
+                                    <option value="练习32- Modal Progression 2">练习32- Modal Progression 2</option>
+                                    <option value="练习33 - Jimi Progression">练习33 - Jimi Progression</option>
+                                    <option value="练习34 - Jimi With Secondary Dominants">练习34 - Jimi With Secondary Dominants</option>
+                                    <option value="练习35 - Bop Passing Note Progression 1">练习35 - Bop Passing Note Progression 1</option>
+                                    <option value="练习36 - Bop Passing Note Progression 2">练习36 - Bop Passing Note Progression 2</option>
+                                    <option value="练习37- Bop Passing Note Progression 3">练习37- Bop Passing Note Progression 3</option>
                                 </optgroup>
                             </select>
                             
@@ -7168,7 +7425,14 @@
                 '5': {
                     '500 Miles High': {
                         key: 'E',
-                        chords: ['Im7', '♭IIIm7', 'Im7', '♭IIIm7', '♭VIM7', '♭IIM7', 'Im7', 'Im7']
+                        chords: ['Im7', '♭IIIm7', 'Im7', '♭IIIm7', '♭VIM7', '♭IIM7', 'Im7', 'Im7'],
+                        info: {
+                            composer: 'Chick Corea',
+                            year: '1971',
+                            style: 'Jazz Latin',
+                            tempo: 'Medium-Up Latin',
+                            description: 'Chick Corea的经典作品，融合了拉丁节奏和现代爵士和声，是学习拉丁爵士的重要曲目。'
+                        }
                     }
                 },
                 'A': {
@@ -7189,7 +7453,7 @@
                         info: {
                             composer: 'Joseph Kosma',
                             year: '1945',
-                            style: '法式香颂/爵士标准曲',
+                            style: 'Jazz Swing',
                             tempo: 'Medium Ballad',
                             description: '法国作曲家创作的经典曲目，展现了从大调到小调的自然转换，是学习ii-V-i进行的绝佳教材。'
                         }
@@ -7200,34 +7464,76 @@
                         info: {
                             composer: 'Gerald Marks & Seymour Simons',
                             year: '1931',
-                            style: '爵士标准曲',
+                            style: 'Jazz Swing',
                             tempo: 'Medium Swing',
                             description: '经典的32小节AABA结构爵士标准曲，以其简单而优美的和声进行著称。'
                         }
                     },
                     'A Night In Tunisia': {
                         key: 'D',
-                        chords: ['IIm7♭5', 'V7', 'Im7', 'Im7', 'IIm7♭5', 'V7', 'Im7', '♭IIM7']
+                        chords: ['IIm7♭5', 'V7', 'Im7', 'Im7', 'IIm7♭5', 'V7', 'Im7', '♭IIM7'],
+                        info: {
+                            composer: 'Dizzy Gillespie',
+                            year: '1942',
+                            style: 'Jazz Latin',
+                            tempo: 'Fast Afro-Cuban',
+                            description: 'Dizzy Gillespie的标志性作品，将非洲古巴节奏与爵士乐结合，开创了拉丁爵士的新纪元。'
+                        }
                     },
                     'All of You': {
                         key: 'C',
-                        chords: ['IM7', 'VI7', 'IIm7', 'V7', 'IIIm7', 'VI7', 'IIm7', 'V7']
+                        chords: ['IM7', 'VI7', 'IIm7', 'V7', 'IIIm7', 'VI7', 'IIm7', 'V7'],
+                        info: {
+                            composer: 'Cole Porter',
+                            year: '1954',
+                            style: 'Jazz Swing',
+                            tempo: 'Medium Swing',
+                            description: 'Cole Porter创作的经典爵士标准曲，拥有优美的旋律和复杂的和声结构。'
+                        }
                     },
                     'Alone Together': {
                         key: 'G',
-                        chords: ['IIm7♭5', 'V7', 'Im7', '♭VI7', '♭IIM7', 'IIm7♭5', 'V7', 'Im7']
+                        chords: ['IIm7♭5', 'V7', 'Im7', '♭VI7', '♭IIM7', 'IIm7♭5', 'V7', 'Im7'],
+                        info: {
+                            composer: 'Arthur Schwartz',
+                            year: '1939',
+                            style: 'Jazz Swing',
+                            tempo: 'Medium Ballad',
+                            description: '经典的爵士标准曲，以其小调色彩和复杂的和声进行著称。'
+                        }
                     },
                     'Ambleside': {
                         key: 'C',
-                        chords: ['IM7', 'V7sus4', 'IM7', 'IVM7', 'IIm7', 'V7', 'IM7', 'IM7']
+                        chords: ['IM7', 'V7sus4', 'IM7', 'IVM7', 'IIm7', 'V7', 'IM7', 'IM7'],
+                        info: {
+                            composer: 'Jim Hall',
+                            year: '1988',
+                            style: 'Jazz Modern',
+                            tempo: 'Medium',
+                            description: 'Jim Hall创作的现代爵士作品，以独特的和声进行和旋律性著称。'
+                        }
                     },
                     'Anthropology': {
                         key: 'B♭',
-                        chords: ['I7', 'VI7', 'IIm7', 'V7', 'IIIm7', 'VI7', 'IIm7', 'V7']
+                        chords: ['I7', 'VI7', 'IIm7', 'V7', 'IIIm7', 'VI7', 'IIm7', 'V7'],
+                        info: {
+                            composer: 'Charlie Parker/Dizzy Gillespie',
+                            year: '1945',
+                            style: 'Jazz Bebop',
+                            tempo: 'Up',
+                            description: 'Charlie Parker和Dizzy Gillespie创作的Bebop经典曲目，基于"Got Rhythm"的和声进行。'
+                        }
                     },
                     'Ask Me Now': {
                         key: 'F',
-                        chords: ['IM7', '♭II7', 'IM7', 'VI7', 'IIm7', 'V7', 'IM7', 'IM7']
+                        chords: ['IM7', '♭II7', 'IM7', 'VI7', 'IIm7', 'V7', 'IM7', 'IM7'],
+                        info: {
+                            composer: 'Thelonious Monk',
+                            year: '1947',
+                            style: 'Jazz Modern',
+                            tempo: 'Medium Ballad',
+                            description: 'Thelonious Monk的经典作品，展现了独特的和声语言和旋律风格。'
+                        }
                     }
                 },
                 'B': {
@@ -7245,19 +7551,47 @@
                     },
                     'Beautiful Love': {
                         key: 'G',
-                        chords: ['IIm7♭5', 'V7', 'Im7', 'Im7', 'IVm7', '♭VII7', '♭IIIM7', '♭IIIM7']
+                        chords: ['IIm7♭5', 'V7', 'Im7', 'Im7', 'IVm7', '♭VII7', '♭IIIM7', '♭IIIM7'],
+                        info: {
+                            composer: 'Victor Young/Eddie King',
+                            year: '1931',
+                            style: 'Jazz Swing',
+                            tempo: 'Medium Swing',
+                            description: '经典的爵士标准曲，以其优美的旋律和复杂的和声变化著称。'
+                        }
                     },
                     'Blue Bossa': {
                         key: 'C',
-                        chords: ['Im7', 'IVm7', 'Im7', 'Im7', 'IIm7♭5', 'V7', '♭VIIM7', '♭VIIM7']
+                        chords: ['Im7', 'IVm7', 'Im7', 'Im7', 'IIm7♭5', 'V7', '♭VIIM7', '♭VIIM7'],
+                        info: {
+                            composer: 'Kenny Dorham',
+                            year: '1963',
+                            style: 'Jazz Latin',
+                            tempo: 'Medium Bossa',
+                            description: 'Kenny Dorham创作的经典Bossa Nova曲目，融合了巴西节奏与爵士和声。'
+                        }
                     },
                     'Blue in Green': {
                         key: 'C',
-                        chords: ['IM7', '♭VII7', '♭IIIM7', '♭VIM7', 'IIm7♭5', 'V7', 'Im7', 'Im7']
+                        chords: ['IM7', '♭VII7', '♭IIIM7', '♭VIM7', 'IIm7♭5', 'V7', 'Im7', 'Im7'],
+                        info: {
+                            composer: 'Miles Davis/Bill Evans',
+                            year: '1959',
+                            style: 'Jazz Modal',
+                            tempo: 'Slow Ballad',
+                            description: 'Miles Davis的经典作品，展现了调式爵士的特点，和声进行缓慢而富有氛围感。'
+                        }
                     },
                     'Blues for Alice': {
                         key: 'F',
-                        chords: ['I7', 'VI7', 'II7', 'V7', 'III7', 'VI7', 'II7', 'V7']
+                        chords: ['I7', 'VI7', 'II7', 'V7', 'III7', 'VI7', 'II7', 'V7'],
+                        info: {
+                            composer: 'Charlie Parker',
+                            year: '1951',
+                            style: 'Jazz Bebop',
+                            tempo: 'Medium-Up',
+                            description: 'Charlie Parker创作的Bebop经典曲目，是对传统蓝调进行的现代化重新诠释。'
+                        }
                     }
                 },
                 'C': {
@@ -7271,19 +7605,47 @@
                     },
                     'Confirmation': {
                         key: 'F',
-                        chords: ['IM7', '♭VII7', 'IIIm7♭5', 'VI7', 'IIm7', 'V7', 'IIIm7♭5', 'VI7']
+                        chords: ['IM7', '♭VII7', 'IIIm7♭5', 'VI7', 'IIm7', 'V7', 'IIIm7♭5', 'VI7'],
+                        info: {
+                            composer: 'Charlie Parker',
+                            year: '1946',
+                            style: 'Jazz Bebop',
+                            tempo: 'Up',
+                            description: 'Charlie Parker的Bebop代表作之一，展现了复杂的和声进行和快速的节奏变化。'
+                        }
                     },
                     'Coral': {
                         key: 'G',
-                        chords: ['IM7', 'VIm7', 'IIm7', 'V7', 'IIIm7', 'VI7', 'IIm7', 'V7']
+                        chords: ['IM7', 'VIm7', 'IIm7', 'V7', 'IIIm7', 'VI7', 'IIm7', 'V7'],
+                        info: {
+                            composer: 'Keith Jarrett',
+                            year: '1974',
+                            style: 'Jazz Modern',
+                            tempo: 'Medium',
+                            description: 'Keith Jarrett的现代爵士作品，展现了独特的和声语言和即兴风格。'
+                        }
                     },
                     'Corcovado': {
                         key: 'F',
-                        chords: ['IM7', 'IIm7', 'V7', 'IM7', 'IVM7', 'VIIm7♭5', 'III7', 'VIm7']
+                        chords: ['IM7', 'IIm7', 'V7', 'IM7', 'IVM7', 'VIIm7♭5', 'III7', 'VIm7'],
+                        info: {
+                            composer: 'Antonio Carlos Jobim',
+                            year: '1960',
+                            style: 'Jazz Bossa',
+                            tempo: 'Medium Bossa',
+                            description: 'Antonio Carlos Jobim创作的经典Bossa Nova，描绘了里约热内卢基督山的景色。'
+                        }
                     },
                     'Countdown': {
                         key: 'E♭',
-                        chords: ['IM7', '♭III7', '♭VIM7', '♭II7', 'VM7', 'I7', 'IVM7', '♭VII7']
+                        chords: ['IM7', '♭III7', '♭VIM7', '♭II7', 'VM7', 'I7', 'IVM7', '♭VII7'],
+                        info: {
+                            composer: 'John Coltrane',
+                            year: '1959',
+                            style: 'Jazz Swing',
+                            tempo: 'Up',
+                            description: 'John Coltrane的经典作品，以其独特的三和弦进行和复杂的和声结构著称。'
+                        }
                     }
                 },
                 'D': {
@@ -7493,121 +7855,121 @@
                     }
                 },
                 '练习': {
-                    '练习1 - Maj7和弦(12个调)': {
+                    '练习01 - Maj7和弦(12个调)': {
                         key: 'A',
                         chords: ['IM7', 'IV7', 'V7', 'IM7'], // 简化的和弦进行示例
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'Maj7和弦五度圈循环练习。从AMaj7开始，按照五度圈倒序方向（A-D-G-C-F-B♭-E♭-A♭-D♭-G♭-B-E）进行12个调的Maj7和弦练习。每个和弦持续一个小节，共48小节的完整循环。适合练习大七和弦在不同调中的指法和声音色彩。',
                             details: '五度圈倒序进行：AMaj7 → DMaj7 → GMaj7 → CMaj7 → FMaj7 → B♭Maj7 → E♭Maj7 → A♭Maj7 → D♭Maj7 → G♭Maj7 → BMaj7 → EMaj7 → 回到AMaj7。每个调的Maj7和弦练习帮助你掌握不同调性下的声音特点。'
                         }
                     },
-                    '练习2 - Min7和弦(12个调)': {
+                    '练习02 - Min7和弦(12个调)': {
                         key: 'A',
                         chords: ['Im7', 'IVm7', 'Vm7', 'Im7'], // 简化的和弦进行示例
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'Min7和弦五度圈循环练习。从Am7开始，按照五度圈倒序方向（A-D-G-C-F-B♭-E♭-A♭-D♭-G♭-B-E）进行12个调的小七和弦练习。每个和弦持续一个小节，共48小节的完整循环。适合练习小七和弦在不同调中的指法和声音色彩。',
                             details: '五度圈倒序进行：Am7 → Dm7 → Gm7 → Cm7 → Fm7 → B♭m7 → E♭m7 → A♭m7 → D♭m7 → G♭m7 → Bm7 → Em7 → 回到Am7。每个调的小七和弦练习帮助你掌握不同调性下的和声色彩。'
                         }
                     },
-                    '练习3 - Sus4b9和弦(12个调)': {
+                    '练习03 - Sus4b9和弦(12个调)': {
                         key: 'A',
                         chords: ['Isus4(b9)', 'IVsus4(b9)', 'Vsus4(b9)', 'Isus4(b9)'],
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'Sus4(b9)和弦五度圈循环练习。从Asus4(b9)开始，按照五度圈倒序方向进行12个调的挂留四和弦加降九音练习。这个和弦组合具有紧张和解决的强烈倾向性，适合练习爵士和声的张力处理。',
                             details: '五度圈倒序进行：Asus4(b9) → Dsus4(b9) → Gsus4(b9) → Csus4(b9) → Fsus4(b9) → B♭sus4(b9) → E♭sus4(b9) → A♭sus4(b9) → D♭sus4(b9) → G♭sus4(b9) → Bsus4(b9) → Esus4(b9) → 回到Asus4(b9)。'
                         }
                     },
-                    '练习4 - Maj7#11和弦(12个调)': {
+                    '练习04 - Maj7#11和弦(12个调)': {
                         key: 'A',
                         chords: ['IMaj7(#11)', 'IVMaj7(#11)', 'VMaj7(#11)', 'IMaj7(#11)'],
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'Maj7(#11)和弦五度圈循环练习。从AMaj7(#11)开始，按照五度圈倒序方向进行12个调的升十一音大七和弦练习。这个和弦具有强烈的Lydian调式色彩，是现代爵士和声的重要元素。',
                             details: '五度圈倒序进行：AMaj7(#11) → DMaj7(#11) → GMaj7(#11) → CMaj7(#11) → FMaj7(#11) → B♭Maj7(#11) → E♭Maj7(#11) → A♭Maj7(#11) → D♭Maj7(#11) → G♭Maj7(#11) → BMaj7(#11) → EMaj7(#11) → 回到AMaj7(#11)。'
                         }
                     },
-                    '练习5 - 7sus4和弦(12个调)': {
+                    '练习05 - 7sus4和弦(12个调)': {
                         key: 'A',
                         chords: ['I7sus4', 'IV7sus4', 'V7sus4', 'I7sus4'],
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: '7sus4和弦五度圈循环练习。从A7sus4开始，按照五度圈倒序方向进行12个调的属七挂留四和弦练习。这个和弦在不解决前保持高度张力，是爵士即兴的常用手法。',
                             details: '五度圈倒序进行：A7sus4 → D7sus4 → G7sus4 → C7sus4 → F7sus4 → B♭7sus4 → E♭7sus4 → A♭7sus4 → D♭7sus4 → G♭7sus4 → B7sus4 → E7sus4 → 回到A7sus4。'
                         }
                     },
-                    '练习5a - Dom7和弦(12个调)': {
+                    '练习05a - Dom7和弦(12个调)': {
                         key: 'A',
                         chords: ['I7', 'IV7', 'V7', 'I7'],
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'Dom7和弦五度圈循环练习。从A7开始，按照五度圈倒序方向进行12个调的属七和弦练习。属七和弦是布鲁斯和爵士音乐的核心，掌握其循环对于理解功能性和声至关重要。',
                             details: '五度圈倒序进行：A7 → D7 → G7 → C7 → F7 → B♭7 → E♭7 → A♭7 → D♭7 → G♭7 → B7 → E7 → 回到A7。'
                         }
                     },
-                    '练习6 - Min7b5和弦(12个调)': {
+                    '练习06 - Min7b5和弦(12个调)': {
                         key: 'A',
                         chords: ['Im7(b5)', 'IVm7(b5)', 'Vm7(b5)', 'Im7(b5)'],
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'Min7(b5)和弦五度圈循环练习。从Am7(b5)开始，按照五度圈倒序方向进行12个调的小七降五和弦练习。这个和弦是小调和声和减音阶的重要组成部分，具有强烈的紧张感。',
                             details: '五度圈倒序进行：Am7(b5) → Dm7(b5) → Gm7(b5) → Cm7(b5) → Fm7(b5) → B♭m7(b5) → E♭m7(b5) → A♭m7(b5) → D♭m7(b5) → G♭m7(b5) → Bm7(b5) → Em7(b5) → 回到Am7(b5)。'
                         }
                     },
-                    '练习7 - MinMaj7和弦(12个调)': {
+                    '练习07 - MinMaj7和弦(12个调)': {
                         key: 'A',
                         chords: ['Im(Maj7)', 'IVm(Maj7)', 'Vm(Maj7)', 'Im(Maj7)'],
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'MinMaj7和弦五度圈循环练习。从Am(Maj7)开始，按照五度圈倒序方向进行12个调的小大七和弦练习。这个和弦具有独特的神秘色彩，是小调和声和旋律小调音阶的代表性和弦。',
                             details: '五度圈倒序进行：Am(Maj7) → Dm(Maj7) → Gm(Maj7) → Cm(Maj7) → Fm(Maj7) → B♭m(Maj7) → E♭m(Maj7) → A♭m(Maj7) → D♭m(Maj7) → G♭m(Maj7) → Bm(Maj7) → Em(Maj7) → 回到Am(Maj7)。'
                         }
                     },
-                    '练习8 - 13sus4b9和弦(12个调)': {
+                    '练习08 - 13sus4b9和弦(12个调)': {
                         key: 'A',
                         chords: ['I13sus4(b9)', 'IV13sus4(b9)', 'V13sus4(b9)', 'I13sus4(b9)'],
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: '13sus4(b9)和弦五度圈循环练习。从A13sus4(b9)开始，按照五度圈倒序方向进行12个调的十三挂留四降九和弦练习。这是一个复杂的延伸和弦，结合了多个音程层次，适合高级和声练习。',
                             details: '五度圈倒序进行：A13sus4(b9) → D13sus4(b9) → G13sus4(b9) → C13sus4(b9) → F13sus4(b9) → B♭13sus4(b9) → E♭13sus4(b9) → A♭13sus4(b9) → D♭13sus4(b9) → G♭13sus4(b9) → B13sus4(b9) → E13sus4(b9) → 回到A13sus4(b9)。'
                         }
                     },
-                    '练习9 - Maj7#5和弦(12个调)': {
+                    '练习09 - Maj7#5和弦(12个调)': {
                         key: 'A',
                         chords: ['IMaj7(#5)', 'IVMaj7(#5)', 'VMaj7(#5)', 'IMaj7(#5)'],
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'Maj7(#5)和弦五度圈循环练习。从AMaj7(#5)开始，按照五度圈倒序方向进行12个调的升五大七和弦练习。这个和弦具有增三和弦的色彩，适合练习调性和声的扩展。',
                             details: '五度圈倒序进行：AMaj7(#5) → DMaj7(#5) → GMaj7(#5) → CMaj7(#5) → FMaj7(#5) → B♭Maj7(#5) → E♭Maj7(#5) → A♭Maj7(#5) → D♭Maj7(#5) → G♭Maj7(#5) → BMaj7(#5) → EMaj7(#5) → 回到AMaj7(#5)。'
@@ -7619,7 +7981,7 @@
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: '7#11和弦五度圈循环练习。从A7(#11)开始，按照五度圈倒序方向进行12个调的升十一音属七和弦练习。这个和弦融合了属功能和Lydian色彩，是现代爵士的重要和声词汇。',
                             details: '五度圈倒序进行：A7(#11) → D7(#11) → G7(#11) → C7(#11) → F7(#11) → B♭7(#11) → E♭7(#11) → A♭7(#11) → D♭7(#11) → G♭7(#11) → B7(#11) → E7(#11) → 回到A7(#11)。'
@@ -7631,7 +7993,7 @@
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: 'Min7(b5,♮9)和弦五度圈循环练习。从Am7(b5,♮9)开始，按照五度圈倒序方向进行12个调的小七降五自然九和弦练习。这个和弦结合了减音程和自然音，创造出独特的和声张力。',
                             details: '五度圈倒序进行：Am7(b5,♮9) → Dm7(b5,♮9) → Gm7(b5,♮9) → Cm7(b5,♮9) → Fm7(b5,♮9) → B♭m7(b5,♮9) → E♭m7(b5,♮9) → A♭m7(b5,♮9) → D♭m7(b5,♮9) → G♭m7(b5,♮9) → Bm7(b5,♮9) → Em7(b5,♮9) → 回到Am7(b5,♮9)。'
@@ -7643,10 +8005,310 @@
                         info: {
                             composer: '系统生成',
                             year: '2024',
-                            style: '和弦循环练习',
+                            style: 'Single Chord Exercises',
                             tempo: 'Medium',
                             description: '13(b9)和弦五度圈循环练习。从A13(b9)开始，按照五度圈倒序方向进行12个调的十三降九和弦练习。这是一个复杂的属功能和弦，结合了多个音程层次，适合高级爵士和声练习。',
                             details: '五度圈倒序进行：A13(b9) → D13(b9) → G13(b9) → C13(b9) → F13(b9) → B♭13(b9) → E♭13(b9) → A♭13(b9) → D♭13(b9) → G♭13(b9) → B13(b9) → E13(b9) → 回到A13(b9)。'
+                        }
+                    },
+                    '练习13 - Major II-V-I (Single Key)': {
+                        key: 'C',
+                        chords: ['IIm7', 'V7', 'IM7', 'IIm7', 'V7', 'IM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium',
+                            description: '大调II-V-I进行练习。在单一调性中练习大调的ii-V-I进行，这是爵士和声中最基础也是最重要的进行。适合初学者掌握基本的和弦功能和进行。',
+                            details: '大调II-V-I模式：IIm7 → V7 → IM7。如C调：Dm7 → G7 → CM7。练习重点：1)听辨每个和弦的功能色彩 2)掌握和弦间的平滑过渡 3)理解属七和弦到主和弦的解决感 4)练习不同音阶选择：Dorian、Mixolydian、Ionian。'
+                        }
+                    },
+                    '练习14 - Minor II-V-I (Single Key)': {
+                        key: 'C',
+                        chords: ['IIm7(b5)', 'V7alt', 'Im7', 'IIm7(b5)', 'V7alt', 'Im7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium Slow',
+                            description: '小调II-V-I进行练习。在单一调性中练习小调的ii-V-i进行，包含半减七和弦、变化属七和弦到小七和弦的解决。这是爵士小调和声的基础进行。',
+                            details: '小调II-V-I模式：IIm7(b5) → V7alt → Im7。练习每个和弦的音阶选择：Dorian模式、和声小调音阶或旋律小调音阶。重点是听辨和弦间的和声运动和解决感。'
+                        }
+                    },
+                    '练习15 - Major II-V-I (altered V) Single Key': {
+                        key: 'C',
+                        chords: ['IIm7', 'V7alt', 'IM7', 'IIm7', 'V7alt', 'IM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium',
+                            description: '大调II-V-I进行练习，包含变化的属七和弦。在单一调性中练习大调的ii-V-I进行，属七和弦使用变化音创造更多的张力和解决。',
+                            details: '大调II-V-I模式：IIm7 → V7alt → IM7。V7alt和弦可以选择使用b9、#9、b5、#5等变化音。练习不同变化音的选择对解决效果的影响。'
+                        }
+                    },
+                    '练习16 - Major II-V-I (All 12 Keys)': {
+                        key: 'C',
+                        chords: ['IIm7', 'V7', 'IM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium',
+                            description: '大调II-V-I进行12个调练习。按照五度圈顺序练习所有12个调的大调II-V-I进行，这是爵士和声最基础也是最重要的进行。',
+                            details: '五度圈顺序：C: Dm7-G7-CM7 → F: Gm7-C7-FM7 → B♭: Cm7-F7-B♭M7 → E♭: Fm7-B♭7-E♭M7 → A♭: B♭m7-E♭7-A♭M7 → D♭: E♭m7-A♭7-D♭M7 → G♭: A♭m7-D♭7-G♭M7 → B: C♯m7-F♯7-BM7 → E: F♯m7-B7-EM7 → A: Bm7-E7-AM7 → D: Em7-A7-DM7 → G: Am7-D7-GM7'
+                        }
+                    },
+                    '练习17 - Minor II-V-I(All 12 Keys)': {
+                        key: 'C',
+                        chords: ['IIm7(b5)', 'V7alt', 'Im7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium Slow',
+                            description: '小调II-V-I进行12个调练习。按照五度圈顺序练习所有12个调的小调II-V-I进行，掌握小调和声的核心进行。',
+                            details: '五度圈顺序：C: Dm7(b5)-G7alt-Cm7 → F: Gm7(b5)-C7alt-Fm7 → B♭: Cm7(b5)-F7alt-B♭m7 → E♭: Fm7(b5)-B♭7alt-E♭m7 → A♭: B♭m7(b5)-E♭7alt-A♭m7 → D♭: E♭m7(b5)-A♭7alt-D♭m7 → G♭: A♭m7(b5)-D♭7alt-G♭m7 → B: C♯m7(b5)-F♯7alt-Bm7 → E: F♯m7(b5)-B7alt-Em7 → A: Bm7(b5)-E7alt-Am7 → D: Em7(b5)-A7alt-Dm7 → G: Am7(b5)-D7alt-Gm7'
+                        }
+                    },
+                    '练习18 - Major II-V-I w/Tritone Subs (12 Keys)': {
+                        key: 'C',
+                        chords: ['IIm7', '♭II7', 'IM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium',
+                            description: '大调II-V-I三全音替代练习。用三全音替代和弦替代原属七和弦，创造更丰富的和声色彩。这是现代爵士的重要和声技巧。',
+                            details: 'II-V-I三全音替代：IIm7 → ♭II7 → IM7。如C调：Dm7 → D♭7 → CM7。三全音替代和弦的根音是原属七和弦根音的减五度，两者共同音（3音和7音）互换位置。'
+                        }
+                    },
+                    '练习19 - Minor II-V-I w/Tritone Subs (12 Keys)': {
+                        key: 'C',
+                        chords: ['IIm7(b5)', '♭II7alt', 'Im7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium Slow',
+                            description: '小调II-V-I三全音替代练习。在小调ii-V-i进行中使用三全音替代，增加和声的复杂性和现代感。',
+                            details: '小调II-V-I三全音替代：IIm7(b5) → ♭II7alt → Im7。如C小调：Dm7(b5) → D♭7alt → Cm7。三全音替代在小调中使用时可以创造独特的和声张力。'
+                        }
+                    },
+                    '练习20 - Major Key I-IV-V-I (All 12 Keys)': {
+                        key: 'C',
+                        chords: ['IM7', 'IVM7', 'V7', 'IM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium',
+                            description: '大调I-IV-V-I进行12个调练习。这是最基础的和弦进行，涵盖了大调的主要功能和弦，是理解调性和声的基础。',
+                            details: 'I-IV-V-I功能进行：主功能 → 下属功能 → 属功能 → 主功能。如C调：CM7 → FM7 → G7 → CM7。这个进行体现了西方调性和声的基本框架。'
+                        }
+                    },
+                    '练习21- Major Key I-VI-IV-V (All 12 Keys)': {
+                        key: 'C',
+                        chords: ['IM7', 'VIm7', 'IVM7', 'V7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium Up',
+                            description: '大调I-VI-IV-V进行12个调练习。这是流行音乐和早期爵士的经典进行，经常被称为"50年代进行"。',
+                            details: 'I-VI-IV-V进行：主功能 → 关系小调 → 下属功能 → 属功能。如C调：CM7 → Am7 → FM7 → G7。这个进行在大量经典歌曲中使用。'
+                        }
+                    },
+                    '练习22 - Major I-VI-II-V (All 12 Keys)': {
+                        key: 'C',
+                        chords: ['IM7', 'VIm7', 'IIm7', 'V7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium',
+                            description: '大调I-VI-II-V进行12个调练习。这是爵士和R&B音乐中非常常见的和弦进行，为即兴演奏提供丰富的和声背景。',
+                            details: 'I-VI-II-V进行：主功能 → 关系小调 → 上主音小调 → 属功能。如C调：CM7 → Am7 → Dm7 → G7。这个进行是爵士标准曲的基石。'
+                        }
+                    },
+                    '练习23 - Minor I-VI-II-V (All 12 Keys)': {
+                        key: 'C',
+                        chords: ['Im7', '♭VIM7', 'IIm7(b5)', 'V7alt'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Medium Slow',
+                            description: '小调I-VI-II-V进行12个调练习。这是小调中的经典进行，在小调爵士和拉丁音乐中广泛使用。',
+                            details: '小调I-VI-II-V进行：主小调 → 降六级大调 → 上主音半减七 → 变化属七。如C小调：Cm7 → A♭M7 → Dm7(b5) → G7alt。这个进行具有独特的小调色彩。'
+                        }
+                    },
+                    '练习24 -I Dim-1 Maj7': {
+                        key: 'C',
+                        chords: ['I°7', 'IM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Slow',
+                            description: '减七和弦到大七和弦的解决练习。练习减七和弦到主大七和弦的解决，这是创造和声张力的重要技巧。',
+                            details: '减七和弦解决：I°7 → IM7。如C调：C°7 → CM7。减七和弦包含强烈的张力，解决到主和弦时产生强烈的释放感。'
+                        }
+                    },
+                    '练习25 - VII Dim- IMaj7': {
+                        key: 'C',
+                        chords: ['VIIm7(b5)', 'IM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Basic Chord Progressions',
+                            tempo: 'Slow',
+                            description: '七级半减七和弦到主大七和弦的解决练习。这是自然小调音阶中的和弦进行，具有独特的和声色彩。',
+                            details: 'VII-I解决：VIIm7(b5) → IM7。如C调：Bm7(b5) → CM7。这个进行体现了从导音到主音的自然倾向。'
+                        }
+                    },
+                    '练习26 - Major Key Diatonic 7th Chords': {
+                        key: 'C',
+                        chords: ['IM7', 'IIm7', 'IIIm7', 'IVM7', 'V7', 'VIm7', 'VIIm7(b5)', 'IM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Diatonic Major Scale Chords',
+                            tempo: 'Medium',
+                            description: '大调自然七和弦顺序练习。按照音阶顺序演奏大调的七个自然七和弦，最后回到主和弦，建立对调性内完整和弦体系的理解。',
+                            details: '大调自然七和弦：IM7 → IIm7 → IIIm7 → IVM7 → V7 → VIm7 → VIIm7(b5) → IM7。如C调：CM7-Dm7-Em7-FM7-G7-Am7-Bm7(b5)-CM7。每个和弦都有其在调性中的特定功能。'
+                        }
+                    },
+                    '练习27 - Basic Blues Progression (Quick IV)': {
+                        key: 'F',
+                        chords: ['I7', 'IV7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'V7', 'IV7', 'I7', 'V7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Standard Chord Progressions',
+                            tempo: 'Medium Shuffle',
+                            description: '基础布鲁斯进行练习（快速IV）。这是12小节布鲁斯的基本形式，第二小节快速进入IV级和弦，创造更丰富的和声运动。',
+                            details: '12小节布鲁斯：I7-IV7-I7-I7 / IV7-IV7-I7-I7 / V7-IV7-I7-V7。这是所有布鲁斯音乐的基础，也是爵士即兴的重要素材。'
+                        }
+                    },
+                    '练习28 - Jazz Blues': {
+                        key: 'F',
+                        chords: ['I7', 'IV7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'IIIm7', 'VIm7', 'IIm7', 'V7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Standard Chord Progressions',
+                            tempo: 'Medium Swing',
+                            description: '爵士布鲁斯进行练习。在传统布鲁斯基础上加入更多爵士和弦，如IIIm7-VIm7进行和IIm7-V7进行，创造更丰富的和声色彩。',
+                            details: '爵士布鲁斯：第9-10小节使用IIIm7-VIm7，第11-12小节使用IIm7-V7。这是从基础布鲁斯向爵士和声过渡的重要步骤。'
+                        }
+                    },
+                    '练习29 - Rhythm Changes': {
+                        key: 'B♭',
+                        chords: ['IM7', 'VIm7', 'IIm7', 'V7', 'IIIm7', 'VIm7', 'IIm7', 'V7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Standard Chord Progressions',
+                            tempo: 'Medium Up',
+                            description: 'Rhythm Changes进行练习。基于George Gershwin的"I Got Rhythm"的和弦进行，是爵士乐中最重要和最常见的进行之一。',
+                            details: 'Rhythm Changes A段：IM7-VIm7-IIm7-V7 / IIIm7-VIm7-IIm7-V7。这个进行在无数爵士标准曲中使用，是爵士即兴的核心素材。'
+                        }
+                    },
+                    '练习30 - Tadd Dameron Progression': {
+                        key: 'C',
+                        chords: ['IM7', '♭IIIM7', 'VIm7', '♭VIM7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Standard Chord Progressions',
+                            tempo: 'Medium Ballad',
+                            description: 'Tadd Dameron进行练习。这是由爵士钢琴家Tadd Dameron创作的经典和声进行，具有优美的和声流动。',
+                            details: 'Tadd Dameron进行：IM7 → ♭IIIM7 → VIm7 → ♭VIM7。如C调：CM7 → E♭M7 → Am7 → A♭M7。这个进行经常用于爵士标准曲的桥段。'
+                        }
+                    },
+                    '练习31- Modal Progression 1': {
+                        key: 'D',
+                        chords: ['Im7', 'Im7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Modal Progressions',
+                            tempo: 'Slow',
+                            description: 'Dorian调式练习。单一小调和弦的持续，适合练习Dorian调式的即兴演奏，这是Miles Davis调式爵士的核心概念。',
+                            details: 'Dorian调式：在Im7和弦上即兴，使用Dorian音阶（自然小调音阶升高6音）。重点在于调式的色彩而非和弦进行。'
+                        }
+                    },
+                    '练习32- Modal Progression 2': {
+                        key: 'D',
+                        chords: ['Im7', 'IVm7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Modal Progressions',
+                            tempo: 'Medium Slow',
+                            description: 'Dorian调式和弦移动练习。在Dorian调式中的和弦移动：Im7到IVm7，保持调式色彩的同时增加和声运动。',
+                            details: 'Dorian调式移动：Im7 → IVm7。如D Dorian：Dm7 → Gm7。这个进行保持Dorian调式的色彩，适合练习调式之间的转换。'
+                        }
+                    },
+                    '练习33 - Jimi Progression': {
+                        key: 'C',
+                        chords: ['Imaj7#7', 'IV7#9', 'I7', 'IV7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Pop/Rock Progressions',
+                            tempo: 'Medium Rock',
+                            description: 'Jimi Hendrix风格进行练习。基于Hendrix的"Little Wing"等作品的和声风格，融合了摇滚和爵士元素。',
+                            details: 'Jimi进行：Imaj7#7 → IV7#9 → I7 → IV7。如C调：Cmaj7#7 → F7#9 → C7 → F7。这个进行融合了扩展和弦和变化音。'
+                        }
+                    },
+                    '练习34 - Jimi With Secondary Dominants': {
+                        key: 'C',
+                        chords: ['Imaj7#7', 'V7/IV', 'IV7#9', 'V7/V', 'I7', 'V7/IV', 'IV7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Pop/Rock Progressions',
+                            tempo: 'Medium Rock',
+                            description: 'Jimi进行加副属和弦练习。在Jimi Hendrix风格进行基础上加入副属和弦，增加和声的复杂性和推动力。',
+                            details: '副属和弦的使用增强了和声的指向性，如V7/IV（C7）进行到F7#9，V7/V（D7）进行到G7。'
+                        }
+                    },
+                    '练习35 - Bop Passing Note Progression 1': {
+                        key: 'C',
+                        chords: ['IM7', 'IIIm7', 'IIm7', 'V7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Passing Note Scale Exercises',
+                            tempo: 'Medium Up',
+                            description: 'Bebop经过音进行练习1。使用半音下行经过音：Imaj7 → ♭IIImaj7 → IIm7 → V7，创造流畅的和声线条。',
+                            details: 'Bebop经过音：CM7 → B♭M7 → Dm7 → G7。经过音和弦创造半音下行的低音线条，这是Bebop风格的特点。'
+                        }
+                    },
+                    '练习36 - Bop Passing Note Progression 2': {
+                        key: 'C',
+                        chords: ['IM7', 'VIm7', '♭IIm7', 'IIm7', 'V7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Passing Note Scale Exercises',
+                            tempo: 'Medium Up',
+                            description: 'Bebop经过音进行练习2。更复杂的经过音使用：Imaj7 → VIm7 → ♭IIm7 → IIm7 → V7。',
+                            details: '复杂经过音：CM7 → Am7 → D♭m7 → Dm7 → G7。这个进行展示了Bebop风格中对经过音和弦的高级运用。'
+                        }
+                    },
+                    '练习37- Bop Passing Note Progression 3': {
+                        key: 'C',
+                        chords: ['IM7', 'VI7', 'IIm7', 'V7'],
+                        info: {
+                            composer: '系统生成',
+                            year: '2024',
+                            style: 'Passing Note Scale Exercises',
+                            tempo: 'Up',
+                            description: 'Bebop经过音进行练习3。使用副属和弦作为经过音：Imaj7 → VI7 → IIm7 → V7，创造强烈的和声推动。',
+                            details: '副属经过音：CM7 → A7 → Dm7 → G7。VI7和弦作为V7/II，推动到IIm7，这是Bebop即兴中的常用技巧。'
                         }
                     }
                 }
@@ -8274,7 +8936,7 @@
                     }
 
                     // 清理自定义和弦模式状态
-                    window.state.isCustomChordMode = false;
+                    window.resetCustomChordMode();
 
                     // 清理找音练习的答题状态
                     window.state.pitchFindingAnswered = false;
@@ -9017,7 +9679,7 @@
                 const detectedNote = frequencyToNoteName(yinResult.frequency);
                 const exercise = state.currentIntervalExercise;
                 
-                console.log(`音程练习音频处理: 频率=${yinResult.frequency.toFixed(2)}Hz, 检测音符=${detectedNote}, 目标音程=${exercise.currentInterval}, 根音=${exercise.rootNote}`);
+                // console.log(`音程练习音频处理: 频率=${yinResult.frequency.toFixed(2)}Hz, 检测音符=${detectedNote}, 目标音程=${exercise.currentInterval}, 根音=${exercise.rootNote}`);
                 
                 // 检查是否匹配当前音程对中的某个音程
                 const matchedInterval = checkIntervalMatch(detectedNote, exercise.currentInterval, exercise.rootNote);
@@ -9064,7 +9726,7 @@
                 }
                 
                 const detectedNote = frequencyToNoteName(yinResult.frequency); // 直接返回音符名字符串
-                console.log('检测到音符:', detectedNote, '(类型:', typeof detectedNote, ') 目标音符:', state.currentNote, '(类型:', typeof state.currentNote, ')');
+                // console.log('检测到音符:', detectedNote, '(类型:', typeof detectedNote, ') 目标音符:', state.currentNote, '(类型:', typeof state.currentNote, ')');
                 
                 if (detectedNote === state.currentNote || isEquivalentNote(detectedNote, state.currentNote)) {
                     console.log('音符匹配！调用handlePitchFindingCorrect');
@@ -9628,15 +10290,15 @@
 
             // 生成和弦进行的下一个和弦
             function generateNextProgressionChord() {
-                console.log('generateNextProgressionChord: === 开始调用 ===');
-                console.log('generateNextProgressionChord: 调用时间', new Date().toISOString());
-                console.log('generateNextProgressionChord: 进入下一个和弦');
-                console.log('generateNextProgressionChord: 当前进度', {
-                    progressionIndex: state.progressionIndex,
-                    totalChords: state.progressionChords ? state.progressionChords.length : 0,
-                    currentChord: state.progressionChords && state.progressionChords[state.progressionIndex],
-                    allChords: state.progressionChords
-                });
+                // console.log('generateNextProgressionChord: === 开始调用 ===');
+                // console.log('generateNextProgressionChord: 调用时间', new Date().toISOString());
+                // console.log('generateNextProgressionChord: 进入下一个和弦');
+                // console.log('generateNextProgressionChord: 当前进度', {
+                //     progressionIndex: state.progressionIndex,
+                //     totalChords: state.progressionChords ? state.progressionChords.length : 0,
+                //     currentChord: state.progressionChords && state.progressionChords[state.progressionIndex],
+                //     allChords: state.progressionChords
+                // });
 
                 if (!state.progressionChords || state.progressionChords.length === 0) {
                     console.error('generateNextProgressionChord: 没有和弦进行数据');
@@ -9669,12 +10331,8 @@
                         state.isCustomChordMode = false;
                         console.log('自定义和弦练习完成退出 - 重置 state.isCustomChordMode = false');
 
-                        // 清空自定义和弦相关状态
-                        // useCustomChords 开关已移除
-
-                        // 清空全局自定义和弦序列
-                        window.customChordSequence = [];
-                        console.log('练习完成 - 清空自定义和弦序列');
+                        // 保留自定义和弦序列，不清空，以便下次使用
+                        console.log('练习完成 - 保留自定义和弦序列供下次使用');
 
                         // 清空和弦进行状态
                         state.progressionChords = null;
@@ -10725,7 +11383,7 @@
                 
                 const detectedNote = frequencyToNoteName(yinResult.frequency);
                 
-                console.log(`CAGED音频处理: 检测到音符=${detectedNote}, 频率=${yinResult.frequency.toFixed(2)}Hz, 能量=${energy.toFixed(4)}`);
+                // console.log(`CAGED音频处理: 检测到音符=${detectedNote}, 频率=${yinResult.frequency.toFixed(2)}Hz, 能量=${energy.toFixed(4)}`);
                 
                 // 检查检测到的音符是否有效
                 if (!detectedNote) {
@@ -11749,7 +12407,7 @@
                     state.chordType = 'major';
                     state.currentIntervals = ['1', '3', '5'];
                     const targetIntervalEl = document.getElementById('targetInterval');
-                    if (targetIntervalEl) targetIntervalEl.textContent = 'C Major';
+                    if (targetIntervalEl) targetIntervalEl.textContent = formatChordSymbol('C', 'major');
                     displaySequence();
                 }
             }
@@ -12155,7 +12813,14 @@
                             // 清理自定义和弦模式状态（如果不是切换到和弦进行标签页）
                             if (tabName !== 'progression' && window.state.isCustomChordMode) {
                                 console.log('导航切换: 清理自定义和弦模式状态');
-                                window.state.isCustomChordMode = false;
+                                window.resetCustomChordMode();
+                            }
+
+                            // 确保自定义和弦按钮始终可用
+                            if (tabName === 'progression') {
+                                setTimeout(() => {
+                                    window.ensureCustomChordButton();
+                                }, 100);
                             }
 
                             // 清理找音练习的答题状态
@@ -12325,6 +12990,12 @@
                             generateChordExercise();
                         } else if (activeTab === 'progression') {
                             generateProgressionExercise();
+                        }
+
+                        // 如果当前是自定义和弦模式，更新显示
+                        if (state.isCustomChordMode) {
+                            updateCustomChordProgressionDisplay();
+                            updateChordSequenceDisplay();
                         }
                         
                         // 保存设置
@@ -12906,8 +13577,7 @@
 
                     // 根据当前模式重置相应的状态
                     if (state.isCustomChordMode) {
-                        state.isCustomChordMode = false;
-                        console.log('退出自定义和弦练习页面 - 重置 state.isCustomChordMode = false');
+                        window.resetCustomChordMode();
                     } else {
                     state.cagedMode = false;
                     console.log('退出练习页面 - 重置 state.cagedMode = false');
@@ -13289,14 +13959,158 @@
                     // 向下键：隐藏指板
                     if (e.key === 'ArrowDown' && practiceScreen.style.display === 'flex') {
                         e.preventDefault();
-                        
+
                         const activeTab = document.querySelector('.nav-item.active');
                         if (activeTab && activeTab.dataset.tab === 'pitch-finding') {
                             console.log('隐藏指板');
                             hideFretboardForPractice();
                         }
                     }
+
+                    // PageDown键：跳转到下一题
+                    if (e.key === 'PageDown' && practiceScreen.style.display === 'flex') {
+                        // 阻止默认行为
+                        e.preventDefault();
+
+                        console.log('PageDown下一题触发');
+
+                        // 检查当前练习模式
+                        const activeTab = document.querySelector('.nav-item.active');
+                        if (activeTab && activeTab.dataset.tab === 'pitch-finding') {
+                            // 找音练习模式
+                            const practiceMode = document.querySelector('.practice-mode-btn.active');
+                            if (practiceMode && practiceMode.dataset.mode === 'interval') {
+                                // 音程练习模式：直接调用函数
+                                console.log('音程练习下一题触发');
+                                // 使用window对象访问函数
+                                if (window.generateNextIntervalExercise) {
+                                    window.generateNextIntervalExercise();
+                                } else {
+                                    console.log('generateNextIntervalExercise函数未找到');
+                                }
+                            } else {
+                                // 单音练习模式：生成下一题单音练习
+                                console.log('单音练习下一题触发');
+                                if (typeof generateNextPitchFindingQuestion === 'function') {
+                                    generateNextPitchFindingQuestion();
+                                }
+                            }
+                        } else {
+                            // 其他练习模式：使用预生成的下一题
+                            console.log('其他练习模式下一题触发');
+                            useNextExercise();
+                        }
+                    }
                 });
+            }
+
+            // 使用预生成的下一题信息生成当前练习
+            function useNextExercise() {
+                console.log('useNextExercise开始 - 检查预生成的下一题信息');
+
+                // 获取当前活动标签页
+                const activeTab = document.querySelector('.nav-item.active').dataset.tab;
+                console.log('当前活动标签页:', activeTab);
+
+                // 根据活动标签页调用相应的生成函数
+                if (activeTab === 'scale') {
+                    if (window.cagedState && window.cagedState.enabled) {
+                        console.log('调用generateCagedExercise - CAGED模式启用');
+                        generateCagedExercise();
+                    } else {
+                        console.log('调用generateScaleExercise - 普通音阶模式');
+                        generateScaleExercise();
+                    }
+                } else if (activeTab === 'chord') {
+                    console.log('调用generateChordExerciseFromNext - 使用预生成信息的和弦模式');
+                    generateChordExerciseFromNext();
+                } else if (activeTab === 'progression') {
+                    console.log('调用generateProgressionExercise - 和弦进行模式');
+                    generateProgressionExercise();
+                } else if (activeTab === 'pitch-finding') {
+                    // 找音练习不在这里处理，因为在PageDown键逻辑中已经单独处理了
+                    console.log('找音练习模式，应该在PageDown键逻辑中处理');
+                    return;
+                } else {
+                    // 其他未知的练习模式，回退到generateExercise
+                    console.log('未知练习模式，调用 generateExercise');
+                    generateExercise();
+                }
+
+                // 跳转到下一题后，生成新的下一题预览信息
+                console.log('生成新的下一题预览信息，当前活动标签页:', activeTab);
+
+                // 和弦练习需要更长的延迟时间，因为它涉及更复杂的生成逻辑
+                const delayTime = (activeTab === 'chord') ? 300 : 100;
+
+                setTimeout(() => {
+                    console.log('延迟调用 generateNextExercise()');
+                    generateNextExercise();
+                }, delayTime); // 和弦练习需要更长的延迟时间
+            }
+
+            // 使用预生成信息的和弦练习生成函数
+            function generateChordExerciseFromNext() {
+                try {
+                    console.log('generateChordExerciseFromNext 开始，预生成信息:', {
+                        nextExerciseInfo: state.nextExerciseInfo,
+                        nextExerciseIntervals: state.nextExerciseIntervals
+                    });
+
+                    // 检查是否有预生成的下一题信息
+                    if (state.nextExerciseInfo && state.nextExerciseIntervals && state.nextExerciseIntervals.length > 0) {
+                        console.log('使用预生成的和弦信息生成当前练习');
+
+                        // 解析预生成的和弦信息
+                        const chordSymbol = state.nextExerciseInfo;
+                        const intervals = [...state.nextExerciseIntervals];
+
+                        // 尝试解析和弦符号来获取根音和类型
+                        const parseResult = parseChordSymbol(chordSymbol);
+                        if (parseResult) {
+                            state.rootNote = parseResult.root;
+                            state.chordType = parseResult.type;
+
+                            // 检查和弦类型是否存在
+                            if (!chordTypes[state.chordType]) {
+                                console.warn('预生成的和弦类型不存在，使用默认类型:', state.chordType);
+                                state.chordType = 'major';
+                            }
+
+                            state.currentIntervals = intervals;
+
+                            // 获取转位和弦名称（应该与预生成信息一致）
+                            const bassNoteSelect = document.getElementById('chordBassNote');
+                            const bassNote = bassNoteSelect ? bassNoteSelect.value : 'root';
+                            const displayChordSymbol = getInversionChordName(state.rootNote, state.chordType, bassNote);
+
+                            // 设置显示
+                            const targetIntervalEl = document.getElementById('targetInterval');
+                            if (targetIntervalEl) {
+                                targetIntervalEl.textContent = displayChordSymbol;
+                            }
+
+                            displaySequence();
+
+                            console.log('成功使用预生成信息生成了和弦练习:', {
+                                rootNote: state.rootNote,
+                                chordType: state.chordType,
+                                intervals: state.currentIntervals,
+                                displaySymbol: displayChordSymbol
+                            });
+                        } else {
+                            console.warn('无法解析预生成的和弦符号，回退到常规生成');
+                            generateChordExercise();
+                        }
+                    } else {
+                        console.log('没有预生成的和弦信息，使用常规生成');
+                        generateChordExercise();
+                    }
+                } catch (error) {
+                    console.error('使用预生成信息生成分弦练习失败:', error);
+                    console.log('回退到常规和弦练习生成');
+                    generateChordExercise();
+                }
             }
 
             // 更新状态指示器
@@ -13472,7 +14286,7 @@
                     state.chordType = 'major';
                     state.currentIntervals = ['1', '3', '5'];
                     const targetIntervalEl = document.getElementById('targetInterval');
-                    if (targetIntervalEl) targetIntervalEl.textContent = 'C Major';
+                    if (targetIntervalEl) targetIntervalEl.textContent = formatChordSymbol('C', 'major');
                     displaySequence();
                 }
             }
@@ -13678,6 +14492,23 @@
 
                     console.log(`生成的${selectedSong}和弦循环：`, chords);
 
+                } else if (selectedSong.includes('练习')) {
+                    // 和弦进行练习：使用歌曲数据中的和弦进行
+                    console.log('检测到和弦进行练习，使用歌曲数据中的和弦进行');
+
+                    // 对于12个调的练习，需要生成所有调的和弦进行
+                    if (selectedSong.includes('All 12 Keys') || selectedSong.includes('(12 Keys)')) {
+                        chords = generateAllKeysProgression(selectedSong, songData, selectedKey);
+                    } else {
+                        // 单一调性的练习，使用歌曲数据中的和弦
+                        const degreeChords = [...songData.chords];
+                        chords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, originalKey, selectedKey)
+                        );
+                    }
+
+                    console.log(`生成的${selectedSong}和弦进行：`, chords);
+
                 } else {
                     // 普通歌曲处理
                     const degreeChords = [...songData.chords];
@@ -13693,6 +14524,18 @@
                 if (selectedSong.includes('练习') && selectedSong.includes('个调')) {
                     console.log(`练习曲目：${selectedSong}`);
                     console.log(`和弦循环：`, chords);
+                } else if (selectedSong.includes('练习')) {
+                    console.log(`和弦进行练习：${selectedSong}`);
+                    if (selectedSong.includes('All 12 Keys') || selectedSong.includes('(12 Keys)')) {
+                        console.log(`12个调练习，总共${chords.length}个和弦`);
+                    } else {
+                        const keyInfo = selectedKey === originalKey ?
+                            `原调：${originalKey}` :
+                            `${originalKey} → ${selectedKey}`;
+                        console.log(`调性转换：${keyInfo}`);
+                    }
+                    console.log(`音级和弦：`, songData.chords);
+                    console.log(`转换后和弦：`, chords);
                 } else {
                     const keyInfo = selectedKey === originalKey ?
                         `原调：${originalKey}` :
@@ -13753,13 +14596,9 @@
                         // 重置自定义和弦模式状态（退出练习时立即重置）
                         state.isCustomChordMode = false;
                         console.log('自定义和弦练习完成退出 - 重置 state.isCustomChordMode = false');
-                        
-                        // 清空自定义和弦相关状态
-                        // useCustomChords 开关已移除
-                        
-                        // 清空全局自定义和弦序列
-                        window.customChordSequence = [];
-                        console.log('练习完成 - 清空自定义和弦序列');
+
+                        // 保留自定义和弦序列，不清空，以便下次使用
+                        console.log('练习完成 - 保留自定义和弦序列供下次使用');
                         
                         // 清空和弦进行状态
                         state.progressionChords = null;
@@ -13833,9 +14672,11 @@
                 }
 
                 state.currentIntervals = intervals;
-                // 只显示和弦名称，不显示音级结构
-                targetIntervalEl.textContent = currentChord;
-                targetIntervalEl.innerHTML = currentChord; // 确保只显示和弦名称，不显示音级结构
+                // 使用formatChordSymbol来确保显示模式设置生效
+                const { root: chordRoot, type: chordType } = parseChordSymbol(currentChord);
+                const formattedChord = formatChordSymbol(chordRoot, chordType);
+                targetIntervalEl.textContent = formattedChord;
+                targetIntervalEl.innerHTML = formattedChord; // 确保只显示和弦名称
                 displaySequence();
 
                 // 准备下一个和弦
@@ -13933,13 +14774,9 @@
                         // 重置自定义和弦模式状态（退出练习时立即重置）
                         state.isCustomChordMode = false;
                         console.log('自定义和弦练习完成退出 - 重置 state.isCustomChordMode = false');
-                        
-                        // 清空自定义和弦相关状态
-                        // useCustomChords 开关已移除
-                        
-                        // 清空全局自定义和弦序列
-                        window.customChordSequence = [];
-                        console.log('练习完成 - 清空自定义和弦序列');
+
+                        // 保留自定义和弦序列，不清空，以便下次使用
+                        console.log('练习完成 - 保留自定义和弦序列供下次使用');
                         
                         // 清空和弦进行状态
                         state.progressionChords = null;
@@ -14005,9 +14842,11 @@
                 }
 
                 state.currentIntervals = intervals;
-                // 只显示和弦名称，不显示音级结构
-                targetIntervalEl.textContent = currentChord;
-                targetIntervalEl.innerHTML = currentChord; // 确保只显示和弦名称，不显示音级结构
+                // 使用formatChordSymbol来确保显示模式设置生效
+                const { root: chordRoot, type: chordType } = parseChordSymbol(currentChord);
+                const formattedChord = formatChordSymbol(chordRoot, chordType);
+                targetIntervalEl.textContent = formattedChord;
+                targetIntervalEl.innerHTML = formattedChord; // 确保只显示和弦名称
                 displaySequence();
 
                 // 准备下一个和弦（保持相同的顺序）
@@ -14166,8 +15005,13 @@
 
             // 旋律结构1的音程映射函数
             function getMelodicStructure1Intervals(chordType) {
-                // 根据和弦类型映射到不同的结构
-                // 描述：大调和弦/属七和弦: 1,2,3,5；小三和弦: 1,3,4,5；挂留和弦: 1,2,4,5；减和弦: 1,2,3,5（属七和弦不含变化五音）
+                // Melodic Structure 1 - Root to 5th mapping based on chord type
+                // Rules:
+                // - Major/Dominant chords: 1, 2, 3, 5
+                // - Minor chords: 1, 3, 4, 5
+                // - Sus chords: 1, 2, 4, 5
+                // - Diminished chords: 1, 2, 3, 5
+                // (No altered 5ths on dominant chords)
 
                 if (!chordType) {
                     // 默认返回大调和弦结构
@@ -14179,29 +15023,849 @@
                     chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
                     chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
                     chordType === 'augmented' || chordType === 'augmented7') {
-                    // 大调和弦/属七和弦: 1,2,3,5 (注意：描述中说属七和弦不含变化五音，所以这里用纯五度)
+                    // Major/Dominant chords: 1,2,3,5 (No altered 5ths on dominant chords)
+                    // 大调和弦/属七和弦: 1,2,3,5 (属七和弦不含变化五音)
                     return ['1', '2', '3', '5'];
 
                 } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
                           chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 1,3,4,5
                     // 小三和弦: 1,3,4,5
                     return ['1', '3', '4', '5'];
 
                 } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
                           chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
                           chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 1,2,4,5
                     // 挂留和弦: 1,2,4,5
                     return ['1', '2', '4', '5'];
 
                 } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
                           chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 1,2,3,5
                     // 减和弦: 1,2,3,5
                     return ['1', '2', '3', '5'];
 
                 } else {
+                    // Default to major chord structure for other chord types
                     // 其他和弦类型默认使用大调和弦结构
                     return ['1', '2', '3', '5'];
                 }
+            }
+
+            // 旋律结构2的音程映射函数
+            function getMelodicStructure2Intervals(chordType) {
+                // Melodic Structure 2 - Root to 5th with different patterns based on chord type
+                // Rules:
+                // - Major/Dominant chords: 2, 1, 5, 3
+                // - Minor chords: 3, 1, 5, 4
+                // - Sus chords: 2, 1, 4, 5
+                // - Diminished chords: 2, 1, 5, 3
+                // (No altered 5ths on dominant chords)
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['2', '1', '5', '3'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9' ||
+                    chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                    chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                    chordType === 'augmented' || chordType === 'augmented7') {
+                    // Major/Dominant chords: 2,1,5,3 (No altered 5ths on dominant chords)
+                    // 大调和弦/属七和弦: 2,1,5,3 (属七和弦不含变化五音)
+                    return ['2', '1', '5', '3'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 3,1,5,4
+                    // 小三和弦: 3,1,5,4
+                    return ['3', '1', '5', '4'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 2,1,4,5
+                    // 挂留和弦: 2,1,4,5
+                    return ['2', '1', '4', '5'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 2,1,5,3
+                    // 减和弦: 2,1,5,3
+                    return ['2', '1', '5', '3'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['2', '1', '5', '3'];
+                }
+            }
+
+            // 旋律结构3的音程映射函数
+            function getMelodicStructure3Intervals(chordType) {
+                // Melodic Structure 3 - Root to 5th with different patterns based on chord type
+                // Rules:
+                // - Major/Dominant chords: 3, 5, 2, 1
+                // - Minor chords: 4, 5, 3, 1
+                // - Sus chords: 4, 5, 2, 1
+                // - Diminished chords: 3, 5, 2, 1
+                // (No altered 5ths on dominant chords)
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['3', '5', '2', '1'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9' ||
+                    chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                    chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                    chordType === 'augmented' || chordType === 'augmented7') {
+                    // Major/Dominant chords: 3,5,2,1 (No altered 5ths on dominant chords)
+                    // 大调和弦/属七和弦: 3,5,2,1 (属七和弦不含变化五音)
+                    return ['3', '5', '2', '1'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 4,5,3,1
+                    // 小三和弦: 4,5,3,1
+                    return ['4', '5', '3', '1'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 4,5,2,1
+                    // 挂留和弦: 4,5,2,1
+                    return ['4', '5', '2', '1'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 3,5,2,1
+                    // 减和弦: 3,5,2,1
+                    return ['3', '5', '2', '1'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['3', '5', '2', '1'];
+                }
+            }
+
+            // 旋律结构4的音程映射函数
+            function getMelodicStructure4Intervals(chordType) {
+                // Melodic Structure 4 - Root to 5th starting from 5th with different patterns based on chord type
+                // Rules:
+                // - Major/Dominant chords: 5, 1, 2, 3
+                // - Minor chords: 5, 1, 3, 4
+                // - Sus chords: 5, 1, 2, 4
+                // - Diminished chords: 5, 1, 2, 3
+                // (No altered 6ths on dominant chords)
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['5', '1', '2', '3'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9' ||
+                    chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                    chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                    chordType === 'augmented' || chordType === 'augmented7') {
+                    // Major/Dominant chords: 5,1,2,3 (No altered 6ths on dominant chords)
+                    // 大调和弦/属七和弦: 5,1,2,3 (属七和弦不含变化六音)
+                    return ['5', '1', '2', '3'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 5,1,3,4
+                    // 小三和弦: 5,1,3,4
+                    return ['5', '1', '3', '4'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 5,1,2,4
+                    // 挂留和弦: 5,1,2,4
+                    return ['5', '1', '2', '4'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 5,1,2,3
+                    // 减和弦: 5,1,2,3
+                    return ['5', '1', '2', '3'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['5', '1', '2', '3'];
+                }
+            }
+
+            // 旋律结构5的随机转位映射函数
+            function getMelodicStructure5Intervals(chordType) {
+                // Melodic Structure 5 - Random inversions of Melodic Structure 1 base patterns
+                // Uses the same base structures as Melodic Structure 1 but creates random inversions:
+                // - Major/Dominant chords base: 1,2,3,5 → random inversions
+                // - Minor chords base: 1,3,4,5 → random inversions
+                // - Sus chords base: 1,2,4,5 → random inversions
+                // - Diminished chords base: 1,2,3,5 → random inversions
+                // (No altered 5ths on dominant chords)
+
+                // Get the base structure from Melodic Structure 1
+                const baseIntervals = getMelodicStructure1Intervals(chordType);
+
+                // Generate all possible inversions of the base intervals
+                const inversions = [];
+                for (let i = 0; i < baseIntervals.length; i++) {
+                    const inversion = [];
+                    for (let j = 0; j < baseIntervals.length; j++) {
+                        inversion.push(baseIntervals[(i + j) % baseIntervals.length]);
+                    }
+                    inversions.push(inversion);
+                }
+
+                // Return a random inversion
+                const randomIndex = Math.floor(Math.random() * inversions.length);
+                return inversions[randomIndex];
+            }
+
+            // 旋律结构6的音程映射函数
+            function getMelodicStructure6Intervals(chordType) {
+                // Melodic Structure 6 - 5th to 9th with different patterns based on chord type
+                // Rules:
+                // - Major/Dominant chords: 5, 6, 7, 2
+                // - Minor chords: 5, 7, 1, 2
+                // - Diminished chords: 5, 6, 7, 1
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['5', '6', '7', '2'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9' ||
+                    chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                    chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                    chordType === 'augmented' || chordType === 'augmented7') {
+                    // Major/Dominant chords: 5,6,7,2
+                    // 大调和弦/属七和弦: 5,6,7,2
+                    return ['5', '6', '7', '2'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 5,7,1,2
+                    // 小三和弦: 5,7,1,2
+                    return ['5', '7', '1', '2'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: Use major pattern (not specified in requirements, but following major pattern)
+                    // 挂留和弦: 使用大调模式（要求中未指定，但遵循大调模式）
+                    return ['5', '6', '7', '2'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 5,6,7,1
+                    // 减和弦: 5,6,7,1
+                    return ['5', '6', '7', '1'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['5', '6', '7', '2'];
+                }
+            }
+
+            // 旋律结构7的音程映射函数
+            function getMelodicStructure7Intervals(chordType) {
+                // Melodic Structure 7 - 5th to 9th with different patterns based on chord type
+                // Rules:
+                // - Major/Dominant chords: 6, 5, 2, 7
+                // - Minor chords: 7, 5, 2, 1
+                // - Diminished chords: 6, 5, 1, 7
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['6', '5', '2', '7'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9' ||
+                    chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                    chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                    chordType === 'augmented' || chordType === 'augmented7') {
+                    // Major/Dominant chords: 6,5,2,7
+                    // 大调和弦/属七和弦: 6,5,2,7
+                    return ['6', '5', '2', '7'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 7,5,2,1
+                    // 小三和弦: 7,5,2,1
+                    return ['7', '5', '2', '1'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: Use major pattern (not specified in requirements, but following major pattern)
+                    // 挂留和弦: 使用大调模式（要求中未指定，但遵循大调模式）
+                    return ['6', '5', '2', '7'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 6,5,1,7
+                    // 减和弦: 6,5,1,7
+                    return ['6', '5', '1', '7'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['6', '5', '2', '7'];
+                }
+            }
+
+            // 旋律结构8的音程映射函数
+            function getMelodicStructure8Intervals(chordType) {
+                // Melodic Structure 8 - 5th to 9th with different patterns based on chord type
+                // Rules:
+                // - Major/Dominant chords: 7, 2, 6, 5
+                // - Minor chords: 1, 2, 7, 5
+                // - Diminished chords: 6, 1, 7, 5
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['7', '2', '6', '5'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9' ||
+                    chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                    chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                    chordType === 'augmented' || chordType === 'augmented7') {
+                    // Major/Dominant chords: 7,2,6,5
+                    // 大调和弦/属七和弦: 7,2,6,5
+                    return ['7', '2', '6', '5'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 1,2,7,5
+                    // 小三和弦: 1,2,7,5
+                    return ['1', '2', '7', '5'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: Use major pattern (not specified in requirements, but following major pattern)
+                    // 挂留和弦: 使用大调模式（要求中未指定，但遵循大调模式）
+                    return ['7', '2', '6', '5'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 6,1,7,5
+                    // 减和弦: 6,1,7,5
+                    return ['6', '1', '7', '5'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['7', '2', '6', '5'];
+                }
+            }
+
+            // 旋律结构9的音程映射函数
+            function getMelodicStructure9Intervals(chordType) {
+                // Melodic Structure 9 - 5th to 9th with different patterns based on chord type
+                // Rules:
+                // - Major/Dominant chords: 2, 7, 6, 5
+                // - Minor chords: 2, 1, 7, 5
+                // - Diminished chords: 2, 7, 1, 6
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['2', '7', '6', '5'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9' ||
+                    chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                    chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                    chordType === 'augmented' || chordType === 'augmented7') {
+                    // Major/Dominant chords: 2,7,6,5
+                    // 大调和弦/属七和弦: 2,7,6,5
+                    return ['2', '7', '6', '5'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 2,1,7,5
+                    // 小三和弦: 2,1,7,5
+                    return ['2', '1', '7', '5'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: Use major pattern (not specified in requirements, but following major pattern)
+                    // 挂留和弦: 使用大调模式（要求中未指定，但遵循大调模式）
+                    return ['2', '7', '6', '5'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 2,7,1,6
+                    // 减和弦: 2,7,1,6
+                    return ['2', '7', '1', '6'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['2', '7', '6', '5'];
+                }
+            }
+
+            // 旋律结构10的随机转位映射函数
+            function getMelodicStructure10Intervals(chordType) {
+                // Melodic Structure 10 - Random inversions of 5th to 9th base patterns
+                // Uses the same base structures as Melodic Structure 6 but creates random inversions:
+                // - Major/Dominant chords base: 5,6,7,2 → random inversions
+                // - Minor chords base: 5,7,1,2 → random inversions
+                // - Diminished chords base: 5,6,7,1 → random inversions
+
+                // Get the base structure from Melodic Structure 6
+                const baseIntervals = getMelodicStructure6Intervals(chordType);
+
+                // Generate all possible inversions of the base intervals
+                const inversions = [];
+                for (let i = 0; i < baseIntervals.length; i++) {
+                    const inversion = [];
+                    for (let j = 0; j < baseIntervals.length; j++) {
+                        inversion.push(baseIntervals[(i + j) % baseIntervals.length]);
+                    }
+                    inversions.push(inversion);
+                }
+
+                // Return a random inversion
+                const randomIndex = Math.floor(Math.random() * inversions.length);
+                return inversions[randomIndex];
+            }
+
+            // Voice Led Structure 1的音程映射函数
+            function getVoiceLedStructure1Intervals(chordType) {
+                // Voice Led Structure 1 - Basic voice leading patterns
+                // Rules:
+                // - Minor chords: 3, 2, 1, 7
+                // - Dominant chords: 3, 2, 1, 7
+                // - Major chords: 3, 2, 1, 7
+                // - Sus chords: 4, 2, 1, 7
+                // - Diminished chords: 3, 2, 1, 6
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['3', '2', '1', '7'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9') {
+                    // Major chords: 3,2,1,7
+                    // 大三和弦: 3,2,1,7
+                    return ['3', '2', '1', '7'];
+
+                } else if (chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                          chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                          chordType === 'augmented' || chordType === 'augmented7') {
+                    // Dominant chords: 3,2,1,7
+                    // 属七和弦: 3,2,1,7
+                    return ['3', '2', '1', '7'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 3,2,1,7
+                    // 小三和弦: 3,2,1,7
+                    return ['3', '2', '1', '7'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 4,2,1,7
+                    // 挂留和弦: 4,2,1,7
+                    return ['4', '2', '1', '7'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 3,2,1,6
+                    // 减和弦: 3,2,1,6
+                    return ['3', '2', '1', '6'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['3', '2', '1', '7'];
+                }
+            }
+
+            // Voice Led Structure 2的音程映射函数
+            function getVoiceLedStructure2Intervals(chordType) {
+                // Voice Led Structure 2 - Varied voice leading patterns
+                // Rules:
+                // - Minor chords: 3, 2, 1, 7
+                // - Dominant chords: 3, 5, 7, 2
+                // - Major chords: 5, 1, 2, 3
+                // - Sus chords: 4, 5, 7, 2
+                // - Diminished chords: 3, 2, 1, 6
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['5', '1', '2', '3'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9') {
+                    // Major chords: 5,1,2,3
+                    // 大三和弦: 5,1,2,3
+                    return ['5', '1', '2', '3'];
+
+                } else if (chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                          chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                          chordType === 'augmented' || chordType === 'augmented7') {
+                    // Dominant chords: 3,5,7,2
+                    // 属七和弦: 3,5,7,2
+                    return ['3', '5', '7', '2'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 3,2,1,7
+                    // 小三和弦: 3,2,1,7
+                    return ['3', '2', '1', '7'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 4,5,7,2
+                    // 挂留和弦: 4,5,7,2
+                    return ['4', '5', '7', '2'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 3,2,1,6
+                    // 减和弦: 3,2,1,6
+                    return ['3', '2', '1', '6'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['5', '1', '2', '3'];
+                }
+            }
+
+            // Voice Led Structure 3的音程映射函数
+            function getVoiceLedStructure3Intervals(chordType) {
+                // Voice Led Structure 3 - Harmonic voice leading patterns
+                // Rules:
+                // - Minor chords: 1, 3, 5, 7
+                // - Dominant chords: 3, 2, 1, 7
+                // - Major chords: 3, 2, 1, 7
+                // - Sus chords: 4, 2, 1, 7
+                // - Diminished chords: 3, 2, 1, 6
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['3', '2', '1', '7'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9') {
+                    // Major chords: 3,2,1,7
+                    // 大三和弦: 3,2,1,7
+                    return ['3', '2', '1', '7'];
+
+                } else if (chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                          chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                          chordType === 'augmented' || chordType === 'augmented7') {
+                    // Dominant chords: 3,2,1,7
+                    // 属七和弦: 3,2,1,7
+                    return ['3', '2', '1', '7'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 1,3,5,7
+                    // 小三和弦: 1,3,5,7
+                    return ['1', '3', '5', '7'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 4,2,1,7
+                    // 挂留和弦: 4,2,1,7
+                    return ['4', '2', '1', '7'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 3,2,1,6
+                    // 减和弦: 3,2,1,6
+                    return ['3', '2', '1', '6'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['3', '2', '1', '7'];
+                }
+            }
+
+            // Voice Led Structure 4的音程映射函数
+            function getVoiceLedStructure4Intervals(chordType) {
+                // Voice Led Structure 4 - Mixed voice leading patterns
+                // Rules:
+                // - Minor chords: 1, 3, 5, 7
+                // - Dominant chords: 3, 5, 7, 2
+                // - Major chords: 3, 2, 1, 7
+                // - Sus chords: 4, 5, 7, 2
+                // - Diminished chords: 3, 2, 1, 6
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['3', '2', '1', '7'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9') {
+                    // Major chords: 3,2,1,7
+                    // 大三和弦: 3,2,1,7
+                    return ['3', '2', '1', '7'];
+
+                } else if (chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                          chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                          chordType === 'augmented' || chordType === 'augmented7') {
+                    // Dominant chords: 3,5,7,2
+                    // 属七和弦: 3,5,7,2
+                    return ['3', '5', '7', '2'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 1,3,5,7
+                    // 小三和弦: 1,3,5,7
+                    return ['1', '3', '5', '7'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 4,5,7,2
+                    // 挂留和弦: 4,5,7,2
+                    return ['4', '5', '7', '2'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 3,2,1,6
+                    // 减和弦: 3,2,1,6
+                    return ['3', '2', '1', '6'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['3', '2', '1', '7'];
+                }
+            }
+
+            // Voice Led Structure 5的音程映射函数
+            function getVoiceLedStructure5Intervals(chordType) {
+                // Voice Led Structure 5 - Advanced voice leading patterns
+                // Rules:
+                // - Minor chords: 5, 3, 1, 7
+                // - Dominant chords: 3, 5, 7, 2
+                // - Major chords: 3, 2, 1, 7
+                // - Sus chords: 4, 5, 7, 2
+                // - Diminished chords: 3, 2, 1, 6
+
+                if (!chordType) {
+                    // 默认返回大调和弦结构
+                    return ['3', '2', '1', '7'];
+                }
+
+                // 判断和弦类型类别
+                if (chordType === 'major' || chordType === 'major7' || chordType === 'major9') {
+                    // Major chords: 3,2,1,7
+                    // 大三和弦: 3,2,1,7
+                    return ['3', '2', '1', '7'];
+
+                } else if (chordType === 'dominant7' || chordType === 'dominant9' || chordType === 'dominant13' ||
+                          chordType === 'dominant7b5' || chordType === 'dominant7#5' || chordType === 'dominant9b5' ||
+                          chordType === 'augmented' || chordType === 'augmented7') {
+                    // Dominant chords: 3,5,7,2
+                    // 属七和弦: 3,5,7,2
+                    return ['3', '5', '7', '2'];
+
+                } else if (chordType === 'minor' || chordType === 'minor7' || chordType === 'minor9' ||
+                          chordType === 'minor11' || chordType === 'minor6' || chordType === 'minMaj7') {
+                    // Minor chords: 5,3,1,7
+                    // 小三和弦: 5,3,1,7
+                    return ['5', '3', '1', '7'];
+
+                } else if (chordType === 'sus4' || chordType === 'sus2' || chordType === 'sus4b9' ||
+                          chordType === 'sus4b9b13' || chordType === '7sus4' || chordType === '7sus2' ||
+                          chordType === 'sus4add3' || chordType === 'sus2add3') {
+                    // Sus chords: 4,5,7,2
+                    // 挂留和弦: 4,5,7,2
+                    return ['4', '5', '7', '2'];
+
+                } else if (chordType === 'dim' || chordType === 'dim7' || chordType === 'minor7b5' ||
+                          chordType === 'diminished' || chordType === 'diminished7' || chordType === 'halfDiminished') {
+                    // Diminished chords: 3,2,1,6
+                    // 减和弦: 3,2,1,6
+                    return ['3', '2', '1', '6'];
+
+                } else {
+                    // Default to major chord structure for other chord types
+                    // 其他和弦类型默认使用大调和弦结构
+                    return ['3', '2', '1', '7'];
+                }
+            }
+
+            // Suspended 2 Resolution的音程映射函数
+            function getSuspended2ResolutionIntervals(chordType) {
+                // Suspended 2 Resolution - Sus2 resolving to 3 then 1
+                // Pattern: 1,2,5 → 1,3,5 → 1,3,1 (or maintain 3)
+
+                // Return the three-step resolution pattern
+                return ['1', '2', '5', '1', '3', '5', '1', '3', '1'];
+            }
+
+            // Suspended 4 Resolution的音程映射函数
+            function getSuspended4ResolutionIntervals(chordType) {
+                // Suspended 4 Resolution - Sus4 resolving to 3 then 1
+                // Pattern: 1,4,5 → 1,3,5 → 1,3,1 (or maintain 3)
+
+                // Return the three-step resolution pattern
+                return ['1', '4', '5', '1', '3', '5', '1', '3', '1'];
+            }
+
+            // Chord Scale Root to Root的音程映射函数
+            function getChordScaleRootToRootIntervals(chordType) {
+                // Chord Scale Root to Root - Complete scale from root through octave
+                // Returns all scale degrees: 1, 2, 3, 4, 5, 6, 7, 1
+                return ['1', '2', '3', '4', '5', '6', '7', '1'];
+            }
+
+            // Chord Scale 3rd to 3rd的音程映射函数
+            function getChordScale3rdTo3rdIntervals(chordType) {
+                // Chord Scale 3rd to 3rd - Complete scale from 3rd through octave
+                // Returns scale degrees starting from 3rd: 3, 4, 5, 6, 7, 1, 2, 3
+                return ['3', '4', '5', '6', '7', '1', '2', '3'];
+            }
+
+            // Chord Scale 5th to 5th的音程映射函数
+            function getChordScale5thTo5thIntervals(chordType) {
+                // Chord Scale 5th to 5th - Complete scale from 5th through octave
+                // Returns scale degrees starting from 5th: 5, 6, 7, 1, 2, 3, 4, 5
+                return ['5', '6', '7', '1', '2', '3', '4', '5'];
+            }
+
+            // Chord Scale 7th to 7th的音程映射函数
+            function getChordScale7thTo7thIntervals(chordType) {
+                // Chord Scale 7th to 7th - Complete scale from 7th through octave
+                // Returns scale degrees starting from 7th: 7, 1, 2, 3, 4, 5, 6, 7
+                return ['7', '1', '2', '3', '4', '5', '6', '7'];
+            }
+
+            // Chord Scale Random Chord Tone的音程映射函数
+            function getChordScaleRandomChordToneIntervals(chordType) {
+                // Chord Scale Random Chord Tone - Complete scale from random chord tone
+                // Randomly select from chord tones: 1, 3, 5, 7
+                const chordTones = ['1', '3', '5', '7'];
+                const randomIndex = Math.floor(Math.random() * chordTones.length);
+                const startTone = chordTones[randomIndex];
+
+                // Generate complete scale starting from the selected chord tone
+                const scaleDegrees = ['1', '2', '3', '4', '5', '6', '7', '1'];
+                const result = [];
+
+                // Find starting position and create 8-note sequence
+                const startPos = scaleDegrees.indexOf(startTone);
+                for (let i = 0; i < 8; i++) {
+                    result.push(scaleDegrees[(startPos + i) % 7]);
+                }
+
+                return result;
+            }
+
+            // Chord Scale Random Scale Tone的音程映射函数
+            function getChordScaleRandomScaleToneIntervals(chordType) {
+                // Chord Scale Random Scale Tone - Complete scale from random scale tone
+                // Randomly select from any scale degree: 1, 2, 3, 4, 5, 6, 7
+                const scaleDegrees = ['1', '2', '3', '4', '5', '6', '7'];
+                const randomIndex = Math.floor(Math.random() * scaleDegrees.length);
+                const startTone = scaleDegrees[randomIndex];
+
+                // Generate complete scale starting from the selected scale tone
+                const fullScale = ['1', '2', '3', '4', '5', '6', '7', '1'];
+                const result = [];
+
+                // Find starting position and create 8-note sequence
+                const startPos = scaleDegrees.indexOf(startTone);
+                for (let i = 0; i < 8; i++) {
+                    result.push(fullScale[(startPos + i) % 7]);
+                }
+
+                return result;
+            }
+
+            // Passing Note Scale Root to Root的音程映射函数
+            function getPassingNoteScaleRootToRootIntervals(chordType) {
+                // Passing Note Scale Root to Root - Scale with passing notes ensuring chord tones on downbeats
+                // Pattern: 1 (passing) 2 3 (passing) 4 5 (passing) 6 7 (passing) 1
+                // Chord tones (1, 3, 5, 7) fall on strong beats, passing tones on weak beats
+                return ['1', '2', '3', '4', '5', '6', '7', '1'];
+            }
+
+            // Passing Note Scale 3rd to 3rd的音程映射函数
+            function getPassingNoteScale3rdTo3rdIntervals(chordType) {
+                // Passing Note Scale 3rd to 3rd - Scale with passing notes starting from 3rd
+                // Pattern: 3 (passing) 4 5 (passing) 6 7 (passing) 1 2 (passing) 3
+                // Chord tones (3, 5, 7, 2 in next octave) fall on strong beats
+                return ['3', '4', '5', '6', '7', '1', '2', '3'];
+            }
+
+            // Passing Note Scale 5th to 5th的音程映射函数
+            function getPassingNoteScale5thTo5thIntervals(chordType) {
+                // Passing Note Scale 5th to 5th - Scale with passing notes starting from 5th
+                // Pattern: 5 (passing) 6 7 (passing) 1 2 (passing) 3 4 (passing) 5
+                // Chord tones (5, 7, 2, 4 in next octave) fall on strong beats
+                return ['5', '6', '7', '1', '2', '3', '4', '5'];
+            }
+
+            // Passing Note Scale 6th/7th to 6th/7th的音程映射函数
+            function getPassingNoteScale6th7thTo6th7thIntervals(chordType) {
+                // Passing Note Scale 6th/7th to 6th/7th - Scale with passing notes from 6th or 7th
+                // For major chords, start from 6th; for 7th chords, start from 7th
+                // Pattern for 6th: 6 (passing) 7 1 (passing) 2 3 (passing) 4 5 (passing) 6
+                // Pattern for 7th: 7 (passing) 1 2 (passing) 3 4 (passing) 5 6 (passing) 7
+
+                if (chordType && (chordType.includes('7') || chordType.includes('9') || chordType.includes('13'))) {
+                    // For chords with 7th, start from 7th
+                    return ['7', '1', '2', '3', '4', '5', '6', '7'];
+                } else {
+                    // For other chords, start from 6th
+                    return ['6', '7', '1', '2', '3', '4', '5', '6'];
+                }
+            }
+
+            // Passing Note Scale Random Chord Tone的音程映射函数
+            function getPassingNoteScaleRandomChordToneIntervals(chordType) {
+                // Passing Note Scale Random Chord Tone - Scale with passing notes from random chord tone
+                // Randomly select from chord tones: 1, 3, 5, 7
+                const chordTones = ['1', '3', '5', '7'];
+                const randomIndex = Math.floor(Math.random() * chordTones.length);
+                const startTone = chordTones[randomIndex];
+
+                // Generate complete scale starting from the selected chord tone
+                const scaleDegrees = ['1', '2', '3', '4', '5', '6', '7', '1'];
+                const result = [];
+
+                // Find starting position and create 8-note sequence
+                const startPos = scaleDegrees.indexOf(startTone);
+                for (let i = 0; i < 8; i++) {
+                    result.push(scaleDegrees[(startPos + i) % 7]);
+                }
+
+                return result;
             }
 
             function getIntervalsForLevel(level, chordType = null) {
@@ -14292,21 +15956,40 @@
                         intervals = getMelodicStructure1Intervals(chordType);
                         break;
                     case 'melodic-r-5':
-                        intervals = ['1', '5'];
+                        // 旋律结构2: 根据和弦类型映射到不同结构
+                        intervals = getMelodicStructure2Intervals(chordType);
                         break;
                     case 'melodic-3-5':
-                        intervals = ['3', '5'];
+                        // 旋律结构3: 根据和弦类型映射到不同结构
+                        intervals = getMelodicStructure3Intervals(chordType);
                         break;
                     case 'melodic-r-3-5':
-                        intervals = ['1', '3', '5'];
+                        // 旋律结构4: 根据和弦类型映射到不同结构
+                        intervals = getMelodicStructure4Intervals(chordType);
                         break;
                     case 'melodic-random-inversions':
-                        const melodicInversions = [
-                            ['1', '3', '5'],
-                            ['3', '5', '1'],
-                            ['5', '1', '3']
-                        ];
-                        intervals = melodicInversions[Math.floor(Math.random() * melodicInversions.length)];
+                        // 旋律结构5: 基于旋律结构1的随机转位
+                        intervals = getMelodicStructure5Intervals(chordType);
+                        break;
+                    case 'melodic-structure-6':
+                        // 旋律结构6: 根据和弦类型映射到不同结构
+                        intervals = getMelodicStructure6Intervals(chordType);
+                        break;
+                    case 'melodic-structure-7':
+                        // 旋律结构7: 根据和弦类型映射到不同结构
+                        intervals = getMelodicStructure7Intervals(chordType);
+                        break;
+                    case 'melodic-structure-8':
+                        // 旋律结构8: 根据和弦类型映射到不同结构
+                        intervals = getMelodicStructure8Intervals(chordType);
+                        break;
+                    case 'melodic-structure-9':
+                        // 旋律结构9: 根据和弦类型映射到不同结构
+                        intervals = getMelodicStructure9Intervals(chordType);
+                        break;
+                    case 'melodic-structure-10':
+                        // 旋律结构10: 基于旋律结构6的随机转位
+                        intervals = getMelodicStructure10Intervals(chordType);
                         break;
 
                     // 全部和弦音
@@ -14314,6 +15997,86 @@
                         // 这个选项会在调用处特殊处理，返回和弦的所有音符
                         // 这里返回空数组，表示需要使用和弦的完整音程
                         intervals = [];
+                        break;
+
+                    // Voice Led Structure
+                    case 'voice-led-structure-1':
+                        // Voice Led结构1: 根据和弦类型映射到不同结构
+                        intervals = getVoiceLedStructure1Intervals(chordType);
+                        break;
+                    case 'voice-led-structure-2':
+                        // Voice Led结构2: 根据和弦类型映射到不同结构
+                        intervals = getVoiceLedStructure2Intervals(chordType);
+                        break;
+                    case 'voice-led-structure-3':
+                        // Voice Led结构3: 根据和弦类型映射到不同结构
+                        intervals = getVoiceLedStructure3Intervals(chordType);
+                        break;
+                    case 'voice-led-structure-4':
+                        // Voice Led结构4: 根据和弦类型映射到不同结构
+                        intervals = getVoiceLedStructure4Intervals(chordType);
+                        break;
+                    case 'voice-led-structure-5':
+                        // Voice Led结构5: 根据和弦类型映射到不同结构
+                        intervals = getVoiceLedStructure5Intervals(chordType);
+                        break;
+
+                    // Suspension Resolution
+                    case 'sus2-resolve-to-3-then-1':
+                        // Suspended 2 Resolution: Sus2解决到3然后到1
+                        intervals = getSuspended2ResolutionIntervals(chordType);
+                        break;
+                    case 'sus4-resolve-to-3-then-1':
+                        // Suspended 4 Resolution: Sus4解决到3然后到1
+                        intervals = getSuspended4ResolutionIntervals(chordType);
+                        break;
+
+                    // Chord Scale Structure
+                    case 'chord-scale-root-to-root':
+                        // Chord Scale Root to Root: 和弦音阶-根音到根音
+                        intervals = getChordScaleRootToRootIntervals(chordType);
+                        break;
+                    case 'chord-scale-3rd-to-3rd':
+                        // Chord Scale 3rd to 3rd: 和弦音阶-三音到三音
+                        intervals = getChordScale3rdTo3rdIntervals(chordType);
+                        break;
+                    case 'chord-scale-5th-to-5th':
+                        // Chord Scale 5th to 5th: 和弦音阶-五音到五音
+                        intervals = getChordScale5thTo5thIntervals(chordType);
+                        break;
+                    case 'chord-scale-7th-to-7th':
+                        // Chord Scale 7th to 7th: 和弦音阶-七音到七音
+                        intervals = getChordScale7thTo7thIntervals(chordType);
+                        break;
+                    case 'chord-scale-random-chord-tone':
+                        // Chord Scale Random Chord Tone: 和弦音阶-随机和弦音开始
+                        intervals = getChordScaleRandomChordToneIntervals(chordType);
+                        break;
+                    case 'chord-scale-random-scale-tone':
+                        // Chord Scale Random Scale Tone: 和弦音阶-随机音阶音开始
+                        intervals = getChordScaleRandomScaleToneIntervals(chordType);
+                        break;
+
+                    // Passing Note Scale Structure
+                    case 'passing-note-scale-root-to-root':
+                        // Passing Note Scale Root to Root: 经过音音阶-根音到根音
+                        intervals = getPassingNoteScaleRootToRootIntervals(chordType);
+                        break;
+                    case 'passing-note-scale-3rd-to-3rd':
+                        // Passing Note Scale 3rd to 3rd: 经过音音阶-三音到三音
+                        intervals = getPassingNoteScale3rdTo3rdIntervals(chordType);
+                        break;
+                    case 'passing-note-scale-5th-to-5th':
+                        // Passing Note Scale 5th to 5th: 经过音音阶-五音到五音
+                        intervals = getPassingNoteScale5thTo5thIntervals(chordType);
+                        break;
+                    case 'passing-note-scale-6th-7th-to-6th-7th':
+                        // Passing Note Scale 6th/7th to 6th/7th: 经过音音阶-六音/七音到六音/七音
+                        intervals = getPassingNoteScale6th7thTo6th7thIntervals(chordType);
+                        break;
+                    case 'passing-note-scale-random-chord-tone':
+                        // Passing Note Scale Random Chord Tone: 经过音音阶-随机和弦音开始
+                        intervals = getPassingNoteScaleRandomChordToneIntervals(chordType);
                         break;
 
                     default:
@@ -15118,6 +16881,91 @@
                 return chordSymbol;
             }
 
+            // 生成所有调的和弦进行（用于12个调的练习）
+            function generateAllKeysProgression(songName, songData, selectedKey) {
+                const circleOfFifths = ['C', 'F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'B', 'E', 'A', 'D', 'G'];
+                const degreeChords = [...songData.chords];
+                let allChords = [];
+
+                // 根据不同的练习类型生成不同的和弦序列
+                if (songName.includes('Major II-V-I (All 12 Keys)')) {
+                    // 大调II-V-I 12个调
+                    circleOfFifths.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, 'C', key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                } else if (songName.includes('Minor II-V-I(All 12 Keys)')) {
+                    // 小调II-V-I 12个调
+                    circleOfFifths.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, 'C', key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                } else if (songName.includes('Major II-V-I w/Tritone Subs (12 Keys)')) {
+                    // 大调II-V-I三全音替代 12个调
+                    circleOfFifths.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, 'C', key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                } else if (songName.includes('Minor II-V-I w/Tritone Subs (12 Keys)')) {
+                    // 小调II-V-I三全音替代 12个调
+                    circleOfFifths.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, 'C', key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                } else if (songName.includes('Major Key I-IV-V-I (All 12 Keys)')) {
+                    // 大调I-IV-V-I 12个调
+                    circleOfFifths.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, 'C', key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                } else if (songName.includes('Major Key I-VI-IV-V (All 12 Keys)')) {
+                    // 大调I-VI-IV-V 12个调
+                    circleOfFifths.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, 'C', key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                } else if (songName.includes('Major I-VI-II-V (All 12 Keys)')) {
+                    // 大调I-VI-II-V 12个调
+                    circleOfFifths.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, 'C', key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                } else if (songName.includes('Minor I-VI-II-V (All 12 Keys)')) {
+                    // 小调I-VI-II-V 12个调
+                    circleOfFifths.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, 'C', key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                } else {
+                    // 默认：使用五度圈倒序（与原有练习保持一致）
+                    const circleOfFifthsReverse = ['A', 'D', 'G', 'C', 'F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'B', 'E'];
+                    circleOfFifthsReverse.forEach(key => {
+                        const transposedChords = degreeChords.map(degreeChord =>
+                            transposeChordFromDegree(degreeChord, songData.key, key)
+                        );
+                        allChords.push(...transposedChords);
+                    });
+                }
+
+                return allChords;
+            }
+
             // 调式多选下拉框管理器
             const ScaleTypeManager = {
                 // 选中的调式
@@ -15692,21 +17540,31 @@
             // 获取旋律结构的详细说明
             function getMelodicStructureDescription(descKey) {
                 const descriptions = {
-                    'root_to_third': '根音到三音的旋律进行。这是最基本的旋律结构，帮助建立和弦的基本性质。适合初学者练习音高识别和听觉记忆。',
+                    'root_to_third': '旋律结构1 - 根音到五音的旋律结构。根据和弦类型使用不同的音阶音：\n• 大调和弦/属七和弦：使用1,2,3,5音\n• 小三和弦：使用1,3,4,5音\n• 挂留和弦：使用1,2,4,5音\n• 减和弦：使用1,2,3,5音\n（注意：属七和弦中不使用变化的五音）\n这个练习帮助理解不同和弦类型的音阶结构，培养针对不同和弦性质的旋律构建能力。',
 
-                    'root_to_fifth': '根音到五音的旋律进行。五音是和弦的稳定音，这个进行有助于理解和弦框架和和声基础。',
+                    'root_to_fifth': '旋律结构2 - 根音到五音的变化旋律结构。根据和弦类型使用不同的音序模式：\n• 大调和弦/属七和弦：使用2,1,5,3音序\n• 小三和弦：使用3,1,5,4音序\n• 挂留和弦：使用2,1,4,5音序\n• 减和弦：使用2,1,5,3音序\n（注意：属七和弦中不使用变化的五音）\n这个练习帮助掌握不同音序模式的旋律构建，培养更丰富的和声进行和旋律变化能力。',
 
-                    'third_to_fifth': '三音到五音的旋律进行。专注于和弦内音的连接，培养对和弦色彩变化的敏感度。',
+                    'third_to_fifth': '旋律结构3 - 变化的根音到五音旋律结构。根据和弦类型使用不同的音序模式：\n• 大调和弦/属七和弦：使用3,5,2,1音序\n• 小三和弦：使用4,5,3,1音序\n• 挂留和弦：使用4,5,2,1音序\n• 减和弦：使用3,5,2,1音序\n（注意：属七和弦中不使用变化的五音）\n这个练习帮助掌握更复杂的音序模式，特别是从高音区向低音区的旋律进行，培养旋律的流畅性和音区控制能力。',
 
-                    'root_third_fifth_line': '根音-三音-五音的线性进行。完整的和弦内音旋律线，帮助理解和弦的完整结构和声部进行。',
+                    'root_third_fifth_line': '旋律结构4 - 五音开始的根音到五音旋律结构。根据和弦类型使用不同的音序模式：\n• 大调和弦/属七和弦：使用5,1,2,3音序\n• 小三和弦：使用5,1,3,4音序\n• 挂留和弦：使用5,1,2,4音序\n• 减和弦：使用5,1,2,3音序\n（注意：属七和弦中不使用变化的六音）\n这个练习帮助掌握从五音开始的各种旋律进行模式，培养灵活的音区跳跃能力和多样化的旋律构建技巧。',
 
-                    'random_inversions': '随机转位练习。随机排列和弦内音，培养灵活的音高识别能力和适应不同旋律进行的能力。',
+                    'random_inversions': '旋律结构5 - 随机转位练习。基于以下结构的随机转位：\n• 大调和弦/属七和弦：对1,2,3,5进行随机转位\n• 小三和弦：对1,3,4,5进行随机转位\n• 挂留和弦：对1,2,4,5进行随机转位\n• 减和弦：对1,2,3,5进行随机转位\n（注意：属七和弦中不使用变化的五音）\n这个练习通过随机转位培养灵活的音高识别能力，帮助适应各种旋律进行模式，提高即兴演奏和音乐反应能力。',
 
                     'fifth_to_seventh': '五音到七音的旋律进行。七音是和弦的特征音，这个练习有助于掌握七和弦的色彩和张力。',
 
                     'seventh_to_ninth': '七音到九音的旋律进行。九音是延伸音，这个练习帮助理解现代和声中的复杂音程关系。',
 
                     'fifth_to_ninth': '五音到九音的跳进。大跳音程练习，培养对大跳音程的精确掌握和音准控制。',
+
+                    'melodic_structure_6': '旋律结构6 - 五音到九音的旋律结构。根据和弦类型使用不同的音序模式：\n• 大调和弦/属七和弦：使用5,6,7,2音序\n• 小三和弦：使用5,7,1,2音序\n• 减和弦：使用5,6,7,1音序\n这个练习帮助掌握延伸音的旋律进行，特别是从五音开始的复杂音程关系，培养对现代和声中九音的运用能力。',
+
+                    'melodic_structure_7': '旋律结构7 - 五音到九音的变化旋律结构。根据和弦类型使用不同的音序模式：\n• 大调和弦/属七和弦：使用6,5,2,7音序\n• 小三和弦：使用7,5,2,1音序\n• 减和弦：使用6,5,1,7音序\n这个练习帮助掌握更复杂的延伸音旋律进行，培养对音程跳跃和旋律轮廓的控制能力，提高现代和声应用水平。',
+
+                    'melodic_structure_8': '旋律结构8 - 五音到九音的复杂旋律结构。根据和弦类型使用不同的音序模式：\n• 大调和弦/属七和弦：使用7,2,6,5音序\n• 小三和弦：使用1,2,7,5音序\n• 减和弦：使用6,1,7,5音序\n这个练习通过复杂的音程跳跃培养高级旋律构建能力，特别是对大跳音程的精确控制和音乐表现力。',
+
+                    'melodic_structure_9': '旋律结构9 - 五音到九音的倒置旋律结构。根据和弦类型使用不同的音序模式：\n• 大调和弦/属七和弦：使用2,7,6,5音序\n• 小三和弦：使用2,1,7,5音序\n• 减和弦：使用2,7,1,6音序\n这个练习帮助掌握从高音区向低音区的旋律构建，培养对音区转换和旋律方向控制的敏感性。',
+
+                    'melodic_structure_10': '旋律结构10 - 随机转位练习。基于以下结构的随机转位：\n• 大调和弦/属七和弦：对5,6,7,2进行随机转位\n• 小三和弦：对5,7,1,2进行随机转位\n• 减和弦：对5,6,7,1进行随机转位\n这个练习通过随机转位培养灵活的音高识别能力，帮助适应各种延伸音旋律进行模式，提高即兴演奏水平。',
 
                     'fifth_seventh_ninth_line': '五音-七音-九音的线性进行。高级延伸音旋律线，适合练习复杂的和声听觉和旋律构建。',
 
@@ -15718,6 +17576,16 @@
 
                     'parallel_motion_voice_leading': '平行进行。声部同方向移动，保持相同的音程关系，创造统一感。',
 
+                    'voice_led_structure_1': 'Voice Led结构1 - 基础声部引导模式。不同和弦类型的声部进行模式：\n• 小三/属七/大三和弦：使用3,2,1,7声部进行\n• 挂留和弦：使用4,2,1,7声部进行\n• 减和弦：使用3,2,1,6声部进行\n这个练习帮助掌握基础声部连接技巧，特别适合循环进行（如II-V-I）的和声进行。',
+
+                    'voice_led_structure_2': 'Voice Led结构2 - 变化声部引导模式。不同和弦类型的声部进行模式：\n• 小三和弦：使用3,2,1,7声部进行\n• 属七和弦：使用3,5,7,2声部进行\n• 大三和弦：使用5,1,2,3声部进行\n• 挂留和弦：使用4,5,7,2声部进行\n• 减和弦：使用3,2,1,6声部进行\n这个练习培养更复杂的声部引导技巧，增强和声进行的流畅性。',
+
+                    'voice_led_structure_3': 'Voice Led结构3 - 和音声部引导模式。不同和弦类型的声部进行模式：\n• 小三和弦：使用1,3,5,7和音结构\n• 属七/大三和弦：使用3,2,1,7声部进行\n• 挂留和弦：使用4,2,1,7声部进行\n• 减和弦：使用3,2,1,6声部进行\n这个练习通过和音结构培养对和声进行中声音关系的理解。',
+
+                    'voice_led_structure_4': 'Voice Led结构4 - 混合声部引导模式。不同和弦类型的声部进行模式：\n• 小三和弦：使用1,3,5,7和音结构\n• 属七和弦：使用3,5,7,2声部进行\n• 大三和弦：使用3,2,1,7声部进行\n• 挂留和弦：使用4,5,7,2声部进行\n• 减和弦：使用3,2,1,6声部进行\n这个练习结合多种声部进行技巧，培养灵活的和声处理能力。',
+
+                    'voice_led_structure_5': 'Voice Led结构5 - 高级声部引导模式。不同和弦类型的声部进行模式：\n• 小三和弦：使用5,3,1,7声部进行\n• 属七和弦：使用3,5,7,2声部进行\n• 大三和弦：使用3,2,1,7声部进行\n• 挂留和弦：使用4,5,7,2声部进行\n• 减和弦：使用3,2,1,6声部进行\n这个练习提供最高级声部引导训练，适合复杂的和声进行和编曲应用。',
+
                     'sus4_to_sus2': 'Sus4到Sus2的解决。从四度挂留到二度挂留，体验不同挂留音的解决感。',
 
                     'sus4_to_third': 'Sus4到三音的解决。经典的挂留解决，创造期待和满足的音乐张力。',
@@ -15726,6 +17594,10 @@
 
                     'suspension_resolution_chain': '挂留解决链。连续的挂留和解决，培养对和声流动的理解。',
 
+                    'suspended_2_resolution': 'Sus2二度挂留解决模式。挂留二度音先解决到三音，然后再解决到根音的完整解决过程：\n• 第一步：Sus2（1,2,5）中的二度音保持张力\n• 第二步：二度音解决到三音（1,3,5）创造部分解决\n• 第三步：最终解决到根音（1,3,1）或保持三音\n这个练习帮助理解分步解决的概念，培养对张力和解决的精确控制能力。',
+
+                    'suspended_4_resolution': 'Sus4四度挂留解决模式。挂留四度音先解决到三音，然后再解决到根音的完整解决过程：\n• 第一步：Sus4（1,4,5）中的四度音保持张力\n• 第二步：四度音解决到三音（1,3,5）创造部分解决\n• 第三步：最终解决到根音（1,3,1）或保持三音\n这是最经典的挂留解决模式，帮助掌握传统和声中的张力建立和释放技巧。',
+
                     'triadic_chord_scales': '三和弦音阶。基于三和弦结构的音阶进行，建立扎实的和声基础。',
 
                     'seventh_chord_scales': '七和弦音阶。包含七音的音阶结构，适合爵士和现代音乐。',
@@ -15733,6 +17605,28 @@
                     'extended_chord_scales': '扩展和弦音阶。包含九音、十一音等延伸音的复杂音阶。',
 
                     'modal_chord_scales': '调式和弦音阶。基于各种调式的音阶进行，拓展调性思维。',
+
+                    'chord_scale_root_to_root': '和弦音阶-根音到根音。从根音开始，完整演奏相关和弦音阶的所有音符，经过一个八度回到根音：\n• 模式：1, 2, 3, 4, 5, 6, 7, 1（根据和弦类型调整）\n• 用途：建立和弦音阶的基本框架，培养对音阶结构的整体理解\n• 适合：初学者掌握和弦音阶的基础练习',
+
+                    'chord_scale_3rd_to_3rd': '和弦音阶-三音到三音。从三音开始，完整演奏相关和弦音阶的所有音符，经过一个八度回到三音：\n• 模式：3, 4, 5, 6, 7, 1, 2, 3（根据和弦类型调整）\n• 用途：从和弦内音出发理解音阶结构，培养旋律构建能力\n• 适合：中级学习者掌握和弦音阶的不同起始点',
+
+                    'chord_scale_5th_to_5th': '和弦音阶-五音到五音。从五音开始，完整演奏相关和弦音阶的所有音符，经过一个八度回到五音：\n• 模式：5, 6, 7, 1, 2, 3, 4, 5（根据和弦类型调整）\n• 用途：从稳定音开始探索音阶，培养对音程关系的理解\n• 适合：理解和弦五音在音阶中的核心作用',
+
+                    'chord_scale_7th_to_7th': '和弦音阶-七音到七音。从七音开始，完整演奏相关和弦音阶的所有音符，经过一个八度回到七音：\n• 模式：7, 1, 2, 3, 4, 5, 6, 7（根据和弦类型调整）\n• 用途：从延伸音开始理解音阶，培养对现代和声的掌握\n• 适合：高级学习者掌握延伸音的应用',
+
+                    'chord_scale_random_chord_tone': '和弦音阶-随机和弦音开始。从随机的和弦内音开始，完整演奏相关和弦音阶：\n• 模式：随机选择1, 3, 5, 7中的一个作为起始点\n• 用途：培养灵活的音阶起始能力，适应各种旋律构建需求\n• 适合：提高即兴演奏和旋律创造的灵活性',
+
+                    'chord_scale_random_scale_tone': '和弦音阶-随机音阶音开始。从随机的音阶音符开始，完整演奏相关和弦音阶：\n• 模式：随机选择音阶中的任意音符作为起始点\n• 用途：最大程度地培养音阶掌握能力，消除对特定起始点的依赖\n• 适合：高级练习，全面提升音阶应用能力和即兴技巧',
+
+                    'passing_note_scale_root_to_root': '经过音音阶-根音到根音。从根音开始，演奏完整的相关和弦音阶，包含适当的经过音：\n• 模式：和弦音与经过音交替，确保和弦音落在强拍上\n• 特点：如在强拍开始，后续所有和弦音也将落在强拍上\n• 用途：培养对节拍和和声关系的理解，适合旋律构建练习\n• 适合：学习如何在旋律中正确放置和弦音和经过音',
+
+                    'passing_note_scale_3rd_to_3rd': '经过音音阶-三音到三音。从三音开始，演奏完整的相关和弦音阶，包含适当的经过音：\n• 模式：从和弦内音出发，和弦音与经过音合理分布\n• 特点：保持节拍对齐，确保和弦音的强调位置\n• 用途：从和弦内音构建旋律，培养和声感知能力\n• 适合：中级学习者掌握旋律中的和声框架',
+
+                    'passing_note_scale_5th_to_5th': '经过音音阶-五音到五音。从五音开始，演奏完整的相关和弦音阶，包含适当的经过音：\n• 模式：从稳定音出发，创建平衡的旋律线条\n• 特点：五音作为起点，提供稳定的和声基础\n• 用途：理解稳定音在旋律构建中的作用\n• 适合：培养对和声稳定性和旋律走向的理解',
+
+                    'passing_note_scale_6th_7th_to_6th_7th': '经过音音阶-六音/七音到六音/七音。从六音或七音开始，根据和声适当性选择：\n• 模式：从延伸音开始，创建更复杂的和声色彩\n• 特点：根据和弦性质选择6音或7音作为起始点\n• 用途：掌握延伸音的应用，培养现代和声感觉\n• 适合：高级学习者掌握爵士和现代音乐的旋律技巧',
+
+                    'passing_note_scale_random_chord_tone': '经过音音阶-随机和弦音开始。从随机和弦内音开始，演奏完整的相关和弦音阶：\n• 模式：随机选择1, 3, 5, 7中的一个作为起始点\n• 特点：每次练习提供不同的起始角度，增强适应性\n• 用途：培养灵活的旋律构建能力，适应各种和声情境\n• 适合：提高即兴演奏的灵活性和创造性',
 
                     'diatonic_passing_tones': '自然经过音。使用调内音作为经过音，创造流畅的旋律连接。',
 
@@ -15819,6 +17713,12 @@
                 fullscreenSelector.classList.remove('active');
                 currentSelectorType = null;
                 currentCallback = null;
+
+                // 隐藏排序控件
+                const sortControls = document.getElementById('sortControls');
+                if (sortControls) {
+                    sortControls.style.display = 'none';
+                }
             }
             
             // 返回按钮事件
@@ -15867,34 +17767,41 @@
                         { value: 'melodic-random-inversions', text: '旋律结构5-随机转位', desc: 'random_inversions' }
                     ],
                     'melodic_structure_5th_to_9th': [
-                        { value: 'melodic-5-7', text: '5→7', desc: 'fifth_to_seventh' },
-                        { value: 'melodic-7-9', text: '7→9', desc: 'seventh_to_ninth' },
-                        { value: 'melodic-5-9', text: '5→9', desc: 'fifth_to_ninth' },
-                        { value: 'melodic-5-7-9', text: '5→7→9', desc: 'fifth_seventh_ninth_line' }
+                        { value: 'melodic-structure-6', text: '旋律结构6', desc: 'melodic_structure_6' },
+                        { value: 'melodic-structure-7', text: '旋律结构7', desc: 'melodic_structure_7' },
+                        { value: 'melodic-structure-8', text: '旋律结构8', desc: 'melodic_structure_8' },
+                        { value: 'melodic-structure-9', text: '旋律结构9', desc: 'melodic_structure_9' },
+                        { value: 'melodic-structure-10', text: '旋律结构10-随机转位', desc: 'melodic_structure_10' }
                     ],
                     'voice_led_structure': [
-                        { value: 'voice-led-stepwise', text: '级进连接', desc: 'stepwise_voice_leading' },
-                        { value: 'voice-led-common', text: '共同音保持', desc: 'common_tone_voice_leading' },
-                        { value: 'voice-led-contrary', text: '反向进行', desc: 'contrary_motion_voice_leading' },
-                        { value: 'voice-led-parallel', text: '平行进行', desc: 'parallel_motion_voice_leading' }
+                        { value: 'voice-led-structure-1', text: 'Voice Led结构1', desc: 'voice_led_structure_1' },
+                        { value: 'voice-led-structure-2', text: 'Voice Led结构2', desc: 'voice_led_structure_2' },
+                        { value: 'voice-led-structure-3', text: 'Voice Led结构3', desc: 'voice_led_structure_3' },
+                        { value: 'voice-led-structure-4', text: 'Voice Led结构4', desc: 'voice_led_structure_4' },
+                        { value: 'voice-led-structure-5', text: 'Voice Led结构5', desc: 'voice_led_structure_5' }
                     ],
                     'suspension_structure': [
-                        { value: 'sus4-sus2', text: 'Sus4→Sus2', desc: 'sus4_to_sus2' },
-                        { value: 'sus4-resolve', text: 'Sus4→3', desc: 'sus4_to_third' },
-                        { value: 'sus2-resolve', text: 'Sus2→3', desc: 'sus2_to_third' },
-                        { value: 'sus-resolve-chain', text: '挂留解决链', desc: 'suspension_resolution_chain' }
+                        { value: 'sus2-resolve-to-3-then-1', text: 'Sus2解决到3然后到1', desc: 'suspended_2_resolution' },
+                        { value: 'sus4-resolve-to-3-then-1', text: 'Sus4解决到3然后到1', desc: 'suspended_4_resolution' }
                     ],
                     'chord_scale_structure': [
-                        { value: 'chord-scale-triadic', text: '三和弦音阶', desc: 'triadic_chord_scales' },
-                        { value: 'chord-scale-seventh', text: '七和弦音阶', desc: 'seventh_chord_scales' },
-                        { value: 'chord-scale-extended', text: '扩展和弦音阶', desc: 'extended_chord_scales' },
-                        { value: 'chord-scale-modal', text: '调式和弦音阶', desc: 'modal_chord_scales' }
+                        { value: 'chord-scale-root-to-root', text: '和弦音阶-根音到根音', desc: 'chord_scale_root_to_root' },
+                        { value: 'chord-scale-3rd-to-3rd', text: '和弦音阶-三音到三音', desc: 'chord_scale_3rd_to_3rd' },
+                        { value: 'chord-scale-5th-to-5th', text: '和弦音阶-五音到五音', desc: 'chord_scale_5th_to_5th' },
+                        { value: 'chord-scale-7th-to-7th', text: '和弦音阶-七音到七音', desc: 'chord_scale_7th_to_7th' },
+                        { value: 'chord-scale-random-chord-tone', text: '和弦音阶-随机和弦音开始', desc: 'chord_scale_random_chord_tone' },
+                        { value: 'chord-scale-random-scale-tone', text: '和弦音阶-随机音阶音开始', desc: 'chord_scale_random_scale_tone' }
                     ],
                     'passing_tone_structure': [
                         { value: 'passing-diatonic', text: '自然经过音', desc: 'diatonic_passing_tones' },
                         { value: 'passing-chromatic', text: '半音经过音', desc: 'chromatic_passing_tones' },
                         { value: 'passing-enclosure', text: '包围音', desc: 'enclosure_passing_tones' },
-                        { value: 'passing-appoggiatura', text: '装饰音', desc: 'appoggiatura_passing_tones' }
+                        { value: 'passing-appoggiatura', text: '装饰音', desc: 'appoggiatura_passing_tones' },
+                        { value: 'passing-note-scale-root-to-root', text: '经过音音阶-根音到根音', desc: 'passing_note_scale_root_to_root' },
+                        { value: 'passing-note-scale-3rd-to-3rd', text: '经过音音阶-三音到三音', desc: 'passing_note_scale_3rd_to_3rd' },
+                        { value: 'passing-note-scale-5th-to-5th', text: '经过音音阶-五音到五音', desc: 'passing_note_scale_5th_to_5th' },
+                        { value: 'passing-note-scale-6th-7th-to-6th-7th', text: '经过音音阶-六音/七音到六音/七音', desc: 'passing_note_scale_6th_7th_to_6th_7th' },
+                        { value: 'passing-note-scale-random-chord-tone', text: '经过音音阶-随机和弦音开始', desc: 'passing_note_scale_random_chord_tone' }
                     ]
                 };
 
@@ -16063,11 +17970,17 @@
             function generateJazzStandardContent() {
                 const jazzStandardSelect = document.getElementById('jazzStandard');
                 const currentValue = jazzStandardSelect.value;
-                
+
+                // 显示排序控件
+                const sortControls = document.getElementById('sortControls');
+                if (sortControls) {
+                    sortControls.style.display = 'flex';
+                }
+
                 // 按字母分组的歌曲
                 const groups = {};
                 const options = jazzStandardSelect.querySelectorAll('option');
-                
+
                 let currentGroup = '';
                 options.forEach(option => {
                     const parent = option.parentElement;
@@ -16082,35 +17995,199 @@
                         });
                     }
                 });
-                
+
+                // 获取所有歌曲数据用于排序
+                let allSongs = [];
+                for (const [groupName, songs] of Object.entries(groups)) {
+                    songs.forEach(song => {
+                        // 获取歌曲的Style信息
+                        let styleBadge = groupName;
+                        const jazzStandardsData = window.jazzStandards || jazzStandards;
+
+                        // 查找歌曲数据以获取style信息
+                        for (const letter in jazzStandardsData) {
+                            if (jazzStandardsData[letter][song.value] &&
+                                jazzStandardsData[letter][song.value].info &&
+                                jazzStandardsData[letter][song.value].info.style) {
+                                styleBadge = jazzStandardsData[letter][song.value].info.style;
+                                break;
+                            }
+                        }
+
+                        allSongs.push({
+                            value: song.value,
+                            text: song.text,
+                            group: groupName,
+                            style: styleBadge
+                        });
+                    });
+                }
+
+                // 排序函数
+                function sortSongs(songs, sortBy) {
+                    const sortedSongs = [...songs];
+                    switch (sortBy) {
+                        case 'title-asc':
+                            return sortedSongs.sort((a, b) => {
+                                // 定义分组优先级：数字 < 字母 < 练习 < 中文
+                                const getGroupPriority = (text) => {
+                                    if (/[\u4e00-\u9fff]/.test(text)) return 4; // 中文最后
+                                    if (text.includes('练习')) return 3; // 练习在中间
+                                    if (/^[0-9]/.test(text)) return 1; // 数字最前
+                                    return 2; // 字母在中间
+                                };
+
+                                const aPriority = getGroupPriority(a.text);
+                                const bPriority = getGroupPriority(b.text);
+
+                                if (aPriority !== bPriority) {
+                                    return aPriority - bPriority;
+                                }
+
+                                // 在同一分组内按字母顺序排序
+                                return a.text.localeCompare(b.text, 'zh-CN');
+                            });
+                        case 'title-desc':
+                            return sortedSongs.sort((a, b) => {
+                                // 定义分组优先级：数字 < 字母 < 练习 < 中文
+                                const getGroupPriority = (text) => {
+                                    if (/[\u4e00-\u9fff]/.test(text)) return 4; // 中文最后
+                                    if (text.includes('练习')) return 3; // 练习在中间
+                                    if (/^[0-9]/.test(text)) return 1; // 数字最前
+                                    return 2; // 字母在中间
+                                };
+
+                                const aPriority = getGroupPriority(a.text);
+                                const bPriority = getGroupPriority(b.text);
+
+                                if (aPriority !== bPriority) {
+                                    return aPriority - bPriority;
+                                }
+
+                                // 在同一分组内按字母倒序排序
+                                return b.text.localeCompare(a.text, 'zh-CN');
+                            });
+                        case 'style-asc':
+                            return sortedSongs.sort((a, b) => {
+                                // 按风格分组排序
+                                const styleComparison = (a.style || '其他').localeCompare(b.style || '其他', 'zh-CN');
+                                if (styleComparison !== 0) return styleComparison;
+
+                                // 同一风格内按标题排序（数字、字母、练习、中文顺序）
+                                const getGroupPriority = (text) => {
+                                    if (/[\u4e00-\u9fff]/.test(text)) return 4; // 中文最后
+                                    if (text.includes('练习')) return 3; // 练习在中间
+                                    if (/^[0-9]/.test(text)) return 1; // 数字最前
+                                    return 2; // 字母在中间
+                                };
+
+                                const aPriority = getGroupPriority(a.text);
+                                const bPriority = getGroupPriority(b.text);
+
+                                if (aPriority !== bPriority) {
+                                    return aPriority - bPriority;
+                                }
+
+                                return a.text.localeCompare(b.text, 'zh-CN');
+                            });
+                        case 'style-desc':
+                            return sortedSongs.sort((a, b) => {
+                                // 按风格分组倒序排序
+                                const styleComparison = (b.style || '其他').localeCompare(a.style || '其他', 'zh-CN');
+                                if (styleComparison !== 0) return styleComparison;
+
+                                // 同一风格内按标题排序（数字、字母、练习、中文顺序）
+                                const getGroupPriority = (text) => {
+                                    if (/[\u4e00-\u9fff]/.test(text)) return 4; // 中文最后
+                                    if (text.includes('练习')) return 3; // 练习在中间
+                                    if (/^[0-9]/.test(text)) return 1; // 数字最前
+                                    return 2; // 字母在中间
+                                };
+
+                                const aPriority = getGroupPriority(a.text);
+                                const bPriority = getGroupPriority(b.text);
+
+                                if (aPriority !== bPriority) {
+                                    return aPriority - bPriority;
+                                }
+
+                                return a.text.localeCompare(b.text, 'zh-CN');
+                            });
+                        default:
+                            return sortedSongs;
+                    }
+                }
+
+                // 获取当前排序方式
+                const sortBySelect = document.getElementById('sortBySelect');
+                let currentSort = 'title-asc';
+                if (sortBySelect) {
+                    currentSort = sortBySelect.value;
+                }
+
+                // 应用排序
+                const sortedSongs = sortSongs(allSongs, currentSort);
+
                 // 添加搜索框
                 let html = `
                     <div class="selector-search-box">
-                        <input type="text" 
-                               id="songSearchInput" 
-                               class="selector-search-input" 
-                               placeholder="搜索歌曲名..." data-i18n-key="search_song_placeholder" 
+                        <input type="text"
+                               id="songSearchInput"
+                               class="selector-search-input"
+                               placeholder="搜索歌曲名..." data-i18n-key="search_song_placeholder"
                                autocomplete="off">
                         <span class="selector-search-icon">🔍</span>
                     </div>
                     <div class="selector-list" id="songListContainer">
                 `;
-                
-                for (const [groupName, songs] of Object.entries(groups)) {
-                    html += `<div class="selector-group-title" data-group="${groupName}">● ${groupName}</div>`;
-                    songs.forEach(song => {
-                        const isActive = song.value === currentValue ? 'active' : '';
+
+                // 按排序后的顺序显示歌曲，并添加分组
+                let displayGroup = null;
+                sortedSongs.forEach(song => {
+                    const isActive = song.value === currentValue ? 'active' : '';
+
+                    // 确定当前歌曲的分组
+                    let songGroup = null;
+                    if (currentSort.startsWith('title-')) {
+                        // 按标题排序时，使用首字母分组
+                        if (song.text.includes('练习')) {
+                            songGroup = '练习';
+                        } else if (/[\u4e00-\u9fff]/.test(song.text)) {
+                            songGroup = '中文';
+                        } else if (/^[0-9]/.test(song.text)) {
+                            // 如果以数字开头，使用数字分组
+                            const numberMatch = song.text.match(/^(\d+)/);
+                            songGroup = numberMatch ? numberMatch[1] : '0-9';
+                        } else {
+                            // 英文字母分组
+                            const firstChar = song.text.charAt(0).toUpperCase();
+                            songGroup = firstChar;
+                        }
+                    } else if (currentSort.startsWith('style-')) {
+                        // 按风格排序时，使用风格分组
+                        songGroup = song.style || '其他';
+                    }
+
+                    // 如果分组发生变化，添加分组标题
+                    if (songGroup !== displayGroup) {
+                        displayGroup = songGroup;
                         html += `
-                            <div class="selector-list-item ${isActive}" data-value="${song.value}" data-song-name="${song.text}" data-group="${groupName}">
-                                <div class="selector-list-item-name">${song.text}</div>
-                                <div class="selector-list-item-info">
-                                    <div class="selector-list-item-badge">${groupName}</div>
-                                    <span class="selector-info-icon" data-song-info="${song.value}">ℹ️</span>
-                                </div>
+                            <div class="selector-group-header">
+                                <div class="selector-group-title">${displayGroup}</div>
                             </div>
                         `;
-                    });
-                }
+                    }
+
+                    html += `
+                        <div class="selector-list-item ${isActive}" data-value="${song.value}" data-song-name="${song.text}" data-group="${song.group}">
+                            <div class="selector-list-item-name">${song.text}</div>
+                            <div class="selector-list-item-info">
+                                <div class="selector-list-item-badge">${song.style}</div>
+                                <span class="selector-info-icon" data-song-info="${song.value}">ℹ️</span>
+                            </div>
+                        </div>
+                    `;
+                });
                 
                 html += '</div>';
                 fullscreenSelectorContent.innerHTML = html;
@@ -16156,48 +18233,54 @@
                     icon.addEventListener('click', function(e) {
                         e.stopPropagation();
                         const songName = this.dataset.songInfo;
-                        
+
                         // 调用显示歌曲信息的函数
                         if (typeof window.showSongInfo === 'function') {
                             window.showSongInfo(songName);
                         }
                     });
                 });
-                
+
+                // 绑定排序选择器事件
+                if (sortBySelect) {
+                    sortBySelect.addEventListener('change', function(e) {
+                        e.stopPropagation();
+                        // 重新生成内容以应用新的排序
+                        generateJazzStandardContent();
+
+                        // 恢复搜索框内容（如果有的话）
+                        const searchInput = document.getElementById('songSearchInput');
+                        if (searchInput && searchInput.value) {
+                            // 触发搜索事件
+                            setTimeout(() => {
+                                searchInput.dispatchEvent(new Event('input'));
+                            }, 100);
+                        }
+                    });
+                }
+
                 // 搜索功能
                 const searchInput = document.getElementById('songSearchInput');
                 if (searchInput) {
                     searchInput.focus(); // 自动聚焦搜索框
-                    
+
                     searchInput.addEventListener('input', function(e) {
                         const searchTerm = e.target.value.toLowerCase().trim();
                         const allItems = fullscreenSelectorContent.querySelectorAll('.selector-list-item');
-                        const allGroupTitles = fullscreenSelectorContent.querySelectorAll('.selector-group-title');
-                        
+
                         if (!searchTerm) {
                             // 清空搜索时显示所有项目
                             allItems.forEach(item => item.style.display = '');
-                            allGroupTitles.forEach(title => title.style.display = '');
                         } else {
-                            // 搜索匹配
-                            const visibleGroups = new Set();
-                            
+                            // 搜索匹配歌曲名称和风格
                             allItems.forEach(item => {
                                 const songName = item.dataset.songName.toLowerCase();
-                                if (songName.includes(searchTerm)) {
+                                const styleBadge = item.querySelector('.selector-list-item-badge').textContent.toLowerCase();
+
+                                if (songName.includes(searchTerm) || styleBadge.includes(searchTerm)) {
                                     item.style.display = '';
-                                    visibleGroups.add(item.dataset.group);
                                 } else {
                                     item.style.display = 'none';
-                                }
-                            });
-                            
-                            // 只显示有歌曲的分组标题
-                            allGroupTitles.forEach(title => {
-                                if (visibleGroups.has(title.dataset.group)) {
-                                    title.style.display = '';
-                                } else {
-                                    title.style.display = 'none';
                                 }
                             });
                         }
@@ -16856,6 +18939,46 @@
             document.addEventListener('DOMContentLoaded', function() {
                 // 初始化自定义和弦弹窗
                 initCustomChordsDialog();
+
+                // 添加额外的保护机制，确保自定义和弦按钮始终可用
+                setTimeout(() => {
+                    window.ensureCustomChordButton();
+                }, 1000);
+
+                // 添加事件委托，确保动态创建的元素也能响应点击
+                document.addEventListener('click', function(e) {
+                    // 处理自定义和弦弹窗的关闭按钮
+                    if (e.target.closest('#closeCustomChordsDialog')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const dialog = document.getElementById('customChordsDialog');
+                        if (dialog) {
+                            dialog.classList.remove('active');
+                            dialog.style.display = 'none';
+                        }
+                        return;
+                    }
+
+                    // 处理自定义和弦弹窗的打开按钮
+                    if (e.target.closest('#openCustomChordsDialog')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const dialog = document.getElementById('customChordsDialog');
+                        if (dialog) {
+                            // 显示弹窗
+                            dialog.classList.add('active');
+                            dialog.style.display = 'flex';
+
+                            // 更新和弦序列显示
+                            if (typeof updateChordSequenceDisplay === 'function') {
+                                updateChordSequenceDisplay();
+                            }
+                        }
+                        return;
+                    }
+                });
                 // 练习等级下拉框
                 const progressionLevelDropdown = document.getElementById('progressionLevelDropdown');
                 if (progressionLevelDropdown) {

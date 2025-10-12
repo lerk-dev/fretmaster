@@ -3761,3 +3761,173 @@ input:checked+.slider:before {
     }
 }
 
+/* 歌曲选择器分组样式 */
+.selector-group-header {
+    background: rgba(59, 130, 246, 0.1);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+    margin: 8px 0 4px 0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    backdrop-filter: blur(3px);
+}
+
+.selector-group-title {
+    color: #60a5fa;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+}
+
+/* 浅色主题下的分组样式 */
+[data-theme="light"] .selector-group-header {
+    background: rgba(59, 130, 246, 0.05);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+[data-theme="light"] .selector-group-title {
+    color: #2563eb;
+}
+
+/* ===================================
+   CSS优化 - 合并重复样式和提升性能
+   =================================== */
+
+/* 合并常用透明背景和边框样式 */
+.glass-effect {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    backdrop-filter: blur(10px);
+}
+
+.glass-effect-strong {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid var(--border-glass);
+    backdrop-filter: blur(10px);
+}
+
+.glass-effect-hover:hover {
+    background: var(--bg-glass-hover);
+    border-color: var(--border-glass-hover);
+}
+
+/* 合并过渡动画样式 */
+.smooth-transition {
+    transition: all var(--transition-normal);
+}
+
+.fast-transition {
+    transition: all var(--transition-fast);
+}
+
+/* 合并卡片样式 */
+.card-base {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+/* 合并文本样式 */
+.text-primary {
+    color: var(--text-primary);
+}
+
+.text-secondary {
+    color: var(--text-secondary);
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* 合并flex布局样式 */
+.flex-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flex-column {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 合并间距样式 */
+.gap-small { gap: 8px; }
+.gap-medium { gap: 12px; }
+.gap-large { gap: 16px; }
+
+.margin-small { margin: 8px 0; }
+.margin-medium { margin: 16px 0; }
+.margin-large { margin: 24px 0; }
+
+.padding-small { padding: 8px; }
+.padding-medium { padding: 16px; }
+.padding-large { padding: 24px; }
+
+/* 合并圆角样式 */
+.rounded-small { border-radius: var(--radius-sm); }
+.rounded-medium { border-radius: var(--radius-md); }
+.rounded-large { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+
+/* 合并状态样式 */
+.state-success {
+    border-color: var(--success-600) !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+}
+
+.state-error {
+    border-color: var(--error-600) !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+.state-warning {
+    border-color: var(--warning-600) !important;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1) !important;
+}
+
+/* 优化的动画效果 */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* 统一动画类 */
+.animate-fade { animation: fadeIn 0.3s ease-out; }
+.animate-slide { animation: slideIn 0.3s ease-out; }
+.animate-scale { animation: scaleIn 0.2s ease-out; }
+
+/* 优化的响应式工具类 */
+@media (max-width: 768px) {
+    .mobile-hidden { display: none !important; }
+    .mobile-full { width: 100% !important; }
+    .mobile-center { text-align: center !important; }
+}
+
+@media (max-width: 480px) {
+    .small-hidden { display: none !important; }
+    .small-full { width: 100% !important; }
+    .small-center { text-align: center !important; }
+}
+
