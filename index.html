@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#0f0f0f">
     <meta name="msapplication-navbutton-color" content="#0f0f0f">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title data-i18n-key="page_title">🎸 吉他练习工具 v0.41 20251025</title>
+    <title data-i18n-key="page_title">🎸 吉他练习工具 v3.7</title>
     
     
     <!-- 引入外部CSS文件 -->
@@ -529,7 +529,50 @@
                     // MIDI设备
                     'midi_support': 'MIDI设备支持',
                     'midi_support_hint': '连接MIDI键盘或控制器进行练习',
-                    'midi_enable': 'MIDI设备'
+                    'midi_enable': 'MIDI设备',
+
+                    // 音乐风格和速度术语
+                    'jazz_medium': '中等',
+                    'jazz_up_tempo': '快节奏',
+                    'jazz_ballad': '抒情曲',
+                    'jazz_swing': '摇摆乐',
+                    'jazz_latin': '拉丁爵士',
+                    'jazz_afro_cuban': '非洲-古巴风格',
+                    'jazz_bebop': 'Bebop',
+                    'jazz_modern': '现代爵士',
+                    'jazz_standard': '爵士标准曲',
+                    'tempo_medium': '中等',
+                    'tempo_up': '快节奏',
+                    'tempo_ballad': '抒情',
+                    'tempo_swing': '摇摆',
+                    'tempo_fast': '快速',
+
+                    // MIDI状态消息
+                    'midi_connected': '已连接',
+                    'midi_disconnected': '已断开',
+                    'midi_device_detected': '检测到 {count} 个MIDI设备',
+                    'midi_no_device': '未检测到MIDI设备',
+                    'midi_connect': '连接',
+                    'midi_connected_status': '已连接',
+                    'midi_device': 'MIDI设备',
+                    'midi_select_to_connect': '请选择连接',
+
+                    // 工具提示和状态消息
+                    'shape': '形状',
+                    'shape_current': '当前形状',
+                    'shape_completed': '已完成',
+                    'shape_switch': '点击切换到',
+                    'shape_not_selected': '未选中',
+                    'fullscreen_selector_title': '选择',
+                    'random_inversions': '随机转位',
+                    'default_tempo': '中等',
+                    'unknown_composer': '未知',
+                    'unknown_year': '未知',
+
+                    // 调性选择
+                    'key_c_default': 'C 默认',
+                    'select_song': '选择歌曲',
+                    'select_key': '选择调性'
                 },
                 'en': {
                     'app_title': '🎸 Fretboard Master',
@@ -1005,6 +1048,49 @@
                     'midi_device_detected': 'Detected {count} MIDI devices',
                     'midi_device_none': 'No MIDI devices detected',
 
+                    // Music style and tempo terms
+                    'jazz_medium': 'Medium',
+                    'jazz_up_tempo': 'Up-tempo',
+                    'jazz_ballad': 'Ballad',
+                    'jazz_swing': 'Swing',
+                    'jazz_latin': 'Latin',
+                    'jazz_afro_cuban': 'Afro-Cuban',
+                    'jazz_bebop': 'Bebop',
+                    'jazz_modern': 'Modern',
+                    'jazz_standard': 'Jazz Standard',
+                    'tempo_medium': 'Medium',
+                    'tempo_up': 'Up-tempo',
+                    'tempo_ballad': 'Ballad',
+                    'tempo_swing': 'Swing',
+                    'tempo_fast': 'Fast',
+
+                    // MIDI status messages
+                    'midi_connected': 'Connected',
+                    'midi_disconnected': 'Disconnected',
+                    'midi_device_detected': 'Detected {count} MIDI devices',
+                    'midi_no_device': 'No MIDI devices detected',
+                    'midi_connect': 'Connect',
+                    'midi_connected_status': 'Connected',
+                    'midi_device': 'MIDI device',
+                    'midi_select_to_connect': 'Please select to connect',
+
+                    // Tooltips and status messages
+                    'shape': 'shape',
+                    'shape_current': 'Current shape',
+                    'shape_completed': 'Completed',
+                    'shape_switch': 'Switch to',
+                    'shape_not_selected': 'Not selected',
+                    'fullscreen_selector_title': 'Select',
+                    'random_inversions': 'Random Inversions',
+                    'default_tempo': 'Medium',
+                    'unknown_composer': 'Unknown',
+                    'unknown_year': 'Unknown',
+
+                    // Key selection
+                    'key_c_default': 'C Default',
+                    'select_song': 'Select Song',
+                    'select_key': 'Select Key',
+
                     // 歌曲信息相关
                     'basic_info': 'Basic Information',
                     'song_composer': 'Composer:',
@@ -1296,16 +1382,16 @@
                     // 找到当前连接的设备名称
                     const currentDevice = window.midiState.devices.find(device => device.id === window.midiState.currentDevice);
                     if (currentDevice) {
-                        deviceStatus.textContent = `已连接: ${currentDevice.name}`;
+                        deviceStatus.textContent = `${window.t ? window.t('midi_connected') : 'Connected'}: ${currentDevice.name}`;
                     } else {
-                        deviceStatus.textContent = '已连接 1 个MIDI设备';
+                        deviceStatus.textContent = `${window.t ? window.t('midi_connected') : 'Connected'} 1 ${window.t ? window.t('midi_device') || 'MIDI device' : 'MIDI device'}`;
                     }
                     deviceStatus.className = 'midi-device-status connected';
                 } else if (connectedCount > 0) {
-                    deviceStatus.textContent = `检测到 ${connectedCount} 个MIDI设备，请选择连接`;
+                    deviceStatus.textContent = `${window.t ? window.t('midi_device_detected').replace('{count}', connectedCount) : 'Detected ' + connectedCount + ' MIDI devices'}, ${window.t ? window.t('midi_select_to_connect') : 'Please select to connect'}`;
                     deviceStatus.className = 'midi-device-status disconnected';
                 } else {
-                    deviceStatus.textContent = '未检测到MIDI设备';
+                    deviceStatus.textContent = window.t ? window.t('midi_no_device') : 'No MIDI devices detected';
                     deviceStatus.className = 'midi-device-status disconnected';
                 }
             }
@@ -1350,7 +1436,7 @@
                         // 选择按钮
                         const selectButton = document.createElement('button');
                         selectButton.className = 'midi-device-select-btn';
-                        selectButton.textContent = window.midiState.currentDevice === device.id ? '已连接' : '连接';
+                        selectButton.textContent = window.midiState.currentDevice === device.id ? (window.t ? window.t('midi_connected_status') : 'Connected') : (window.t ? window.t('midi_connect') : 'Connect');
                         selectButton.disabled = window.midiState.currentDevice === device.id;
 
                         // 连接状态指示器
@@ -2564,10 +2650,10 @@
                         <div class="song-info-section">
                             <h3 class="song-info-subtitle" data-i18n-key="basic_info">基本信息</h3>
                             <div class="song-info-content">
-                                <p><strong data-i18n-key="song_composer">作曲家:</strong> ${info.composer || '未知'}</p>
-                                <p><strong data-i18n-key="song_year">年代:</strong> ${info.year || '未知'}</p>
-                                <p><strong data-i18n-key="song_style">风格:</strong> ${info.style || '爵士标准曲'}</p>
-                                <p><strong data-i18n-key="song_tempo">速度:</strong> ${info.tempo || 'Medium'}</p>
+                                <p><strong data-i18n-key="song_composer">作曲家:</strong> ${info.composer || (window.t ? window.t('unknown_composer') : '未知')}</p>
+                                <p><strong data-i18n-key="song_year">年代:</strong> ${info.year || (window.t ? window.t('unknown_year') : '未知')}</p>
+                                <p><strong data-i18n-key="song_style">风格:</strong> ${info.style || (window.t ? window.t('jazz_standard') : '爵士标准曲')}</p>
+                                <p><strong data-i18n-key="song_tempo">速度:</strong> ${info.tempo || (window.t ? window.t('default_tempo') : 'Medium')}</p>
                                 <p><strong data-i18n-key="song_key">原调:</strong> ${songData.key}</p>
                             </div>
                         </div>
@@ -3097,6 +3183,9 @@
                         chordText += `/${bassNoteName}`;
                     }
                 }
+
+                // 确保使用正确的音乐符号（将b替换为♭）
+                chordText = chordText.replace(/b/g, '♭');
 
                 return chordText;
             }
@@ -5469,7 +5558,7 @@
                     <span>←</span>
                     <span data-i18n-key="btn_back">返回</span>
                 </button>
-                <h2 class="fullscreen-selector-title" id="fullscreenSelectorTitle">选择</h2>
+                <h2 class="fullscreen-selector-title" id="fullscreenSelectorTitle" data-i18n-key="fullscreen_selector_title">选择</h2>
             </div>
             <div class="fullscreen-selector-right">
                 <div class="sort-controls" id="sortControls" style="display: none;">
@@ -5979,7 +6068,10 @@
                         <div class="select-wrapper">
                             <!-- 隐藏的原生select -->
                             <select id="jazzStandard" class="hidden">
-                                
+
+                                <optgroup label="2" >
+                                    <option value="26-2" >26-2</option>
+                                </optgroup>
                                 <optgroup label="5" >
                                     <option value="500 Miles High" >500 Miles High</option>
                                 </optgroup>
@@ -7385,7 +7477,7 @@
             const standardTuning = ['E', 'B', 'G', 'D', 'A', 'E'];
 
             // 所有可能的音级
-            const intervals = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
+            const intervals = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', 'bb7', '7'];
 
             // 音级到半音距离的映射
             const intervalToSemitones = {
@@ -7405,6 +7497,7 @@
                 '6': 9,
                 '♯6': 10,
                 '♭7': 10,
+                'bb7': 9,  // 减七度 (diminished seventh)
                 '7': 11,
                 // 复合音程映射（9=2, 11=4, 13=6）
                 '♭9': 1,
@@ -7492,6 +7585,7 @@
                 'major': { name: '大三和弦', intervals: ['1', '3', '5'] },
                 'minor': { name: '小三和弦', intervals: ['1', '♭3', '5'] },
                 'diminished': { name: '减三和弦', intervals: ['1', '♭3', '♭5'] },
+                'dim': { name: '减三和弦', intervals: ['1', '♭3', '♭5'] },  // 直接映射，避免类型查找
                 'augmented': { name: '增三和弦', intervals: ['1', '3', '♯5'] },
                 
                 // 六和弦
@@ -7503,7 +7597,7 @@
                 'major7': { name: '大七和弦', intervals: ['1', '3', '5', '7'] },
                 'minor7': { name: '小七和弦', intervals: ['1', '♭3', '5', '♭7'] },
                 'minor7b5': { name: '半减七和弦', intervals: ['1', '♭3', '♭5', '♭7'] },
-                'diminished7': { name: '减七和弦', intervals: ['1', '♭3', '♭5', '6'] },
+                'diminished7': { name: '减七和弦', intervals: ['1', '♭3', '♭5', 'bb7'] },
                 
                 // 九和弦
                 'dominant9': { name: '属九和弦', intervals: ['1', '3', '5', '♭7', '9'] },
@@ -7546,10 +7640,24 @@
 
             // 经典爵士乐歌曲和弦进行（基于音级储存）
             const jazzStandards = {
+                '2': {
+                    '26-2': {
+                        key: 'F',
+                        chords: ['IM7', '♭III7', '♭VIM7', 'II7', 'VIM7', 'II7', 'IIm7', 'V7', 'IVM7', '♭VII7', '♭IIM7', 'VI7', 'IIm7', 'V7', 'IIm7', 'V7', 'IM7', '♭III7', '♭VIM7', 'II7', 'VIM7', 'II7', 'IIm7', 'V7', 'IVM7', '♭VII7', '♭VIM7', 'II7', 'VIM7', 'II7', 'IM7'],
+                        info: {
+                            composer: 'John Coltrane',
+                            year: '1959',
+                            style: 'Jazz Bebop',
+                            tempo: 'Up-tempo Bebop',
+                            description: 'John Coltrane的经典作品，展现了复杂的Coltrane Changes和声进行，是学习现代爵士和声的重要曲目。'
+                        }
+                    }
+                },
                 '5': {
                     '500 Miles High': {
                         key: 'E',
-                        chords: ['Im7', 'Im7', '♭IIIm7', '♭IIIm7', '♭VIM7', '♭VIM7', 'IIm7♭5', 'V7#9', 'Im7', 'Im7', 'VIIm7♭5', 'VIIm7♭5', '♭VIM7', '♭VIM7', 'Vm7', 'Vm7', 'IVm7', 'IVm7', '♭IIM7', '♭IIM7', 'VII7#9', 'VII7#9', '♭VIM7', '♭VIM7'],
+                        mode: 'minor',
+                        chords: ['Im7', 'Im7', '♭IIIm7', '♭IIIm7', '♭VImaj7', '♭VImaj7', 'IIm7♭5', 'V7#9', 'IVm7', 'IVm7', 'VIm7♭5', 'VIm7♭5', '♭VIm7', '♭VIm7', '♭IIm7', '♭IIm7', 'V7#9', 'V7#9', '♭IIm7', '♭IIm7', '♭Vmaj7', '♭Vmaj7'],
                         info: {
                             composer: 'Chick Corea',
                             year: '1971',
@@ -7561,8 +7669,9 @@
                 },
                 'A': {
                     'All The Things You Are': {
-                        key: 'C',
-                        chords: ['VIIm7♭5', 'III7', 'VIm7', 'II7', 'IIm7', 'V7', 'IM7', 'IM7'],
+                        key: 'A♭',
+                        mode: 'major',
+                        chords: ['VIm7', 'IIm7', 'V7', 'Imaj7', 'IVmaj7', 'IVø7', 'VII7♭9', 'IIImaj7', 'IIImaj7', 'VII7', 'IIIm7', 'VIm7', 'II7', 'Vmaj7', 'I', 'Iø7', 'IV7♭9', '♭VIImaj7', '♭VIImaj7', 'IV', 'VIm7', 'II7', '♭VIImaj7', '♭VIImaj7', 'VIIø7', 'VII7', 'IIImaj7', 'I7♭13', 'II', 'VIm7', 'IIm7', 'V7', 'Imaj7', 'IVmaj7', 'IVm7', 'IIIm7', 'VII°7', 'IIm7', 'V7', 'Imaj7', 'VIIø7', 'III7♭9'],
                         info: {
                             composer: 'Jerome Kern',
                             year: '1939',
@@ -7573,6 +7682,7 @@
                     },
                     'Autumn Leaves': {
                         key: 'G',
+                        mode: 'minor',
                         chords: ['IVm7', '♭VII7', '♭IIIM7', '♭VIM7', 'IIm7♭5', 'V7', 'Im7', 'Im7'],
                         info: {
                             composer: 'Joseph Kosma',
@@ -7584,6 +7694,7 @@
                     },
                     'All Of Me': {
                         key: 'C',
+                        mode: 'major',
                         chords: ['I6', 'III7', 'VI7', 'IIm7', 'III7', 'VIm7', 'II7', 'IIm7', 'V7', 'I6', 'III7', 'VI7', 'IIm7', 'IVmaj7', 'IVm6', 'IIIm7', 'VIm9', 'IIm7', 'V7', 'I6', 'IIm7', 'V7'],
                         info: {
                             composer: 'Gerald Marks & Seymour Simons',
@@ -7595,6 +7706,7 @@
                     },
                     'A Night In Tunisia': {
                         key: 'D',
+                        mode: 'minor',
                         chords: ['IIm7♭5', 'V7', 'Im7', 'Im7', 'IIm7♭5', 'V7', 'Im7', '♭IIM7'],
                         info: {
                             composer: 'Dizzy Gillespie',
@@ -7605,18 +7717,20 @@
                         }
                     },
                     'All of You': {
-                        key: 'C',
-                        chords: ['IM7', 'VI7', 'IIm7', 'V7', 'IIIm7', 'VI7', 'IIm7', 'V7'],
+                        key: 'E♭',
+                        mode: 'major',
+                        chords: ['♭VIm6', 'IM7', 'IIm7♭5', 'V7♭9', '♭VIm6', 'IM7', 'IIm7♭5', 'V7', 'I6', '♯IIdim', 'IIm7', 'V7', 'I', 'VII7', 'III7', 'VI7', 'IIm7', 'V7', '♭VIm6', 'IM7', 'IIm7♭5', 'V7♭9', '♭VIm6', 'IM7', 'IIIm7', 'VI7', '♭VI', 'VIø7', 'VII7♭9', 'IIIm7', 'VI7', 'IIm7', 'V7', 'I', 'I'],
                         info: {
                             composer: 'Cole Porter',
                             year: '1954',
                             style: 'Jazz Swing',
                             tempo: 'Medium Swing',
-                            description: 'Cole Porter创作的经典爵士标准曲，拥有优美的旋律和复杂的和声结构。'
+                            description: 'Cole Porter创作的经典爵士标准曲，拥有优美的旋律和复杂的和声结构。AABA结构，包含丰富的和声变化和半音进行。'
                         }
                     },
                     'Alone Together': {
                         key: 'G',
+                        mode: 'minor',
                         chords: ['IIm7♭5', 'V7', 'Im7', '♭VI7', '♭IIM7', 'IIm7♭5', 'V7', 'Im7'],
                         info: {
                             composer: 'Arthur Schwartz',
@@ -7627,8 +7741,9 @@
                         }
                     },
                     'Ambleside': {
-                        key: 'C',
-                        chords: ['IM7', 'V7sus4', 'IM7', 'IVM7', 'IIm7', 'V7', 'IM7', 'IM7'],
+                        key: 'A♭',
+                        mode: 'major',
+                        chords: ['Imaj9', 'Vmaj9', '♯VIm11', '♭III13sus4', '♯Vmaj9', 'I13sus4', 'IVmaj9♯11', 'VII13sus4', 'IIImaj9', 'VIImaj9', 'IIm7', 'V13sus4', 'Imaj9', 'III13sus4', 'VImaj9', '♭III13sus4', '♯Vmaj9', '♯IImaj9', '♯IVm7', 'VII13', 'IIImaj9', '♯V13sus4', '♯Imaj13', 'V13sus4♭9', 'Imaj7♯5', 'VII13sus4♭9', 'IIImaj7♯5', '♯II13sus4♭9', '♯Vmaj7♯5', 'V13sus4'],
                         info: {
                             composer: 'Jim Hall',
                             year: '1988',
@@ -7639,6 +7754,7 @@
                     },
                     'Anthropology': {
                         key: 'B♭',
+                        mode: 'major',
                         chords: ['I7', 'VI7', 'IIm7', 'V7', 'IIIm7', 'VI7', 'IIm7', 'V7'],
                         info: {
                             composer: 'Charlie Parker/Dizzy Gillespie',
@@ -7686,6 +7802,7 @@
                     },
                     'Blue Bossa': {
                         key: 'C',
+                        mode: 'minor',
                         chords: ['Im7', 'IVm7', 'Im7', 'Im7', 'IIm7♭5', 'V7', '♭VIIM7', '♭VIIM7'],
                         info: {
                             composer: 'Kenny Dorham',
@@ -9887,79 +10004,102 @@
             }
 
             // 检查音程匹配的辅助函数
-            function checkIntervalMatch(detectedNote, targetIntervalPair, rootNote) {
+            function checkIntervalMatch(detectedNote, targetInterval, rootNote) {
                 // 获取根音值
                 const rootValue = noteToSemitones[rootNote] || 0;
-                
-                // 解析目标音程对（如 "1 7" 或 "7 b13"）
-                const intervals = targetIntervalPair.split(' ');
-                if (intervals.length !== 2) {
-                    console.error('目标音程格式错误:', targetIntervalPair);
-                    return null;
-                }
-                
-                // 计算两个音程的目标音符值
-                const interval1Semitones = intervalToSemitones[intervals[0]] || 0;
-                const interval2Semitones = intervalToSemitones[intervals[1]] || 0;
-                
-                const targetNote1Value = (rootValue + interval1Semitones) % 12;
-                const targetNote2Value = (rootValue + interval2Semitones) % 12;
-                
+
+                // 解析目标音程（可能是单个音程如 "7"，也可能是音程对如 "1 7" 或 "7 b13"）
+                const intervals = targetInterval.split(' ');
+
                 // 计算检测到的音符值
                 const detectedNoteValue = noteToSemitones[detectedNote] || 0;
-                
+
                 // 检查匹配哪个音程
                 let matchedInterval = null;
-                if (detectedNoteValue === targetNote1Value) {
-                    matchedInterval = intervals[0];
-                } else if (detectedNoteValue === targetNote2Value) {
-                    matchedInterval = intervals[1];
+
+                if (intervals.length === 1) {
+                    // 单个音程的情况
+                    const intervalSemitones = intervalToSemitones[intervals[0]] || 0;
+                    const targetNoteValue = (rootValue + intervalSemitones) % 12;
+
+                    if (detectedNoteValue === targetNoteValue) {
+                        matchedInterval = intervals[0];
+                    }
+
+                    // 调试信息
+                    console.log(`音程练习匹配检查 (单个音程):`);
+                    console.log(`- 根音: ${rootNote} (${rootValue})`);
+                    console.log(`- 目标音程: ${targetInterval}`);
+                    console.log(`- 音程: ${intervals[0]} -> 半音数 ${intervalSemitones} -> 音符值 ${targetNoteValue}`);
+                    console.log(`- 检测到的音符: ${detectedNote} (${detectedNoteValue})`);
+                    console.log(`- 匹配的音程: ${matchedInterval}`);
+
+                } else {
+                    // 音程对的情况
+                    if (intervals.length !== 2) {
+                        console.error('目标音程格式错误:', targetInterval);
+                        return null;
+                    }
+
+                    // 计算两个音程的目标音符值
+                    const interval1Semitones = intervalToSemitones[intervals[0]] || 0;
+                    const interval2Semitones = intervalToSemitones[intervals[1]] || 0;
+
+                    const targetNote1Value = (rootValue + interval1Semitones) % 12;
+                    const targetNote2Value = (rootValue + interval2Semitones) % 12;
+
+                    if (detectedNoteValue === targetNote1Value) {
+                        matchedInterval = intervals[0];
+                    } else if (detectedNoteValue === targetNote2Value) {
+                        matchedInterval = intervals[1];
+                    }
+
+                    // 调试信息
+                    console.log(`音程练习匹配检查 (音程对):`);
+                    console.log(`- 根音: ${rootNote} (${rootValue})`);
+                    console.log(`- 目标音程对: ${targetInterval}`);
+                    console.log(`- 音程1: ${intervals[0]} -> 半音数 ${interval1Semitones} -> 音符值 ${targetNote1Value}`);
+                    console.log(`- 音程2: ${intervals[1]} -> 半音数 ${interval2Semitones} -> 音符值 ${targetNote2Value}`);
+                    console.log(`- 检测到的音符: ${detectedNote} (${detectedNoteValue})`);
+                    console.log(`- 匹配的音程: ${matchedInterval}`);
                 }
-                
-                // 调试信息
-                console.log(`音程练习匹配检查:`);
-                console.log(`- 根音: ${rootNote} (${rootValue})`);
-                console.log(`- 目标音程对: ${targetIntervalPair}`);
-                console.log(`- 音程1: ${intervals[0]} -> 半音数 ${interval1Semitones} -> 音符值 ${targetNote1Value}`);
-                console.log(`- 音程2: ${intervals[1]} -> 半音数 ${interval2Semitones} -> 音符值 ${targetNote2Value}`);
-                console.log(`- 检测到的音符: ${detectedNote} (${detectedNoteValue})`);
-                console.log(`- 匹配的音程: ${matchedInterval}`);
-                
-                // 额外调试：显示目标音符名称
-                const targetNote1Name = Object.keys(noteToSemitones).find(key => noteToSemitones[key] === targetNote1Value);
-                const targetNote2Name = Object.keys(noteToSemitones).find(key => noteToSemitones[key] === targetNote2Value);
-                console.log(`- 目标音符1: ${targetNote1Name} (${targetNote1Value})`);
-                console.log(`- 目标音符2: ${targetNote2Name} (${targetNote2Value})`);
-                
+
                 return matchedInterval;
             }
 
             // 处理音程练习部分正确的函数（弹对了其中一个音程）
             function handleIntervalPartialCorrect(matchedInterval) {
                 if (!state.currentIntervalExercise || state.currentIntervalExercise.answered) return;
-                
+
                 // 初始化已完成的音程数组
                 if (!state.currentIntervalExercise.completedIntervals) {
                     state.currentIntervalExercise.completedIntervals = [];
                 }
-                
+
                 // 检查这个音程是否已经弹对过了
                 if (state.currentIntervalExercise.completedIntervals.includes(matchedInterval)) {
                     console.log(`音程 ${matchedInterval} 已经弹对过了，忽略重复`);
                     return;
                 }
-                
+
                 // 添加到已完成列表
                 state.currentIntervalExercise.completedIntervals.push(matchedInterval);
                 console.log(`音程 ${matchedInterval} 弹对了！已完成: ${state.currentIntervalExercise.completedIntervals.join(', ')}`);
-                
+
                 // 更新显示，将弹对的音程变灰
                 updateIntervalDisplay(matchedInterval);
-                
-                // 检查是否所有音程都弹对了
-                const intervals = state.currentIntervalExercise.currentInterval.split(' ');
-                if (state.currentIntervalExercise.completedIntervals.length >= intervals.length) {
-                    // 所有音程都弹对了，完成这道题
+
+                if (state.currentIntervalExercise.findRootFirst) {
+                    // 先找根音模式：检查是否所有音程都弹对了
+                    const intervals = state.currentIntervalExercise.currentInterval.split(' ');
+
+                    // 对于音程对的情况，需要完成所有音程
+                    if (state.currentIntervalExercise.completedIntervals.length >= intervals.length) {
+                        // 所有音程都弹对了，完成这道题
+                        handleIntervalFullyCorrect();
+                    }
+                } else {
+                    // 非先找根音模式：单个音程完成就完成这道题
                     handleIntervalFullyCorrect();
                 }
             }
@@ -9970,23 +10110,71 @@
             // 处理音程练习完全正确的函数（所有音程都弹对了）
             function handleIntervalFullyCorrect() {
                 if (!state.currentIntervalExercise || state.currentIntervalExercise.answered) return;
-                
+
                 state.currentIntervalExercise.answered = true;
-                
+
                 // 检查是否显示指板（检查设置和当前状态）
                 const showFretboard = document.getElementById('showFretboard').checked;
                 const fretboardContainer = document.getElementById('fretboardContainer');
                 const isFretboardVisible = fretboardContainer && fretboardContainer.style.display !== 'none';
-                
+
                 if (showFretboard && isFretboardVisible) {
-                    // 在指板上显示当前题目的两个音级
+                    // 在指板上显示当前题目的音级
                     showIntervalOnFretboard(state.currentIntervalExercise.currentInterval, state.currentIntervalExercise.rootNote);
                 }
-                
+
+                const exercise = state.currentIntervalExercise;
+
+                // 检查是否需要继续下一个音程或切换根音
+                if (!exercise.findRootFirst) {
+                    // 非先找根音模式：检查是否还有未练习的音程
+                    exercise.currentIntervalIndex++;
+
+                    console.log(`当前音程索引: ${exercise.currentIntervalIndex}, 音程序列长度: ${exercise.intervalSequence.length}`);
+
+                    if (exercise.currentIntervalIndex < exercise.intervalSequence.length) {
+                        // 还有未练习的音程，继续下一个音程
+                        console.log('继续下一个音程');
+
+                        // 获取下一题间隔时间
+                        const selectedIntervalBtn = document.querySelector('.pitch-finding-interval-btn.active');
+                        const intervalSeconds = selectedIntervalBtn ? parseInt(selectedIntervalBtn.dataset.value) : 0;
+
+                        // 动态设置延迟时间
+                        let delayTime;
+                        if (!isFretboardVisible) {
+                            // 指板隐藏时立即自动切换
+                            delayTime = 100;
+                            console.log(`音程练习指板隐藏: 立即自动切换下一题`);
+                        } else if (intervalSeconds === 0) {
+                            // 指板显示且手动模式：不设置自动切换
+                            delayTime = 0;
+                            console.log(`音程练习指板显示且手动模式: 不自动切换下一题，等待用户操作`);
+                        } else {
+                            // 指板显示且自动模式：使用设置的延迟时间
+                            delayTime = intervalSeconds * 1000;
+                            console.log(`音程练习指板显示且自动模式: 延迟${delayTime}ms切换下一题`);
+                        }
+
+                        if (delayTime > 0) {
+                            console.log(`音程练习自动延迟: 指板显示=${isFretboardVisible}, 延迟时间=${delayTime}ms`);
+                            // 设置音程练习延迟定时器
+                            state.intervalNextTimeout = setTimeout(() => {
+                                generateNextIntervalExercise();
+                            }, delayTime);
+                        }
+                        return;
+                    } else {
+                        // 所有音程都已练习完成，需要切换到下一个根音
+                        console.log('当前根音的所有音程练习完成，准备切换根音');
+                    }
+                }
+
+                // 先找根音模式 或 所有音程练习完成：按照原有逻辑处理
                 // 获取下一题间隔时间
                 const selectedIntervalBtn = document.querySelector('.pitch-finding-interval-btn.active');
                 const intervalSeconds = selectedIntervalBtn ? parseInt(selectedIntervalBtn.dataset.value) : 0;
-                
+
                 // 动态设置延迟时间：
                 // - 指板隐藏时：立即自动进入下一题（忽略手动模式设置）
                 // - 指板显示且手动模式：不自动切换，等待用户手动操作
@@ -10813,7 +11001,31 @@
                         nextChordIndex = 0;
                     }
 
-                    const nextChordSymbol = state.progressionChords[nextChordIndex];
+                    let nextChordSymbol = state.progressionChords[nextChordIndex];
+
+                    // 备用匹配：如果主要正则表达式失败，尝试分解匹配
+                    let isRomanChord = nextChordSymbol.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/);
+                    if (!isRomanChord) {
+                        // 检查是否包含罗马数字和变音符号
+                        if (/[IVX]+/.test(nextChordSymbol) && (/[♭b#♯]/.test(nextChordSymbol) || /[mM]/.test(nextChordSymbol) || /[0-9]/.test(nextChordSymbol))) {
+                            isRomanChord = true;
+                            console.log('generateNextProgressionChord: 备用匹配成功，识别为罗马数字和弦');
+                        }
+                    }
+
+                    // 检查是否是罗马数字，如果是则转换为具体和弦符号
+                    if (isRomanChord) {
+                        // 这是罗马数字，需要转换
+                        const songGroup = state.progressionSong.charAt(0);
+                        const songData = jazzStandards[songGroup][state.progressionSong];
+                        const originalKey = songData.key;
+                        const targetKey = state.progressionKey;
+                        const songMode = songData.mode || detectSongMode(songData.chords);
+
+                        console.log('预览和弦转换:', { nextChordSymbol, originalKey, targetKey, songMode });
+                        nextChordSymbol = transposeChordFromDegree(nextChordSymbol, originalKey, targetKey, songMode);
+                        console.log('预览和弦转换结果:', nextChordSymbol);
+                    }
 
                     // 解析下一个和弦
                     const nextChordInfo = parseChordSymbol(nextChordSymbol);
@@ -11132,9 +11344,24 @@
                         }
                         
                         if (nextIndex < chords.length) {
-                            const nextChord = chords[nextIndex];
+                            let nextChord = chords[nextIndex];
+
+                            // 检查是否是罗马数字，如果是则转换为具体和弦符号
+                            if (nextChord.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/)) {
+                                // 这是罗马数字，需要转换
+                                const songGroup = state.progressionSong.charAt(0);
+                                const songData = jazzStandards[songGroup][state.progressionSong];
+                                const originalKey = songData.key;
+                                const targetKey = state.progressionKey;
+                                const songMode = songData.mode || detectSongMode(songData.chords);
+
+                                console.log('generateNextExercise: 转换罗马数字和弦', nextChord);
+                                nextChord = transposeChordFromDegree(nextChord, originalKey, targetKey, songMode);
+                                console.log('generateNextExercise: 转换结果', nextChord);
+                            }
+
                             const level = progressionLevelEl.value;
-                            
+
                             // 解析下一个和弦的类型
                             const { root: nextRoot, type: nextType } = parseChordSymbol(nextChord);
 
@@ -11144,11 +11371,20 @@
                                 // 对于"全部"选项，使用和弦的完整音程
                                 if (chordTypes[nextType]) {
                                     intervals = [...chordTypes[nextType].intervals];
-                                    
+
+                                    // 减三和弦特殊处理：自动扩展为减七和弦
+                                    if (nextType === 'dim' || nextType === 'diminished') {
+                                        // 检查是否只包含3个音（三和弦）
+                                        if (intervals.length === 3 && intervals.includes('1') && intervals.includes('♭3') && intervals.includes('♭5')) {
+                                            // 扩展为减七和弦，添加减七度
+                                            intervals = ['1', '♭3', '♭5', 'bb7'];
+                                        }
+                                    }
+
                                     // 根据顺序设置调整音程顺序
                                     const activeOrderBtn = document.querySelector('.progression-order-btn.active');
                                     const order = activeOrderBtn ? activeOrderBtn.dataset.value : 'ordered';
-                                    
+
                                     if (order === 'reverse') {
                                         // 倒序
                                         intervals = intervals.reverse();
@@ -11328,8 +11564,24 @@
                 if (state.nextExerciseInfo) {
                     // 显示调性和音阶名/和弦名以及音级结构
                     let displayHTML = state.nextExerciseInfo;
+                    // 确保和弦符号使用正确的音乐符号（将b替换为♭）
+                    displayHTML = displayHTML.replace(/b/g, '♭');
+
                     if (state.nextExerciseIntervals && state.nextExerciseIntervals.length > 0) {
-                        displayHTML += '<br><span style="font-size: 14px; color: #94a3b8;">' + state.nextExerciseIntervals.join(' ') + '</span>';
+                        // 修复：确保音级显示正确，特别是对于包含负号的情况
+                        let intervals = state.nextExerciseIntervals.map(interval => {
+                            // 如果音级包含负号，这可能是错误的结果，需要修正
+                            if (typeof interval === 'string' && interval.includes('-')) {
+                                // 这里不应该有负号音级，如果是负号则可能是计算错误
+                                // 尝试修正常见的错误
+                                if (interval === '-1') return '1';  // 将错误的-1修正为1
+                                if (interval === '-3') return '♭3';  // 将错误的-3修正为♭3
+                                if (interval === '-5') return '♭5';  // 将错误的-5修正为♭5
+                                if (interval === '-7') return '♭7';  // 将错误的-7修正为♭7
+                            }
+                            return interval;
+                        });
+                        displayHTML += '<br><span style="font-size: 14px; color: #94a3b8;">' + intervals.join(' ') + '</span>';
                     }
                     console.log('updateNextExerciseDisplay: 显示内容', displayHTML);
                     nextExerciseEl.innerHTML = displayHTML;
@@ -11871,18 +12123,18 @@
                     if (selectedShapes.includes(shape)) {
                         if (shape === currentShape) {
                             btn.classList.add('current');
-                            btn.title = `当前形状: ${shape}`;
+                            btn.title = `${window.t ? window.t('shape_current') : 'Current shape'}: ${shape}`;
                         } else if (completedShapes.includes(shape)) {
                             // 弹过的形状显示为透明
                             btn.classList.add('played');
-                            btn.title = `已完成 ${shape} 形状`;
+                            btn.title = `${window.t ? window.t('shape_completed') : 'Completed'} ${shape} ${window.t ? window.t('shape') || 'shape' : 'shape'}`;
                         } else {
                             btn.classList.add('completed');
-                            btn.title = `点击切换到 ${shape} 形状`;
+                            btn.title = `${window.t ? window.t('shape_switch') : 'Switch to'} ${shape} ${window.t ? window.t('shape') || 'shape' : 'shape'}`;
                         }
                     } else {
                         btn.classList.add('disabled');
-                        btn.title = `${shape} 形状未选中`;
+                        btn.title = `${shape} ${window.t ? window.t('shape_not_selected') : 'Not selected'}`;
                     }
                 });
             }
@@ -13010,9 +13262,11 @@
                     // 获取转位和弦名称
                     const bassNote = state.bassNote || (bassNoteSelect ? bassNoteSelect.value : 'root');
                     const chordSymbol = getInversionChordName(state.rootNote, state.chordType, bassNote);
+                    // 确保使用正确的音乐符号（将b替换为♭）
+                    const correctedChordSymbol = chordSymbol.replace(/b/g, '♭');
                     // 只显示和弦名称，不显示音级结构
-                    targetIntervalEl.textContent = chordSymbol;
-                    targetIntervalEl.innerHTML = chordSymbol; // 确保只显示和弦名称
+                    targetIntervalEl.textContent = correctedChordSymbol;
+                    targetIntervalEl.innerHTML = correctedChordSymbol; // 确保只显示和弦名称
                     displaySequence();
 
                     // 设置下一个和弦为序列中的下一个
@@ -13760,12 +14014,12 @@
                         // 阻止事件冒泡，避免触发退出练习的逻辑
                         event.stopPropagation();
                         event.preventDefault();
-                        
+
                         // 检查当前练习模式
                         const practiceMode = document.querySelector('.practice-mode-btn.active');
                         if (practiceMode && practiceMode.dataset.mode === 'interval') {
                             // 音程练习模式
-                            generateNextIntervalExercise();
+                            manualNextIntervalExercise();
                         } else {
                             // 单音练习模式
                             generateNextPitchFindingQuestion();
@@ -13937,7 +14191,8 @@
                     // 生成题目
                     let exerciseIntervals = [];
                     let currentInterval = '';
-                    
+                    let intervalSequence = []; // 在外部定义 intervalSequence 变量
+
                     if (findRootFirst) {
                         // 先找根音：生成 1 + 其他音程 的组合
                         exerciseIntervals = selectedIntervals;
@@ -13945,16 +14200,11 @@
                         const randomInterval = selectedIntervals[Math.floor(Math.random() * selectedIntervals.length)];
                         currentInterval = `1 ${randomInterval}`;
                     } else {
-                        // 不先找根音：从选中的音程中随机选择两个配对
+                        // 不先找根音：生成单个音程序列
                         exerciseIntervals = selectedIntervals;
-                        if (selectedIntervals.length >= 2) {
-                            // 随机选择两个不同的音程
-                            const shuffled = [...selectedIntervals].sort(() => Math.random() - 0.5);
-                            currentInterval = `${shuffled[0]} ${shuffled[1]}`;
-                        } else {
-                            // 只有一个音程，重复显示
-                            currentInterval = `${selectedIntervals[0]} ${selectedIntervals[0]}`;
-                        }
+                        // 生成随机打乱的音程序列，并选择第一个作为当前音程
+                        intervalSequence = [...selectedIntervals].sort(() => Math.random() - 0.5);
+                        currentInterval = intervalSequence[0];
                     }
                     
                     // 显示根音作为当前音符
@@ -13968,7 +14218,9 @@
                         rootNote: selectedRootNote,
                         findRootFirst: findRootFirst,
                         answered: false,
-                        completedIntervals: [] // 跟踪已完成的音程
+                        completedIntervals: [], // 跟踪已完成的音程
+                        currentIntervalIndex: 0, // 当前音程的索引（用于非先找根音模式）
+                        intervalSequence: intervalSequence // 音程练习序列（用于非先找根音模式）
                     };
                     
                     // 显示音级信息
@@ -13990,6 +14242,81 @@
                 }
                 
                 // 生成下一题音程练习（不重新启动计时器）
+                // 手动推进到下一个音程的函数
+                function manualNextIntervalExercise() {
+                    // 清除之前的定时器
+                    if (state.intervalNextTimeout) {
+                        clearTimeout(state.intervalNextTimeout);
+                        state.intervalNextTimeout = null;
+                    }
+
+                    if (!state.currentIntervalExercise) return;
+
+                    const exercise = state.currentIntervalExercise;
+
+                    if (exercise.findRootFirst) {
+                        // 先找根音模式：使用原有逻辑
+                        generateNextIntervalExercise();
+                        return;
+                    }
+
+                    // 非先找根音模式：推进到下一个音程
+                    exercise.currentIntervalIndex++;
+                    console.log(`手动推进到下一个音程，新索引: ${exercise.currentIntervalIndex}`);
+
+                    // 检查是否需要生成新的音程序列或切换根音
+                    const selectedIntervals = exercise.intervals.filter(interval => interval !== '1');
+
+                    if (exercise.currentIntervalIndex >= exercise.intervalSequence.length) {
+                        // 当前根音的所有音程都练习完成，需要切换根音
+
+                        // 检查根音设置
+                        const rootNoteSelect = document.getElementById('rootNoteSelect');
+                        let newRootNote = exercise.rootNote;
+
+                        if (rootNoteSelect.value === 'random') {
+                            // 随机选择新的根音
+                            const allNotes = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
+                            newRootNote = allNotes[Math.floor(Math.random() * allNotes.length)];
+
+                            // 更新根音显示
+                            const currentNoteDisplay = document.getElementById('currentNoteDisplay');
+                            currentNoteDisplay.textContent = newRootNote;
+
+                            // 更新练习状态中的根音
+                            state.currentIntervalExercise.rootNote = newRootNote;
+
+                            console.log(`手动切换到新的根音: ${newRootNote}`);
+                        }
+
+                        // 生成新的音程序列
+                        exercise.intervalSequence = [...selectedIntervals].sort(() => Math.random() - 0.5);
+                        exercise.currentIntervalIndex = 0;
+                        exercise.completedIntervals = []; // 重置已完成的音程
+
+                        console.log('手动生成新的音程序列:', exercise.intervalSequence);
+                    }
+
+                    // 获取当前音程
+                    const currentInterval = exercise.intervalSequence[exercise.currentIntervalIndex];
+
+                    // 更新练习状态
+                    state.currentIntervalExercise.currentInterval = currentInterval;
+                    state.currentIntervalExercise.answered = false;
+
+                    console.log(`手动显示音程序列第${exercise.currentIntervalIndex + 1}个音程: ${currentInterval}`);
+
+                    // 清除指板上的高亮和音程显示
+                    clearFretboardHighlights();
+
+                    // 显示音级信息
+                    updateIntervalExerciseDisplay();
+
+                    // 重置单音练习状态，避免混淆
+                    state.pitchFindingAnswered = false;
+                    state.currentNote = null;
+                }
+
                 function generateNextIntervalExercise() {
                     // 清除之前的定时器
                     if (state.intervalNextTimeout) {
@@ -14005,17 +14332,21 @@
                     // 检查根音设置，如果是随机则生成新的随机根音
                     const rootNoteSelect = document.getElementById('rootNoteSelect');
                     let newRootNote = exercise.rootNote;
-                    
-                    if (rootNoteSelect.value === 'random') {
+
+                    // 只有在需要切换根音时才生成新的随机根音
+                    if (rootNoteSelect.value === 'random' &&
+                        (!exercise.findRootFirst && exercise.currentIntervalIndex >= exercise.intervalSequence.length)) {
                         const allNotes = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
                         newRootNote = allNotes[Math.floor(Math.random() * allNotes.length)];
-                        
+
                         // 更新根音显示
                         const currentNoteDisplay = document.getElementById('currentNoteDisplay');
                         currentNoteDisplay.textContent = newRootNote;
-                        
+
                         // 更新练习状态中的根音
                         state.currentIntervalExercise.rootNote = newRootNote;
+
+                        console.log(`切换到新的根音: ${newRootNote}`);
                     }
                     
                     // 随机选择当前音程对
@@ -14024,20 +14355,35 @@
                         // 如果开启先找根音，则随机选择1和某个选中的音程
                         const randomInterval = selectedIntervals[Math.floor(Math.random() * selectedIntervals.length)];
                         currentInterval = `1 ${randomInterval}`;
+
+                        // 更新练习状态
+                        state.currentIntervalExercise.currentInterval = currentInterval;
+                        state.currentIntervalExercise.answered = false;
+                        state.currentIntervalExercise.completedIntervals = []; // 重置已完成的音程
                     } else {
-                        // 如果关闭先找根音，则随机选择两个选中的音程
-                        if (selectedIntervals.length >= 2) {
-                            const shuffled = [...selectedIntervals].sort(() => Math.random() - 0.5);
-                            currentInterval = `${shuffled[0]} ${shuffled[1]}`;
-                        } else {
-                            currentInterval = `${selectedIntervals[0]} ${selectedIntervals[0]}`;
+                        // 如果关闭先找根音，则逐个练习选中的音程
+
+                        // 检查是否需要生成新的音程序列
+                        if (!exercise.intervalSequence || exercise.intervalSequence.length === 0 ||
+                            exercise.currentIntervalIndex >= exercise.intervalSequence.length) {
+
+                            // 生成随机打乱的音程序列
+                            exercise.intervalSequence = [...selectedIntervals].sort(() => Math.random() - 0.5);
+                            exercise.currentIntervalIndex = 0;
+                            exercise.completedIntervals = []; // 重置已完成的音程
+
+                            console.log('生成新的音程序列:', exercise.intervalSequence);
                         }
+
+                        // 获取当前音程
+                        currentInterval = exercise.intervalSequence[exercise.currentIntervalIndex];
+
+                        // 更新练习状态
+                        state.currentIntervalExercise.currentInterval = currentInterval;
+                        state.currentIntervalExercise.answered = false;
+
+                        console.log(`显示音程序列第${exercise.currentIntervalIndex + 1}个音程: ${currentInterval}`);
                     }
-                    
-                    // 更新练习状态
-                    state.currentIntervalExercise.currentInterval = currentInterval;
-                    state.currentIntervalExercise.answered = false;
-                    state.currentIntervalExercise.completedIntervals = []; // 重置已完成的音程
                     
                     // 清除指板上的高亮和音程显示
                     clearFretboardHighlights();
@@ -14052,6 +14398,7 @@
                 
                 // 将函数暴露到全局作用域
                 window.generateNextIntervalExercise = generateNextIntervalExercise;
+                window.manualNextIntervalExercise = manualNextIntervalExercise;
                 window.generateExercise = generateExercise;
                 window.generateNextProgressionChord = generateNextProgressionChord;
                 
@@ -15042,9 +15389,11 @@
                     // 获取转位和弦名称
                     const bassNote = bassNoteSelect ? bassNoteSelect.value : 'root';
                     const chordSymbol = getInversionChordName(rootNote, chordType, bassNote);
+                    // 确保使用正确的音乐符号（将b替换为♭）
+                    const correctedChordSymbol = chordSymbol.replace(/b/g, '♭');
                     // 只显示和弦名称，不显示音级结构
-                    targetIntervalEl.textContent = chordSymbol;
-                    targetIntervalEl.innerHTML = chordSymbol; // 确保只显示和弦名称
+                    targetIntervalEl.textContent = correctedChordSymbol;
+                    targetIntervalEl.innerHTML = correctedChordSymbol; // 确保只显示和弦名称
                     displaySequence();
                     
                     // 预生成下一题
@@ -15151,15 +15500,44 @@
 
                         // 获取选定的调
                         const progressionKeyEl = document.getElementById('progressionKey');
-                        const selectedKey = progressionKeyEl ? progressionKeyEl.value : songData.key;
+                        let selectedKey = progressionKeyEl ? progressionKeyEl.value : songData.key;
 
-                        // 检测歌曲调式
-                        const songMode = detectSongMode ? detectSongMode(degreeChords) : 'major';
+                        // 如果selectedKey带有m后缀，去掉它用于转调计算
+                        let targetKey = selectedKey;
+                        if (targetKey.endsWith('m')) {
+                            targetKey = targetKey.slice(0, -1);
+                        }
 
-                        // 移调到目标调
-                        const chords = degreeChords.map(degreeChord =>
-                            transposeChordFromDegree(degreeChord, songData.key, selectedKey, songMode)
-                        );
+                        // 使用歌曲数据的调式，而不是通过检测推断
+                        const songMode = songData.mode || 'major';
+
+                        // 移调到目标调 - 检查是否需要转换
+                        const chords = degreeChords.map(degreeChord => {
+                            const romanRegex = /^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/;
+                            console.log(`初始化调试: 检查和弦 "${degreeChord}" 匹配结果: ${romanRegex.test(degreeChord)}`);
+                            if (degreeChord.includes('III')) {
+                                console.log(`III和弦字符编码: ${Array.from(degreeChord).map(c => `${c}(${c.charCodeAt(0)})`).join(', ')}`);
+                            }
+
+                            // 备用匹配：如果主要正则表达式失败，尝试分解匹配
+                            let isRomanChord = degreeChord.match(romanRegex);
+                            if (!isRomanChord) {
+                                // 检查是否包含罗马数字和变音符号
+                                if (/[IVX]+/.test(degreeChord) && (/[♭b#♯]/.test(degreeChord) || /[mM]/.test(degreeChord) || /[0-9]/.test(degreeChord))) {
+                                    isRomanChord = true;
+                                    console.log('初始化: 备用匹配成功，识别为罗马数字和弦');
+                                }
+                            }
+
+                            // 如果是具体和弦符号，直接使用；如果是音级符号，进行转换
+                            if (isRomanChord) {
+                                console.log('初始化: 转换音级和弦', degreeChord);
+                                return transposeChordFromDegree(degreeChord, songData.key, targetKey, songMode);
+                            } else {
+                                console.log('初始化: 使用具体和弦符号', degreeChord);
+                                return degreeChord;
+                            }
+                        });
 
                         console.log('转换后的和弦:', chords);
 
@@ -15415,9 +15793,16 @@
                     } else {
                         // 单一调性的练习，使用歌曲数据中的和弦
                         const degreeChords = [...songData.chords];
-                        chords = degreeChords.map(degreeChord =>
-                            transposeChordFromDegree(degreeChord, originalKey, selectedKey)
-                        );
+                        chords = degreeChords.map(degreeChord => {
+                            // 如果是具体和弦符号，直接使用；如果是音级符号，进行转换
+                            if (degreeChord.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/)) {
+                                console.log('练习模式: 转换音级和弦', degreeChord);
+                                return transposeChordFromDegree(degreeChord, originalKey, selectedKey);
+                            } else {
+                                console.log('练习模式: 使用具体和弦符号', degreeChord);
+                                return degreeChord;
+                            }
+                        });
                     }
 
                     console.log(`生成的${selectedSong}和弦进行：`, chords);
@@ -15429,10 +15814,17 @@
                     // 检测歌曲调式
                     const songMode = detectSongMode(degreeChords);
 
-                    // 移调到目标调
-                    chords = degreeChords.map(degreeChord =>
-                        transposeChordFromDegree(degreeChord, originalKey, selectedKey, songMode)
-                    );
+                    // 移调到目标调 - 检查是否需要转换
+                    chords = degreeChords.map(degreeChord => {
+                        // 如果是具体和弦符号，直接使用；如果是音级符号，进行转换
+                        if (degreeChord.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/)) {
+                            console.log('普通歌曲: 转换音级和弦', degreeChord);
+                            return transposeChordFromDegree(degreeChord, originalKey, selectedKey, songMode);
+                        } else {
+                            console.log('普通歌曲: 使用具体和弦符号', degreeChord);
+                            return degreeChord;
+                        }
+                    });
                 }
 
     
@@ -15543,7 +15935,7 @@
                 let currentChord = chords[state.progressionIndex];
 
                 // 将音级符号转换为实际的和弦名称
-                if (currentChord.match(/^[IVX]+[mM]?(sus4|sus2|maj|dim|aug)?[0-9♭♯()]*$/)) {
+                if (currentChord.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/)) {
                     // 这是一个音级符号，需要转换为实际和弦
                     const songData = jazzStandards[state.progressionKey][state.progressionSong];
                     const keyRoot = songData.key;
@@ -15585,8 +15977,14 @@
                         }
                         // 如果是顺序(ordered)，保持原顺序
                     } else {
-                        // 如果无法获取和弦类型信息，回退到默认设置
-                        intervals = ['1', '3', '5'];
+                        // 如果无法获取和弦类型信息，尝试从和弦符号中推断音程
+                        console.log('无法从chordTypes获取和弦类型，尝试从和弦符号推断:', type, currentChord);
+                        intervals = getIntervalsFromChordSymbol(currentChord);
+                        
+                        // 如果仍然无法获取，回退到默认设置
+                        if (intervals.length === 0) {
+                            intervals = ['1', '3', '5'];
+                        }
                     }
                 }
 
@@ -15622,7 +16020,21 @@
                     }
 
                     const nextChord = chords[nextIndex];
-                    state.nextExerciseInfo = nextChord; // 只显示和弦名
+
+                    // 检查是否是罗马数字，如果是则转换为具体和弦符号
+                    if (nextChord.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/)) {
+                        // 这是罗马数字，需要转换
+                        const songGroup = state.progressionSong.charAt(0);
+                        const songData = jazzStandards[songGroup][state.progressionSong];
+                        const keyRoot = songData.key;
+                        const targetKey = state.progressionKey;
+
+                        console.log('下一题预览: 转换罗马数字和弦', nextChord);
+                        nextChord = transposeChordFromDegree(nextChord, keyRoot, targetKey);
+                        console.log('下一题预览: 转换结果', nextChord);
+                    }
+
+                    state.nextExerciseInfo = nextChord; // 显示转换后的和弦名
                     console.log('generateCurrentProgressionChord: 显示下一个和弦', nextChord, '索引:', nextIndex);
                     
                     // 为下一个和弦生成音程
@@ -15633,11 +16045,20 @@
                         // 对于"全部"选项，使用和弦的完整音程
                         if (chordTypes[nextType]) {
                             let nextIntervals = [...chordTypes[nextType].intervals];
-                            
+
+                            // 减三和弦特殊处理：自动扩展为减七和弦
+                            if (nextType === 'dim' || nextType === 'diminished') {
+                                // 检查是否只包含3个音（三和弦）
+                                if (nextIntervals.length === 3 && nextIntervals.includes('1') && nextIntervals.includes('♭3') && nextIntervals.includes('♭5')) {
+                                    // 扩展为减七和弦，添加减七度
+                                    nextIntervals = ['1', '♭3', '♭5', 'bb7'];
+                                }
+                            }
+
                             // 根据顺序设置调整音程顺序
                             const activeOrderBtn = document.querySelector('.progression-order-btn.active');
                             const order = activeOrderBtn ? activeOrderBtn.dataset.value : 'ordered';
-                            
+
                             if (order === 'reverse') {
                                 // 倒序
                                 nextIntervals = nextIntervals.reverse();
@@ -15756,12 +16177,51 @@
                 let currentChord = state.progressionChords[state.progressionIndex];
                 console.log('generateCurrentProgressionChord: 当前和弦', currentChord, '索引', state.progressionIndex);
 
-                // 如果是音级符号，需要转换为实际和弦
-                if (currentChord.match(/^[IVX]+[mM]?(sus4|sus2|maj|dim|aug)?[0-9♭♯()]*$/)) {
-                    const songData = jazzStandards[state.progressionKey][state.progressionSong];
-                    const keyRoot = songData.key;
-                    const songMode = detectSongMode(songData.chords);
-                    currentChord = transposeChordFromDegree(currentChord, keyRoot, keyRoot, songMode);
+                // 检查是否是音级符号，如果是则需要转换为实际和弦
+                const romanRegex = /^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/;
+                console.log(`检查音级符号匹配: "${currentChord}" 匹配结果: ${romanRegex.test(currentChord)}`);
+                console.log(`和弦字符编码: ${Array.from(currentChord).map(c => `${c}(${c.charCodeAt(0)})`).join(', ')}`);
+                console.log(`正则表达式详情: ${romanRegex.source}`);
+                console.log(`测试各个部分:`);
+                console.log(`- 匹配♭符号: ${/^[♭b#♯]?/.test(currentChord)}`);
+                console.log(`- 匹配罗马数字: ${/[IVX]+/.test(currentChord)}`);
+                console.log(`- 匹配后缀部分: ${/[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/.test(currentChord)}`);
+
+                // 备用匹配：如果主要正则表达式失败，尝试分解匹配
+                let isRomanChord = romanRegex.test(currentChord);
+                if (!isRomanChord) {
+                    console.log('主要正则匹配失败，尝试备用匹配');
+                    // 检查是否包含罗马数字
+                    if (/[IVX]+/.test(currentChord) && (/[♭b#♯]/.test(currentChord) || /[mM]/.test(currentChord) || /[0-9]/.test(currentChord))) {
+                        isRomanChord = true;
+                        console.log('备用匹配成功，识别为罗马数字和弦');
+                    }
+                }
+
+                if (isRomanChord) {
+                    console.log('generateCurrentProgressionChord: 检测到音级符号，需要转换', currentChord);
+                    // 获取歌曲数据的第一个字符作为分组键
+                    const songGroup = state.progressionSong.charAt(0);
+                    const songData = jazzStandards[songGroup][state.progressionSong];
+                    const originalKey = songData.key;
+                    const targetKey = state.progressionKey;
+                    const songMode = songData.mode || detectSongMode(songData.chords);
+                    console.log('准备调用 transposeChordFromDegree', { degreeChord: currentChord, originalKey, targetKey, songMode });
+                    const originalChordBefore = currentChord;
+                    currentChord = transposeChordFromDegree(currentChord, originalKey, targetKey, songMode);
+                    console.log('generateCurrentProgressionChord: 音级和弦转换', {
+                        originalChord: originalChordBefore,
+                        degreeChord: state.progressionChords[state.progressionIndex],
+                        songGroup: songGroup,
+                        songName: state.progressionSong,
+                        originalKey: originalKey,
+                        targetKey: targetKey,
+                        songMode: songMode,
+                        result: currentChord
+                    });
+                    console.log('generateCurrentProgressionChord: 转换后的和弦符号', currentChord);
+                } else {
+                    console.log('generateCurrentProgressionChord: 使用具体和弦符号，无需转换', currentChord);
                 }
 
                 const { root, type } = parseChordSymbol(currentChord);
@@ -15783,11 +16243,20 @@
                     // 获取和弦类型对应的完整音程
                     if (chordTypes[type]) {
                         intervals = [...chordTypes[type].intervals];
-                        
+
+                        // 减三和弦特殊处理：自动扩展为减七和弦
+                        if (type === 'dim' || type === 'diminished') {
+                            // 检查是否只包含3个音（三和弦）
+                            if (intervals.length === 3 && intervals.includes('1') && intervals.includes('♭3') && intervals.includes('♭5')) {
+                                // 扩展为减七和弦，添加减七度
+                                intervals = ['1', '♭3', '♭5', 'bb7'];
+                            }
+                        }
+
                         // 根据顺序设置调整音程顺序
                         const activeOrderBtn = document.querySelector('.progression-order-btn.active');
                         const order = activeOrderBtn ? activeOrderBtn.dataset.value : 'ordered';
-                        
+
                         if (order === 'reverse') {
                             // 倒序
                             intervals = intervals.reverse();
@@ -15818,9 +16287,34 @@
                 // 准备下一个和弦（保持相同的顺序）
                 const nextIndex = state.progressionIndex + 1;
                 if (nextIndex < state.progressionChords.length && shouldUpdateNextInfo) {
-                    const nextChord = state.progressionChords[nextIndex];
+                    let nextChord = state.progressionChords[nextIndex];
+
+                    // 备用匹配：如果主要正则表达式失败，尝试分解匹配
+                    let isRomanChord = nextChord.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/);
+                    if (!isRomanChord) {
+                        // 检查是否包含罗马数字和变音符号
+                        if (/[IVX]+/.test(nextChord) && (/[♭b#♯]/.test(nextChord) || /[mM]/.test(nextChord) || /[0-9]/.test(nextChord))) {
+                            isRomanChord = true;
+                            console.log('备用预览匹配成功，识别为罗马数字和弦');
+                        }
+                    }
+
+                    // 检查是否是罗马数字，如果是则转换为具体和弦符号
+                    if (isRomanChord) {
+                        // 这是罗马数字，需要转换
+                        const songGroup = state.progressionSong.charAt(0);
+                        const songData = jazzStandards[songGroup][state.progressionSong];
+                        const originalKey = songData.key;
+                        const targetKey = state.progressionKey;
+                        const songMode = songData.mode || detectSongMode(songData.chords);
+
+                        console.log('备用预览和弦转换:', { nextChord, originalKey, targetKey, songMode });
+                        nextChord = transposeChordFromDegree(nextChord, originalKey, targetKey, songMode);
+                        console.log('备用预览和弦转换结果:', nextChord);
+                    }
+
                     const { root: nextRoot, type: nextType } = parseChordSymbol(nextChord);
-                    
+
                     // 检查是否已经有预生成的下一个和弦信息
                     // 如果有，不要覆盖，以保持generateNextProgressionChord中预设置的值
                     if (!state.nextExerciseInfo) {
@@ -15832,11 +16326,20 @@
                             // 对于"全部"选项，使用和弦的完整音程
                             if (chordTypes[nextType]) {
                                 let nextIntervals = [...chordTypes[nextType].intervals];
-                                
+
+                                // 减三和弦特殊处理：自动扩展为减七和弦
+                                if (nextType === 'dim' || nextType === 'diminished') {
+                                    // 检查是否只包含3个音（三和弦）
+                                    if (nextIntervals.length === 3 && nextIntervals.includes('1') && nextIntervals.includes('♭3') && nextIntervals.includes('♭5')) {
+                                        // 扩展为减七和弦，添加减七度
+                                        nextIntervals = ['1', '♭3', '♭5', 'bb7'];
+                                    }
+                                }
+
                                 // 根据顺序设置调整音程顺序
                                 const activeOrderBtn = document.querySelector('.progression-order-btn.active');
                                 const order = activeOrderBtn ? activeOrderBtn.dataset.value : 'ordered';
-                                
+
                                 if (order === 'reverse') {
                                     // 倒序
                                     nextIntervals = nextIntervals.reverse();
@@ -17434,6 +17937,9 @@
                             if (chordType && chordType.includes('6')) {
                                 // 6和弦用6音替代7音
                                 intervals = ['3', '5', '6'];
+                            } else if (chordType && (chordType === 'dim' || chordType === 'diminished')) {
+                                // 减三和弦自动扩展为减七和弦，使用减七度
+                                intervals = ['3', '5', 'bb7']; // bb7 = 减七度
                             } else {
                                 // 其他非七和弦回退到三和弦音
                                 intervals = ['3', '5']; // 移除7级音
@@ -17453,15 +17959,32 @@
                     // 四和弦音
                     case 'quad-root-3-5-7':
                         intervals = ['1', '3', '5', '7'];
+                        // 减三和弦特殊处理：扩展为减七和弦
+                        if (chordType && (chordType === 'dim' || chordType === 'diminished')) {
+                            // 减三和弦自动扩展为减七和弦，使用减七度
+                            intervals = ['1', '3', '5', 'bb7']; // bb7 = 减七度
+                        }
                         break;
                     case 'quad-3-5-7-root':
                         intervals = ['3', '5', '7', '1'];
+                        // 减三和弦特殊处理：扩展为减七和弦
+                        if (chordType && (chordType === 'dim' || chordType === 'diminished')) {
+                            intervals = ['3', '5', 'bb7', '1']; // bb7 = 减七度
+                        }
                         break;
                     case 'quad-5-7-root-3':
                         intervals = ['5', '7', '1', '3'];
+                        // 减三和弦特殊处理：扩展为减七和弦
+                        if (chordType && (chordType === 'dim' || chordType === 'diminished')) {
+                            intervals = ['5', 'bb7', '1', '3']; // bb7 = 减七度
+                        }
                         break;
                     case 'quad-7-root-3-5':
                         intervals = ['7', '1', '3', '5'];
+                        // 减三和弦特殊处理：扩展为减七和弦
+                        if (chordType && (chordType === 'dim' || chordType === 'diminished')) {
+                            intervals = ['bb7', '1', '3', '5']; // bb7 = 减七度
+                        }
                         break;
                     case 'quad-random-inversion':
                         // 1,3,5,7随机转位
@@ -17472,9 +17995,17 @@
                             ['7', '1', '3', '5']  // 第三转位
                         ];
                         intervals = quadInversions[Math.floor(Math.random() * quadInversions.length)];
+                        // 减三和弦特殊处理：将7音替换为减七度
+                        if (chordType && (chordType === 'dim' || chordType === 'diminished')) {
+                            intervals = intervals.map(interval => interval === '7' ? 'bb7' : interval); // bb7 = 减七度
+                        }
                         break;
                     case 'quad-root-3-5-7-root':
                         intervals = ['1', '3', '5', '7', '1'];
+                        // 减三和弦特殊处理：扩展为减七和弦
+                        if (chordType && (chordType === 'dim' || chordType === 'diminished')) {
+                            intervals = ['1', '3', '5', 'bb7', '1']; // bb7 = 减七度
+                        }
                         break;
                     
                     // 旋律结构 - R→5th
@@ -17648,6 +18179,88 @@
                 return intervals;
             }
             
+            // 从和弦符号中推断音程
+            function getIntervalsFromChordSymbol(chordSymbol) {
+                console.log('getIntervalsFromChordSymbol - 输入和弦符号:', chordSymbol);
+                // 首先将b替换为♭符号，以支持两种格式
+                const normalizedChordSymbol = chordSymbol.replace(/b/g, '♭');
+                const { root, type } = parseChordSymbol(normalizedChordSymbol);
+                let intervals = [];
+                
+                // 基础音程（所有和弦都有根音）
+                intervals.push('1');
+                
+                // 根据和弦符号后缀推断音程
+                if (type.includes('minor') || type.includes('m')) {
+                    intervals.push('♭3');
+                } else if (!type.includes('sus')) {
+                    intervals.push('3');
+                }
+                
+                // 添加五音
+                if (type.includes('dim') || type.includes('♭5')) {
+                    intervals.push('♭5');
+                } else if (type.includes('aug') || type.includes('♯5')) {
+                    intervals.push('♯5');
+                } else {
+                    intervals.push('5');
+                }
+                
+                // 添加六音
+                if (type.includes('6')) {
+                    intervals.push('6');
+                }
+                
+                // 添加七音
+                if (type.includes('maj7') || type.includes('Maj7')) {
+                    intervals.push('7');
+                } else if (type.includes('7') && !type.includes('maj7') && !type.includes('Maj7')) {
+                    intervals.push('♭7');
+                }
+                
+                // 添加九音
+                if (type.includes('9') && !type.includes('♭9') && !type.includes('♯9')) {
+                    intervals.push('9');
+                } else if (type.includes('♭9')) {
+                    intervals.push('♭9');
+                } else if (type.includes('♯9')) {
+                    intervals.push('♯9');
+                }
+                
+                // 添加十一音
+                if (type.includes('11') && !type.includes('♯11')) {
+                    intervals.push('11');
+                } else if (type.includes('♯11')) {
+                    intervals.push('♯11');
+                }
+                
+                // 添加十三音
+                if (type.includes('13') && !type.includes('♭13')) {
+                    intervals.push('13');
+                } else if (type.includes('♭13')) {
+                    intervals.push('♭13');
+                }
+                
+                // 处理挂留和弦
+                if (type.includes('sus2')) {
+                    // 移除三音，添加二音
+                    intervals = intervals.filter(i => i !== '3' && i !== '♭3');
+                    intervals.push('2');
+                } else if (type.includes('sus4')) {
+                    // 移除三音，添加四音
+                    intervals = intervals.filter(i => i !== '3' && i !== '♭3');
+                    intervals.push('4');
+                }
+                
+                // 处理add9和弦
+                if (type.includes('add9') && !intervals.includes('9')) {
+                    intervals.push('9');
+                }
+                
+                console.log('getIntervalsFromChordSymbol - 推断出的音程:', intervals);
+                return intervals;
+            }
+
             // 获取和弦的特定音级对应的音符
             function getChordTone(root, chordType, interval) {
                 const noteIndex = notes.indexOf(root);
@@ -17935,7 +18548,10 @@
                     // 六和弦
                     'major6': '6',
                     'minor6': 'm6',
-                    
+
+                    // 三和弦
+                    'diminished': 'dim',
+
                     // 七和弦
                     'dominant7': '7',
                     'major7': 'maj7',
@@ -18026,7 +18642,9 @@
 
             // 解析和弦符号
             function parseChordSymbol(chordSymbol) {
-                const match = chordSymbol.match(/^([A-G][\u266f\u266d]?)(.*)$/);
+                // 首先将b替换为♭符号，以支持两种格式
+                const normalizedChordSymbol = chordSymbol.replace(/b/g, '♭');
+                const match = normalizedChordSymbol.match(/^([A-G][\u266f\u266d]?)(.*)$/);
                 if (!match) {
                     return { root: 'C', type: 'major' };
                 }
@@ -18051,6 +18669,8 @@
                     '': 'major',
                     'm': 'minor',
                     'dim': 'diminished',
+                    'o': 'diminished',
+                    'ø': 'minor7b5',
                     'aug': 'augmented',
                     '6': 'major6',
                     'm6': 'minor6',
@@ -18098,7 +18718,7 @@
             function updateKeySelector(songName) {
                 const progressionKeyEl = document.getElementById('progressionKey');
                 const customDropdown = document.getElementById('progressionKeyDropdown');
-                
+
                 // 获取歌曲数据
                 let songData = null;
                 for (const letter in jazzStandards) {
@@ -18107,27 +18727,36 @@
                         break;
                     }
                 }
-                
+
                 if (!songData) return;
-                
+
                 const originalKey = songData.key;
-                
-                // 重新生成原生select选项列表
-                const allKeys = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
-                
+                const songMode = songData.mode || 'major'; // 默认为大调，如果未指定
+
+                // 根据歌曲的调性类型生成相应的Key选项
+                const majorKeys = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
+                const minorKeys = ['Cm', 'C♯m', 'D♭m', 'Dm', 'D♯m', 'E♭m', 'Em', 'Fm', 'F♯m', 'G♭m', 'Gm', 'G♯m', 'A♭m', 'Am', 'A♯m', 'B♭m', 'Bm'];
+
+                const availableKeys = songMode === 'minor' ? minorKeys : majorKeys;
+
                 progressionKeyEl.innerHTML = '';
-                
-                allKeys.forEach(key => {
+
+                availableKeys.forEach(key => {
                     const option = document.createElement('option');
                     option.value = key;
-                    
-                    if (key === originalKey) {
+
+                    // 检查是否是默认调（去掉m后缀进行比较）
+                    const isDefaultKey = songMode === 'minor' ?
+                        key === originalKey + 'm' || key === originalKey :
+                        key === originalKey;
+
+                    if (isDefaultKey) {
                         option.textContent = `${key} 默认`;
                         option.selected = true;
                     } else {
                         option.textContent = key;
                     }
-                    
+
                     progressionKeyEl.appendChild(option);
                 });
                 
@@ -18135,22 +18764,29 @@
                 if (customDropdown) {
                     const trigger = customDropdown.querySelector('.dropdown-trigger .dropdown-text');
                     if (trigger) {
-                        trigger.textContent = `${originalKey} 默认`;
+                        const defaultKey = songMode === 'minor' ? originalKey + 'm' : originalKey;
+                        trigger.textContent = `${defaultKey} 默认`;
                     }
-                    
+
                     // 重新生成自定义下拉框的选项
                     const menu = customDropdown.querySelector('.dropdown-menu');
                     if (menu) {
                         menu.innerHTML = '';
-                        
-                        allKeys.forEach(key => {
+
+                        availableKeys.forEach(key => {
                             const keyLi = document.createElement('li');
                             keyLi.className = 'dropdown-item';
                             keyLi.setAttribute('data-value', key);
                             
                             const itemText = document.createElement('span');
                             itemText.className = 'item-text';
-                            if (key === originalKey) {
+
+                            // 检查是否是默认调
+                            const isDefaultKey = songMode === 'minor' ?
+                                key === originalKey + 'm' || key === originalKey :
+                                key === originalKey;
+
+                            if (isDefaultKey) {
                                 itemText.textContent = `${key} 默认`;
                             } else {
                                 itemText.textContent = key;
@@ -18346,19 +18982,25 @@
                 // 基本音级
                 'I': 0, 'II': 2, 'III': 4, 'IV': 5, 'V': 7, 'VI': 9, 'VII': 11,
                 // 降号音级
-                'bII': 1, 'bIII': 3, 'bV': 6, 'bVI': 8, 'bVII': 10,
-                // 升号音级（用等音代替）
-                '#I': 0, '#II': 2, '#IV': 5, '#V': 7, '#VI': 9
+                'bII': 1, 'bIII': 3, 'bIV': 4, 'bV': 6, 'bVI': 8, 'bVII': 10,
+                // 升号音级
+                '#I': 1, '#II': 3, '#IV': 6, '#V': 8, '#VI': 10,
+                // 变化音级（爵士和声中常用）
+                'VII': 11,  // 七级（导音）
+                '#IV': 6   // 升四级（作为属功能使用）
             };
 
-            // 小调音阶的音级对应关系（以自然小调为基础）
+            // 小调音阶的音级对应关系（支持爵士和声中的变化音级）
             const minorScaleDegrees = {
                 // 基本音级（自然小调：全-半-全-全-半-全-全）
                 'I': 0, 'II': 2, 'III': 3, 'IV': 5, 'V': 7, 'VI': 8, 'VII': 10,
                 // 降号音级
-                'bII': 1, 'bIII': 2, 'bIV': 4, 'bV': 6, 'bVI': 7, 'bVII': 9,
-                // 升号音级（用等音代替）
-                '#I': 0, '#II': 2, '#III': 3, '#IV': 5, '#V': 7, '#VI': 8
+                'bII': 1, 'bIII': 3, 'bIV': 4, 'bV': 6, 'bVI': 8, 'bVII': 10,
+                // 额外的变化音级（用于爵士和声）
+                'bbVII': 9,  // 重降七级
+                '#VI': 9,    // 升六级（等于降七级）
+                '#VII': 11,  // 升七级（等于主音）
+                'bVII': 10   // 降七级（在自然小调中已经存在）
             };
             
             // 十二平均律音名数组
@@ -18388,7 +19030,7 @@
             // 解析罗马数字级数
             function parseRomanNumeral(roman) {
                 // 匹配罗马数字部分（包括可能的变音前缀，支持♭、b、#、♯）
-                const match = roman.match(/^([♭b#♯]?)([IVX]+|[ivx]+)/);
+                const match = roman.match(/^([♭b#♯]?)([IVX]+|[ivx]+)(.*)$/);
                 if (!match) {
                     console.warn(`Cannot parse roman numeral: ${roman}`);
                     return { degree: 'I', isMinor: false, suffix: '' };
@@ -18396,10 +19038,18 @@
 
                 const accidentalPrefix = match[1]; // '♭'、'b'、'#'、'♯' 或空字符串
                 const romanPart = match[2];
-                const suffix = roman.replace(match[0], ''); // 移除罗马数字部分后的部分
+                const suffix = match[3] || ''; // 后缀部分（可能是空的）
 
-                // 判断是否为小写（小调）
-                const isMinor = /[ivx]/.test(romanPart);
+                // 判断是否为小调（通过罗马数字大小写或后缀中的m判断）
+                const isMinorFromRoman = /[ivx]/.test(romanPart);
+                // 排除减和弦、增和弦等特殊类型后，再判断是否为小调
+                const isMinorFromSuffix = /m/.test(suffix) &&
+                                         !suffix.includes('maj') &&
+                                         !suffix.includes('dim') &&
+                                         !suffix.includes('aug') &&
+                                         !suffix.includes('o') &&
+                                         !suffix.includes('ø');
+                const isMinor = isMinorFromRoman || isMinorFromSuffix;
                 const upperRoman = romanPart.toUpperCase();
 
                 // 标准化变音符号，以匹配音阶映射
@@ -18412,6 +19062,8 @@
 
                 const degree = normalizedPrefix + upperRoman;
 
+                console.log(`parseRomanNumeral: ${roman} -> degree: ${degree}, isMinor: ${isMinor}, suffix: ${suffix}`);
+
                 return {
                     degree: degree,
                     isMinor: isMinor,
@@ -18423,18 +19075,68 @@
             function degreeToNote(degree, keyRoot, keyMode = 'major') {
                 const keyRootNumber = noteToNumber[keyRoot];
                 const scaleDegrees = keyMode === 'major' ? majorScaleDegrees : minorScaleDegrees;
-                
+
+                // 调试♭III音级转换
+                if (degree === 'bIII' || degree.includes('III')) {
+                    console.log(`♭III音级调试: ${degree} in ${keyRoot}调, 调式=${keyMode}`);
+                    console.log(`keyRootNumber: ${keyRootNumber}, degree: ${degree}, semitones: ${scaleDegrees[degree]}`);
+                }
+
                 if (!(degree in scaleDegrees)) {
                     console.warn(`Unknown degree: ${degree}`);
+                    console.log(`Available degrees: ${Object.keys(scaleDegrees)}`);
                     return keyRoot;
                 }
-                
+
                 const semitones = scaleDegrees[degree];
                 const resultNumber = (keyRootNumber + semitones) % 12;
-                
-                // 使用固定的十二平均律音名数组，而不是根据调性选择
-                const chromaticNotes = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
-                return chromaticNotes[resultNumber];
+
+                // 调试♭III音级计算结果
+                if (degree === 'bIII' || degree.includes('III')) {
+                    console.log(`♭III音级计算: ${keyRootNumber} + ${semitones} = ${resultNumber}`);
+                }
+
+                // 根据调性选择合适的音名数组，但要尊重用户指定的升降号
+                const chromaticNotesSharp = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+                const chromaticNotesFlat = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+
+                // 检查音级是否包含升号或降号前缀
+                const hasSharpPrefix = degree.startsWith('#');
+                const hasFlatPrefix = degree.startsWith('b') || degree.startsWith('♭');
+
+                let chromaticNotes;
+                if (hasSharpPrefix) {
+                    // 如果用户明确指定了升号，优先使用升号音名
+                    chromaticNotes = chromaticNotesSharp;
+                    console.log(`用户指定升号音级 ${degree}，使用升号音名数组`);
+                } else if (hasFlatPrefix) {
+                    // 如果用户明确指定了降号，优先使用降号音名
+                    chromaticNotes = chromaticNotesFlat;
+                    console.log(`用户指定降号音级 ${degree}，使用降号音名数组`);
+                } else {
+                    // 否则根据调性默认选择
+                    // 升号调：G, D, A, E, B, F♯, C♯
+                    const sharpKeys = ['G', 'D', 'A', 'E', 'B', 'F♯', 'C♯'];
+                    // 降号调：F, B♭, E♭, A♭, D♭, G♭, C♭
+                    const flatKeys = ['F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'C♭'];
+
+                    if (sharpKeys.includes(keyRoot)) {
+                        chromaticNotes = chromaticNotesSharp;
+                        console.log(`${keyRoot}调默认使用升号音名数组`);
+                    } else {
+                        chromaticNotes = chromaticNotesFlat;
+                        console.log(`${keyRoot}调默认使用降号音名数组`);
+                    }
+                }
+
+                const result = chromaticNotes[resultNumber];
+
+                // 调试♭III音级最终结果
+                if (degree === 'bIII' || degree.includes('III')) {
+                    console.log(`计算结果: ${resultNumber} = ${result}`);
+                }
+
+                return result;
             }
             
             // 检测歌曲的调式（大调或小调）
@@ -18447,11 +19149,22 @@
                 let majorCount = 0;
 
                 for (const chord of sampleChords) {
-                    const parsed = parseRomanNumeral(chord);
-                    if (parsed.isMinor || chord.includes('m')) {
-                        minorCount++;
+                    // 检查是否是罗马数字表示法
+                    if (chord.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/)) {
+                        // 这是罗马数字表示法，使用parseRomanNumeral解析
+                        const parsed = parseRomanNumeral(chord);
+                        if (parsed.isMinor || chord.includes('m')) {
+                            minorCount++;
+                        } else {
+                            majorCount++;
+                        }
                     } else {
-                        majorCount++;
+                        // 这是直接的和弦符号，检查是否包含小调和弦标记
+                        if (chord.includes('m') && !chord.includes('maj')) {
+                            minorCount++;
+                        } else {
+                            majorCount++;
+                        }
                     }
                 }
 
@@ -18459,72 +19172,184 @@
                 return minorCount > majorCount ? 'minor' : 'major';
             }
 
+            // 将直接和弦符号转换为罗马数字音级
+            function chordToDegree(chordSymbol, keyRoot, keyMode = 'major') {
+                // 提取根音和和弦类型
+                const match = chordSymbol.match(/^([A-G][♭♯#b]?)(.*)$/);
+                if (!match) {
+                    console.warn(`无法解析和弦符号: ${chordSymbol}`);
+                    return 'I';
+                }
+
+                const rootNote = match[1];
+                const chordType = match[2];
+
+                // 标准化根音中的变音符号
+                let normalizedRoot = rootNote;
+                if (rootNote.includes('b')) {
+                    normalizedRoot = rootNote.replace(/b/g, '♭');
+                }
+
+                // 计算根音与调根音之间的音程
+                const keyRootNumber = noteToNumber[keyRoot];
+                const rootNoteNumber = noteToNumber[normalizedRoot];
+                const semitoneInterval = (rootNoteNumber - keyRootNumber + 12) % 12;
+
+                // 根据音程确定音级
+                let degree;
+                const scaleDegrees = keyMode === 'major' ? majorScaleDegrees : minorScaleDegrees;
+
+                // 查找最接近的音级
+                for (const [deg, semitones] of Object.entries(scaleDegrees)) {
+                    if (semitones === semitoneInterval) {
+                        degree = deg;
+                        break;
+                    }
+                }
+
+                // 如果没有找到精确匹配，查找最接近的音级
+                if (!degree) {
+                    // 处理特殊情况
+                    switch (semitoneInterval) {
+                        case 1: degree = 'bII'; break;
+                        case 2: degree = 'II'; break;
+                        case 3: degree = keyMode === 'major' ? 'bIII' : 'III'; break;
+                        case 4: degree = 'IV'; break;
+                        case 5: degree = keyMode === 'major' ? 'V' : 'bV'; break;
+                        case 6: degree = keyMode === 'major' ? 'bVI' : 'VI'; break;
+                        case 7: degree = keyMode === 'major' ? 'bVII' : 'VII'; break;
+                        case 8: degree = keyMode === 'major' ? 'VII' : 'I'; break;
+                        case 9: degree = keyMode === 'major' ? 'I' : 'bII'; break;
+                        case 10: degree = keyMode === 'major' ? 'bII' : 'II'; break;
+                        case 11: degree = keyMode === 'major' ? 'II' : 'bIII'; break;
+                        default: degree = 'I'; break;
+                    }
+                }
+
+                // 判断是否为小调和弦
+                let isMinor = false;
+                if (chordType.includes('m') && !chordType.includes('maj')) {
+                    isMinor = true;
+                }
+
+                // 构建罗马数字
+                let romanNumeral = degree;
+                if (isMinor) {
+                    // 将音级转换为小写罗马数字
+                    romanNumeral = romanNumeral.replace(/I/g, 'i')
+                                              .replace(/V/g, 'v')
+                                              .replace(/X/g, 'x');
+                }
+
+                // 添加和弦类型后缀
+                let suffix = chordType;
+                if (isMinor) {
+                    // 移除小调和弦标记中的'm'
+                    suffix = suffix.replace(/^m/, '');
+                }
+
+                // 处理特殊和弦类型
+                suffix = suffix.replace(/^maj/, 'M');
+                suffix = suffix.replace(/^7/, '7');
+                suffix = suffix.replace(/^9/, '9');
+                suffix = suffix.replace(/^13/, '13');
+
+                return romanNumeral + suffix;
+            }
+
             // 将基于音级的和弦转换为具体调性的和弦
             function transposeChordFromDegree(degreeChord, originalKey, targetKey, keyMode = 'major') {
-                const parsed = parseRomanNumeral(degreeChord);
-
-                let targetNote;
-
-                // 对于小调歌曲，使用修正的音阶映射
-                if (keyMode === 'minor') {
-                    // 小调中的特殊音级映射
-                    const minorScaleAdjustments = {
-                        'I': 0,   // 主音
-                        'bII': 1, // 降二级
-                        'II': 2,  // 自然二级
-                        'bIII': 3, // 降三级（关系大调的主音）
-                        'III': 4, // 自然三级
-                        'IV': 5,  // 自然四级
-                        'bV': 6,  // 降五级
-                        'V': 7,   // 自然五级
-                        'bVI': 8, // 降六级（属七和弦的三音）
-                        'VI': 9,  // 自然六级
-                        'bVII': 10, // 降七级
-                        'VII': 11  // 导音
-                    };
-
-                    if (minorScaleAdjustments.hasOwnProperty(parsed.degree)) {
-                        const semitones = minorScaleAdjustments[parsed.degree];
-                        const targetNoteNumber = (noteToNumber[targetKey] + semitones) % 12;
-                        // 使用固定的十二平均律音名数组，而不是根据调性选择
-                        const chromaticNotes = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
-                        targetNote = chromaticNotes[targetNoteNumber];
-                        console.log(`小调特殊映射: ${parsed.degree} = ${semitones} 半音, 目标音: ${targetNote}`);
-                    } else {
-                        // 回退到标准计算
-                        targetNote = degreeToNote(parsed.degree, targetKey, keyMode);
+                // 检查是否是罗马数字表示法（支持变音前缀和复杂和弦类型）
+                // 备用匹配：如果主要正则表达式失败，尝试分解匹配
+                let isRomanChord = degreeChord.match(/^[♭b#♯]?[IVX]+[mM]?(sus4|sus2|maj|dim|aug|o|ø)?[0-9♭♯()]*$/);
+                if (!isRomanChord) {
+                    // 检查是否包含罗马数字和变音符号
+                    if (/[IVX]+/.test(degreeChord) && (/[♭b#♯]/.test(degreeChord) || /[mM]/.test(degreeChord) || /[0-9]/.test(degreeChord))) {
+                        isRomanChord = true;
+                        console.log('transposeChordFromDegree: 备用匹配成功，识别为罗马数字和弦');
                     }
+                }
+
+                if (isRomanChord) {
+                    // 这是罗马数字表示法，进行转换
+                    const parsed = parseRomanNumeral(degreeChord);
+                    console.log(`转调: ${degreeChord} 从 ${originalKey} 到 ${targetKey}, 调式: ${keyMode}`);
+                    console.log(`解析结果: 度数=${parsed.degree}, 是否小调=${parsed.isMinor}, 后缀=${parsed.suffix}`);
+
+                    let targetNote;
+
+                    // 对于小调歌曲，使用修正的音阶映射
+                    if (keyMode === 'minor') {
+                        // 小调中的特殊音级映射
+                        const minorScaleAdjustments = {
+                            'I': 0,   // 主音
+                            'bII': 1, // 降二级
+                            'II': 2,  // 自然二级
+                            'bIII': 3, // 降三级（关系大调的主音）
+                            'III': 4, // 自然三级
+                            'IV': 5,  // 自然四级
+                            'bV': 6,  // 降五级
+                            'V': 7,   // 自然五级
+                            'bVI': 8, // 降六级（属七和弦的三音）
+                            'VI': 9,  // 自然六级
+                            'bVII': 10, // 降七级
+                            'VII': 11  // 导音
+                        };
+
+                        if (minorScaleAdjustments.hasOwnProperty(parsed.degree)) {
+                            const semitones = minorScaleAdjustments[parsed.degree];
+                            const targetNoteNumber = (noteToNumber[targetKey] + semitones) % 12;
+                            // 使用固定的十二平均律音名数组，而不是根据调性选择
+                            const chromaticNotes = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+                            targetNote = chromaticNotes[targetNoteNumber];
+                            console.log(`小调特殊映射: ${parsed.degree} = ${semitones} 半音, 目标音: ${targetNote}`);
+                        } else {
+                            // 回退到标准计算
+                            targetNote = degreeToNote(parsed.degree, targetKey, keyMode);
+                            console.log(`小调回退计算: ${parsed.degree} 在 ${targetKey} 调中 = ${targetNote}`);
+                        }
+                    } else {
+                        // 大调使用标准计算
+                        targetNote = degreeToNote(parsed.degree, targetKey, keyMode);
+                        console.log(`大调标准计算: ${parsed.degree} 在 ${targetKey} 调中 = ${targetNote}`);
+                    }
+
+                    // 构建和弦符号
+                    let chordSymbol = targetNote;
+
+                    // 添加和弦类型和后缀
+                    // 对于减和弦、增和弦等特殊类型，直接添加后缀，不需要添加m
+                    if (parsed.isMinor && !parsed.suffix.match(/^(dim|aug|o|ø)/)) {
+                        // 如果后缀已经包含m，避免重复
+                        if (!parsed.suffix.startsWith('m')) {
+                            chordSymbol += 'm';
+                        }
+                    }
+
+                    // 添加其他后缀
+                    chordSymbol += parsed.suffix;
+
+                    // 处理特殊符号替换
+                    chordSymbol = chordSymbol.replace('M7', 'maj7');
+                    // 将M6转换为6（大六和弦的标准标记）
+                    chordSymbol = chordSymbol.replace('M6', '6');
+                    // 处理其他可能的M后缀
+                    chordSymbol = chordSymbol.replace('M9', '9');
+                    chordSymbol = chordSymbol.replace('M13', '13');
+                    // 只有当M后面没有数字时才替换为maj（保护M6、M9等）
+                    if (!chordSymbol.match(/M\d/)) {
+                        chordSymbol = chordSymbol.replace(/M$/, 'maj');
+                    }
+
+                    // 确保使用正确的音乐符号（将b替换为♭）
+                    chordSymbol = chordSymbol.replace(/b/g, '♭');
+
+                    console.log(`最终和弦符号: ${chordSymbol}`);
+                    return chordSymbol;
                 } else {
-                    // 大调使用标准计算
-                    targetNote = degreeToNote(parsed.degree, targetKey, keyMode);
+                    // 这是直接的和弦符号，不需要转换，直接返回
+                    return degreeChord;
                 }
-
-                console.log(`计算结果: ${parsed.degree} 在 ${targetKey} 调中 = ${targetNote}`);
-
-                // 构建和弦符号
-                let chordSymbol = targetNote;
-
-                // 添加和弦类型
-                if (parsed.isMinor) {
-                    chordSymbol += 'm';
-                }
-
-                // 添加其他后缀
-                chordSymbol += parsed.suffix;
-
-                // 处理特殊符号替换
-                chordSymbol = chordSymbol.replace('M7', 'maj7');
-                // 将M6转换为6（大六和弦的标准标记）
-                chordSymbol = chordSymbol.replace('M6', '6');
-                // 处理其他可能的M后缀
-                chordSymbol = chordSymbol.replace('M9', '9');
-                chordSymbol = chordSymbol.replace('M13', '13');
-                // 只有当M后面没有数字时才替换为maj（保护M6、M9等）
-                if (!chordSymbol.match(/M\d/)) {
-                    chordSymbol = chordSymbol.replace(/M$/, 'maj');
-                }
-
-                return chordSymbol;
             }
 
             // 生成所有调的和弦进行（用于12个调的练习）
@@ -19952,32 +20777,40 @@
             function generateProgressionKeyContent() {
                 const keySelect = document.getElementById('progressionKey');
                 const currentValue = keySelect.value;
-                
-                const keys = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
-                
-                // 获取当前选中乐曲的原调
+
+                // 根据歌曲调性类型生成相应的调性列表
+                const majorKeys = ['C', 'C♯', 'D♭', 'D', 'D♯', 'E♭', 'E', 'F', 'F♯', 'G♭', 'G', 'G♯', 'A♭', 'A', 'A♯', 'B♭', 'B'];
+                const minorKeys = ['Cm', 'C♯m', 'D♭m', 'Dm', 'D♯m', 'E♭m', 'Em', 'Fm', 'F♯m', 'G♭m', 'Gm', 'G♯m', 'A♭m', 'Am', 'A♯m', 'B♭m', 'Bm'];
+
+                // 获取当前选中乐曲的原调和调式
                 const jazzStandardSelect = document.getElementById('jazzStandard');
                 const selectedSong = jazzStandardSelect.value;
-                
-                // 查找原调
+
+                // 查找原调和调式
                 let originalKey = 'C';
+                let songMode = 'major'; // 默认大调
                 if (typeof jazzStandards !== 'undefined') {
                     for (const letter in jazzStandards) {
                         if (jazzStandards[letter][selectedSong]) {
                             originalKey = jazzStandards[letter][selectedSong].key;
+                            songMode = jazzStandards[letter][selectedSong].mode || 'major';
                             break;
                         }
                     }
                 }
-                
+
+                // 根据调式选择相应的调性列表
+                const keys = songMode === 'minor' ? minorKeys : majorKeys;
+                const originalKeyDisplay = songMode === 'minor' ? originalKey + 'm' : originalKey;
+
                 let html = '<div class="selector-grid">';
-                
+
                 keys.forEach(key => {
                     const isActive = key === currentValue ? 'active' : '';
-                    const isOriginal = key === originalKey;
+                    const isOriginal = key === originalKeyDisplay || key === originalKey;
                     const displayText = isOriginal ? `${key} 默认` : key;
-                    const desc = isOriginal ? '歌曲原调' : '移调';
-                    
+                    const desc = isOriginal ? '歌曲原调' : (songMode === 'minor' ? '移调到此小调' : '移调到此大调');
+
                     html += `
                         <div class="selector-item ${isActive}" data-value="${key}">
                             <div class="selector-item-title">${displayText}</div>
@@ -19985,7 +20818,7 @@
                         </div>
                     `;
                 });
-                
+
                 html += '</div>';
                 fullscreenSelectorContent.innerHTML = html;
                 
@@ -20677,7 +21510,19 @@
                         newTrigger.addEventListener('click', function(e) {
                             e.preventDefault();
                             e.stopPropagation();
-                            openFullscreenSelector('progressionKey', '选择调性', null);
+                            // 根据歌曲调性类型确定标题
+                        let keyTitle = '选择调性';
+                        if (typeof jazzStandards !== 'undefined') {
+                            const selectedSong = document.getElementById('jazzStandard').value;
+                            for (const letter in jazzStandards) {
+                                if (jazzStandards[letter][selectedSong]) {
+                                    const songMode = jazzStandards[letter][selectedSong].mode || 'major';
+                                    keyTitle = songMode === 'minor' ? '选择小调' : '选择大调';
+                                    break;
+                                }
+                            }
+                        }
+                        openFullscreenSelector('progressionKey', keyTitle, null);
                         });
                     }
                 }
