@@ -182,7 +182,7 @@
     color: white;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 .chord-sequence-empty {
@@ -263,7 +263,7 @@ select optgroup {
     color: #3a9fc4;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     letter-spacing: 0.5px;
 }
 
@@ -952,7 +952,7 @@ select optgroup {
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -983,7 +983,7 @@ select optgroup {
 
 .caged-toggle-text {
     display: inline-block;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 /* MIDI设备支持样式 */
@@ -1001,7 +1001,7 @@ select optgroup {
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -1032,7 +1032,7 @@ select optgroup {
 
 .midi-toggle-text {
     display: inline-block;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 .midi-device-info {
@@ -1083,7 +1083,7 @@ select optgroup {
     border-radius: 8px;
     color: #e2e8f0;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     font-size: 14px;
     font-weight: 500;
 }
@@ -1431,7 +1431,7 @@ select optgroup {
     border-radius: 8px;
     color: #e2e8f0;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     font-size: 14px;
     font-weight: 500;
     text-align: center;
@@ -2112,7 +2112,7 @@ input:checked+.slider:before {
         border-radius: 8px;
         color: #e2e8f0;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
         font-size: 14px;
         font-weight: 500;
         text-align: center;
@@ -2136,7 +2136,7 @@ input:checked+.slider:before {
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease, visibility 0.3s ease, opacity 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     letter-spacing: 0.5px;
     flex: 1;
     max-width: 280px;
@@ -2368,7 +2368,7 @@ input:checked+.slider:before {
     color: #94a3b8;
     border: 1px solid rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     z-index: 1000;
 }
 
@@ -2956,7 +2956,7 @@ input:checked+.slider:before {
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     box-shadow: 0 4px 12px rgba(5, 5, 5, 0.5);
 }
 
@@ -3071,6 +3071,36 @@ input:checked+.slider:before {
     0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
     50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
     100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 优化后的音程完成样式 - 使用CSS类而不是内联样式 */
+.interval-completed {
+    color: #888;
+    opacity: 0.3;
+    transition: opacity 0.15s ease-out;
+    /* 使用硬件加速优化性能 */
+    will-change: opacity;
+    transform: translateZ(0);
+}
+
+/* MIDI输入反馈样式 - 移除内联样式到CSS */
+.midi-input-feedback {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(58, 159, 196, 0.9);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    z-index: 10001;
+    transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    /* 优化移动端性能 */
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .fretboard-note {
@@ -3259,7 +3289,7 @@ input:checked+.slider:before {
     padding: 6px 12px;
     font-size: 12px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     white-space: nowrap;
 }
 

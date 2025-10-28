@@ -1544,49 +1544,40 @@
                 }
             }
 
-            // 显示MIDI输入反馈
+            // 显示MIDI输入反馈（优化版）
             function showMIDIInputFeedback(noteName, velocity) {
                 // 创建或更新MIDI反馈显示元素
                 let feedbackEl = document.getElementById('midiInputFeedback');
                 if (!feedbackEl) {
                     feedbackEl = document.createElement('div');
                     feedbackEl.id = 'midiInputFeedback';
-                    feedbackEl.style.cssText = `
-                        position: fixed;
-                        top: 20px;
-                        right: 20px;
-                        background: rgba(58, 159, 196, 0.9);
-                        color: white;
-                        padding: 10px 15px;
-                        border-radius: 8px;
-                        font-size: 18px;
-                        font-weight: bold;
-                        z-index: 10001;
-                        transition: all 0.3s ease;
-                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-                    `;
+                    feedbackEl.className = 'midi-input-feedback';
                     document.body.appendChild(feedbackEl);
                 }
 
-                // 更新显示内容
+                // 优化：批量更新样式，减少重排
                 const noteWithoutOctave = noteName.replace(/\d+$/, '');
-                feedbackEl.textContent = `♪ ${noteWithoutOctave}`;
-
-                // 根据力度调整透明度和大小
                 const opacity = Math.min(1, 0.5 + (velocity / 127) * 0.5);
                 const scale = 1 + (velocity / 127) * 0.2;
-                feedbackEl.style.opacity = opacity;
-                feedbackEl.style.transform = `scale(${scale})`;
 
-                // 短暂显示后淡出
-                feedbackEl.style.display = 'block';
+                // 使用requestAnimationFrame优化视觉更新
+                requestAnimationFrame(() => {
+                    feedbackEl.textContent = `♪ ${noteWithoutOctave}`;
+                    feedbackEl.style.opacity = opacity;
+                    feedbackEl.style.transform = `scale(${scale})`;
+                    feedbackEl.style.display = 'block';
+                });
+
+                // 优化：使用更短的延迟，减少资源占用
                 clearTimeout(window.midiState.feedbackTimeout);
                 window.midiState.feedbackTimeout = setTimeout(() => {
-                    feedbackEl.style.opacity = '0';
+                    requestAnimationFrame(() => {
+                        feedbackEl.style.opacity = '0';
+                    });
                     setTimeout(() => {
                         feedbackEl.style.display = 'none';
-                    }, 300);
-                }, 800);
+                    }, 200); // 减少动画时间
+                }, 600); // 减少显示时间
             }
 
             // MIDI音符号转换为音符名称
@@ -6972,7 +6963,7 @@
 
                         // 旋律小调系列
                         'melodicMinor': { name: 'Melodic Minor - 1 2 ♭3 4 5 6 7', intervals: ['1', '2', '♭3', '4', '5', '6', '7'] },
-                        'melodicMinorDescending': { name: 'Melodic Minor Descending - 1 ♭7 ♭6 5 4 ♭3 2 1', intervals: ['1', '♭7', '♭6', '5', '4', '♭3', '2', '1'] },
+                        'melodicMinorDescending': { name: 'Melodic Minor Descending - 1 ♭7 ♭6 5 4 ♭3 2', intervals: ['1', '♭7', '♭6', '5', '4', '♭3', '2'] },
                         'dorianFlat2': { name: 'Dorian ♭2 - 1 ♭2 ♭3 4 5 6 ♭7', intervals: ['1', '♭2', '♭3', '4', '5', '6', '♭7'] },
                         'lydianAugmented': { name: 'Lydian Augmented - 1 2 3 ♯4 ♯5 6 7', intervals: ['1', '2', '3', '♯4', '♯5', '6', '7'] },
                         'lydianFlat7': { name: 'Lydian ♭7 - 1 2 3 ♯4 5 6 ♭7', intervals: ['1', '2', '3', '♯4', '5', '6', '♭7'] },
@@ -7542,7 +7533,7 @@
                 
                 // 旋律小调系列
                 'melodicMinor': { name: 'Melodic Minor - 1 2 ♭3 4 5 6 7', intervals: ['1', '2', '♭3', '4', '5', '6', '7'] },
-                'melodicMinorDescending': { name: 'Melodic Minor Descending - 1 ♭7 ♭6 5 4 ♭3 2 1', intervals: ['1', '♭7', '♭6', '5', '4', '♭3', '2', '1'] },
+                'melodicMinorDescending': { name: 'Melodic Minor Descending - 1 ♭7 ♭6 5 4 ♭3 2', intervals: ['1', '♭7', '♭6', '5', '4', '♭3', '2'] },
                 'dorianFlat2': { name: 'Dorian ♭2 - 1 ♭2 ♭3 4 5 6 ♭7', intervals: ['1', '♭2', '♭3', '4', '5', '6', '♭7'] },
                 'lydianAugmented': { name: 'Lydian Augmented - 1 2 3 ♯4 ♯5 6 7', intervals: ['1', '2', '3', '♯4', '♯5', '6', '7'] },
                 'lydianFlat7': { name: 'Lydian ♭7 - 1 2 3 ♯4 5 6 ♭7', intervals: ['1', '2', '3', '♯4', '5', '6', '♭7'] },
@@ -19837,39 +19828,43 @@
             }
         });
 
-        // 全局函数：更新音程显示，将弹对的音程变灰
+        // 全局函数：更新音程显示，将弹对的音程变灰（优化版）
         window.updateIntervalDisplay = function(completedInterval) {
-            console.log(`updateIntervalDisplay: 更新音程 ${completedInterval} 的显示`);
             const intervalDisplay = document.getElementById('intervalExerciseDisplay');
-            if (!intervalDisplay) {
-                console.log('updateIntervalDisplay: 未找到 intervalExerciseDisplay 元素');
-                return;
-            }
+            if (!intervalDisplay) return;
 
-            // 查找当前题目显示元素并更新
             const currentInterval = intervalDisplay.querySelector('.current-interval');
-            if (currentInterval) {
-                const intervals = state.currentIntervalExercise.currentInterval.split(' ');
-                const completedIntervals = state.currentIntervalExercise.completedIntervals || [];
+            if (!currentInterval) return;
 
-                console.log(`updateIntervalDisplay: 所有音程=${intervals}, 已完成=${completedIntervals}`);
+            const intervals = state.currentIntervalExercise.currentInterval.split(' ');
+            const completedIntervals = state.currentIntervalExercise.completedIntervals || [];
 
-                // 重新构建当前题目显示，已完成的音程用灰色显示
-                const displayText = intervals.map(interval => {
-                    if (completedIntervals.includes(interval)) {
-                        return `<span style="color: #888; opacity: 0.3;">${interval}</span>`;
-                    } else {
-                        return interval;
-                    }
-                }).join(' ');
+            // 优化：使用DocumentFragment减少重排，预先计算样式类
+            const fragment = document.createDocumentFragment();
+            let hasChanges = false;
 
-                console.log(`updateIntervalDisplay: 新显示内容=${displayText}`);
-                currentInterval.innerHTML = displayText;
-            } else {
-                console.log('updateIntervalDisplay: 未找到 .current-interval 元素');
+            intervals.forEach((interval, index) => {
+                const span = document.createElement('span');
+                span.textContent = interval;
+
+                // 添加间隔空格（除了最后一个）
+                if (index < intervals.length - 1) {
+                    span.textContent += ' ';
+                }
+
+                if (completedIntervals.includes(interval)) {
+                    span.className = 'interval-completed';
+                    hasChanges = true;
+                }
+
+                fragment.appendChild(span);
+            });
+
+            // 只在有变化时更新DOM
+            if (hasChanges) {
+                currentInterval.innerHTML = '';
+                currentInterval.appendChild(fragment);
             }
-
-            console.log(`音程显示已更新，已完成: ${state.currentIntervalExercise.completedIntervals.join(', ')}`);
         };
     </script>
     
@@ -20966,7 +20961,7 @@
                     ],
                     '旋律小调系列': [
                         { value: 'melodicMinor', title: 'Melodic Minor', desc: '1 2 ♭3 4 5 6 7' },
-                        { value: 'melodicMinorDescending', title: 'Melodic Minor Desc', desc: '1 ♭7 ♭6 5 4 ♭3 2 1' },
+                        { value: 'melodicMinorDescending', title: 'Melodic Minor Desc', desc: '1 ♭7 ♭6 5 4 ♭3 2' },
                         { value: 'dorianFlat2', title: 'Dorian ♭2', desc: '1 ♭2 ♭3 4 5 6 ♭7' },
                         { value: 'lydianAugmented', title: 'Lydian Augmented', desc: '1 2 3 ♯4 ♯5 6 7' },
                         { value: 'lydianFlat7', title: 'Lydian ♭7', desc: '1 2 3 ♯4 5 6 ♭7' },
