@@ -1,0 +1,54 @@
+# v0 runtime files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+dist_backup/
+dist.zip
+*.tsbuildinfo
+
+# Environment files
+.env*.local
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Certificates (SENSITIVE - DO NOT COMMIT)
+*.crt
+*.key
+*.pem
+
+# Backup files
+*.corrupted
+*_backup.*
+*.bak
+
+# Temporary scripts
+fix-*.js
+fix-*.sh
+*-api.sh
+stats-*.sh
+test-*.sh
+mobile-optimized.html
+sqlite-api.sh
+
+# Local server scripts
+server*.js
+
+# Logs
+*.log
+npm-debug.log*
