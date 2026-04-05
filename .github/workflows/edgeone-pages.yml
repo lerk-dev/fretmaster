@@ -1,0 +1,35 @@
+name: Deploy to EdgeOne Pages
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Deploy to EdgeOne Pages
+        uses: TencentCloud/edgeone-pages-action@main
+        with:
+          build-dir: ./dist
+          # 在 EdgeOne Pages 控制台获取以下信息
+          # zone-id: ${{ secrets.EO_ZONE_ID }}
+          # api-token: ${{ secrets.EO_API_TOKEN }}
