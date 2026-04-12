@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { Button } from "@/components/ui/button"
@@ -5065,11 +5065,10 @@ export default function FretMasterPage() {
             }
           }
           
-          // 连接音频节点
+          // 连接音频节点（不连接到扬声器，避免音频反馈）
           source.connect(gainNode)
           gainNode.connect(analyser)
           analyser.connect(workletNode)
-          workletNode.connect(ctx.destination)
           
           useWorklet = true
           logger.debug('AudioWorklet 初始化成功')
@@ -5088,7 +5087,12 @@ export default function FretMasterPage() {
         source.connect(gainNode)
         gainNode.connect(analyser)
         analyser.connect(scriptProcessor)
-        scriptProcessor.connect(ctx.destination)
+        // ScriptProcessorNode 需要连接到 destination 才能触发 onaudioprocess
+        // 但我们创建一个静音的 gain 节点来避免声音输出
+        const silentGain = ctx.createGain()
+        silentGain.gain.value = 0
+        scriptProcessor.connect(silentGain)
+        silentGain.connect(ctx.destination)
         
         startPitchDetectionWithNodes(analyser, ctx, scriptProcessor)
       }
