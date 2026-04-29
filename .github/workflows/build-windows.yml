@@ -23,8 +23,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Rust
-        uses: dtolnay/rust-action@master
+      - name: Setup Rust
+        run: |
+          rustup update
+          rustup target add x86_64-pc-windows-msvc
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
@@ -40,14 +42,10 @@ jobs:
       - name: Build Tauri App
         run: cargo tauri build
         working-directory: src-tauri
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: List build outputs
         run: |
           Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -ErrorAction SilentlyContinue
-          Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
 
       - name: Upload MSI Installer
         uses: actions/upload-artifact@v4
