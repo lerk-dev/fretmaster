@@ -1,0 +1,5 @@
+[target.x86_64-pc-windows-gnu]
+linker = "gcc"
+
+[build]
+target = "x86_64-pc-windows-gnu"
