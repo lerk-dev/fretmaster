@@ -24,7 +24,7 @@ jobs:
           node-version: '20'
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-action@master
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
