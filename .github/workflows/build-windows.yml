@@ -22,27 +22,36 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install Rust
         uses: dtolnay/rust-action@stable
-        with:
-          targets: x86_64-pc-windows-msvc
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Build Frontend
+        run: npm run build
+        env:
+          TAURI_BUILD: true
+
       - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli
+        run: cargo install tauri-cli --locked
 
       - name: Build Tauri App
-        run: npm run tauri:build
+        run: cargo tauri build
+        working-directory: src-tauri
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+      - name: List build outputs
+        run: |
+          Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -ErrorAction SilentlyContinue
+          Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
+
       - name: Upload MSI Installer
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: FretMaster-Windows-MSI
           path: src-tauri/target/release/bundle/msi/*.msi
@@ -50,16 +59,10 @@ jobs:
 
       - name: Upload NSIS Installer
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: FretMaster-Windows-NSIS
           path: src-tauri/target/release/bundle/nsis/*.exe
-          if-no-files-found: warn
-
-      - name: Upload Portable Executable
-        uses: actions/upload-artifact@v4
-        with:
-          name: FretMaster-Windows-Portable
-          path: src-tauri/target/release/FretMaster.exe
           if-no-files-found: warn
 
       - name: Create Release
