@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CARGO_TERM_COLOR: always
 
 jobs:
   build-windows:
@@ -24,13 +24,24 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
 
-      - name: Setup Rust
-        uses: dtolnay/rust-action@stable
-        with:
-          toolchain: stable
-          targets: x86_64-pc-windows-msvc
+      - name: Install Rust
+        shell: pwsh
+        run: |
+          $rustupPath = "$env:USERPROFILE\.cargo\bin"
+          if (-not (Test-Path "$rustupPath\rustc.exe")) {
+            Invoke-WebRequest -Uri 'https://win.rustup.rs/x86_64' -OutFile 'rustup-init.exe'
+            .\rustup-init.exe -y --default-toolchain stable --target x86_64-pc-windows-msvc
+          }
+          "$rustupPath" | Out-File -FilePath $env:GITHUB_PATH -Append
+          "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Verify Rust
+        shell: pwsh
+        run: |
+          rustc --version
+          cargo --version
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
@@ -41,9 +52,13 @@ jobs:
           TAURI_BUILD: true
 
       - name: Build Tauri App
-        run: npm run tauri:build
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:PATH;$env:USERPROFILE\.cargo\bin"
+          npm run tauri:build
 
       - name: List build outputs
+        shell: pwsh
         run: |
           Get-ChildItem -Path "src-tauri/target/release" -ErrorAction SilentlyContinue
           Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -ErrorAction SilentlyContinue
@@ -74,4 +89,4 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }
