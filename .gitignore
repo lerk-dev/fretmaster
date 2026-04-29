@@ -1,0 +1,110 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+dist/
+dist_backup/
+out/
+*.tsbuildinfo
+dist.zip
+
+# Environment files
+.env*.local
+.env
+.env.development
+.env.production
+
+# OS files
+.DDS_Store
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# Certificates (SENSITIVE - DO NOT COMMIT)
+*.crt
+*.key
+*.pem
+*.p12
+
+# Backup files
+*.corrupted
+*_backup.*
+*.bak
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+
+# TypeScript
+*.tsbuildinfo
+
+# Debug
+.npm
+.eslintcache
+
+# Deployment
+fretmaster.tar.gz
+fretmaster.zip
+fretmaster-deploy.zip
+
+# Local server scripts
+server*.js
+!server-*.d.ts
+
+# Python scripts (development tools)
+*.py
+__pycache__/
+*.py[cod]
+
+# Analysis files
+*-analysis.md
+code-comparison-analysis.md
+
+# Converted files
+solo_levels_converted.txt
+solo_songs_converted.ts
+
+# v0 runtime files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+
+# Temporary scripts
+fix-*.js
+fix-*.sh
+*-api.sh
+stats-*.sh
+test-*.sh
+mobile-optimized.html
+sqlite-api.sh
+
+# Rust installer
+rustup-init.exe
+
+# Deployment scripts
+deploy-simple.ps1
+deploy-ssh.ps1
