@@ -10,6 +10,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -21,12 +24,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Setup Rust
-        run: |
-          rustup update
-          rustup target add x86_64-pc-windows-msvc
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
@@ -36,15 +40,12 @@ jobs:
         env:
           TAURI_BUILD: true
 
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --locked
-
       - name: Build Tauri App
-        run: cargo tauri build
-        working-directory: src-tauri
+        run: npm run tauri:build
 
       - name: List build outputs
         run: |
+          Get-ChildItem -Path "src-tauri/target/release" -ErrorAction SilentlyContinue
           Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -ErrorAction SilentlyContinue
 
       - name: Upload MSI Installer
