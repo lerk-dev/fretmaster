@@ -24,6 +24,14 @@ export interface AudioSettings {
   useAudioWorklet: boolean
   selectedAudioDevice: string
   pitchAlgorithm: 'standard' | 'solo'  // 音高识别算法：standard=标准YIN, solo=SOLO FFT加速版
+  // Windows 版本专用设置
+  bufferSize?: number  // 缓冲区大小 (256, 512, 1024, 2048, 4096)
+  sampleRate?: number  // 采样率 (44100, 48000, 96000, 192000)
+  noiseSuppression?: number  // 噪音抑制级别 (0-100)
+  enableHighPass?: boolean  // 高通滤波
+  enableLowPass?: boolean  // 低通滤波
+  enableNotch50?: boolean  // 50Hz 陷波
+  enableNotch60?: boolean  // 60Hz 陷波
 }
 
 // Focus模式设置
@@ -83,6 +91,26 @@ export interface FeedbackSoundSettings {
   wrongSound: boolean
 }
 
+// 和弦符号显示设置
+export interface ChordSymbolSettings {
+  minorSymbol: 'm' | '-' | 'min'  // 小调和弦符号
+  minor7flat5Symbol: 'm7b5' | 'ø7' | 'half-dim'  // 半减七和弦符号
+  dominant7flat9Symbol: '7b9' | '7♭9' | '7-9'  // 属七降九和弦符号
+  useUnicode: boolean  // 使用 Unicode 符号 (♯, ♭, Δ, ø, °)
+  useJazzNotation: boolean  // 使用爵士乐记谱法
+}
+
+// 音阶练习设置
+export interface ScalePracticeSettings {
+  scaleKey: string  // 音阶主音
+  isScaleKeyRandom: boolean  // 是否随机主音
+  selectedScaleCategory: string  // 音阶分类
+  selectedScales: string[]  // 选中的音阶列表
+  scaleDirection: 'up' | 'down' | 'random'  // 音阶方向
+  scaleRootMovement: 'static' | 'random' | 'upSemiTone' | 'downSemiTone' | 'circleOfFifths' | 'circleOfFourths'  // 主音移动方式
+  scalePracticeSequence: string  // 音阶练习序列类型
+}
+
 // 应用状态
 export interface AppState {
   // UI 状态
@@ -109,6 +137,12 @@ export interface AppState {
   
   // 反馈音
   feedbackSound: FeedbackSoundSettings
+  
+  // 和弦符号显示
+  chordSymbols: ChordSymbolSettings
+  
+  // 音阶练习设置
+  scalePractice: ScalePracticeSettings
   
   // 统计数据
   practiceStats: PracticeStats[]
@@ -158,6 +192,14 @@ export interface AppActions {
   setUseAudioWorklet: (use: boolean) => void
   setSelectedAudioDevice: (deviceId: string) => void
   setPitchAlgorithm: (algorithm: 'standard' | 'solo') => void
+  // Windows 版本音频设置操作
+  setBufferSize: (size: number) => void
+  setSampleRate: (rate: number) => void
+  setNoiseSuppression: (level: number) => void
+  setEnableHighPass: (enabled: boolean) => void
+  setEnableLowPass: (enabled: boolean) => void
+  setEnableNotch50: (enabled: boolean) => void
+  setEnableNotch60: (enabled: boolean) => void
   setDetectedPitch: (pitch: string | null) => void
   setDetectedCents: (cents: number | null) => void
   
@@ -179,6 +221,12 @@ export interface AppActions {
   setFeedbackSoundEnabled: (enabled: boolean) => void
   setCorrectSoundEnabled: (enabled: boolean) => void
   setWrongSoundEnabled: (enabled: boolean) => void
+  
+  // 和弦符号设置操作
+  setChordSymbolSettings: (settings: Partial<ChordSymbolSettings>) => void
+  
+  // 音阶练习设置操作
+  setScalePracticeSettings: (settings: Partial<ScalePracticeSettings>) => void
   
   // 统计操作
   addPracticeRecord: (type: PracticeType, detailName: string) => void
@@ -232,6 +280,14 @@ const initialState: AppState = {
     useAudioWorklet: true,
     selectedAudioDevice: '',
     pitchAlgorithm: 'solo',  // 默认使用SOLO算法
+    // Windows 版本默认值 - SOLO 默认参数
+    bufferSize: 2048,        // SOLO 默认缓冲区大小
+    sampleRate: 48000,       // SOLO 默认采样率
+    noiseSuppression: 70,    // Windows 最佳实践：较高噪音抑制
+    enableHighPass: true,    // Windows 最佳实践：启用高通滤波
+    enableLowPass: true,     // Windows 最佳实践：启用低通滤波
+    enableNotch50: true,     // Windows 最佳实践：启用50Hz陷波(亚洲/欧洲)
+    enableNotch60: false,    // 北美用户可手动启用60Hz陷波
   },
   
   detectedPitch: null,
@@ -257,6 +313,24 @@ const initialState: AppState = {
     enabled: true,
     correctSound: true,
     wrongSound: true,
+  },
+  
+  chordSymbols: {
+    minorSymbol: 'm',  // SOLO 默认使用 'm'
+    minor7flat5Symbol: 'ø7',  // SOLO 默认使用爵士符号 ø7
+    dominant7flat9Symbol: '7b9',  // SOLO 默认使用 7b9
+    useUnicode: true,  // SOLO 默认使用 Unicode 符号
+    useJazzNotation: true,  // SOLO 默认使用爵士乐记谱法
+  },
+  
+  scalePractice: {
+    scaleKey: 'C',
+    isScaleKeyRandom: false,
+    selectedScaleCategory: 'pentatonic',
+    selectedScales: ['minor_pentatonic'],
+    scaleDirection: 'up',
+    scaleRootMovement: 'static',
+    scalePracticeSequence: '1to1',
   },
   
   practiceStats: [],
@@ -334,6 +408,14 @@ export const useAppStore = create<AppState & AppActions>()(
       setUseAudioWorklet: (use) => set((state) => ({ audio: { ...state.audio, useAudioWorklet: use } })),
       setSelectedAudioDevice: (deviceId) => set((state) => ({ audio: { ...state.audio, selectedAudioDevice: deviceId } })),
       setPitchAlgorithm: (algorithm) => set((state) => ({ audio: { ...state.audio, pitchAlgorithm: algorithm } })),
+      // Windows 版本音频设置
+      setBufferSize: (size) => set((state) => ({ audio: { ...state.audio, bufferSize: size } })),
+      setSampleRate: (rate) => set((state) => ({ audio: { ...state.audio, sampleRate: rate } })),
+      setNoiseSuppression: (level) => set((state) => ({ audio: { ...state.audio, noiseSuppression: level } })),
+      setEnableHighPass: (enabled) => set((state) => ({ audio: { ...state.audio, enableHighPass: enabled } })),
+      setEnableLowPass: (enabled) => set((state) => ({ audio: { ...state.audio, enableLowPass: enabled } })),
+      setEnableNotch50: (enabled) => set((state) => ({ audio: { ...state.audio, enableNotch50: enabled } })),
+      setEnableNotch60: (enabled) => set((state) => ({ audio: { ...state.audio, enableNotch60: enabled } })),
       setDetectedPitch: (pitch) => set({ detectedPitch: pitch }),
       setDetectedCents: (cents) => set({ detectedCents: cents }),
       
@@ -355,6 +437,12 @@ export const useAppStore = create<AppState & AppActions>()(
       setFeedbackSoundEnabled: (enabled) => set((state) => ({ feedbackSound: { ...state.feedbackSound, enabled } })),
       setCorrectSoundEnabled: (enabled) => set((state) => ({ feedbackSound: { ...state.feedbackSound, correctSound: enabled } })),
       setWrongSoundEnabled: (enabled) => set((state) => ({ feedbackSound: { ...state.feedbackSound, wrongSound: enabled } })),
+      
+      // 和弦符号设置操作
+      setChordSymbolSettings: (settings) => set((state) => ({ chordSymbols: { ...state.chordSymbols, ...settings } })),
+      
+      // 音阶练习设置操作
+      setScalePracticeSettings: (settings) => set((state) => ({ scalePractice: { ...state.scalePractice, ...settings } })),
       
       // 统计操作
       addPracticeRecord: (type, detailName) => set((state) => {

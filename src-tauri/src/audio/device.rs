@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use cpal::traits::{HostTrait, DeviceTrait};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioDeviceInfo {
@@ -16,13 +17,13 @@ pub fn list_input_devices() -> Vec<AudioDeviceInfo> {
     let mut devices = Vec::new();
     
     if let Ok(input_devices) = host.input_devices() {
-        for device in input_devices.flatten() {
+        for device in input_devices {
             let name = device.name().unwrap_or_else(|_| "Unknown".to_string());
             let is_default = default_name.as_ref().map(|n| n == &name).unwrap_or(false);
             
             let (channels, sample_rate) = device
                 .default_input_config()
-                .map(|config| (config.channels, config.sample_rate.0))
+                .map(|config| (config.channels(), config.sample_rate().0))
                 .unwrap_or((1, 48000));
             
             devices.push(AudioDeviceInfo {
@@ -44,7 +45,7 @@ pub fn get_default_input_device() -> Option<AudioDeviceInfo> {
     
     let (channels, sample_rate) = device
         .default_input_config()
-        .map(|config| (config.channels, config.sample_rate.0))
+        .map(|config| (config.channels(), config.sample_rate().0))
         .unwrap_or((1, 48000));
     
     Some(AudioDeviceInfo {

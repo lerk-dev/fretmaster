@@ -500,6 +500,64 @@ export function getChordTypeUnicodeDisplayString(chordType: ChordType): string {
     .replace(/aug/g, '+')
 }
 
+// ==================== 可配置的和弦符号格式化 ====================
+export interface ChordSymbolConfig {
+  minorSymbol: 'm' | '-' | 'min'
+  minor7flat5Symbol: 'm7b5' | 'ø7' | 'half-dim'
+  dominant7flat9Symbol: '7b9' | '7♭9' | '7-9'
+  useUnicode: boolean
+  useJazzNotation: boolean
+}
+
+export function formatChordWithConfig(
+  chordType: ChordType,
+  config: ChordSymbolConfig
+): string {
+  let display = getChordTypeDisplayString(chordType, config.minorSymbol, config.minor7flat5Symbol)
+  
+  // 处理 7b9 符号
+  if (config.dominant7flat9Symbol !== '7b9') {
+    display = display.replace(/7b9/g, config.dominant7flat9Symbol)
+  }
+  
+  // 应用 Unicode 转换
+  if (config.useUnicode) {
+    display = display
+      .replace(/b/g, '♭')
+      .replace(/#/g, '♯')
+    if (config.useJazzNotation) {
+      display = display
+        .replace(/Maj/g, 'Δ')
+        .replace(/dim7/g, '°7')
+        .replace(/dim/g, '°')
+        .replace(/aug/g, '+')
+    }
+  }
+  
+  return display
+}
+
+// 格式化完整和弦名称（包含根音）
+export function formatFullChordName(
+  rootNote: number,
+  chordType: ChordType,
+  slashRoot: number | null = null,
+  config: ChordSymbolConfig,
+  preferFlat: boolean = false
+): string {
+  const rootName = getNoteName(rootNote, preferFlat, config.useUnicode)
+  const typeDisplay = formatChordWithConfig(chordType, config)
+  
+  let result = rootName + typeDisplay
+  
+  if (slashRoot !== null) {
+    const slashName = getNoteName(slashRoot, preferFlat, config.useUnicode)
+    result += '/' + slashName
+  }
+  
+  return result
+}
+
 // ==================== 和弦音程定义 ====================
 export const CHORD_INTERVALS: Record<ChordType, number[]> = {
   [ChordType.majorTriad]: [0, 4, 7],

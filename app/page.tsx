@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List, ListChildComponentProps } from 'react-window'
@@ -48,6 +48,8 @@ import { Label } from "@/components/ui/label"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { isTauri } from "@/lib/native-audio"
+import { WindowsAudioSettings } from "@/components/windows-audio-settings"
 import Sidebar from "@/components/Sidebar"
 import Header from "@/components/Header"
 import BottomNavigation from "@/components/BottomNavigation"
@@ -11912,160 +11914,166 @@ export default function FretMasterPage() {
                     
                     <Separator />
                     
-                    {/* Audio Input */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Mic className="h-4 w-4" />
-                        {t('device_audio_input')}
-                      </h4>
-                      
-                      {/* 权限请求提示 - 当没有设备或设备没有标签时显示 */}
-                      {(audioDevices.length === 0 || audioDevices.every(d => !d.label)) && (
-                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-600 dark:text-yellow-400">
-                          <p className="mb-2">{audioDevices.length === 0 ? t('mic_permission_needed_for_device') : t('mic_permission_needed_for_label')}</p>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={async () => {
-                              try {
-                                if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
-                                  toast.error(t('browser_not_support_audio'))
-                                  return
+                    {/* Audio Input - 根据平台显示不同设置 */}
+                    {isTauri() ? (
+                      // Windows 版本使用原生音频设置
+                      <WindowsAudioSettings language={language as 'zh-CN' | 'en'} />
+                    ) : (
+                      // Web 版本使用 Web Audio API 设置
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                          <Mic className="h-4 w-4" />
+                          {t('device_audio_input')}
+                        </h4>
+                        
+                        {/* 权限请求提示 - 当没有设备或设备没有标签时显示 */}
+                        {(audioDevices.length === 0 || audioDevices.every(d => !d.label)) && (
+                          <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-600 dark:text-yellow-400">
+                            <p className="mb-2">{audioDevices.length === 0 ? t('mic_permission_needed_for_device') : t('mic_permission_needed_for_label')}</p>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={async () => {
+                                try {
+                                  if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+                                    toast.error(t('browser_not_support_audio'))
+                                    return
+                                  }
+                                  toast.info(t('requesting_mic_permission'))
+                                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+                                  stream.getTracks().forEach(track => track.stop())
+                                  // 刷新设备列表
+                                  await enumerateAudioDevices(false)
+                                  // 检查是否成功获取设备
+                                  const devices = await navigator.mediaDevices.enumerateDevices()
+                                  const audioInputs = devices.filter(d => d.kind === 'audioinput')
+                                  if (audioInputs.length > 0 && audioInputs.some(d => d.label)) {
+                                    toast.success('已获取麦克风权限')
+                                  } else if (audioInputs.length > 0) {
+                                    toast.warning('已获取权限，但设备名称不可用')
+                                  } else {
+                                    toast.warning('未检测到音频输入设备')
+                                  }
+                                } catch (err: any) {
+                                  console.error('麦克风权限错误', err)
+                                  if (err.name === 'NotAllowedError') {
+                                    toast.error('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风')
+                                  } else if (err.name === 'NotFoundError') {
+                                    toast.error('未找到麦克风设备')
+                                  } else {
+                                    toast.error('无法获取麦克风权限 ' + (err.message || '未知错误'))
+                                  }
                                 }
-                                toast.info(t('requesting_mic_permission'))
-                                const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-                                stream.getTracks().forEach(track => track.stop())
-                                // 刷新设备列表
-                                await enumerateAudioDevices(false)
-                                // 检查是否成功获取设备
-                                const devices = await navigator.mediaDevices.enumerateDevices()
-                                const audioInputs = devices.filter(d => d.kind === 'audioinput')
-                                if (audioInputs.length > 0 && audioInputs.some(d => d.label)) {
-                                  toast.success('已获取麦克风权限')
-                                } else if (audioInputs.length > 0) {
-                                  toast.warning('已获取权限，但设备名称不可用')
-                                } else {
-                                  toast.warning('未检测到音频输入设备')
-                                }
-                              } catch (err: any) {
-                                console.error('麦克风权限错误', err)
-                                if (err.name === 'NotAllowedError') {
-                                  toast.error('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风')
-                                } else if (err.name === 'NotFoundError') {
-                                  toast.error('未找到麦克风设备')
-                                } else {
-                                  toast.error('无法获取麦克风权限 ' + (err.message || '未知错误'))
-                                }
-                              }
-                            }}
-                          >
-                            请求麦克风权限
-                          </Button>
-                        </div>
-                      )}
-                      
-                      <Select value={selectedAudioDevice} onValueChange={setSelectedAudioDevice}>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('hint_select_device')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {audioDevices.map(device => (
-                            <SelectItem key={device.deviceId} value={device.deviceId}>
-                              {device.label || `Device ${device.deviceId.slice(0, 8)}...`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">{t('device_audio_input')}</span>
-                          {micEnabled && (
-                            <span className="text-xs text-green-500">
-                              {useAudioWorklet ? 'AudioWorklet' : 'ScriptProcessor'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {audioInitializing && (
-                            <span className="text-xs text-muted-foreground animate-pulse">
-                              {language === 'zh-CN' ? '初始化中...' : 'Initializing...'}
-                            </span>
-                          )}
-                          <Switch 
-                            checked={micEnabled} 
-                            disabled={audioInitializing}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                // 直接启动音频输入，不通过 useEffect
-                                setMicEnabled(true)
-                              } else {
-                                setMicEnabled(false)
-                                stopAudioInput()
-                              }
-                            }} 
-                          />
-                        </div>
-                      </div>
-                      {audioError && (
-                        <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
-                          {audioError}
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between py-2 border-t border-border/50">
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">
-                            {language === 'zh-CN' ? '使用 AudioWorklet' : 'Use AudioWorklet'}
-                          </span>
-                          <span className="text-xs text-muted-foreground/60">
-                            {language === 'zh-CN' ? '关闭则使用 ScriptProcessorNode' : 'Off to use ScriptProcessorNode'}
-                          </span>
-                        </div>
-                        <Switch
-                          checked={useAudioWorklet}
-                          disabled={micEnabled}
-                          onCheckedChange={(checked) => {
-                            setUseAudioWorklet(checked)
-                            logger.debug(`[音频模式] 切换为 ${checked ? 'AudioWorklet' : 'ScriptProcessorNode'}`)
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{t('device_gain')}</span>
-                          <span className="font-mono">{Math.round(inputGain * 100)}%</span>
-                        </div>
-                        <Slider
-                          value={[inputGain * 100]}
-                          onValueChange={useCallback(([v]: number[]) => setInputGain(v / 100), [])}
-                          min={0}
-                          max={200}
-                          step={10}
-                          disabled={!micEnabled}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{t('device_pitch_algorithm')}</span>
-                        </div>
-                        <Select 
-                          value={audioSettings.pitchAlgorithm} 
-                          onValueChange={(value) => store.setPitchAlgorithm(value as 'standard' | 'solo')}
-                        >
+                              }}
+                            >
+                              请求麦克风权限
+                            </Button>
+                          </div>
+                        )}
+                        
+                        <Select value={selectedAudioDevice} onValueChange={setSelectedAudioDevice}>
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder={t('hint_select_device')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="solo">{t('algorithm_solo')}</SelectItem>
-                            <SelectItem value="standard">{t('algorithm_standard')}</SelectItem>
+                            {audioDevices.map(device => (
+                              <SelectItem key={device.deviceId} value={device.deviceId}>
+                                {device.label || `Device ${device.deviceId.slice(0, 8)}...`}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
-                        <p className="text-xs text-muted-foreground">
-                          {language === 'zh-CN' 
-                            ? 'SOLO算法使用FFT加速，检测速度更快' 
-                            : 'SOLO algorithm uses FFT acceleration for faster detection'}
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className="text-sm text-muted-foreground">{t('device_audio_input')}</span>
+                            {micEnabled && (
+                              <span className="text-xs text-green-500">
+                                {useAudioWorklet ? 'AudioWorklet' : 'ScriptProcessor'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {audioInitializing && (
+                              <span className="text-xs text-muted-foreground animate-pulse">
+                                {language === 'zh-CN' ? '初始化中...' : 'Initializing...'}
+                              </span>
+                            )}
+                            <Switch 
+                              checked={micEnabled} 
+                              disabled={audioInitializing}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  // 直接启动音频输入，不通过 useEffect
+                                  setMicEnabled(true)
+                                } else {
+                                  setMicEnabled(false)
+                                  stopAudioInput()
+                                }
+                              }} 
+                            />
+                          </div>
+                        </div>
+                        {audioError && (
+                          <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
+                            {audioError}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between py-2 border-t border-border/50">
+                          <div className="flex flex-col">
+                            <span className="text-sm text-muted-foreground">
+                              {language === 'zh-CN' ? '使用 AudioWorklet' : 'Use AudioWorklet'}
+                            </span>
+                            <span className="text-xs text-muted-foreground/60">
+                              {language === 'zh-CN' ? '关闭则使用 ScriptProcessorNode' : 'Off to use ScriptProcessorNode'}
+                            </span>
+                          </div>
+                          <Switch
+                            checked={useAudioWorklet}
+                            disabled={micEnabled}
+                            onCheckedChange={(checked) => {
+                              setUseAudioWorklet(checked)
+                              logger.debug(`[音频模式] 切换为 ${checked ? 'AudioWorklet' : 'ScriptProcessorNode'}`)
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{t('device_gain')}</span>
+                            <span className="font-mono">{Math.round(inputGain * 100)}%</span>
+                          </div>
+                          <Slider
+                            value={[inputGain * 100]}
+                            onValueChange={useCallback(([v]: number[]) => setInputGain(v / 100), [])}
+                            min={0}
+                            max={200}
+                            step={10}
+                            disabled={!micEnabled}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{t('device_pitch_algorithm')}</span>
+                          </div>
+                          <Select 
+                            value={audioSettings.pitchAlgorithm} 
+                            onValueChange={(value) => store.setPitchAlgorithm(value as 'standard' | 'solo')}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="solo">{t('algorithm_solo')}</SelectItem>
+                              <SelectItem value="standard">{t('algorithm_standard')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {language === 'zh-CN' 
+                              ? 'SOLO算法使用FFT加速，检测速度更快' 
+                              : 'SOLO algorithm uses FFT acceleration for faster detection'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
                     <Separator />
                     
