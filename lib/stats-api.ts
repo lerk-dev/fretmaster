@@ -1,5 +1,5 @@
-// SQLite 版本统计数据 API 模块
-// 用于与路由器上的 CGI API 交互，支持多设备共享
+// 统计数据 API 模块
+// Web 版本使用 CGI API，Windows 版本使用 SQLite
 
 import { logger } from './logger'
 
@@ -7,6 +7,9 @@ const API_BASE_URL = '/cgi-bin';
 
 // 检查是否在开发环境
 const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+
+// 检查是否在 Tauri 环境（Windows 桌面版）
+const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
 
 // 使用统一的用户标识，所有设备共享同一个用户数据
 const USER_ID = 'fretmaster_user';
@@ -30,15 +33,21 @@ export interface PracticeStats {
   exerciseType?: string;
 }
 
-// 保存练习数据到路由器
+// 保存练习数据
 export async function savePracticeStats(
   stats: Omit<PracticeStats, 'id' | 'created_at' | 'device_id'>
 ): Promise<{ status: string; message: string; id?: number }> {
+  // Windows 版本使用 SQLite
+  if (isTauri) {
+    const { savePracticeStats: nativeSave } = await import('./native-stats');
+    return nativeSave(stats);
+  }
+  
   const userId = getUserId();
   
   // 转换字段名以匹配 API 期望的格式
   const data = {
-    device_id: userId,  // 所有设备使用相同的用户标识
+    device_id: userId,
     exercise_type: stats.exercise_type || stats.exerciseType || '未知练习',
     score: stats.score,
     duration: stats.duration,
@@ -100,6 +109,12 @@ export async function savePracticeStats(
 
 // 从路由器获取所有练习数据（所有设备共享）
 export async function getAllPracticeStats(): Promise<PracticeStats[]> {
+  // Windows 版本使用 SQLite
+  if (isTauri) {
+    const { getAllPracticeStats: nativeGetAll } = await import('./native-stats');
+    return nativeGetAll();
+  }
+  
   // 开发环境下直接返回本地数据
   if (isDev) {
     return getLocalBackup();
@@ -131,12 +146,24 @@ export async function getAllPracticeStats(): Promise<PracticeStats[]> {
 
 // 获取当前用户的练习数据（所有设备共享）
 export async function getMyPracticeStats(): Promise<PracticeStats[]> {
+  // Windows 版本使用 SQLite
+  if (isTauri) {
+    const { getMyPracticeStats: nativeGetMy } = await import('./native-stats');
+    return nativeGetMy();
+  }
+  
   // 获取所有记录，因为所有设备使用相同的用户标识
   return getAllPracticeStats();
 }
 
 // 获取统计数据摘要
 export async function getStatsSummary() {
+  // Windows 版本使用 SQLite
+  if (isTauri) {
+    const { getStatsSummary: nativeGetSummary } = await import('./native-stats');
+    return nativeGetSummary();
+  }
+  
   const stats = await getAllPracticeStats();
   
   if (stats.length === 0) {
@@ -166,6 +193,12 @@ export async function getStatsSummary() {
 
 // 获取最近 N 天的练习数据
 export async function getRecentStats(days: number = 7): Promise<PracticeStats[]> {
+  // Windows 版本使用 SQLite
+  if (isTauri) {
+    const { getRecentStats: nativeGetRecent } = await import('./native-stats');
+    return nativeGetRecent(days);
+  }
+  
   const stats = await getAllPracticeStats();
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -178,6 +211,12 @@ export async function getRecentStats(days: number = 7): Promise<PracticeStats[]>
 
 // 按练习类型分组统计
 export async function getStatsByExerciseType() {
+  // Windows 版本使用 SQLite
+  if (isTauri) {
+    const { getStatsByExerciseType: nativeGetByType } = await import('./native-stats');
+    return nativeGetByType();
+  }
+  
   const stats = await getAllPracticeStats();
   const grouped: Record<string, { count: number; avgScore: number; totalDuration: number }> = {};
   
@@ -226,6 +265,12 @@ function getLocalBackup(): PracticeStats[] {
 
 // 同步本地备份到服务器
 export async function syncLocalBackupToServer(): Promise<number> {
+  // Windows 版本不需要同步
+  if (isTauri) {
+    const { syncLocalBackupToServer: nativeSync } = await import('./native-stats');
+    return nativeSync();
+  }
+  
   const localData = getLocalBackup();
   if (localData.length === 0) return 0;
 
@@ -253,5 +298,8 @@ export async function syncLocalBackupToServer(): Promise<number> {
 
 // 获取用户 ID（用于调试）
 export function getCurrentUserId(): string {
+  if (isTauri) {
+    return 'local_user';
+  }
   return getUserId();
 }

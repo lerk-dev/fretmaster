@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { TitleBar } from '@/components/title-bar'
 
 export const metadata: Metadata = {
   title: 'FretMaster - 吉他指板练习工具',
@@ -31,8 +32,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" className="dark" suppressHydrationWarning>
-      <body className="font-sans antialiased" suppressHydrationWarning>
-        {children}
+      <body className="font-sans antialiased flex flex-col h-screen overflow-hidden" suppressHydrationWarning>
+        <TitleBar />
+        <div className="flex-1 overflow-hidden">
+          {children}
+        </div>
       </body>
     </html>
   )

@@ -4,9 +4,9 @@ const isTauri = process.env.TAURI_BUILD === 'true'
 
 const nextConfig = {
   output: isDev ? undefined : 'export',
-  distDir: isTauri ? 'out' : 'dist',
-  basePath: isDev || isTauri ? '' : '/fretmaster',
-  assetPrefix: isDev || isTauri ? '' : '/fretmaster',
+  distDir: 'dist',
+  basePath: '',
+  assetPrefix: '.',
   trailingSlash: true,
   typescript: {
     ignoreBuildErrors: true,
