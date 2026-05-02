@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List, ListChildComponentProps } from 'react-window'
@@ -11587,6 +11587,14 @@ export default function FretMasterPage() {
     return null
   }
 
+  // Slider回调 - 必须在顶层调用，不能在JSX中内联useCallback
+  const handleReferenceFrequencyChange = useCallback(([v]: number[]) => setReferenceFrequency(v), [])
+  const handlePracticeTimeChange = useCallback(([v]: number[]) => setPracticeTime(v), [])
+  const handleFretCountChange = useCallback(([v]: number[]) => setFretCount(v), [])
+  const handleCooldownDurationChange = useCallback(([v]: number[]) => setCooldownDuration(v), [])
+  const handleMetronomeBpmChange = useCallback(([v]: number[]) => setMetronomeBpm(v), [])
+  const handleInputGainChange = useCallback(([v]: number[]) => setInputGain(v / 100), [])
+
   // ==================== 渲染 ====================
 
   return (
@@ -11767,7 +11775,7 @@ export default function FretMasterPage() {
                         </div>
                         <Slider
                           value={[referenceFrequency]}
-                          onValueChange={useCallback(([v]: number[]) => setReferenceFrequency(v), [])}
+                          onValueChange={handleReferenceFrequencyChange}
                           min={430}
                           max={450}
                           step={1}
@@ -11831,7 +11839,7 @@ export default function FretMasterPage() {
                         </div>
                         <Slider
                           value={[practiceTime]}
-                          onValueChange={useCallback(([v]: number[]) => setPracticeTime(v), [])}
+                          onValueChange={handlePracticeTimeChange}
                           min={30}
                           max={600}
                           step={30}
@@ -11844,7 +11852,7 @@ export default function FretMasterPage() {
                         </div>
                         <Slider
                           value={[fretCount]}
-                          onValueChange={useCallback(([v]: number[]) => setFretCount(v), [])}
+                          onValueChange={handleFretCountChange}
                           min={12}
                           max={24}
                           step={1}
@@ -11862,7 +11870,7 @@ export default function FretMasterPage() {
                           </div>
                           <Slider
                             value={[cooldownDuration]}
-                            onValueChange={useCallback(([v]: number[]) => setCooldownDuration(v), [])}
+                            onValueChange={handleCooldownDurationChange}
                             min={200}
                             max={3000}
                             step={100}
@@ -11890,7 +11898,7 @@ export default function FretMasterPage() {
                         </div>
                         <Slider
                           value={[metronomeBpm]}
-                          onValueChange={useCallback(([v]: number[]) => setMetronomeBpm(v), [])}
+                          onValueChange={handleMetronomeBpmChange}
                           min={40}
                           max={240}
                           step={1}
@@ -12070,7 +12078,7 @@ export default function FretMasterPage() {
                           </div>
                           <Slider
                             value={[inputGain * 100]}
-                            onValueChange={useCallback(([v]: number[]) => setInputGain(v / 100), [])}
+                            onValueChange={handleInputGainChange}
                             min={0}
                             max={200}
                             step={10}

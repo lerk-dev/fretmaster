@@ -18,12 +18,12 @@ pub struct AudioPreprocessorConfig {
 impl Default for AudioPreprocessorConfig {
     fn default() -> Self {
         Self {
-            high_pass_freq: 25.0,
-            low_pass_freq: 5000.0,
+            high_pass_freq: 35.0,
+            low_pass_freq: 4500.0,
             notch_freq_50: 50.0,
             notch_freq_60: 60.0,
-            notch_q: 30.0,
-            noise_gate_threshold: 0.01,
+            notch_q: 15.0,
+            noise_gate_threshold: 0.008,
             enable_high_pass: true,
             enable_low_pass: true,
             enable_notch_50: true,
@@ -196,9 +196,18 @@ impl AudioPreprocessor {
             + (1.0 - self.noise_alpha) * signal_rms.min(self.prev_signal_rms);
         self.prev_signal_rms = signal_rms;
 
-        if self.config.enable_noise_gate && signal_rms < self.config.noise_gate_threshold {
-            for sample in output.iter_mut() {
-                *sample *= 0.0;
+        if self.config.enable_noise_gate {
+            let adaptive_threshold = (self.config.noise_gate_threshold * 2.0).max(self.noise_floor_est * 3.0);
+            if signal_rms < adaptive_threshold {
+                let gain = if adaptive_threshold > 0.0 {
+                    (signal_rms / adaptive_threshold).min(1.0)
+                } else {
+                    0.0
+                };
+                let smooth_gain = gain * gain;
+                for sample in output.iter_mut() {
+                    *sample *= smooth_gain;
+                }
             }
         }
 

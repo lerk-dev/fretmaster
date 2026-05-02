@@ -3,9 +3,9 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use anyhow::Result;
 
-const MIN_BUFFER_SIZE: usize = 512;
-const MAX_BUFFER_SIZE: usize = 4096;
-const DEFAULT_BUFFER_SIZE: usize = 2048;
+const MIN_BUFFER_SIZE: usize = 1024;
+const MAX_BUFFER_SIZE: usize = 8192;
+const DEFAULT_BUFFER_SIZE: usize = 4096;
 const RING_BUFFER_CAPACITY: usize = 16384;
 
 struct StreamHolder {
