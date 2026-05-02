@@ -7461,9 +7461,13 @@ export default function FretMasterPage() {
 
   // 主题状态
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-
+  
+  // 客户端挂载状态 - 用于防止 hydration 不匹配
+  const [mounted, setMounted] = useState(false)
+  
   // 应用主题
   useEffect(() => {
+    setMounted(true)
     if (theme === 'light') {
       document.documentElement.classList.add('light')
       document.documentElement.classList.remove('dark')
@@ -11931,8 +11935,15 @@ export default function FretMasterPage() {
                     <Separator />
                     
                     {/* Audio Input - 根据平台显示不同设置 */}
-                    {isTauri() ? (
-                      // Windows 版本使用原生音频设置
+                    {!mounted ? (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                          <Mic className="h-4 w-4" />
+                          {t('device_audio_input')}
+                        </h4>
+                        <div className="h-20 animate-pulse bg-muted rounded-lg" />
+                      </div>
+                    ) : isTauri() ? (
                       <WindowsAudioSettings language={language as 'zh-CN' | 'en'} />
                     ) : (
                       // Web 版本使用 Web Audio API 设置
