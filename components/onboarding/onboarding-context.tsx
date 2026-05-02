@@ -207,7 +207,9 @@ export function OnboardingProvider({ children, config, t: externalT }: Onboardin
     setIsCompleted(false)
     setHasSeenOnboarding(false)
     setIsPaused(false)
-    localStorage.removeItem(storageKey)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(storageKey)
+    }
   }, [storageKey])
 
   const currentStep = steps[currentStepIndex] || null
