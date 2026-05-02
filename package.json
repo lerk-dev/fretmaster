@@ -18,7 +18,7 @@
     "test:coverage": "vitest run --coverage",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "cross-env TAURI_BUILD=true next build && tauri build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -74,6 +74,8 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/cli": "^2.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.15.17",
@@ -86,6 +88,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "4.1.2",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "16.1.6",
     "eslint-plugin-react": "^7.37.5",
@@ -95,8 +98,6 @@
     "postcss": "^8.5",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.8.3",
-    "vitest": "^4.1.2",
-    "@tauri-apps/cli": "^2.0.0",
-    "@tauri-apps/api": "^2.0.0"
+    "vitest": "^4.1.2"
   }
 }
