@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils"
 
 function getTargetRect(selector: string): DOMRect | null {
+  if (typeof document === 'undefined') return null
   const element = document.querySelector(selector)
   return element?.getBoundingClientRect() || null
 }
@@ -28,6 +29,10 @@ function calculateTooltipPosition(
   tooltipHeight: number
 ): { x: number; y: number } {
   const padding = 16
+  
+  if (typeof window === 'undefined') {
+    return { x: 0, y: 0 }
+  }
   
   if (!targetRect || position === "center") {
     return {
