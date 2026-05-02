@@ -42,6 +42,7 @@ export interface DeviceChangeEvent {
 let deviceChangeListener: UnlistenFn | null = null
 let devicePollInterval: NodeJS.Timeout | null = null
 let lastDevices: AudioDeviceInfo[] = []
+let monitorStarted = false
 
 export async function getAudioDevices(): Promise<AudioDeviceInfo[]> {
   if (!isTauri()) {
@@ -57,17 +58,62 @@ export async function getAudioDevices(): Promise<AudioDeviceInfo[]> {
   }
 }
 
+/**
+ * 启动设备热插拔监控（Rust 后端事件驱动）
+ * 优先使用 Tauri 事件，如果不可用则回退到前端轮询
+ */
+export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) => void): Promise<UnlistenFn | null> {
+  if (!isTauri()) return null
+
+  // 1. 启动 Rust 后端设备监控线程（通过 Tauri 事件推送变化）
+  try {
+    if (!monitorStarted) {
+      await invoke('start_device_monitor', { intervalMs: 1500 })
+      monitorStarted = true
+    }
+
+    // 2. 监听后端推送的 audio-device-changed 事件
+    deviceChangeListener = await listen<DeviceChangeEvent>('audio-device-changed', (event) => {
+      lastDevices = event.payload.devices
+      callback(event.payload)
+    })
+    return deviceChangeListener
+  } catch (error) {
+    console.warn('Tauri event-based monitoring unavailable, falling back to polling:', error)
+    // 3. 回退：前端轮询
+    startDevicePolling(callback, 2000)
+    return () => stopDevicePolling()
+  }
+}
+
+/**
+ * 停止设备变化监听，同时停止后端监控线程
+ */
+export function unlistenDeviceChanges(): void {
+  if (deviceChangeListener) {
+    deviceChangeListener()
+    deviceChangeListener = null
+  }
+  stopDevicePolling()
+  
+  // 停止 Rust 后端监控线程
+  if (monitorStarted && isTauri()) {
+    invoke('stop_device_monitor').catch(() => {})
+    monitorStarted = false
+  }
+}
+
+/**
+ * 前端轮询方案（备用）
+ */
 export function startDevicePolling(callback: (event: DeviceChangeEvent) => void, intervalMs: number = 2000): void {
   if (!isTauri()) return
   
-  // 先获取当前设备列表
   getAudioDevices().then(() => {
-    // 开始轮询
     devicePollInterval = setInterval(async () => {
       try {
         const newDevices = await invoke<AudioDeviceInfo[]>('get_audio_devices')
         
-        // 检测变化
         const added = newDevices.filter(d => !lastDevices.some(ld => ld.name === d.name))
         const removed = lastDevices.filter(d => !newDevices.some(nd => nd.name === d.name)).map(d => d.name)
         
@@ -93,30 +139,6 @@ export function stopDevicePolling(): void {
     clearInterval(devicePollInterval)
     devicePollInterval = null
   }
-}
-
-export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) => void): Promise<UnlistenFn | null> {
-  if (!isTauri()) return null
-  
-  // 尝试使用 Tauri 事件监听（如果后端支持）
-  try {
-    deviceChangeListener = await listen<DeviceChangeEvent>('audio-device-changed', (event) => {
-      callback(event.payload)
-    })
-    return deviceChangeListener
-  } catch {
-    // 如果事件监听不可用，使用轮询
-    startDevicePolling(callback)
-    return () => stopDevicePolling()
-  }
-}
-
-export function unlistenDeviceChanges(): void {
-  if (deviceChangeListener) {
-    deviceChangeListener()
-    deviceChangeListener = null
-  }
-  stopDevicePolling()
 }
 
 export async function startAudioCapture(deviceName?: string): Promise<void> {

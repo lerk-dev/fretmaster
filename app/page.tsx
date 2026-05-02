@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List, ListChildComponentProps } from 'react-window'
@@ -50,6 +50,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils"
 import { isTauri } from "@/lib/native-audio"
 import { WindowsAudioSettings } from "@/components/windows-audio-settings"
+import { ErrorBoundary } from "@/components/error-boundary"
 import Sidebar from "@/components/Sidebar"
 import Header from "@/components/Header"
 import BottomNavigation from "@/components/BottomNavigation"
@@ -441,6 +442,12 @@ const TRANSLATIONS = {
                     'nav_chord_exercise': '和弦练习',
                     'nav_interval': '音程练习',
                     'nav_practice': '找音练习',
+                    'nav_short_practice': '找音',
+                    'nav_short_interval': '音程',
+                    'nav_short_chord_exercise': '和弦',
+                    'nav_short_chord': '转换',
+                    'nav_short_scale': '音阶',
+                    'nav_short_stats': '统计',
                     'app_title': '🎸 吉他指板视觉化练习工具',
                  
                     'page_title': '吉他指板视觉化练习工具',
@@ -1430,6 +1437,12 @@ const TRANSLATIONS = {
                     'next_chord': 'Next',
                     'nav_interval': 'Interval',
                     'nav_practice': 'Practice',
+                    'nav_short_practice': 'Find',
+                    'nav_short_interval': 'Interval',
+                    'nav_short_chord_exercise': 'Chord',
+                    'nav_short_chord': 'Change',
+                    'nav_short_scale': 'Scale',
+                    'nav_short_stats': 'Stats',
                     'app_title': '🎸 Fretboard Master',
                    
                     'page_title': 'Fretboard Master',
@@ -2243,98 +2256,98 @@ const DEGREE_TO_SEMITONE: Record<string, number> = {
 // Chord types with intervals - 完整62种和弦类型，与SOLO保持一致
 const CHORD_TYPES = [
   // 三和弦类 (6种)
-  { name: "Major", intervals: [0, 4, 7], symbol: "", group: "triad", groupZh: "三和弦" },
-  { name: "Minor", intervals: [0, 3, 7], symbol: "m", group: "triad", groupZh: "三和弦" },
-  { name: "Dim", intervals: [0, 3, 6], symbol: "dim", group: "triad", groupZh: "三和弦" },
-  { name: "Aug", intervals: [0, 4, 8], symbol: "aug", group: "triad", groupZh: "三和弦" },
-  { name: "sus2", intervals: [0, 2, 7], symbol: "sus2", group: "triad", groupZh: "三和弦" },
-  { name: "sus4", intervals: [0, 5, 7], symbol: "sus4", group: "triad", groupZh: "三和弦" },
+  { name: "Major", intervals: [0, 4, 7], symbol: "", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "Minor", intervals: [0, 3, 7], symbol: "m", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "Dim", intervals: [0, 3, 6], symbol: "dim", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "Aug", intervals: [0, 4, 8], symbol: "aug", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "sus2", intervals: [0, 2, 7], symbol: "sus2", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "sus4", intervals: [0, 5, 7], symbol: "sus4", group: "triad", groupName: "Triads", groupZh: "三和弦" },
   
   // 加音和弦 (4种)
-  { name: "add9", intervals: [0, 4, 7, 14], symbol: "add9", group: "add", groupZh: "加音和弦" },
-  { name: "madd9", intervals: [0, 3, 7, 14], symbol: "madd9", group: "add", groupZh: "加音和弦" },
-  { name: "6add9", intervals: [0, 4, 7, 9, 14], symbol: "6/9", group: "add", groupZh: "加音和弦" },
-  { name: "m6add9", intervals: [0, 3, 7, 9, 14], symbol: "m6/9", group: "add", groupZh: "加音和弦" },
+  { name: "add9", intervals: [0, 4, 7, 14], symbol: "add9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
+  { name: "madd9", intervals: [0, 3, 7, 14], symbol: "madd9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
+  { name: "6add9", intervals: [0, 4, 7, 9, 14], symbol: "6/9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
+  { name: "m6add9", intervals: [0, 3, 7, 9, 14], symbol: "m6/9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
   
   // 减和弦类 (2种)
-  { name: "dim7", intervals: [0, 3, 6, 9], symbol: "dim7", group: "dim", groupZh: "减和弦" },
-  { name: "dimMaj7", intervals: [0, 3, 6, 11], symbol: "dim(maj7)", group: "dim", groupZh: "减和弦" },
+  { name: "dim7", intervals: [0, 3, 6, 9], symbol: "dim7", group: "dim", groupName: "Diminished", groupZh: "减和弦" },
+  { name: "dimMaj7", intervals: [0, 3, 6, 11], symbol: "dim(maj7)", group: "dim", groupName: "Diminished", groupZh: "减和弦" },
   
   // 六和弦类 (2种)
-  { name: "6", intervals: [0, 4, 7, 9], symbol: "6", group: "six", groupZh: "六和弦" },
-  { name: "m6", intervals: [0, 3, 7, 9], symbol: "m6", group: "six", groupZh: "六和弦" },
+  { name: "6", intervals: [0, 4, 7, 9], symbol: "6", group: "six", groupName: "Six Chords", groupZh: "六和弦" },
+  { name: "m6", intervals: [0, 3, 7, 9], symbol: "m6", group: "six", groupName: "Six Chords", groupZh: "六和弦" },
   
   // 属七和弦类 (18种)
-  { name: "7", intervals: [0, 4, 7, 10], symbol: "7", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b5", intervals: [0, 4, 6, 10], symbol: "7♭5", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#5", intervals: [0, 4, 8, 10], symbol: "7♯5", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b9", intervals: [0, 4, 7, 10, 13], symbol: "7♭9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#9", intervals: [0, 4, 7, 10, 15], symbol: "7♯9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#11", intervals: [0, 4, 7, 10, 18], symbol: "7♯11", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b13", intervals: [0, 4, 7, 10, 20], symbol: "7♭13", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#5b9", intervals: [0, 4, 8, 10, 13], symbol: "7♯5♭9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#5#9", intervals: [0, 4, 8, 10, 15], symbol: "7♯5♯9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b5b9", intervals: [0, 4, 6, 10, 13], symbol: "7♭5♭9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b5#9", intervals: [0, 4, 6, 10, 15], symbol: "7♭5♯9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b9b13", intervals: [0, 4, 7, 10, 13, 20], symbol: "7♭9♭13", group: "dominant", groupZh: "属七和弦" },
-  { name: "7alt", intervals: [0, 4, 8, 10, 13, 15, 20], symbol: "7alt", group: "dominant", groupZh: "属七和弦" },
+  { name: "7", intervals: [0, 4, 7, 10], symbol: "7", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b5", intervals: [0, 4, 6, 10], symbol: "7♭5", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#5", intervals: [0, 4, 8, 10], symbol: "7♯5", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b9", intervals: [0, 4, 7, 10, 13], symbol: "7♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#9", intervals: [0, 4, 7, 10, 15], symbol: "7♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#11", intervals: [0, 4, 7, 10, 18], symbol: "7♯11", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b13", intervals: [0, 4, 7, 10, 20], symbol: "7♭13", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#5b9", intervals: [0, 4, 8, 10, 13], symbol: "7♯5♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#5#9", intervals: [0, 4, 8, 10, 15], symbol: "7♯5♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b5b9", intervals: [0, 4, 6, 10, 13], symbol: "7♭5♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b5#9", intervals: [0, 4, 6, 10, 15], symbol: "7♭5♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b9b13", intervals: [0, 4, 7, 10, 13, 20], symbol: "7♭9♭13", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7alt", intervals: [0, 4, 8, 10, 13, 15, 20], symbol: "7alt", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
   
   // 属九和弦类 (4种)
-  { name: "9", intervals: [0, 4, 7, 10, 14], symbol: "9", group: "dominant9", groupZh: "属九和弦" },
-  { name: "9b13", intervals: [0, 4, 7, 10, 14, 20], symbol: "9♭13", group: "dominant9", groupZh: "属九和弦" },
-  { name: "9#11", intervals: [0, 4, 7, 10, 14, 18], symbol: "9♯11", group: "dominant9", groupZh: "属九和弦" },
-  { name: "9sus4", intervals: [0, 5, 7, 10, 14], symbol: "9sus4", group: "dominant9", groupZh: "属九和弦" },
+  { name: "9", intervals: [0, 4, 7, 10, 14], symbol: "9", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
+  { name: "9b13", intervals: [0, 4, 7, 10, 14, 20], symbol: "9♭13", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
+  { name: "9#11", intervals: [0, 4, 7, 10, 14, 18], symbol: "9♯11", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
+  { name: "9sus4", intervals: [0, 5, 7, 10, 14], symbol: "9sus4", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
   
   // 属十三和弦类 (4种)
-  { name: "13", intervals: [0, 4, 7, 10, 14, 21], symbol: "13", group: "dominant13", groupZh: "属十三和弦" },
-  { name: "13b9", intervals: [0, 4, 7, 10, 13, 21], symbol: "13♭9", group: "dominant13", groupZh: "属十三和弦" },
-  { name: "13#9", intervals: [0, 4, 7, 10, 15, 21], symbol: "13♯9", group: "dominant13", groupZh: "属十三和弦" },
-  { name: "13#11", intervals: [0, 4, 7, 10, 14, 18, 21], symbol: "13♯11", group: "dominant13", groupZh: "属十三和弦" },
+  { name: "13", intervals: [0, 4, 7, 10, 14, 21], symbol: "13", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
+  { name: "13b9", intervals: [0, 4, 7, 10, 13, 21], symbol: "13♭9", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
+  { name: "13#9", intervals: [0, 4, 7, 10, 15, 21], symbol: "13♯9", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
+  { name: "13#11", intervals: [0, 4, 7, 10, 14, 18, 21], symbol: "13♯11", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
   
   // 大七和弦类 (8种)
-  { name: "Maj7", intervals: [0, 4, 7, 11], symbol: "maj7", group: "major7", groupZh: "大七和弦" },
-  { name: "maj7#5", intervals: [0, 4, 8, 11], symbol: "maj7♯5", group: "major7", groupZh: "大七和弦" },
-  { name: "maj7#11", intervals: [0, 4, 7, 11, 18], symbol: "maj7♯11", group: "major7", groupZh: "大七和弦" },
-  { name: "maj7b6", intervals: [0, 4, 7, 11, 8], symbol: "maj7♭6", group: "major7", groupZh: "大七和弦" },
-  { name: "maj7#9", intervals: [0, 4, 7, 11, 15], symbol: "maj7♯9", group: "major7", groupZh: "大七和弦" },
+  { name: "Maj7", intervals: [0, 4, 7, 11], symbol: "maj7", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
+  { name: "maj7#5", intervals: [0, 4, 8, 11], symbol: "maj7♯5", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
+  { name: "maj7#11", intervals: [0, 4, 7, 11, 18], symbol: "maj7♯11", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
+  { name: "maj7b6", intervals: [0, 4, 7, 11, 8], symbol: "maj7♭6", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
+  { name: "maj7#9", intervals: [0, 4, 7, 11, 15], symbol: "maj7♯9", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
   
   // 大九和弦类 (4种)
-  { name: "Maj9", intervals: [0, 4, 7, 11, 14], symbol: "maj9", group: "major9", groupZh: "大九和弦" },
-  { name: "maj9#11", intervals: [0, 4, 7, 11, 14, 18], symbol: "maj9♯11", group: "major9", groupZh: "大九和弦" },
-  { name: "maj9#5", intervals: [0, 4, 8, 11, 14], symbol: "maj9♯5", group: "major9", groupZh: "大九和弦" },
-  { name: "maj9b6", intervals: [0, 4, 7, 11, 14, 8], symbol: "maj9♭6", group: "major9", groupZh: "大九和弦" },
+  { name: "Maj9", intervals: [0, 4, 7, 11, 14], symbol: "maj9", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
+  { name: "maj9#11", intervals: [0, 4, 7, 11, 14, 18], symbol: "maj9♯11", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
+  { name: "maj9#5", intervals: [0, 4, 8, 11, 14], symbol: "maj9♯5", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
+  { name: "maj9b6", intervals: [0, 4, 7, 11, 14, 8], symbol: "maj9♭6", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
   
   // 大十三和弦类 (3种)
-  { name: "maj13", intervals: [0, 4, 7, 11, 14, 21], symbol: "maj13", group: "major13", groupZh: "大十三和弦" },
-  { name: "maj13#11", intervals: [0, 4, 7, 11, 14, 18, 21], symbol: "maj13♯11", group: "major13", groupZh: "大十三和弦" },
-  { name: "maj13#5", intervals: [0, 4, 8, 11, 14, 21], symbol: "maj13♯5", group: "major13", groupZh: "大十三和弦" },
+  { name: "maj13", intervals: [0, 4, 7, 11, 14, 21], symbol: "maj13", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
+  { name: "maj13#11", intervals: [0, 4, 7, 11, 14, 18, 21], symbol: "maj13♯11", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
+  { name: "maj13#5", intervals: [0, 4, 8, 11, 14, 21], symbol: "maj13♯5", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
   
   // 小七和弦类 (8种)
-  { name: "m7", intervals: [0, 3, 7, 10], symbol: "m7", group: "minor7", groupZh: "小七和弦" },
-  { name: "m7b5", intervals: [0, 3, 6, 10], symbol: "m7♭5", group: "minor7", groupZh: "小七和弦" },
-  { name: "m7b5nat9", intervals: [0, 3, 6, 10, 14], symbol: "m7♭5(9)", group: "minor7", groupZh: "小七和弦" },
-  { name: "m7b6", intervals: [0, 3, 7, 10, 8], symbol: "m7♭6", group: "minor7", groupZh: "小七和弦" },
-  { name: "mMaj7", intervals: [0, 3, 7, 11], symbol: "m(maj7)", group: "minor7", groupZh: "小七和弦" },
-  { name: "mMaj9", intervals: [0, 3, 7, 11, 14], symbol: "m(maj9)", group: "minor7", groupZh: "小七和弦" },
-  { name: "mMaj13", intervals: [0, 3, 7, 11, 14, 21], symbol: "m(maj13)", group: "minor7", groupZh: "小七和弦" },
+  { name: "m7", intervals: [0, 3, 7, 10], symbol: "m7", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "m7b5", intervals: [0, 3, 6, 10], symbol: "m7♭5", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "m7b5nat9", intervals: [0, 3, 6, 10, 14], symbol: "m7♭5(9)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "m7b6", intervals: [0, 3, 7, 10, 8], symbol: "m7♭6", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "mMaj7", intervals: [0, 3, 7, 11], symbol: "m(maj7)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "mMaj9", intervals: [0, 3, 7, 11, 14], symbol: "m(maj9)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "mMaj13", intervals: [0, 3, 7, 11, 14, 21], symbol: "m(maj13)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
   
   // 小九和弦类 (2种)
-  { name: "m9", intervals: [0, 3, 7, 10, 14], symbol: "m9", group: "minor9", groupZh: "小九和弦" },
-  { name: "m9b5", intervals: [0, 3, 6, 10, 14], symbol: "m9♭5", group: "minor9", groupZh: "小九和弦" },
+  { name: "m9", intervals: [0, 3, 7, 10, 14], symbol: "m9", group: "minor9", groupName: "Minor 9th", groupZh: "小九和弦" },
+  { name: "m9b5", intervals: [0, 3, 6, 10, 14], symbol: "m9♭5", group: "minor9", groupName: "Minor 9th", groupZh: "小九和弦" },
   
   // 小十一/十三和弦类 (3种)
-  { name: "m11", intervals: [0, 3, 7, 10, 14, 17], symbol: "m11", group: "minor11", groupZh: "小十一/十三和弦" },
-  { name: "m13", intervals: [0, 3, 7, 10, 14, 21], symbol: "m13", group: "minor11", groupZh: "小十一/十三和弦" },
+  { name: "m11", intervals: [0, 3, 7, 10, 14, 17], symbol: "m11", group: "minor11", groupName: "Minor 11th/13th", groupZh: "小十一/十三和弦" },
+  { name: "m13", intervals: [0, 3, 7, 10, 14, 21], symbol: "m13", group: "minor11", groupName: "Minor 11th/13th", groupZh: "小十一/十三和弦" },
   
   // 挂留和弦类 (5种)
-  { name: "7sus4", intervals: [0, 5, 7, 10], symbol: "7sus4", group: "sus", groupZh: "挂留和弦" },
-  { name: "7sus4b9", intervals: [0, 5, 7, 10, 13], symbol: "7sus4♭9", group: "sus", groupZh: "挂留和弦" },
-  { name: "sus4b9", intervals: [0, 5, 7, 13], symbol: "sus4♭9", group: "sus", groupZh: "挂留和弦" },
-  { name: "13sus4", intervals: [0, 5, 7, 10, 14, 21], symbol: "13sus4", group: "sus", groupZh: "挂留和弦" },
-  { name: "13sus4b9", intervals: [0, 5, 7, 10, 13, 21], symbol: "13sus4♭9", group: "sus", groupZh: "挂留和弦" },
+  { name: "7sus4", intervals: [0, 5, 7, 10], symbol: "7sus4", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
+  { name: "7sus4b9", intervals: [0, 5, 7, 10, 13], symbol: "7sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
+  { name: "sus4b9", intervals: [0, 5, 7, 13], symbol: "sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
+  { name: "13sus4", intervals: [0, 5, 7, 10, 14, 21], symbol: "13sus4", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
+  { name: "13sus4b9", intervals: [0, 5, 7, 10, 13, 21], symbol: "13sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
   
   // 增和弦类 (1种)
-  { name: "aug7", intervals: [0, 4, 8, 10], symbol: "aug7", group: "aug", groupZh: "增和弦" },
+  { name: "aug7", intervals: [0, 4, 8, 10], symbol: "aug7", group: "aug", groupName: "Augmented", groupZh: "增和弦" },
 ]
 
 // Intervals - 完整音程定义，与原SOLO保持一致
@@ -7438,12 +7451,12 @@ export default function FretMasterPage() {
 
   // 底部导航菜单 - useMemo缓存避免每次渲染重新创建
   const bottomNavItems = useMemo(() => [
-    { id: "practice", label: t('nav_practice'), Icon: Target, shortLabel: '找音' },
-    { id: "interval", label: t('nav_interval'), Icon: Activity, shortLabel: '音程' },
-    { id: "chord_exercise", label: t('nav_chord_exercise'), Icon: Guitar, shortLabel: '和弦' },
-    { id: "chord", label: t('nav_chord'), Icon: ListMusic, shortLabel: '转换' },
-    { id: "scale", label: t('nav_scale'), Icon: Music, shortLabel: '音阶' },
-    { id: "stats", label: t('nav_stats'), Icon: BarChart3, shortLabel: '统计' },
+    { id: "practice", label: t('nav_practice'), Icon: Target, shortLabel: t('nav_short_practice') },
+    { id: "interval", label: t('nav_interval'), Icon: Activity, shortLabel: t('nav_short_interval') },
+    { id: "chord_exercise", label: t('nav_chord_exercise'), Icon: Guitar, shortLabel: t('nav_short_chord_exercise') },
+    { id: "chord", label: t('nav_chord'), Icon: ListMusic, shortLabel: t('nav_short_chord') },
+    { id: "scale", label: t('nav_scale'), Icon: Music, shortLabel: t('nav_short_scale') },
+    { id: "stats", label: t('nav_stats'), Icon: BarChart3, shortLabel: t('nav_short_stats') },
   ], [t])
 
   // 主题状态
@@ -8701,8 +8714,9 @@ export default function FretMasterPage() {
     }
   }, [audioDevices, selectedAudioDevice])
 
-  // 初始加载和监听设备变化
+  // 初始加载和监听设备变化（仅限 Web 版本）
   useEffect(() => {
+    if (isTauri()) return
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) return
 
     // 请求权限并枚举设备
@@ -8737,8 +8751,8 @@ export default function FretMasterPage() {
 
   // 当设置面板打开时，刷新设备列表
   useEffect(() => {
+    if (isTauri()) return
     if (settingsOpen && typeof navigator !== 'undefined' && navigator.mediaDevices) {
-      // 刷新设备列表
       enumerateAudioDevices(false)
     }
   }, [settingsOpen, enumerateAudioDevices])
@@ -9277,8 +9291,9 @@ export default function FretMasterPage() {
     setPitchDebugInfo(prev => ({ ...prev, isRunning: false }))
   }, [audioContext])
 
-  // 当 micEnabled 为 true 时自动启动音频输入
+  // 当 micEnabled 为 true 时自动启动音频输入（仅限 Web 版本）
   useEffect(() => {
+    if (isTauri()) return
     if (micEnabled && !audioContext) {
       logger.debug('useEffect: 开始启动音频输入...')
       toast.info(language === 'zh-CN' ? '正在请求麦克风权限...' : 'Requesting microphone permission...')
@@ -11796,6 +11811,7 @@ export default function FretMasterPage() {
                     <SheetTitle>{t('nav_settings')}</SheetTitle>
                   </SheetHeader>
                   
+                  <ErrorBoundary>
                   <div className="space-y-6 py-4 px-4">
                     {/* Language */}
                     {/* Practice Settings */}
@@ -12303,6 +12319,7 @@ export default function FretMasterPage() {
                       </div>
                     </div>
                   </div>
+                  </ErrorBoundary>
                 </SheetContent>
               </Sheet>
             </div>
@@ -12310,7 +12327,7 @@ export default function FretMasterPage() {
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden h-0">
           {/* Sidebar */}
           <aside
             data-onboarding="practice-tabs"
@@ -12351,7 +12368,7 @@ export default function FretMasterPage() {
           </aside>
 
           {/* Main Area */}
-          <main className="flex-1 overflow-auto p-2 sm:p-4 pb-16 sm:pb-4">
+          <main className="flex-1 overflow-auto p-2 sm:p-4 pb-20 sm:pb-6">
             <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
               {/* Control Panel - 统计页面不显示*/}
               {activeTab !== "stats" && (
@@ -12877,15 +12894,15 @@ export default function FretMasterPage() {
                           const groups = CHORD_TYPES.reduce((acc, type) => {
                             const groupKey = type.group || 'other'
                             if (!acc[groupKey]) {
-                              acc[groupKey] = { name: type.groupZh || '其他', types: [] }
+                              acc[groupKey] = { name: type.groupName || type.groupZh || 'Other', nameZh: type.groupZh || '其他', types: [] }
                             }
                             acc[groupKey].types.push(type)
                             return acc
-                          }, {} as Record<string, { name: string; types: typeof CHORD_TYPES }>)
+                          }, {} as Record<string, { name: string; nameZh: string; types: typeof CHORD_TYPES }>)
                           
                           return Object.entries(groups).map(([key, group]) => (
                             <div key={key} className="mb-2">
-                              <div className="text-[10px] font-medium text-muted-foreground/70 mb-1 px-1">{group.name}</div>
+                              <div className="text-[10px] font-medium text-muted-foreground/70 mb-1 px-1">{language === 'zh-CN' ? group.nameZh : group.name}</div>
                               <div className="flex flex-wrap gap-1">
                                 {group.types.map(type => (
                                   <Button

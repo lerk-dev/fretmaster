@@ -99,3 +99,50 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground));
 }
+
+/* ===== 和弦符号专业字体 ===== */
+/* Noto Music 覆盖 ♯♭♮Δø° 等音乐记号，确保跨平台渲染一致 */
+.font-music {
+  font-family: 'Noto Music', 'Segoe UI Symbol', 'Apple Symbols', serif;
+  font-feature-settings: 'liga' 1, 'kern' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 和弦符号专用样式 */
+.chord-symbol {
+  font-family: 'Noto Music', 'Segoe UI Symbol', 'Apple Symbols', serif;
+  font-feature-settings: 'liga' 1, 'kern' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.02em;
+  font-variant-ligatures: common-ligatures;
+}
+
+/* 和弦根音加粗 */
+.chord-root {
+  font-weight: 700;
+}
+
+/* 和弦修饰符（7, m, ø, Δ 等） */
+.chord-modifier {
+  font-size: 0.75em;
+  vertical-align: super;
+  font-weight: 600;
+}
+
+/* 音乐升降号 */
+.accidental-sharp::before {
+  content: '♯';
+  font-family: 'Noto Music', serif;
+}
+
+.accidental-flat::before {
+  content: '♭';
+  font-family: 'Noto Music', serif;
+}
+
+.accidental-natural::before {
+  content: '♮';
+  font-family: 'Noto Music', serif;
+}

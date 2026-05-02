@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { Mic, Activity, Zap, Filter, Volume2, Usb } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
@@ -15,9 +15,9 @@ interface WindowsAudioSettingsProps {
   language: 'zh-CN' | 'en'
 }
 
-export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
+export const WindowsAudioSettings = memo(function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
   const store = useAppStore()
-  const audioSettings = store.audio
+  const audioSettings = store?.audio || {}
   
   const [devices, setDevices] = useState<AudioDeviceInfo[]>([])
   const [isCapturing, setIsCapturing] = useState(false)
@@ -25,6 +25,7 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
   const [latency, setLatency] = useState(0)
   const [isInitializing, setIsInitializing] = useState(false)
   const [deviceChangeDetected, setDeviceChangeDetected] = useState(false)
+  const [initError, setInitError] = useState<string | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const devicePollRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -95,7 +96,13 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
   }, [language, audioSettings.selectedAudioDevice, store])
   
   useEffect(() => {
-    loadDevices()
+    try {
+      console.log('[WindowsAudioSettings] Mounting, loading devices...')
+      loadDevices()
+    } catch (err: any) {
+      console.error('[WindowsAudioSettings] Init error:', err?.message || err)
+      setInitError(err?.message || 'Unknown init error')
+    }
   }, [loadDevices])
   
   // 清理定时器
@@ -148,10 +155,8 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
     }
   }, [isCapturing, isInitializing, audioSettings.selectedAudioDevice, audioSettings.sampleRate, language, t])
   
-  // 停止音频捕获
+  // 停止音频捕获 - 使用 ref 避免依赖循环
   const stopAudio = useCallback(async () => {
-    if (!isCapturing) return
-    
     try {
       // 清除定时器
       if (intervalRef.current) {
@@ -165,7 +170,13 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
     } catch (error) {
       console.error('Failed to stop audio:', error)
     }
-  }, [isCapturing, t])
+  }, [t])
+  
+  // 使用 ref 存储 stopAudio 以避免依赖循环
+  const stopAudioRef = useRef(stopAudio)
+  useEffect(() => {
+    stopAudioRef.current = stopAudio
+  }, [stopAudio])
   
   // 切换音频状态
   const toggleAudio = useCallback(async () => {
@@ -176,7 +187,7 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
     }
   }, [isCapturing, startAudio, stopAudio])
   
-  // 处理设备变化
+  // 处理设备变化 - 使用 ref 避免依赖循环
   const handleDeviceChange = useCallback((event: DeviceChangeEvent) => {
     setDeviceChangeDetected(true)
     setDevices(event.devices)
@@ -192,10 +203,9 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
       
       // 如果当前使用的设备被移除，停止音频捕获
       if (event.removed.includes(audioSettings.selectedAudioDevice)) {
-        if (isCapturing) {
-          stopAudio()
-          toast.error(language === 'zh-CN' ? '当前音频设备已断开，音频输入已停止' : 'Current audio device disconnected, audio input stopped')
-        }
+        // 使用 ref 调用 stopAudio 避免依赖循环
+        stopAudioRef.current()
+        toast.error(language === 'zh-CN' ? '当前音频设备已断开，音频输入已停止' : 'Current audio device disconnected, audio input stopped')
         // 清除设备选择
         store.setSelectedAudioDevice('')
       }
@@ -206,14 +216,19 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
       const defaultDevice = event.devices.find(d => d.isDefault) || event.devices[0]
       store.setSelectedAudioDevice(defaultDevice.name)
     }
-  }, [language, audioSettings.selectedAudioDevice, isCapturing, store, stopAudio])
+  }, [language, audioSettings.selectedAudioDevice, store])
   
-  // 启动设备热插拔检测
+  // 启动设备热插拔检测（使用 Rust 后端事件驱动）
   useEffect(() => {
-    nativeAudio.startDevicePolling(handleDeviceChange, 2000)
+    let unlisten: (() => void) | null = null
+    
+    nativeAudio.listenDeviceChanges(handleDeviceChange).then((fn) => {
+      if (fn) unlisten = fn
+    })
     
     return () => {
-      nativeAudio.stopDevicePolling()
+      if (unlisten) unlisten()
+      nativeAudio.unlistenDeviceChanges()
     }
   }, [handleDeviceChange])
   
@@ -236,6 +251,12 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
   
   return (
     <div className="space-y-4">
+      {initError && (
+        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-600 dark:text-red-400">
+          <p className="font-medium">Audio Init Error</p>
+          <p className="text-xs mt-1">{initError}</p>
+        </div>
+      )}
       {/* 设备选择 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -255,7 +276,7 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
           </SelectTrigger>
           <SelectContent>
             {devices.length === 0 && (
-              <SelectItem value="" disabled>
+              <SelectItem value="__no_devices__" disabled>
                 {language === 'zh-CN' ? '未找到音频设备' : 'No audio devices found'}
               </SelectItem>
             )}
@@ -431,4 +452,4 @@ export function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
       </div>
     </div>
   )
-}
+})

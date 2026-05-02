@@ -4,7 +4,7 @@ const isTauri = process.env.TAURI_BUILD === 'true'
 
 const nextConfig = {
   output: isDev ? undefined : 'export',
-  distDir: 'dist',
+  distDir: isTauri ? 'dist-tauri' : 'dist',
   basePath: '',
   assetPrefix: '.',
   trailingSlash: true,
@@ -15,7 +15,7 @@ const nextConfig = {
     unoptimized: true,
   },
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: false,
   },
   experimental: {
     optimizeCss: true,
