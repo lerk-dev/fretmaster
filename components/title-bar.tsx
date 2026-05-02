@@ -4,26 +4,18 @@ import { useState, useEffect, memo } from 'react'
 import { Minus, Square, X, Maximize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// 检查是否在 Tauri 环境
-const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__
-
 interface TitleBarProps {
   className?: string
 }
 
-export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
+const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false)
-  const [isNative, setIsNative] = useState(false)
 
   useEffect(() => {
-    setIsNative(isTauri)
-    if (isTauri) {
-      checkMaximized()
-    }
+    checkMaximized()
   }, [])
 
   const checkMaximized = async () => {
-    if (!isTauri) return
     try {
       const { isWindowMaximized } = await import('@/lib/native-window')
       const maximized = await isWindowMaximized()
@@ -34,7 +26,6 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
   }
 
   const handleMinimize = async () => {
-    if (!isTauri) return
     try {
       const { minimizeWindow } = await import('@/lib/native-window')
       await minimizeWindow()
@@ -44,7 +35,6 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
   }
 
   const handleMaximize = async () => {
-    if (!isTauri) return
     try {
       const { maximizeWindow } = await import('@/lib/native-window')
       await maximizeWindow()
@@ -55,7 +45,6 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
   }
 
   const handleClose = async () => {
-    if (!isTauri) return
     try {
       const { closeWindow } = await import('@/lib/native-window')
       await closeWindow()
@@ -65,18 +54,12 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
   }
 
   const handleDragStart = async () => {
-    if (!isTauri) return
     try {
       const { startDragging } = await import('@/lib/native-window')
       await startDragging()
     } catch (e) {
       console.error('Failed to start dragging:', e)
     }
-  }
-
-  // Web 版本不显示自定义标题栏
-  if (!isNative) {
-    return null
   }
 
   return (
@@ -86,7 +69,6 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
         className
       )}
     >
-      {/* 左侧：标题和图标区域 - 可拖动 */}
       <div 
         className="flex items-center gap-2 px-4 flex-1 h-full"
         onMouseDown={handleDragStart}
@@ -97,13 +79,12 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
         <span className="text-sm font-medium text-foreground/80">FretMaster</span>
       </div>
 
-      {/* 右侧：窗口控制按钮 - 不可拖动 */}
       <div className="flex items-center">
         <button
           onClick={handleMinimize}
           onMouseDown={(e) => e.stopPropagation()}
           className="h-10 w-12 flex items-center justify-center hover:bg-accent/50 transition-colors"
-          title="最小化"
+          title="Minimize"
         >
           <Minus className="w-4 h-4 text-foreground/70" />
         </button>
@@ -111,7 +92,7 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
           onClick={handleMaximize}
           onMouseDown={(e) => e.stopPropagation()}
           className="h-10 w-12 flex items-center justify-center hover:bg-accent/50 transition-colors"
-          title={isMaximized ? '还原' : '最大化'}
+          title={isMaximized ? 'Restore' : 'Maximize'}
         >
           {isMaximized ? (
             <Square className="w-3.5 h-3.5 text-foreground/70" />
@@ -123,7 +104,7 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
           onClick={handleClose}
           onMouseDown={(e) => e.stopPropagation()}
           className="h-10 w-12 flex items-center justify-center hover:bg-red-500/90 hover:text-white transition-colors"
-          title="关闭"
+          title="Close"
         >
           <X className="w-4 h-4 text-foreground/70 hover:text-white" />
         </button>
@@ -131,3 +112,20 @@ export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
     </div>
   )
 })
+
+export function TitleBar({ className }: TitleBarProps) {
+  const [isNative, setIsNative] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__
+    setIsNative(isTauri)
+  }, [])
+
+  if (!mounted || !isNative) {
+    return null
+  }
+
+  return <TitleBarInner className={className} />
+}
