@@ -1,9 +1,8 @@
-use rustfft::FftPlanner;
 use serde::{Deserialize, Serialize};
 
 const MIN_FREQUENCY: f32 = 27.5;
 const MAX_FREQUENCY: f32 = 4186.0;
-const DEFAULT_THRESHOLD: f32 = 0.15;
+const DEFAULT_THRESHOLD: f32 = 0.12;
 const PROBABILITY_CLIFF: f32 = 0.1;
 const SMOOTHING_FACTOR: f32 = 0.85;
 const MAX_HISTORY: usize = 8;
@@ -58,7 +57,7 @@ impl Default for PitchDetectorConfig {
             threshold: DEFAULT_THRESHOLD,
             probability_cliff: PROBABILITY_CLIFF,
             sample_rate: 48000,
-            buffer_size: 2048,
+            buffer_size: 4096,
             enable_temporal_smoothing: true,
             enable_harmonic_check: true,
             calibration_offset: 0.0,
@@ -69,8 +68,6 @@ impl Default for PitchDetectorConfig {
 pub struct PitchDetector {
     config: PitchDetectorConfig,
     yin_buffer: Vec<f32>,
-    fft_planner: FftPlanner<f32>,
-    fft_work: Vec<rustfft::num_complex::Complex<f32>>,
     frequency_history: Vec<f32>,
     smoothed_frequency: Option<f32>,
     adaptive_threshold: f32,
@@ -82,8 +79,6 @@ impl PitchDetector {
         let half_size = config.buffer_size / 2;
         Self {
             yin_buffer: vec![0.0; half_size],
-            fft_planner: FftPlanner::new(),
-            fft_work: vec![rustfft::num_complex::Complex::new(0.0, 0.0); config.buffer_size],
             config,
             frequency_history: Vec::with_capacity(MAX_HISTORY),
             smoothed_frequency: None,
@@ -104,7 +99,6 @@ impl PitchDetector {
         self.config.buffer_size = buffer_size;
         let half_size = buffer_size / 2;
         self.yin_buffer.resize(half_size, 0.0);
-        self.fft_work.resize(buffer_size, rustfft::num_complex::Complex::new(0.0, 0.0));
     }
 
     pub fn set_threshold(&mut self, threshold: f32) {
@@ -212,43 +206,15 @@ impl PitchDetector {
     }
 
     fn compute_difference_function(&mut self, buffer: &[f32], half_size: usize) {
-        let n = self.config.buffer_size;
-        let fft_size = n;
-
-        for i in 0..n {
-            self.fft_work[i] = rustfft::num_complex::Complex::new(buffer[i], 0.0);
-        }
-
-        let fft = self.fft_planner.plan_fft_forward(fft_size);
-        fft.process(&mut self.fft_work);
-
-        for i in 0..fft_size {
-            let val = self.fft_work[i];
-            self.fft_work[i] = val * val.conj();
-        }
-
-        let ifft = self.fft_planner.plan_fft_inverse(fft_size);
-        ifft.process(&mut self.fft_work);
-
-        let auto_corr: Vec<f32> = self.fft_work[..half_size]
-            .iter()
-            .map(|c| c.re / fft_size as f32)
-            .collect();
-
-        let mut energy = vec![0.0f32; half_size];
-        for j in 0..half_size {
-            energy[0] += buffer[j] * buffer[j];
-        }
-        for tau in 1..half_size {
-            energy[tau] = energy[tau - 1]
-                - buffer[tau - 1] * buffer[tau - 1]
-                + buffer[tau + half_size - 1] * buffer[tau + half_size - 1];
-        }
-
         self.yin_buffer[0] = 1.0;
+        
         for tau in 1..half_size {
-            let d = energy[0] + energy[tau] - 2.0 * auto_corr[tau];
-            self.yin_buffer[tau] = if d > 0.0 { d } else { 0.0 };
+            let mut sum = 0.0f32;
+            for j in 0..half_size {
+                let delta = buffer[j] - buffer[j + tau];
+                sum += delta * delta;
+            }
+            self.yin_buffer[tau] = sum;
         }
     }
 
@@ -269,16 +235,29 @@ impl PitchDetector {
         let min_tau = ((self.config.sample_rate as f32 / MAX_FREQUENCY) as usize).max(2);
         let max_tau = ((self.config.sample_rate as f32 / MIN_FREQUENCY) as usize).min(half_size - 1);
 
+        let mut best_tau = 0usize;
+        let mut best_val = 1.0f32;
+
         for tau in min_tau..max_tau {
-            if self.yin_buffer[tau] < self.adaptive_threshold {
-                let mut best_tau = tau;
-                while best_tau + 1 < max_tau
-                    && self.yin_buffer[best_tau + 1] < self.yin_buffer[best_tau]
-                {
+            let val = self.yin_buffer[tau];
+            
+            if val < self.adaptive_threshold && val < best_val {
+                best_tau = tau;
+                best_val = val;
+                
+                while best_tau + 1 < max_tau && self.yin_buffer[best_tau + 1] < best_val {
                     best_tau += 1;
+                    best_val = self.yin_buffer[best_tau];
                 }
-                return Some(best_tau);
+                
+                if best_val < self.adaptive_threshold * 0.5 {
+                    return Some(best_tau);
+                }
             }
+        }
+
+        if best_val < self.adaptive_threshold {
+            return Some(best_tau);
         }
 
         let min_val_tau = (min_tau..max_tau)
