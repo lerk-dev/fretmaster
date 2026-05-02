@@ -39,6 +39,10 @@ fn main() {
             fretmaster::commands::set_buffer_size,
             fretmaster::commands::set_noise_suppression,
             fretmaster::commands::set_audio_filters,
+            // Device monitor commands
+            fretmaster::commands::start_device_monitor,
+            fretmaster::commands::stop_device_monitor,
+            fretmaster::commands::is_device_monitor_running,
             // Database commands
             fretmaster::commands::save_practice_stats,
             fretmaster::commands::get_all_practice_stats,

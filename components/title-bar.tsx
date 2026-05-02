@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Minus, Square, X, Maximize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -11,7 +11,7 @@ interface TitleBarProps {
   className?: string
 }
 
-export function TitleBar({ className }: TitleBarProps) {
+export const TitleBar = memo(function TitleBar({ className }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false)
   const [isNative, setIsNative] = useState(false)
 
@@ -130,4 +130,4 @@ export function TitleBar({ className }: TitleBarProps) {
       </div>
     </div>
   )
-}
+})

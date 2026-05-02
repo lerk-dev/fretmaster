@@ -222,10 +222,9 @@ impl PitchDetector {
         let fft = self.fft_planner.plan_fft_forward(fft_size);
         fft.process(&mut self.fft_work);
 
-        let spectrum: Vec<rustfft::num_complex::Complex<f32>> = self.fft_work.clone();
-
         for i in 0..fft_size {
-            self.fft_work[i] = spectrum[i] * spectrum[i].conj();
+            let val = self.fft_work[i];
+            self.fft_work[i] = val * val.conj();
         }
 
         let ifft = self.fft_planner.plan_fft_inverse(fft_size);
@@ -236,13 +235,15 @@ impl PitchDetector {
             .map(|c| c.re / fft_size as f32)
             .collect();
 
-        let energy: Vec<f32> = (0..half_size)
-            .map(|tau| {
-                (0..half_size)
-                    .map(|j| buffer[j] * buffer[j] + buffer[j + tau] * buffer[j + tau])
-                    .sum::<f32>() * 0.5
-            })
-            .collect();
+        let mut energy = vec![0.0f32; half_size];
+        for j in 0..half_size {
+            energy[0] += buffer[j] * buffer[j];
+        }
+        for tau in 1..half_size {
+            energy[tau] = energy[tau - 1]
+                - buffer[tau - 1] * buffer[tau - 1]
+                + buffer[tau + half_size - 1] * buffer[tau + half_size - 1];
+        }
 
         self.yin_buffer[0] = 1.0;
         for tau in 1..half_size {
@@ -361,7 +362,7 @@ impl PitchDetector {
 
     fn analyze_harmonic_spectrum(&self, frequency: f32, half_size: usize) -> HarmonicAnalysis {
         let mut harmonics_found = Vec::new();
-        let mut total_energy = 0.0f32;
+        let total_energy = 0.0f32;
         let mut harmonic_energy = 0.0f32;
 
         for harmonic in 1..=8 {

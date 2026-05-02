@@ -5,9 +5,8 @@
   "identifier": "com.fretmaster.app",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:3000",
-    "beforeBuildCommand": "set TAURI_BUILD=true && npm run build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": "",
+    "frontendDist": "../dist-tauri"
   },
   "app": {
     "withGlobalTauri": true,
