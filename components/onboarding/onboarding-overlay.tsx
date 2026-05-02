@@ -85,6 +85,11 @@ export function OnboardingOverlay() {
 
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
   const [tooltipSize, setTooltipSize] = useState({ width: 320, height: 200 })
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const updateTargetPosition = useCallback(() => {
     if (currentStep?.targetSelector) {
@@ -96,32 +101,30 @@ export function OnboardingOverlay() {
   }, [currentStep])
 
   useEffect(() => {
-    if (isActive) {
-      updateTargetPosition()
-      
-      const handleResize = () => updateTargetPosition()
-      const handleScroll = () => updateTargetPosition()
-      
-      window.addEventListener("resize", handleResize)
-      window.addEventListener("scroll", handleScroll, true)
-      
-      return () => {
-        window.removeEventListener("resize", handleResize)
-        window.removeEventListener("scroll", handleScroll, true)
-      }
+    if (!mounted || !isActive) return
+    updateTargetPosition()
+    
+    const handleResize = () => updateTargetPosition()
+    const handleScroll = () => updateTargetPosition()
+    
+    window.addEventListener("resize", handleResize)
+    window.addEventListener("scroll", handleScroll, true)
+    
+    return () => {
+      window.removeEventListener("resize", handleResize)
+      window.removeEventListener("scroll", handleScroll, true)
     }
-  }, [isActive, currentStep, updateTargetPosition])
+  }, [mounted, isActive, currentStep, updateTargetPosition])
 
   useEffect(() => {
-    if (isActive && currentStep?.targetSelector && targetRect) {
-      const element = document.querySelector(currentStep.targetSelector)
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" })
-      }
+    if (!mounted || !isActive || !currentStep?.targetSelector || !targetRect) return
+    const element = document.querySelector(currentStep.targetSelector)
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" })
     }
-  }, [isActive, currentStep, targetRect])
+  }, [mounted, isActive, currentStep, targetRect])
 
-  if (!isActive || !currentStep) return null
+  if (!mounted || !isActive || !currentStep) return null
 
   const position = currentStep.position || "bottom"
   const { x, y } = calculateTooltipPosition(
