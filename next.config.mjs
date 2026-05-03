@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV !== 'production'
-const isTauri = process.env.TAURI_BUILD === 'true'
+const isTauri = process.env.TAURI_BUILD === 'true' || process.env.TAURI === 'true'
 
 const nextConfig = {
   output: isDev ? undefined : 'export',
-  distDir: isTauri ? 'out' : 'dist',
-  basePath: isDev || isTauri ? '' : '/fretmaster',
-  assetPrefix: isDev || isTauri ? '' : '/fretmaster',
+  distDir: 'dist-tauri',
+  basePath: '',
+  assetPrefix: '.',
   trailingSlash: true,
   typescript: {
     ignoreBuildErrors: true,
@@ -15,7 +15,7 @@ const nextConfig = {
     unoptimized: true,
   },
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: false,
   },
   experimental: {
     optimizeCss: true,

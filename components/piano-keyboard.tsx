@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { useMemo } from "react"
+import { useMemo, memo } from "react"
 
 const PIANO_CONFIG = {
   startNote: 21,
@@ -43,7 +43,7 @@ interface PianoKeyboardProps {
   maxOctave?: number
 }
 
-export function PianoKeyboard({
+export const PianoKeyboard = memo(function PianoKeyboard({
   highlightedNotes = [],
   currentStepNotes = [],
   rootNote,
@@ -212,7 +212,7 @@ export function PianoKeyboard({
       </div>
     </div>
   )
-}
+})
 
 interface SimplePianoKeyboardProps {
   rootNote: string
@@ -221,7 +221,7 @@ interface SimplePianoKeyboardProps {
   className?: string
 }
 
-export function SimplePianoKeyboard({
+export const SimplePianoKeyboard = memo(function SimplePianoKeyboard({
   rootNote,
   highlightedNotes,
   currentStepNote,
@@ -259,6 +259,6 @@ export function SimplePianoKeyboard({
       maxOctave={5}
     />
   )
-}
+})
 
 export default PianoKeyboard

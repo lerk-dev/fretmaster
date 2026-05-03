@@ -1,3 +1,10 @@
+import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+
+export const isTauri = (): boolean => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__
+}
+
 export interface AudioDeviceInfo {
   name: string
   isDefault: boolean
@@ -6,358 +13,286 @@ export interface AudioDeviceInfo {
 }
 
 export interface PitchResult {
-  frequency: number
   note: string
   octave: number
+  frequency: number
   cents: number
-  probability: number
-  clarity: number
-  volume_rms: number
+  confidence: {
+    yin: number
+    harmonic: number
+    temporal: number
+    overall: number
+  }
   volume_db_spl: number
-  max_amplitude: number
-  timestamp: number
 }
 
-export interface AudioLevelInfo {
-  rms: number
-  db_spl: number
-  peak: number
+export interface AudioStatus {
+  isCapturing: boolean
+  latencyMs: number
+  bufferSize: number
+  sampleRate: number
 }
 
-export interface NativeAudioAPI {
-  getAudioDevices(): Promise<AudioDeviceInfo[]>
-  getDefaultAudioDevice(): Promise<AudioDeviceInfo | null>
-  startAudioCapture(deviceName?: string): Promise<void>
-  startAudioCaptureWithSampleRate(deviceName?: string, sampleRate?: number): Promise<void>
-  stopAudioCapture(): Promise<void>
-  isCapturing(): Promise<boolean>
-  detectPitch(): Promise<PitchResult | null>
-  getSampleRate(): Promise<number>
-  setSampleRate(sampleRate: number): Promise<void>
-  getSupportedSampleRates(): Promise<number[]>
-  getBufferSize(): Promise<number>
-  clearBuffer(): Promise<void>
-  setPitchThreshold(threshold: number): Promise<void>
-  getAudioLevel(): Promise<AudioLevelInfo>
+export interface DeviceChangeEvent {
+  added: AudioDeviceInfo[]
+  removed: string[]
+  devices: AudioDeviceInfo[]
 }
 
-declare global {
-  interface Window {
-    __TAURI__?: {
-      core: {
-        invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T>
-      }
-    }
+let deviceChangeListener: UnlistenFn | null = null
+let devicePollInterval: NodeJS.Timeout | null = null
+let lastDevices: AudioDeviceInfo[] = []
+let monitorStarted = false
+
+export async function getAudioDevices(): Promise<AudioDeviceInfo[]> {
+  if (!isTauri()) {
+    return []
   }
-}
-
-export function isTauri(): boolean {
-  return typeof window !== 'undefined' && !!window.__TAURI__
-}
-
-class TauriAudioAPI implements NativeAudioAPI {
-  private invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    if (!window.__TAURI__) {
-      return Promise.reject(new Error('Tauri not available'))
-    }
-    return window.__TAURI__.core.invoke<T>(cmd, args)
-  }
-
-  async getAudioDevices(): Promise<AudioDeviceInfo[]> {
-    return this.invoke<AudioDeviceInfo[]>('get_audio_devices')
-  }
-
-  async getDefaultAudioDevice(): Promise<AudioDeviceInfo | null> {
-    return this.invoke<AudioDeviceInfo | null>('get_default_audio_device')
-  }
-
-  async startAudioCapture(deviceName?: string): Promise<void> {
-    return this.invoke<void>('start_audio_capture', { deviceName })
-  }
-
-  async startAudioCaptureWithSampleRate(deviceName?: string, sampleRate?: number): Promise<void> {
-    return this.invoke<void>('start_audio_capture_with_sample_rate', { deviceName, sampleRate })
-  }
-
-  async stopAudioCapture(): Promise<void> {
-    return this.invoke<void>('stop_audio_capture')
-  }
-
-  async isCapturing(): Promise<boolean> {
-    return this.invoke<boolean>('is_capturing')
-  }
-
-  async detectPitch(): Promise<PitchResult | null> {
-    return this.invoke<PitchResult | null>('detect_pitch')
-  }
-
-  async getSampleRate(): Promise<number> {
-    return this.invoke<number>('get_sample_rate')
-  }
-
-  async setSampleRate(sampleRate: number): Promise<void> {
-    return this.invoke<void>('set_sample_rate', { sampleRate })
-  }
-
-  async getSupportedSampleRates(): Promise<number[]> {
-    return this.invoke<number[]>('get_supported_sample_rates')
-  }
-
-  async getBufferSize(): Promise<number> {
-    return this.invoke<number>('get_buffer_size')
-  }
-
-  async clearBuffer(): Promise<void> {
-    return this.invoke<void>('clear_buffer')
-  }
-
-  async setPitchThreshold(threshold: number): Promise<void> {
-    return this.invoke<void>('set_pitch_threshold', { threshold })
-  }
-
-  async getAudioLevel(): Promise<AudioLevelInfo> {
-    return this.invoke<AudioLevelInfo>('get_audio_level')
-  }
-}
-
-class WebAudioAPI implements NativeAudioAPI {
-  private audioContext: AudioContext | null = null
-  private mediaStream: MediaStream | null = null
-  private analyser: AnalyserNode | null = null
-  private scriptProcessor: ScriptProcessorNode | null = null
-  private buffer: Float32Array = new Float32Array(8192)
-  private bufferIndex: number = 0
-  private isRunning: boolean = false
-  private sampleRate: number = 48000
-
-  async getAudioDevices(): Promise<AudioDeviceInfo[]> {
-    const devices = await navigator.mediaDevices.enumerateDevices()
+  try {
+    const devices = await invoke<AudioDeviceInfo[]>('get_audio_devices')
+    lastDevices = devices
     return devices
-      .filter(d => d.kind === 'audioinput')
-      .map(d => ({
-        name: d.label || 'Unknown Device',
-        isDefault: false,
-        channels: 1,
-        sampleRate: 48000,
-      }))
+  } catch (error) {
+    console.error('Failed to get audio devices:', error)
+    return []
   }
+}
 
-  async getDefaultAudioDevice(): Promise<AudioDeviceInfo | null> {
-    return {
-      name: 'Default Microphone',
-      isDefault: true,
-      channels: 1,
-      sampleRate: 48000,
-    }
-  }
+/**
+ * 启动设备热插拔监控（Rust 后端事件驱动）
+ * 优先使用 Tauri 事件，如果不可用则回退到前端轮询
+ */
+export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) => void): Promise<UnlistenFn | null> {
+  if (!isTauri()) return null
 
-  async startAudioCapture(deviceName?: string): Promise<void> {
-    return this.startAudioCaptureWithSampleRate(deviceName, undefined)
-  }
-
-  async startAudioCaptureWithSampleRate(deviceName?: string, sampleRate?: number): Promise<void> {
-    if (sampleRate) {
-      this.sampleRate = sampleRate
+  // 1. 启动 Rust 后端设备监控线程（通过 Tauri 事件推送变化）
+  try {
+    if (!monitorStarted) {
+      await invoke('start_device_monitor', { intervalMs: 1500 })
+      monitorStarted = true
     }
 
-    const constraints: MediaStreamConstraints = {
-      audio: deviceName
-        ? { deviceId: { exact: deviceName } }
-        : {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          },
-    }
+    // 2. 监听后端推送的 audio-device-changed 事件
+    deviceChangeListener = await listen<DeviceChangeEvent>('audio-device-changed', (event) => {
+      lastDevices = event.payload.devices
+      callback(event.payload)
+    })
+    return deviceChangeListener
+  } catch (error) {
+    console.warn('Tauri event-based monitoring unavailable, falling back to polling:', error)
+    // 3. 回退：前端轮询
+    startDevicePolling(callback, 2000)
+    return () => stopDevicePolling()
+  }
+}
 
-    this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
-    this.audioContext = new AudioContext({ sampleRate: this.sampleRate })
-    
-    const source = this.audioContext.createMediaStreamSource(this.mediaStream)
-    this.analyser = this.audioContext.createAnalyser()
-    this.analyser.fftSize = 4096
+/**
+ * 停止设备变化监听，同时停止后端监控线程
+ */
+export function unlistenDeviceChanges(): void {
+  if (deviceChangeListener) {
+    deviceChangeListener()
+    deviceChangeListener = null
+  }
+  stopDevicePolling()
+  
+  // 停止 Rust 后端监控线程
+  if (monitorStarted && isTauri()) {
+    invoke('stop_device_monitor').catch(() => {})
+    monitorStarted = false
+  }
+}
 
-    this.scriptProcessor = this.audioContext.createScriptProcessor(2048, 1, 1)
-    
-    this.scriptProcessor.onaudioprocess = (event) => {
-      if (!this.isRunning) return
-      
-      const inputData = event.inputBuffer.getChannelData(0)
-      
-      for (let i = 0; i < inputData.length; i++) {
-        this.buffer[this.bufferIndex] = inputData[i]
-        this.bufferIndex = (this.bufferIndex + 1) % this.buffer.length
+/**
+ * 前端轮询方案（备用）
+ */
+export function startDevicePolling(callback: (event: DeviceChangeEvent) => void, intervalMs: number = 2000): void {
+  if (!isTauri()) return
+  
+  getAudioDevices().then(() => {
+    devicePollInterval = setInterval(async () => {
+      try {
+        const newDevices = await invoke<AudioDeviceInfo[]>('get_audio_devices')
+        
+        const added = newDevices.filter(d => !lastDevices.some(ld => ld.name === d.name))
+        const removed = lastDevices.filter(d => !newDevices.some(nd => nd.name === d.name)).map(d => d.name)
+        
+        if (added.length > 0 || removed.length > 0) {
+          const event: DeviceChangeEvent = {
+            added,
+            removed,
+            devices: newDevices
+          }
+          callback(event)
+        }
+        
+        lastDevices = newDevices
+      } catch (error) {
+        console.error('Device polling error:', error)
       }
-    }
+    }, intervalMs)
+  })
+}
 
-    source.connect(this.analyser)
-    this.analyser.connect(this.scriptProcessor)
-    this.scriptProcessor.connect(this.audioContext.destination)
-    
-    this.isRunning = true
+export function stopDevicePolling(): void {
+  if (devicePollInterval) {
+    clearInterval(devicePollInterval)
+    devicePollInterval = null
   }
+}
 
-  async stopAudioCapture(): Promise<void> {
-    this.isRunning = false
-    
-    if (this.scriptProcessor) {
-      this.scriptProcessor.disconnect()
-      this.scriptProcessor = null
-    }
-    
-    if (this.analyser) {
-      this.analyser.disconnect()
-      this.analyser = null
-    }
-    
-    if (this.audioContext) {
-      await this.audioContext.close()
-      this.audioContext = null
-    }
-    
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach(track => track.stop())
-      this.mediaStream = null
-    }
-    
-    this.bufferIndex = 0
+export async function startAudioCapture(deviceName?: string): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('Not in Tauri environment')
   }
-
-  async isCapturing(): Promise<boolean> {
-    return this.isRunning
+  try {
+    await invoke('start_audio_capture', { deviceName })
+  } catch (error) {
+    console.error('Failed to start audio capture:', error)
+    throw error
   }
+}
 
-  async detectPitch(): Promise<PitchResult | null> {
-    if (!this.isRunning || !this.analyser) {
-      return null
-    }
-
-    const buffer = this.buffer.slice()
-    const result = this.yinPitchDetection(buffer, this.sampleRate)
-    
-    return result
+export async function startAudioCaptureWithSampleRate(
+  deviceName?: string,
+  sampleRate?: number
+): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('Not in Tauri environment')
   }
+  try {
+    await invoke('start_audio_capture_with_sample_rate', { 
+      deviceName, 
+      sampleRate: sampleRate || 48000 
+    })
+  } catch (error) {
+    console.error('Failed to start audio capture:', error)
+    throw error
+  }
+}
 
-  private yinPitchDetection(buffer: Float32Array, sampleRate: number): PitchResult | null {
-    const bufferSize = Math.min(buffer.length, 2048)
-    const halfSize = bufferSize / 2
-    const threshold = 0.15
+export async function stopAudioCapture(): Promise<void> {
+  if (!isTauri()) {
+    return
+  }
+  try {
+    await invoke('stop_audio_capture')
+  } catch (error) {
+    console.error('Failed to stop audio capture:', error)
+  }
+}
 
-    const yinBuffer = new Float32Array(halfSize)
-    
-    for (let tau = 1; tau < halfSize; tau++) {
-      let sum = 0
-      for (let j = 0; j < halfSize; j++) {
-        const delta = buffer[j] - buffer[j + tau]
-        sum += delta * delta
-      }
-      yinBuffer[tau] = sum
-    }
+export async function detectPitch(): Promise<PitchResult | null> {
+  if (!isTauri()) {
+    return null
+  }
+  try {
+    return await invoke<PitchResult | null>('detect_pitch')
+  } catch (error) {
+    console.error('Failed to detect pitch:', error)
+    return null
+  }
+}
 
-    let runningSum = 0
-    for (let tau = 1; tau < halfSize; tau++) {
-      runningSum += yinBuffer[tau]
-      yinBuffer[tau] *= tau / runningSum
-    }
+export async function getLatencyMs(): Promise<number> {
+  if (!isTauri()) {
+    return 0
+  }
+  try {
+    return await invoke<number>('get_latency_ms')
+  } catch (error) {
+    console.error('Failed to get latency:', error)
+    return 0
+  }
+}
 
-    let tau = 2
-    while (tau < halfSize && yinBuffer[tau] > threshold) {
-      tau++
-    }
-
-    if (tau === halfSize) return null
-
-    while (tau + 1 < halfSize && yinBuffer[tau + 1] < yinBuffer[tau]) {
-      tau++
-    }
-
-    const frequency = sampleRate / tau
-    
-    if (frequency < 60 || frequency > 2000) return null
-
-    const probability = 1 - yinBuffer[tau]
-    
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-    const a4 = 440
-    const a4Midi = 69
-    const midiNote = 12 * Math.log2(frequency / a4) + a4Midi
-    const midiRounded = Math.round(midiNote)
-    const noteIndex = ((midiRounded % 12) + 12) % 12
-    const octave = Math.floor(midiRounded / 12) - 1
-    const cents = (midiNote - midiRounded) * 100
-
-    const bufferArray = Array.from(buffer)
-    const rms = Math.sqrt(bufferArray.reduce((sum, x) => sum + x * x, 0) / buffer.length)
-    const dbSpl = rms > 0 ? 20 * Math.log10(rms) + 94 : -96
-    const maxAmplitude = Math.max(...bufferArray.map(Math.abs))
-
+export async function getAudioStatus(): Promise<AudioStatus> {
+  if (!isTauri()) {
     return {
-      frequency,
-      note: noteNames[noteIndex],
-      octave,
-      cents,
-      probability,
-      clarity: probability,
-      volume_rms: rms,
-      volume_db_spl: dbSpl,
-      max_amplitude: maxAmplitude,
-      timestamp: Date.now(),
+      isCapturing: false,
+      latencyMs: 0,
+      bufferSize: 2048,
+      sampleRate: 48000
     }
   }
-
-  async getSampleRate(): Promise<number> {
-    return this.sampleRate
-  }
-
-  async setSampleRate(sampleRate: number): Promise<void> {
-    this.sampleRate = sampleRate
-    if (this.isRunning) {
-      const deviceName = this.mediaStream?.getAudioTracks()[0]?.label
-      await this.stopAudioCapture()
-      await this.startAudioCaptureWithSampleRate(deviceName, sampleRate)
-    }
-  }
-
-  async getSupportedSampleRates(): Promise<number[]> {
-    return [44100, 48000, 96000]
-  }
-
-  async getBufferSize(): Promise<number> {
-    return this.buffer.length
-  }
-
-  async clearBuffer(): Promise<void> {
-    this.buffer.fill(0)
-    this.bufferIndex = 0
-  }
-
-  async setPitchThreshold(_threshold: number): Promise<void> {
-    // Web implementation uses fixed threshold
-  }
-
-  async getAudioLevel(): Promise<AudioLevelInfo> {
-    if (!this.isRunning || this.buffer.length === 0) {
-      return { rms: 0, db_spl: -96, peak: 0 }
-    }
-
-    const bufferArray = Array.from(this.buffer)
-    const rms = Math.sqrt(bufferArray.reduce((sum, x) => sum + x * x, 0) / this.buffer.length)
-    const dbSpl = rms > 0 ? 20 * Math.log10(rms) + 94 : -96
-    const peak = Math.max(...bufferArray.map(Math.abs))
-
+  try {
+    return await invoke<AudioStatus>('get_audio_status')
+  } catch (error) {
+    console.error('Failed to get audio status:', error)
     return {
-      rms,
-      db_spl: dbSpl,
-      peak,
+      isCapturing: false,
+      latencyMs: 0,
+      bufferSize: 2048,
+      sampleRate: 48000
     }
   }
 }
 
-export function createAudioAPI(): NativeAudioAPI {
-  if (isTauri()) {
-    return new TauriAudioAPI()
+export async function setBufferSize(size: number): Promise<void> {
+  if (!isTauri()) {
+    return
   }
-  return new WebAudioAPI()
+  try {
+    await invoke('set_buffer_size', { size })
+  } catch (error) {
+    console.error('Failed to set buffer size:', error)
+  }
 }
 
-export const nativeAudio = createAudioAPI()
+export async function setSampleRate(rate: number): Promise<void> {
+  if (!isTauri()) {
+    return
+  }
+  try {
+    await invoke('set_sample_rate', { rate })
+  } catch (error) {
+    console.error('Failed to set sample rate:', error)
+  }
+}
+
+export async function setNoiseSuppression(level: number): Promise<void> {
+  if (!isTauri()) {
+    return
+  }
+  try {
+    await invoke('set_noise_suppression', { level })
+  } catch (error) {
+    console.error('Failed to set noise suppression:', error)
+  }
+}
+
+export async function setFilters(filters: {
+  highPass?: boolean
+  lowPass?: boolean
+  notch50?: boolean
+  notch60?: boolean
+}): Promise<void> {
+  if (!isTauri()) {
+    return
+  }
+  try {
+    await invoke('set_audio_filters', { filters })
+  } catch (error) {
+    console.error('Failed to set filters:', error)
+  }
+}
+
+export const nativeAudio = {
+  getAudioDevices,
+  startAudioCapture,
+  startAudioCaptureWithSampleRate,
+  stopAudioCapture,
+  detectPitch,
+  getLatencyMs,
+  getAudioStatus,
+  setBufferSize,
+  setSampleRate,
+  setNoiseSuppression,
+  setFilters,
+  startDevicePolling,
+  stopDevicePolling,
+  listenDeviceChanges,
+  unlistenDeviceChanges,
+}
+
+export default nativeAudio

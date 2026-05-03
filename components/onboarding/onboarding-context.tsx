@@ -129,8 +129,10 @@ export function OnboardingProvider({ children, config, t: externalT }: Onboardin
   const [isCompleted, setIsCompleted] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     if (typeof window === "undefined") return
     
     const saved = localStorage.getItem(storageKey)
@@ -205,20 +207,23 @@ export function OnboardingProvider({ children, config, t: externalT }: Onboardin
     setIsCompleted(false)
     setHasSeenOnboarding(false)
     setIsPaused(false)
-    localStorage.removeItem(storageKey)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(storageKey)
+    }
   }, [storageKey])
 
   const currentStep = steps[currentStepIndex] || null
   const progress = ((currentStepIndex + 1) / steps.length) * 100
 
   useEffect(() => {
+    if (!mounted) return
     if (config?.autoStartOnFirstVisit !== false && !hasSeenOnboarding && !isCompleted) {
       const timer = setTimeout(() => {
         startOnboarding()
       }, 1000)
       return () => clearTimeout(timer)
     }
-  }, [config?.autoStartOnFirstVisit, hasSeenOnboarding, isCompleted, startOnboarding])
+  }, [config?.autoStartOnFirstVisit, hasSeenOnboarding, isCompleted, startOnboarding, mounted])
 
   const value: OnboardingContextType = {
     isActive,

@@ -1,5 +1,6 @@
 [target.x86_64-pc-windows-gnu]
-linker = "gcc"
+linker = "e:/fretmasterui/b_WXSxmM0U95a-1773316568068/mingw/mingw64/bin/gcc.exe"
+ar = "e:/fretmasterui/b_WXSxmM0U95a-1773316568068/mingw/mingw64/bin/ar.exe"
 
 [build]
 target = "x86_64-pc-windows-gnu"

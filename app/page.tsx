@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List, ListChildComponentProps } from 'react-window'
@@ -48,6 +48,8 @@ import { Label } from "@/components/ui/label"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { WindowsAudioSettings } from "@/components/windows-audio-settings"
+import { ErrorBoundary } from "@/components/error-boundary"
 import Sidebar from "@/components/Sidebar"
 import Header from "@/components/Header"
 import BottomNavigation from "@/components/BottomNavigation"
@@ -439,6 +441,12 @@ const TRANSLATIONS = {
                     'nav_chord_exercise': '和弦练习',
                     'nav_interval': '音程练习',
                     'nav_practice': '找音练习',
+                    'nav_short_practice': '找音',
+                    'nav_short_interval': '音程',
+                    'nav_short_chord_exercise': '和弦',
+                    'nav_short_chord': '转换',
+                    'nav_short_scale': '音阶',
+                    'nav_short_stats': '统计',
                     'app_title': '🎸 吉他指板视觉化练习工具',
                  
                     'page_title': '吉他指板视觉化练习工具',
@@ -1424,10 +1432,16 @@ const TRANSLATIONS = {
                     'nav_stats': 'Stats',
                     'nav_tuner': 'Tuner',
                     'nav_arpeggio': 'Arpeggio',
-                    'nav_chord_exercise': 'Chord',
+                    'nav_chord_exercise': 'Chord Practice',
                     'next_chord': 'Next',
-                    'nav_interval': 'Interval',
-                    'nav_practice': 'Practice',
+                    'nav_interval': 'Interval Practice',
+                    'nav_practice': 'Note Practice',
+                    'nav_short_practice': 'Note',
+                    'nav_short_interval': 'Interval',
+                    'nav_short_chord_exercise': 'Chords',
+                    'nav_short_chord': 'Changes',
+                    'nav_short_scale': 'Scales',
+                    'nav_short_stats': 'Stats',
                     'app_title': '🎸 Fretboard Master',
                    
                     'page_title': 'Fretboard Master',
@@ -1435,8 +1449,8 @@ const TRANSLATIONS = {
                     'status_ready': 'Ready',
                     'lang_zh': '中文',
                     'lang_en': 'English',
-                    'nav_scale': 'Scale',
-                    'nav_chord': 'Chord',
+                    'nav_scale': 'Scale Practice',
+                    'nav_chord': 'Changes Practice',
                     'nav_progression': 'Changes',
                     'nav_pitch_finding': 'Note&Interval',
                     'settings_pitch_finding': 'Note&Interval Settings',
@@ -2241,98 +2255,98 @@ const DEGREE_TO_SEMITONE: Record<string, number> = {
 // Chord types with intervals - 完整62种和弦类型，与SOLO保持一致
 const CHORD_TYPES = [
   // 三和弦类 (6种)
-  { name: "Major", intervals: [0, 4, 7], symbol: "", group: "triad", groupZh: "三和弦" },
-  { name: "Minor", intervals: [0, 3, 7], symbol: "m", group: "triad", groupZh: "三和弦" },
-  { name: "Dim", intervals: [0, 3, 6], symbol: "dim", group: "triad", groupZh: "三和弦" },
-  { name: "Aug", intervals: [0, 4, 8], symbol: "aug", group: "triad", groupZh: "三和弦" },
-  { name: "sus2", intervals: [0, 2, 7], symbol: "sus2", group: "triad", groupZh: "三和弦" },
-  { name: "sus4", intervals: [0, 5, 7], symbol: "sus4", group: "triad", groupZh: "三和弦" },
+  { name: "Major", intervals: [0, 4, 7], symbol: "", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "Minor", intervals: [0, 3, 7], symbol: "m", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "Dim", intervals: [0, 3, 6], symbol: "dim", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "Aug", intervals: [0, 4, 8], symbol: "aug", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "sus2", intervals: [0, 2, 7], symbol: "sus2", group: "triad", groupName: "Triads", groupZh: "三和弦" },
+  { name: "sus4", intervals: [0, 5, 7], symbol: "sus4", group: "triad", groupName: "Triads", groupZh: "三和弦" },
   
   // 加音和弦 (4种)
-  { name: "add9", intervals: [0, 4, 7, 14], symbol: "add9", group: "add", groupZh: "加音和弦" },
-  { name: "madd9", intervals: [0, 3, 7, 14], symbol: "madd9", group: "add", groupZh: "加音和弦" },
-  { name: "6add9", intervals: [0, 4, 7, 9, 14], symbol: "6/9", group: "add", groupZh: "加音和弦" },
-  { name: "m6add9", intervals: [0, 3, 7, 9, 14], symbol: "m6/9", group: "add", groupZh: "加音和弦" },
+  { name: "add9", intervals: [0, 4, 7, 14], symbol: "add9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
+  { name: "madd9", intervals: [0, 3, 7, 14], symbol: "madd9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
+  { name: "6add9", intervals: [0, 4, 7, 9, 14], symbol: "6/9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
+  { name: "m6add9", intervals: [0, 3, 7, 9, 14], symbol: "m6/9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
   
   // 减和弦类 (2种)
-  { name: "dim7", intervals: [0, 3, 6, 9], symbol: "dim7", group: "dim", groupZh: "减和弦" },
-  { name: "dimMaj7", intervals: [0, 3, 6, 11], symbol: "dim(maj7)", group: "dim", groupZh: "减和弦" },
+  { name: "dim7", intervals: [0, 3, 6, 9], symbol: "dim7", group: "dim", groupName: "Diminished", groupZh: "减和弦" },
+  { name: "dimMaj7", intervals: [0, 3, 6, 11], symbol: "dim(maj7)", group: "dim", groupName: "Diminished", groupZh: "减和弦" },
   
   // 六和弦类 (2种)
-  { name: "6", intervals: [0, 4, 7, 9], symbol: "6", group: "six", groupZh: "六和弦" },
-  { name: "m6", intervals: [0, 3, 7, 9], symbol: "m6", group: "six", groupZh: "六和弦" },
+  { name: "6", intervals: [0, 4, 7, 9], symbol: "6", group: "six", groupName: "Six Chords", groupZh: "六和弦" },
+  { name: "m6", intervals: [0, 3, 7, 9], symbol: "m6", group: "six", groupName: "Six Chords", groupZh: "六和弦" },
   
   // 属七和弦类 (18种)
-  { name: "7", intervals: [0, 4, 7, 10], symbol: "7", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b5", intervals: [0, 4, 6, 10], symbol: "7♭5", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#5", intervals: [0, 4, 8, 10], symbol: "7♯5", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b9", intervals: [0, 4, 7, 10, 13], symbol: "7♭9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#9", intervals: [0, 4, 7, 10, 15], symbol: "7♯9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#11", intervals: [0, 4, 7, 10, 18], symbol: "7♯11", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b13", intervals: [0, 4, 7, 10, 20], symbol: "7♭13", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#5b9", intervals: [0, 4, 8, 10, 13], symbol: "7♯5♭9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7#5#9", intervals: [0, 4, 8, 10, 15], symbol: "7♯5♯9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b5b9", intervals: [0, 4, 6, 10, 13], symbol: "7♭5♭9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b5#9", intervals: [0, 4, 6, 10, 15], symbol: "7♭5♯9", group: "dominant", groupZh: "属七和弦" },
-  { name: "7b9b13", intervals: [0, 4, 7, 10, 13, 20], symbol: "7♭9♭13", group: "dominant", groupZh: "属七和弦" },
-  { name: "7alt", intervals: [0, 4, 8, 10, 13, 15, 20], symbol: "7alt", group: "dominant", groupZh: "属七和弦" },
+  { name: "7", intervals: [0, 4, 7, 10], symbol: "7", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b5", intervals: [0, 4, 6, 10], symbol: "7♭5", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#5", intervals: [0, 4, 8, 10], symbol: "7♯5", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b9", intervals: [0, 4, 7, 10, 13], symbol: "7♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#9", intervals: [0, 4, 7, 10, 15], symbol: "7♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#11", intervals: [0, 4, 7, 10, 18], symbol: "7♯11", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b13", intervals: [0, 4, 7, 10, 20], symbol: "7♭13", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#5b9", intervals: [0, 4, 8, 10, 13], symbol: "7♯5♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7#5#9", intervals: [0, 4, 8, 10, 15], symbol: "7♯5♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b5b9", intervals: [0, 4, 6, 10, 13], symbol: "7♭5♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b5#9", intervals: [0, 4, 6, 10, 15], symbol: "7♭5♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7b9b13", intervals: [0, 4, 7, 10, 13, 20], symbol: "7♭9♭13", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  { name: "7alt", intervals: [0, 4, 8, 10, 13, 15, 20], symbol: "7alt", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
   
   // 属九和弦类 (4种)
-  { name: "9", intervals: [0, 4, 7, 10, 14], symbol: "9", group: "dominant9", groupZh: "属九和弦" },
-  { name: "9b13", intervals: [0, 4, 7, 10, 14, 20], symbol: "9♭13", group: "dominant9", groupZh: "属九和弦" },
-  { name: "9#11", intervals: [0, 4, 7, 10, 14, 18], symbol: "9♯11", group: "dominant9", groupZh: "属九和弦" },
-  { name: "9sus4", intervals: [0, 5, 7, 10, 14], symbol: "9sus4", group: "dominant9", groupZh: "属九和弦" },
+  { name: "9", intervals: [0, 4, 7, 10, 14], symbol: "9", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
+  { name: "9b13", intervals: [0, 4, 7, 10, 14, 20], symbol: "9♭13", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
+  { name: "9#11", intervals: [0, 4, 7, 10, 14, 18], symbol: "9♯11", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
+  { name: "9sus4", intervals: [0, 5, 7, 10, 14], symbol: "9sus4", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
   
   // 属十三和弦类 (4种)
-  { name: "13", intervals: [0, 4, 7, 10, 14, 21], symbol: "13", group: "dominant13", groupZh: "属十三和弦" },
-  { name: "13b9", intervals: [0, 4, 7, 10, 13, 21], symbol: "13♭9", group: "dominant13", groupZh: "属十三和弦" },
-  { name: "13#9", intervals: [0, 4, 7, 10, 15, 21], symbol: "13♯9", group: "dominant13", groupZh: "属十三和弦" },
-  { name: "13#11", intervals: [0, 4, 7, 10, 14, 18, 21], symbol: "13♯11", group: "dominant13", groupZh: "属十三和弦" },
+  { name: "13", intervals: [0, 4, 7, 10, 14, 21], symbol: "13", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
+  { name: "13b9", intervals: [0, 4, 7, 10, 13, 21], symbol: "13♭9", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
+  { name: "13#9", intervals: [0, 4, 7, 10, 15, 21], symbol: "13♯9", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
+  { name: "13#11", intervals: [0, 4, 7, 10, 14, 18, 21], symbol: "13♯11", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
   
   // 大七和弦类 (8种)
-  { name: "Maj7", intervals: [0, 4, 7, 11], symbol: "maj7", group: "major7", groupZh: "大七和弦" },
-  { name: "maj7#5", intervals: [0, 4, 8, 11], symbol: "maj7♯5", group: "major7", groupZh: "大七和弦" },
-  { name: "maj7#11", intervals: [0, 4, 7, 11, 18], symbol: "maj7♯11", group: "major7", groupZh: "大七和弦" },
-  { name: "maj7b6", intervals: [0, 4, 7, 11, 8], symbol: "maj7♭6", group: "major7", groupZh: "大七和弦" },
-  { name: "maj7#9", intervals: [0, 4, 7, 11, 15], symbol: "maj7♯9", group: "major7", groupZh: "大七和弦" },
+  { name: "Maj7", intervals: [0, 4, 7, 11], symbol: "maj7", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
+  { name: "maj7#5", intervals: [0, 4, 8, 11], symbol: "maj7♯5", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
+  { name: "maj7#11", intervals: [0, 4, 7, 11, 18], symbol: "maj7♯11", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
+  { name: "maj7b6", intervals: [0, 4, 7, 11, 8], symbol: "maj7♭6", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
+  { name: "maj7#9", intervals: [0, 4, 7, 11, 15], symbol: "maj7♯9", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
   
   // 大九和弦类 (4种)
-  { name: "Maj9", intervals: [0, 4, 7, 11, 14], symbol: "maj9", group: "major9", groupZh: "大九和弦" },
-  { name: "maj9#11", intervals: [0, 4, 7, 11, 14, 18], symbol: "maj9♯11", group: "major9", groupZh: "大九和弦" },
-  { name: "maj9#5", intervals: [0, 4, 8, 11, 14], symbol: "maj9♯5", group: "major9", groupZh: "大九和弦" },
-  { name: "maj9b6", intervals: [0, 4, 7, 11, 14, 8], symbol: "maj9♭6", group: "major9", groupZh: "大九和弦" },
+  { name: "Maj9", intervals: [0, 4, 7, 11, 14], symbol: "maj9", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
+  { name: "maj9#11", intervals: [0, 4, 7, 11, 14, 18], symbol: "maj9♯11", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
+  { name: "maj9#5", intervals: [0, 4, 8, 11, 14], symbol: "maj9♯5", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
+  { name: "maj9b6", intervals: [0, 4, 7, 11, 14, 8], symbol: "maj9♭6", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
   
   // 大十三和弦类 (3种)
-  { name: "maj13", intervals: [0, 4, 7, 11, 14, 21], symbol: "maj13", group: "major13", groupZh: "大十三和弦" },
-  { name: "maj13#11", intervals: [0, 4, 7, 11, 14, 18, 21], symbol: "maj13♯11", group: "major13", groupZh: "大十三和弦" },
-  { name: "maj13#5", intervals: [0, 4, 8, 11, 14, 21], symbol: "maj13♯5", group: "major13", groupZh: "大十三和弦" },
+  { name: "maj13", intervals: [0, 4, 7, 11, 14, 21], symbol: "maj13", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
+  { name: "maj13#11", intervals: [0, 4, 7, 11, 14, 18, 21], symbol: "maj13♯11", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
+  { name: "maj13#5", intervals: [0, 4, 8, 11, 14, 21], symbol: "maj13♯5", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
   
   // 小七和弦类 (8种)
-  { name: "m7", intervals: [0, 3, 7, 10], symbol: "m7", group: "minor7", groupZh: "小七和弦" },
-  { name: "m7b5", intervals: [0, 3, 6, 10], symbol: "m7♭5", group: "minor7", groupZh: "小七和弦" },
-  { name: "m7b5nat9", intervals: [0, 3, 6, 10, 14], symbol: "m7♭5(9)", group: "minor7", groupZh: "小七和弦" },
-  { name: "m7b6", intervals: [0, 3, 7, 10, 8], symbol: "m7♭6", group: "minor7", groupZh: "小七和弦" },
-  { name: "mMaj7", intervals: [0, 3, 7, 11], symbol: "m(maj7)", group: "minor7", groupZh: "小七和弦" },
-  { name: "mMaj9", intervals: [0, 3, 7, 11, 14], symbol: "m(maj9)", group: "minor7", groupZh: "小七和弦" },
-  { name: "mMaj13", intervals: [0, 3, 7, 11, 14, 21], symbol: "m(maj13)", group: "minor7", groupZh: "小七和弦" },
+  { name: "m7", intervals: [0, 3, 7, 10], symbol: "m7", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "m7b5", intervals: [0, 3, 6, 10], symbol: "m7♭5", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "m7b5nat9", intervals: [0, 3, 6, 10, 14], symbol: "m7♭5(9)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "m7b6", intervals: [0, 3, 7, 10, 8], symbol: "m7♭6", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "mMaj7", intervals: [0, 3, 7, 11], symbol: "m(maj7)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "mMaj9", intervals: [0, 3, 7, 11, 14], symbol: "m(maj9)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
+  { name: "mMaj13", intervals: [0, 3, 7, 11, 14, 21], symbol: "m(maj13)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
   
   // 小九和弦类 (2种)
-  { name: "m9", intervals: [0, 3, 7, 10, 14], symbol: "m9", group: "minor9", groupZh: "小九和弦" },
-  { name: "m9b5", intervals: [0, 3, 6, 10, 14], symbol: "m9♭5", group: "minor9", groupZh: "小九和弦" },
+  { name: "m9", intervals: [0, 3, 7, 10, 14], symbol: "m9", group: "minor9", groupName: "Minor 9th", groupZh: "小九和弦" },
+  { name: "m9b5", intervals: [0, 3, 6, 10, 14], symbol: "m9♭5", group: "minor9", groupName: "Minor 9th", groupZh: "小九和弦" },
   
   // 小十一/十三和弦类 (3种)
-  { name: "m11", intervals: [0, 3, 7, 10, 14, 17], symbol: "m11", group: "minor11", groupZh: "小十一/十三和弦" },
-  { name: "m13", intervals: [0, 3, 7, 10, 14, 21], symbol: "m13", group: "minor11", groupZh: "小十一/十三和弦" },
+  { name: "m11", intervals: [0, 3, 7, 10, 14, 17], symbol: "m11", group: "minor11", groupName: "Minor 11th/13th", groupZh: "小十一/十三和弦" },
+  { name: "m13", intervals: [0, 3, 7, 10, 14, 21], symbol: "m13", group: "minor11", groupName: "Minor 11th/13th", groupZh: "小十一/十三和弦" },
   
   // 挂留和弦类 (5种)
-  { name: "7sus4", intervals: [0, 5, 7, 10], symbol: "7sus4", group: "sus", groupZh: "挂留和弦" },
-  { name: "7sus4b9", intervals: [0, 5, 7, 10, 13], symbol: "7sus4♭9", group: "sus", groupZh: "挂留和弦" },
-  { name: "sus4b9", intervals: [0, 5, 7, 13], symbol: "sus4♭9", group: "sus", groupZh: "挂留和弦" },
-  { name: "13sus4", intervals: [0, 5, 7, 10, 14, 21], symbol: "13sus4", group: "sus", groupZh: "挂留和弦" },
-  { name: "13sus4b9", intervals: [0, 5, 7, 10, 13, 21], symbol: "13sus4♭9", group: "sus", groupZh: "挂留和弦" },
+  { name: "7sus4", intervals: [0, 5, 7, 10], symbol: "7sus4", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
+  { name: "7sus4b9", intervals: [0, 5, 7, 10, 13], symbol: "7sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
+  { name: "sus4b9", intervals: [0, 5, 7, 13], symbol: "sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
+  { name: "13sus4", intervals: [0, 5, 7, 10, 14, 21], symbol: "13sus4", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
+  { name: "13sus4b9", intervals: [0, 5, 7, 10, 13, 21], symbol: "13sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
   
   // 增和弦类 (1种)
-  { name: "aug7", intervals: [0, 4, 8, 10], symbol: "aug7", group: "aug", groupZh: "增和弦" },
+  { name: "aug7", intervals: [0, 4, 8, 10], symbol: "aug7", group: "aug", groupName: "Augmented", groupZh: "增和弦" },
 ]
 
 // Intervals - 完整音程定义，与原SOLO保持一致
@@ -7134,7 +7148,6 @@ class SOLOYinAnalyser {
     return this.maxAmplitude
   }
   
-  // 计算RMS音量
   private calculateRMS(buffer: Float32Array): void {
     let sum = 0
     for (let i = 0; i < buffer.length; i++) {
@@ -7143,7 +7156,6 @@ class SOLOYinAnalyser {
     this.volumeRMS = Math.sqrt(sum / buffer.length)
   }
   
-  // 计算最大振幅
   private calculateMaxAmplitude(buffer: Float32Array): void {
     let max = 0
     for (let i = 0; i < buffer.length; i++) {
@@ -7154,7 +7166,6 @@ class SOLOYinAnalyser {
     this.maxAmplitude = max
   }
   
-  // FFT加速的差分函数
   private difference(buffer: Float32Array): void {
     if (!this.yinBuffer || !this.audioBufferFFT || !this.kernel || !this.yinStyleACF || !this.fft) {
       return
@@ -7163,7 +7174,6 @@ class SOLOYinAnalyser {
     const halfN = this.yinBuffer.length
     const energyTerms = new Float32Array(halfN)
     
-    // 计算能量项
     for (let i = 0; i < halfN; i++) {
       energyTerms[0] += buffer[i] * buffer[i]
     }
@@ -7172,7 +7182,6 @@ class SOLOYinAnalyser {
       energyTerms[tau] = energyTerms[tau - 1] - buffer[tau - 1] * buffer[tau - 1] + buffer[halfN + tau] * buffer[halfN + tau]
     }
     
-    // 准备FFT输入
     for (let i = 0; i < buffer.length; i++) {
       this.audioBufferFFT[i * 2] = buffer[i]
       this.audioBufferFFT[i * 2 + 1] = 0
@@ -7180,7 +7189,6 @@ class SOLOYinAnalyser {
     
     this.fft.complexForward(this.audioBufferFFT)
     
-    // 准备kernel（反转的音频缓冲区）
     for (let i = 0; i < halfN; i++) {
       this.kernel[i * 2] = buffer[halfN - 1 - i]
       this.kernel[i * 2 + 1] = 0
@@ -7190,7 +7198,6 @@ class SOLOYinAnalyser {
     
     this.fft.complexForward(this.kernel)
     
-    // 复数乘法
     for (let i = 0; i < buffer.length; i++) {
       const idx = i * 2
       const re1 = this.audioBufferFFT[idx]
@@ -7203,14 +7210,12 @@ class SOLOYinAnalyser {
     
     this.fft.complexInverse(this.yinStyleACF, true)
     
-    // 计算最终的差分函数
     for (let tau = 0; tau < halfN; tau++) {
       const acfValue = this.yinStyleACF[2 * (halfN - 1 + tau)]
       this.yinBuffer[tau] = energyTerms[0] + energyTerms[tau] - 2 * acfValue
     }
   }
   
-  // 累积平均归一化差分函数
   private cumulativeMeanNormalizedDifference(): void {
     if (!this.yinBuffer) return
     
@@ -7223,13 +7228,11 @@ class SOLOYinAnalyser {
     }
   }
   
-  // 绝对阈值检测
   private absoluteThreshold(): number {
     if (!this.yinBuffer) return -1
     
     for (let tau = 2; tau < this.yinBuffer.length; tau++) {
       if (this.yinBuffer[tau] < this.threshold) {
-        // 找到局部最小值
         while (tau + 1 < this.yinBuffer.length && this.yinBuffer[tau + 1] < this.yinBuffer[tau]) {
           tau++
         }
@@ -7243,7 +7246,6 @@ class SOLOYinAnalyser {
     return -1
   }
   
-  // 抛物线插值
   private parabolicInterpolation(tauEstimate: number): number {
     if (!this.yinBuffer) return tauEstimate
     
@@ -7272,9 +7274,8 @@ class SOLOYinAnalyser {
     return tauEstimate + (s0 - s2) / (2 * denom)
   }
   
-  // 主分析函数
   analyze(buffer: Float32Array): { frequency: number; probability: number; valid: boolean; volumeRMS: number; maxAmplitude: number } | null {
-    if (!this.yinBuffer || !this.fft) {
+    if (!this.yinBuffer || !this.fft || this.audioBufferSize !== buffer.length) {
       this.setAudioBufferSize(buffer.length)
     }
     
@@ -7307,12 +7308,16 @@ class SOLOYinAnalyser {
 // SOLO算法实例（延迟初始化）
 let soloYinAnalyser: SOLOYinAnalyser | null = null
 
-function getSOLOYinAnalyser(bufferSize: number, sampleRate: number): SOLOYinAnalyser {
+function getSOLOYinAnalyser(bufferSize?: number, sampleRate?: number): SOLOYinAnalyser {
   if (!soloYinAnalyser) {
     soloYinAnalyser = new SOLOYinAnalyser()
   }
-  soloYinAnalyser.setSampleRate(sampleRate)
-  soloYinAnalyser.setAudioBufferSize(bufferSize)
+  if (sampleRate !== undefined) {
+    soloYinAnalyser.setSampleRate(sampleRate)
+  }
+  if (bufferSize !== undefined) {
+    soloYinAnalyser.setAudioBufferSize(bufferSize)
+  }
   return soloYinAnalyser
 }
 
@@ -7436,19 +7441,27 @@ export default function FretMasterPage() {
 
   // 底部导航菜单 - useMemo缓存避免每次渲染重新创建
   const bottomNavItems = useMemo(() => [
-    { id: "practice", label: t('nav_practice'), Icon: Target, shortLabel: '找音' },
-    { id: "interval", label: t('nav_interval'), Icon: Activity, shortLabel: '音程' },
-    { id: "chord_exercise", label: t('nav_chord_exercise'), Icon: Guitar, shortLabel: '和弦' },
-    { id: "chord", label: t('nav_chord'), Icon: ListMusic, shortLabel: '转换' },
-    { id: "scale", label: t('nav_scale'), Icon: Music, shortLabel: '音阶' },
-    { id: "stats", label: t('nav_stats'), Icon: BarChart3, shortLabel: '统计' },
+    { id: "practice", label: t('nav_practice'), Icon: Target, shortLabel: t('nav_short_practice') },
+    { id: "interval", label: t('nav_interval'), Icon: Activity, shortLabel: t('nav_short_interval') },
+    { id: "chord_exercise", label: t('nav_chord_exercise'), Icon: Guitar, shortLabel: t('nav_short_chord_exercise') },
+    { id: "chord", label: t('nav_chord'), Icon: ListMusic, shortLabel: t('nav_short_chord') },
+    { id: "scale", label: t('nav_scale'), Icon: Music, shortLabel: t('nav_short_scale') },
+    { id: "stats", label: t('nav_stats'), Icon: BarChart3, shortLabel: t('nav_short_stats') },
   ], [t])
 
   // 主题状态
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-
+  
+  // 客户端挂载状态 - 用于防止 hydration 不匹配
+  const [mounted, setMounted] = useState(false)
+  
+  // 检测是否在 Tauri 环境 - 延迟检测避免 hydration 不匹配
+  const [isTauri, setIsTauri] = useState(false)
+  
   // 应用主题
   useEffect(() => {
+    setMounted(true)
+    setIsTauri(typeof window !== 'undefined' && !!(window as any).__TAURI__)
     if (theme === 'light') {
       document.documentElement.classList.add('light')
       document.documentElement.classList.remove('dark')
@@ -7836,8 +7849,10 @@ export default function FretMasterPage() {
 
   // ==================== 效果 ====================
   
-  // 从localStorage加载设置
+  // 从localStorage加载设置（仅非 Tauri 环境）
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (isTauri) return
     const savedSettings = localStorage.getItem('fretmaster-settings')
     if (savedSettings) {
       try {
@@ -7857,7 +7872,7 @@ export default function FretMasterPage() {
         console.error('Failed to load settings:', e)
       }
     }
-  }, [])
+  }, [isTauri])
 
   // 更新状态refs - 确保音高检测回调中能获取最新状态（合并为一个useEffect减少重渲染）
   useEffect(() => {
@@ -7890,6 +7905,8 @@ export default function FretMasterPage() {
 
   // 从服务器加载统计数据
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (isTauri) return
     const loadStatsFromServer = async () => {
       try {
         // 从服务器获取所有练习记录
@@ -8013,13 +8030,15 @@ export default function FretMasterPage() {
     }
     
     loadStatsFromServer()
-  }, [])
+  }, [isTauri])
 
-  // 保存统计数据到localStorage
+  // 保存统计数据到localStorage（仅非 Tauri 环境）
   const savePracticeStats = useCallback((stats: PracticeStats) => {
+    if (typeof window === 'undefined') return
+    if (isTauri) return
     localStorage.setItem('fretmaster-stats', JSON.stringify(stats))
     setPracticeStats(stats)
-  }, [])
+  }, [isTauri])
 
   // 记录练习统计
   const recordPractice = useCallback((type: PracticeType, detailName: string) => {
@@ -8088,8 +8107,10 @@ export default function FretMasterPage() {
         })
         .sort((a, b) => b.date.localeCompare(a.date))
       
-      // 保存到localStorage
-      localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
+      // 保存到localStorage（仅非 Tauri 环境）
+      if (typeof window !== 'undefined' && !isTauri) {
+        localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
+      }
       
       // 同时保存到服务器（SQLite数据库）
       const typeNames: Record<PracticeType, string> = {
@@ -8347,7 +8368,7 @@ export default function FretMasterPage() {
         
         if (currentAlgorithm === 'solo') {
           // 使用SOLO FFT加速算法
-          const soloAnalyser = getSOLOYinAnalyser()
+          const soloAnalyser = getSOLOYinAnalyser(analyser.fftSize, audioContext.sampleRate)
           const soloResult = soloAnalyser.analyze(buffer)
           if (soloResult && soloResult.valid) {
             yinResult = {
@@ -8460,8 +8481,13 @@ export default function FretMasterPage() {
     }
   }, [tunerOpen, tunerActive, stopTuner])
 
-  // 保存设置到localStorage
+  // 保存设置到localStorage（仅非 Tauri 环境）
   const saveSettings = useCallback(() => {
+    if (typeof window === 'undefined') return
+    if (isTauri) {
+      toast.success(t('save_success'))
+      return
+    }
     const settings = {
       language,
       theme,
@@ -8477,7 +8503,7 @@ export default function FretMasterPage() {
     }
     localStorage.setItem('fretmaster-settings', JSON.stringify(settings))
     toast.success(t('save_success'))
-  }, [language, theme, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, chordScaleDisplay, t])
+  }, [language, theme, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, chordScaleDisplay, t, isTauri])
 
   // 重置设置
   const resetSettings = useCallback(() => {
@@ -8492,9 +8518,11 @@ export default function FretMasterPage() {
     setCooldownDuration(1000)
     setConfidenceThreshold(0.8)
     setSensitivity(0.5)
-    localStorage.removeItem('fretmaster-settings')
+    if (typeof window !== 'undefined' && !isTauri) {
+      localStorage.removeItem('fretmaster-settings')
+    }
     toast.success(t('reset_settings_hint'))
-  }, [t])
+  }, [t, isTauri])
 
   // 导出设置
   const exportSettings = useCallback(() => {
@@ -8699,8 +8727,9 @@ export default function FretMasterPage() {
     }
   }, [audioDevices, selectedAudioDevice])
 
-  // 初始加载和监听设备变化
+  // 初始加载和监听设备变化（仅限 Web 版本）
   useEffect(() => {
+    if (isTauri) return
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) return
 
     // 请求权限并枚举设备
@@ -8735,8 +8764,8 @@ export default function FretMasterPage() {
 
   // 当设置面板打开时，刷新设备列表
   useEffect(() => {
+    if (isTauri) return
     if (settingsOpen && typeof navigator !== 'undefined' && navigator.mediaDevices) {
-      // 刷新设备列表
       enumerateAudioDevices(false)
     }
   }, [settingsOpen, enumerateAudioDevices])
@@ -9275,8 +9304,9 @@ export default function FretMasterPage() {
     setPitchDebugInfo(prev => ({ ...prev, isRunning: false }))
   }, [audioContext])
 
-  // 当 micEnabled 为 true 时自动启动音频输入
+  // 当 micEnabled 为 true 时自动启动音频输入（仅限 Web 版本）
   useEffect(() => {
+    if (isTauri) return
     if (micEnabled && !audioContext) {
       logger.debug('useEffect: 开始启动音频输入...')
       toast.info(language === 'zh-CN' ? '正在请求麦克风权限...' : 'Requesting microphone permission...')
@@ -9384,7 +9414,7 @@ export default function FretMasterPage() {
       
       if (currentPitchAlgorithm === 'solo') {
         // 使用SOLO FFT加速算法
-        const soloAnalyser = getSOLOYinAnalyser()
+        const soloAnalyser = getSOLOYinAnalyser(inputData.length, sampleRate)
         const soloResult = soloAnalyser.analyze(inputData)
         if (soloResult && soloResult.valid) {
           yinResult = {
@@ -9417,8 +9447,8 @@ export default function FretMasterPage() {
         let fundamentalResult: { frequency: number; probability: number } | null = null
         
         if (currentPitchAlgorithm === 'solo') {
-          const soloAnalyser = getSOLOYinAnalyser()
-          const soloResult = soloAnalyser.analyze(inputData)
+          const soloAnalyser2 = getSOLOYinAnalyser(inputData.length, sampleRate)
+          const soloResult = soloAnalyser2.analyze(inputData)
           if (soloResult && soloResult.valid) {
             fundamentalResult = {
               frequency: soloResult.frequency,
@@ -11424,7 +11454,7 @@ export default function FretMasterPage() {
     setCustomChords([])
   }
 
-  // 保存自定义和弦序列到本地存储
+  // 保存自定义和弦序列到本地存储（仅非 Tauri 环境）
   const saveCustomChords = () => {
     if (customChords.length === 0) {
       toast.error(t('custom_chord_empty'))
@@ -11434,25 +11464,31 @@ export default function FretMasterPage() {
       name: customChordName || t('custom_chord_unnamed'),
       sequence: customChords
     }
-    localStorage.setItem('customChordSequence', JSON.stringify(data))
+    if (typeof window !== 'undefined' && !isTauri) {
+      localStorage.setItem('customChordSequence', JSON.stringify(data))
+    }
     toast.success(t('custom_chord_saved'))
   }
 
-  // 从本地存储加载自定义和弦序列
+  // 从本地存储加载自定义和弦序列（仅非 Tauri 环境）
   const loadCustomChords = () => {
-    const saved = localStorage.getItem('customChordSequence')
-    if (saved) {
-      try {
-        const data = JSON.parse(saved)
-        if (data.sequence && data.sequence.length > 0) {
-          setCustomChords(data.sequence)
-          setCustomChordName(data.name || '')
-          toast.success(t('custom_chord_loaded'))
-        } else {
-          toast.error(t('custom_chord_empty_load'))
+    if (typeof window !== 'undefined' && !isTauri) {
+      const saved = localStorage.getItem('customChordSequence')
+      if (saved) {
+        try {
+          const data = JSON.parse(saved)
+          if (data.sequence && data.sequence.length > 0) {
+            setCustomChords(data.sequence)
+            setCustomChordName(data.name || '')
+            toast.success(t('custom_chord_loaded'))
+          } else {
+            toast.error(t('custom_chord_empty_load'))
+          }
+        } catch (e) {
+          toast.error(t('custom_chord_load_error'))
         }
-      } catch (e) {
-        toast.error(t('custom_chord_load_error'))
+      } else {
+        toast.error(t('custom_chord_not_found'))
       }
     } else {
       toast.error(t('custom_chord_not_found'))
@@ -11565,6 +11601,14 @@ export default function FretMasterPage() {
     }
     return null
   }
+
+  // Slider回调 - 必须在顶层调用，不能在JSX中内联useCallback
+  const handleReferenceFrequencyChange = useCallback(([v]: number[]) => setReferenceFrequency(v), [])
+  const handlePracticeTimeChange = useCallback(([v]: number[]) => setPracticeTime(v), [])
+  const handleFretCountChange = useCallback(([v]: number[]) => setFretCount(v), [])
+  const handleCooldownDurationChange = useCallback(([v]: number[]) => setCooldownDuration(v), [])
+  const handleMetronomeBpmChange = useCallback(([v]: number[]) => setMetronomeBpm(v), [])
+  const handleInputGainChange = useCallback(([v]: number[]) => setInputGain(v / 100), [])
 
   // ==================== 渲染 ====================
 
@@ -11746,7 +11790,7 @@ export default function FretMasterPage() {
                         </div>
                         <Slider
                           value={[referenceFrequency]}
-                          onValueChange={useCallback(([v]: number[]) => setReferenceFrequency(v), [])}
+                          onValueChange={handleReferenceFrequencyChange}
                           min={430}
                           max={450}
                           step={1}
@@ -11794,6 +11838,7 @@ export default function FretMasterPage() {
                     <SheetTitle>{t('nav_settings')}</SheetTitle>
                   </SheetHeader>
                   
+                  <ErrorBoundary>
                   <div className="space-y-6 py-4 px-4">
                     {/* Language */}
                     {/* Practice Settings */}
@@ -11809,7 +11854,7 @@ export default function FretMasterPage() {
                         </div>
                         <Slider
                           value={[practiceTime]}
-                          onValueChange={useCallback(([v]: number[]) => setPracticeTime(v), [])}
+                          onValueChange={handlePracticeTimeChange}
                           min={30}
                           max={600}
                           step={30}
@@ -11822,7 +11867,7 @@ export default function FretMasterPage() {
                         </div>
                         <Slider
                           value={[fretCount]}
-                          onValueChange={useCallback(([v]: number[]) => setFretCount(v), [])}
+                          onValueChange={handleFretCountChange}
                           min={12}
                           max={24}
                           step={1}
@@ -11840,7 +11885,7 @@ export default function FretMasterPage() {
                           </div>
                           <Slider
                             value={[cooldownDuration]}
-                            onValueChange={useCallback(([v]: number[]) => setCooldownDuration(v), [])}
+                            onValueChange={handleCooldownDurationChange}
                             min={200}
                             max={3000}
                             step={100}
@@ -11868,7 +11913,7 @@ export default function FretMasterPage() {
                         </div>
                         <Slider
                           value={[metronomeBpm]}
-                          onValueChange={useCallback(([v]: number[]) => setMetronomeBpm(v), [])}
+                          onValueChange={handleMetronomeBpmChange}
                           min={40}
                           max={240}
                           step={1}
@@ -11912,160 +11957,173 @@ export default function FretMasterPage() {
                     
                     <Separator />
                     
-                    {/* Audio Input */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Mic className="h-4 w-4" />
-                        {t('device_audio_input')}
-                      </h4>
-                      
-                      {/* 权限请求提示 - 当没有设备或设备没有标签时显示 */}
-                      {(audioDevices.length === 0 || audioDevices.every(d => !d.label)) && (
-                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-600 dark:text-yellow-400">
-                          <p className="mb-2">{audioDevices.length === 0 ? t('mic_permission_needed_for_device') : t('mic_permission_needed_for_label')}</p>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={async () => {
-                              try {
-                                if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
-                                  toast.error(t('browser_not_support_audio'))
-                                  return
-                                }
-                                toast.info(t('requesting_mic_permission'))
-                                const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-                                stream.getTracks().forEach(track => track.stop())
-                                // 刷新设备列表
-                                await enumerateAudioDevices(false)
-                                // 检查是否成功获取设备
-                                const devices = await navigator.mediaDevices.enumerateDevices()
-                                const audioInputs = devices.filter(d => d.kind === 'audioinput')
-                                if (audioInputs.length > 0 && audioInputs.some(d => d.label)) {
-                                  toast.success('已获取麦克风权限')
-                                } else if (audioInputs.length > 0) {
-                                  toast.warning('已获取权限，但设备名称不可用')
-                                } else {
-                                  toast.warning('未检测到音频输入设备')
-                                }
-                              } catch (err: any) {
-                                console.error('麦克风权限错误', err)
-                                if (err.name === 'NotAllowedError') {
-                                  toast.error('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风')
-                                } else if (err.name === 'NotFoundError') {
-                                  toast.error('未找到麦克风设备')
-                                } else {
-                                  toast.error('无法获取麦克风权限 ' + (err.message || '未知错误'))
-                                }
-                              }
-                            }}
-                          >
-                            请求麦克风权限
-                          </Button>
-                        </div>
-                      )}
-                      
-                      <Select value={selectedAudioDevice} onValueChange={setSelectedAudioDevice}>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('hint_select_device')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {audioDevices.map(device => (
-                            <SelectItem key={device.deviceId} value={device.deviceId}>
-                              {device.label || `Device ${device.deviceId.slice(0, 8)}...`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">{t('device_audio_input')}</span>
-                          {micEnabled && (
-                            <span className="text-xs text-green-500">
-                              {useAudioWorklet ? 'AudioWorklet' : 'ScriptProcessor'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {audioInitializing && (
-                            <span className="text-xs text-muted-foreground animate-pulse">
-                              {language === 'zh-CN' ? '初始化中...' : 'Initializing...'}
-                            </span>
-                          )}
-                          <Switch 
-                            checked={micEnabled} 
-                            disabled={audioInitializing}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                // 直接启动音频输入，不通过 useEffect
-                                setMicEnabled(true)
-                              } else {
-                                setMicEnabled(false)
-                                stopAudioInput()
-                              }
-                            }} 
-                          />
-                        </div>
+                    {/* Audio Input - 根据平台显示不同设置 */}
+                    {!mounted ? (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                          <Mic className="h-4 w-4" />
+                          {t('device_audio_input')}
+                        </h4>
+                        <div className="h-20 animate-pulse bg-muted rounded-lg" />
                       </div>
-                      {audioError && (
-                        <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
-                          {audioError}
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between py-2 border-t border-border/50">
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">
-                            {language === 'zh-CN' ? '使用 AudioWorklet' : 'Use AudioWorklet'}
-                          </span>
-                          <span className="text-xs text-muted-foreground/60">
-                            {language === 'zh-CN' ? '关闭则使用 ScriptProcessorNode' : 'Off to use ScriptProcessorNode'}
-                          </span>
-                        </div>
-                        <Switch
-                          checked={useAudioWorklet}
-                          disabled={micEnabled}
-                          onCheckedChange={(checked) => {
-                            setUseAudioWorklet(checked)
-                            logger.debug(`[音频模式] 切换为 ${checked ? 'AudioWorklet' : 'ScriptProcessorNode'}`)
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{t('device_gain')}</span>
-                          <span className="font-mono">{Math.round(inputGain * 100)}%</span>
-                        </div>
-                        <Slider
-                          value={[inputGain * 100]}
-                          onValueChange={useCallback(([v]: number[]) => setInputGain(v / 100), [])}
-                          min={0}
-                          max={200}
-                          step={10}
-                          disabled={!micEnabled}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{t('device_pitch_algorithm')}</span>
-                        </div>
-                        <Select 
-                          value={audioSettings.pitchAlgorithm} 
-                          onValueChange={(value) => store.setPitchAlgorithm(value as 'standard' | 'solo')}
-                        >
+                    ) : isTauri ? (
+                      <WindowsAudioSettings language={language as 'zh-CN' | 'en'} />
+                    ) : (
+                      // Web 版本使用 Web Audio API 设置
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                          <Mic className="h-4 w-4" />
+                          {t('device_audio_input')}
+                        </h4>
+                        
+                        {/* 权限请求提示 - 当没有设备或设备没有标签时显示 */}
+                        {(audioDevices.length === 0 || audioDevices.every(d => !d.label)) && (
+                          <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-600 dark:text-yellow-400">
+                            <p className="mb-2">{audioDevices.length === 0 ? t('mic_permission_needed_for_device') : t('mic_permission_needed_for_label')}</p>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={async () => {
+                                try {
+                                  if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+                                    toast.error(t('browser_not_support_audio'))
+                                    return
+                                  }
+                                  toast.info(t('requesting_mic_permission'))
+                                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+                                  stream.getTracks().forEach(track => track.stop())
+                                  // 刷新设备列表
+                                  await enumerateAudioDevices(false)
+                                  // 检查是否成功获取设备
+                                  const devices = await navigator.mediaDevices.enumerateDevices()
+                                  const audioInputs = devices.filter(d => d.kind === 'audioinput')
+                                  if (audioInputs.length > 0 && audioInputs.some(d => d.label)) {
+                                    toast.success('已获取麦克风权限')
+                                  } else if (audioInputs.length > 0) {
+                                    toast.warning('已获取权限，但设备名称不可用')
+                                  } else {
+                                    toast.warning('未检测到音频输入设备')
+                                  }
+                                } catch (err: any) {
+                                  console.error('麦克风权限错误', err)
+                                  if (err.name === 'NotAllowedError') {
+                                    toast.error('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风')
+                                  } else if (err.name === 'NotFoundError') {
+                                    toast.error('未找到麦克风设备')
+                                  } else {
+                                    toast.error('无法获取麦克风权限 ' + (err.message || '未知错误'))
+                                  }
+                                }
+                              }}
+                            >
+                              请求麦克风权限
+                            </Button>
+                          </div>
+                        )}
+                        
+                        <Select value={selectedAudioDevice} onValueChange={setSelectedAudioDevice}>
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder={t('hint_select_device')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="solo">{t('algorithm_solo')}</SelectItem>
-                            <SelectItem value="standard">{t('algorithm_standard')}</SelectItem>
+                            {audioDevices.map(device => (
+                              <SelectItem key={device.deviceId} value={device.deviceId}>
+                                {device.label || `Device ${device.deviceId.slice(0, 8)}...`}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
-                        <p className="text-xs text-muted-foreground">
-                          {language === 'zh-CN' 
-                            ? 'SOLO算法使用FFT加速，检测速度更快' 
-                            : 'SOLO algorithm uses FFT acceleration for faster detection'}
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className="text-sm text-muted-foreground">{t('device_audio_input')}</span>
+                            {micEnabled && (
+                              <span className="text-xs text-green-500">
+                                {useAudioWorklet ? 'AudioWorklet' : 'ScriptProcessor'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {audioInitializing && (
+                              <span className="text-xs text-muted-foreground animate-pulse">
+                                {language === 'zh-CN' ? '初始化中...' : 'Initializing...'}
+                              </span>
+                            )}
+                            <Switch 
+                              checked={micEnabled} 
+                              disabled={audioInitializing}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  // 直接启动音频输入，不通过 useEffect
+                                  setMicEnabled(true)
+                                } else {
+                                  setMicEnabled(false)
+                                  stopAudioInput()
+                                }
+                              }} 
+                            />
+                          </div>
+                        </div>
+                        {audioError && (
+                          <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
+                            {audioError}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between py-2 border-t border-border/50">
+                          <div className="flex flex-col">
+                            <span className="text-sm text-muted-foreground">
+                              {language === 'zh-CN' ? '使用 AudioWorklet' : 'Use AudioWorklet'}
+                            </span>
+                            <span className="text-xs text-muted-foreground/60">
+                              {language === 'zh-CN' ? '关闭则使用 ScriptProcessorNode' : 'Off to use ScriptProcessorNode'}
+                            </span>
+                          </div>
+                          <Switch
+                            checked={useAudioWorklet}
+                            disabled={micEnabled}
+                            onCheckedChange={(checked) => {
+                              setUseAudioWorklet(checked)
+                              logger.debug(`[音频模式] 切换为 ${checked ? 'AudioWorklet' : 'ScriptProcessorNode'}`)
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{t('device_gain')}</span>
+                            <span className="font-mono">{Math.round(inputGain * 100)}%</span>
+                          </div>
+                          <Slider
+                            value={[inputGain * 100]}
+                            onValueChange={handleInputGainChange}
+                            min={0}
+                            max={200}
+                            step={10}
+                            disabled={!micEnabled}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{t('device_pitch_algorithm')}</span>
+                          </div>
+                          <Select 
+                            value={audioSettings.pitchAlgorithm} 
+                            onValueChange={(value) => store.setPitchAlgorithm(value as 'standard' | 'solo')}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="solo">{t('algorithm_solo')}</SelectItem>
+                              <SelectItem value="standard">{t('algorithm_standard')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {language === 'zh-CN' 
+                              ? 'SOLO算法使用FFT加速，检测速度更快' 
+                              : 'SOLO algorithm uses FFT acceleration for faster detection'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
                     <Separator />
                     
@@ -12295,6 +12353,7 @@ export default function FretMasterPage() {
                       </div>
                     </div>
                   </div>
+                  </ErrorBoundary>
                 </SheetContent>
               </Sheet>
             </div>
@@ -12302,7 +12361,7 @@ export default function FretMasterPage() {
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden h-0">
           {/* Sidebar */}
           <aside
             data-onboarding="practice-tabs"
@@ -12343,7 +12402,7 @@ export default function FretMasterPage() {
           </aside>
 
           {/* Main Area */}
-          <main className="flex-1 overflow-auto p-2 sm:p-4 pb-16 sm:pb-4">
+          <main className="flex-1 overflow-auto p-2 sm:p-4 pb-20 sm:pb-6">
             <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
               {/* Control Panel - 统计页面不显示*/}
               {activeTab !== "stats" && (
@@ -12869,15 +12928,15 @@ export default function FretMasterPage() {
                           const groups = CHORD_TYPES.reduce((acc, type) => {
                             const groupKey = type.group || 'other'
                             if (!acc[groupKey]) {
-                              acc[groupKey] = { name: type.groupZh || '其他', types: [] }
+                              acc[groupKey] = { name: type.groupName || type.groupZh || 'Other', nameZh: type.groupZh || '其他', types: [] }
                             }
                             acc[groupKey].types.push(type)
                             return acc
-                          }, {} as Record<string, { name: string; types: typeof CHORD_TYPES }>)
+                          }, {} as Record<string, { name: string; nameZh: string; types: typeof CHORD_TYPES }>)
                           
                           return Object.entries(groups).map(([key, group]) => (
                             <div key={key} className="mb-2">
-                              <div className="text-[10px] font-medium text-muted-foreground/70 mb-1 px-1">{group.name}</div>
+                              <div className="text-[10px] font-medium text-muted-foreground/70 mb-1 px-1">{language === 'zh-CN' ? group.nameZh : group.name}</div>
                               <div className="flex flex-wrap gap-1">
                                 {group.types.map(type => (
                                   <Button
