@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List, ListChildComponentProps } from 'react-window'
@@ -48,7 +48,6 @@ import { Label } from "@/components/ui/label"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { isTauri } from "@/lib/native-audio"
 import { WindowsAudioSettings } from "@/components/windows-audio-settings"
 import { ErrorBoundary } from "@/components/error-boundary"
 import Sidebar from "@/components/Sidebar"
@@ -7149,7 +7148,6 @@ class SOLOYinAnalyser {
     return this.maxAmplitude
   }
   
-  // 计算RMS音量
   private calculateRMS(buffer: Float32Array): void {
     let sum = 0
     for (let i = 0; i < buffer.length; i++) {
@@ -7158,7 +7156,6 @@ class SOLOYinAnalyser {
     this.volumeRMS = Math.sqrt(sum / buffer.length)
   }
   
-  // 计算最大振幅
   private calculateMaxAmplitude(buffer: Float32Array): void {
     let max = 0
     for (let i = 0; i < buffer.length; i++) {
@@ -7169,7 +7166,6 @@ class SOLOYinAnalyser {
     this.maxAmplitude = max
   }
   
-  // FFT加速的差分函数
   private difference(buffer: Float32Array): void {
     if (!this.yinBuffer || !this.audioBufferFFT || !this.kernel || !this.yinStyleACF || !this.fft) {
       return
@@ -7178,7 +7174,6 @@ class SOLOYinAnalyser {
     const halfN = this.yinBuffer.length
     const energyTerms = new Float32Array(halfN)
     
-    // 计算能量项
     for (let i = 0; i < halfN; i++) {
       energyTerms[0] += buffer[i] * buffer[i]
     }
@@ -7187,7 +7182,6 @@ class SOLOYinAnalyser {
       energyTerms[tau] = energyTerms[tau - 1] - buffer[tau - 1] * buffer[tau - 1] + buffer[halfN + tau] * buffer[halfN + tau]
     }
     
-    // 准备FFT输入
     for (let i = 0; i < buffer.length; i++) {
       this.audioBufferFFT[i * 2] = buffer[i]
       this.audioBufferFFT[i * 2 + 1] = 0
@@ -7195,7 +7189,6 @@ class SOLOYinAnalyser {
     
     this.fft.complexForward(this.audioBufferFFT)
     
-    // 准备kernel（反转的音频缓冲区）
     for (let i = 0; i < halfN; i++) {
       this.kernel[i * 2] = buffer[halfN - 1 - i]
       this.kernel[i * 2 + 1] = 0
@@ -7205,7 +7198,6 @@ class SOLOYinAnalyser {
     
     this.fft.complexForward(this.kernel)
     
-    // 复数乘法
     for (let i = 0; i < buffer.length; i++) {
       const idx = i * 2
       const re1 = this.audioBufferFFT[idx]
@@ -7218,14 +7210,12 @@ class SOLOYinAnalyser {
     
     this.fft.complexInverse(this.yinStyleACF, true)
     
-    // 计算最终的差分函数
     for (let tau = 0; tau < halfN; tau++) {
       const acfValue = this.yinStyleACF[2 * (halfN - 1 + tau)]
       this.yinBuffer[tau] = energyTerms[0] + energyTerms[tau] - 2 * acfValue
     }
   }
   
-  // 累积平均归一化差分函数
   private cumulativeMeanNormalizedDifference(): void {
     if (!this.yinBuffer) return
     
@@ -7238,13 +7228,11 @@ class SOLOYinAnalyser {
     }
   }
   
-  // 绝对阈值检测
   private absoluteThreshold(): number {
     if (!this.yinBuffer) return -1
     
     for (let tau = 2; tau < this.yinBuffer.length; tau++) {
       if (this.yinBuffer[tau] < this.threshold) {
-        // 找到局部最小值
         while (tau + 1 < this.yinBuffer.length && this.yinBuffer[tau + 1] < this.yinBuffer[tau]) {
           tau++
         }
@@ -7258,7 +7246,6 @@ class SOLOYinAnalyser {
     return -1
   }
   
-  // 抛物线插值
   private parabolicInterpolation(tauEstimate: number): number {
     if (!this.yinBuffer) return tauEstimate
     
@@ -7287,9 +7274,8 @@ class SOLOYinAnalyser {
     return tauEstimate + (s0 - s2) / (2 * denom)
   }
   
-  // 主分析函数
   analyze(buffer: Float32Array): { frequency: number; probability: number; valid: boolean; volumeRMS: number; maxAmplitude: number } | null {
-    if (!this.yinBuffer || !this.fft) {
+    if (!this.yinBuffer || !this.fft || this.audioBufferSize !== buffer.length) {
       this.setAudioBufferSize(buffer.length)
     }
     
@@ -7322,12 +7308,16 @@ class SOLOYinAnalyser {
 // SOLO算法实例（延迟初始化）
 let soloYinAnalyser: SOLOYinAnalyser | null = null
 
-function getSOLOYinAnalyser(bufferSize: number, sampleRate: number): SOLOYinAnalyser {
+function getSOLOYinAnalyser(bufferSize?: number, sampleRate?: number): SOLOYinAnalyser {
   if (!soloYinAnalyser) {
     soloYinAnalyser = new SOLOYinAnalyser()
   }
-  soloYinAnalyser.setSampleRate(sampleRate)
-  soloYinAnalyser.setAudioBufferSize(bufferSize)
+  if (sampleRate !== undefined) {
+    soloYinAnalyser.setSampleRate(sampleRate)
+  }
+  if (bufferSize !== undefined) {
+    soloYinAnalyser.setAudioBufferSize(bufferSize)
+  }
   return soloYinAnalyser
 }
 
@@ -7465,9 +7455,13 @@ export default function FretMasterPage() {
   // 客户端挂载状态 - 用于防止 hydration 不匹配
   const [mounted, setMounted] = useState(false)
   
+  // 检测是否在 Tauri 环境 - 延迟检测避免 hydration 不匹配
+  const [isTauri, setIsTauri] = useState(false)
+  
   // 应用主题
   useEffect(() => {
     setMounted(true)
+    setIsTauri(typeof window !== 'undefined' && !!(window as any).__TAURI__)
     if (theme === 'light') {
       document.documentElement.classList.add('light')
       document.documentElement.classList.remove('dark')
@@ -7855,9 +7849,10 @@ export default function FretMasterPage() {
 
   // ==================== 效果 ====================
   
-  // 从localStorage加载设置
+  // 从localStorage加载设置（仅非 Tauri 环境）
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (isTauri) return
     const savedSettings = localStorage.getItem('fretmaster-settings')
     if (savedSettings) {
       try {
@@ -7877,7 +7872,7 @@ export default function FretMasterPage() {
         console.error('Failed to load settings:', e)
       }
     }
-  }, [])
+  }, [isTauri])
 
   // 更新状态refs - 确保音高检测回调中能获取最新状态（合并为一个useEffect减少重渲染）
   useEffect(() => {
@@ -7911,6 +7906,7 @@ export default function FretMasterPage() {
   // 从服务器加载统计数据
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (isTauri) return
     const loadStatsFromServer = async () => {
       try {
         // 从服务器获取所有练习记录
@@ -8034,14 +8030,15 @@ export default function FretMasterPage() {
     }
     
     loadStatsFromServer()
-  }, [])
+  }, [isTauri])
 
-  // 保存统计数据到localStorage
+  // 保存统计数据到localStorage（仅非 Tauri 环境）
   const savePracticeStats = useCallback((stats: PracticeStats) => {
     if (typeof window === 'undefined') return
+    if (isTauri) return
     localStorage.setItem('fretmaster-stats', JSON.stringify(stats))
     setPracticeStats(stats)
-  }, [])
+  }, [isTauri])
 
   // 记录练习统计
   const recordPractice = useCallback((type: PracticeType, detailName: string) => {
@@ -8110,8 +8107,8 @@ export default function FretMasterPage() {
         })
         .sort((a, b) => b.date.localeCompare(a.date))
       
-      // 保存到localStorage
-      if (typeof window !== 'undefined') {
+      // 保存到localStorage（仅非 Tauri 环境）
+      if (typeof window !== 'undefined' && !isTauri) {
         localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
       }
       
@@ -8371,7 +8368,7 @@ export default function FretMasterPage() {
         
         if (currentAlgorithm === 'solo') {
           // 使用SOLO FFT加速算法
-          const soloAnalyser = getSOLOYinAnalyser()
+          const soloAnalyser = getSOLOYinAnalyser(analyser.fftSize, audioContext.sampleRate)
           const soloResult = soloAnalyser.analyze(buffer)
           if (soloResult && soloResult.valid) {
             yinResult = {
@@ -8484,9 +8481,13 @@ export default function FretMasterPage() {
     }
   }, [tunerOpen, tunerActive, stopTuner])
 
-  // 保存设置到localStorage
+  // 保存设置到localStorage（仅非 Tauri 环境）
   const saveSettings = useCallback(() => {
     if (typeof window === 'undefined') return
+    if (isTauri) {
+      toast.success(t('save_success'))
+      return
+    }
     const settings = {
       language,
       theme,
@@ -8502,7 +8503,7 @@ export default function FretMasterPage() {
     }
     localStorage.setItem('fretmaster-settings', JSON.stringify(settings))
     toast.success(t('save_success'))
-  }, [language, theme, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, chordScaleDisplay, t])
+  }, [language, theme, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, chordScaleDisplay, t, isTauri])
 
   // 重置设置
   const resetSettings = useCallback(() => {
@@ -8517,11 +8518,11 @@ export default function FretMasterPage() {
     setCooldownDuration(1000)
     setConfidenceThreshold(0.8)
     setSensitivity(0.5)
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !isTauri) {
       localStorage.removeItem('fretmaster-settings')
     }
     toast.success(t('reset_settings_hint'))
-  }, [t])
+  }, [t, isTauri])
 
   // 导出设置
   const exportSettings = useCallback(() => {
@@ -8728,7 +8729,7 @@ export default function FretMasterPage() {
 
   // 初始加载和监听设备变化（仅限 Web 版本）
   useEffect(() => {
-    if (isTauri()) return
+    if (isTauri) return
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) return
 
     // 请求权限并枚举设备
@@ -8763,7 +8764,7 @@ export default function FretMasterPage() {
 
   // 当设置面板打开时，刷新设备列表
   useEffect(() => {
-    if (isTauri()) return
+    if (isTauri) return
     if (settingsOpen && typeof navigator !== 'undefined' && navigator.mediaDevices) {
       enumerateAudioDevices(false)
     }
@@ -9305,7 +9306,7 @@ export default function FretMasterPage() {
 
   // 当 micEnabled 为 true 时自动启动音频输入（仅限 Web 版本）
   useEffect(() => {
-    if (isTauri()) return
+    if (isTauri) return
     if (micEnabled && !audioContext) {
       logger.debug('useEffect: 开始启动音频输入...')
       toast.info(language === 'zh-CN' ? '正在请求麦克风权限...' : 'Requesting microphone permission...')
@@ -9413,7 +9414,7 @@ export default function FretMasterPage() {
       
       if (currentPitchAlgorithm === 'solo') {
         // 使用SOLO FFT加速算法
-        const soloAnalyser = getSOLOYinAnalyser()
+        const soloAnalyser = getSOLOYinAnalyser(inputData.length, sampleRate)
         const soloResult = soloAnalyser.analyze(inputData)
         if (soloResult && soloResult.valid) {
           yinResult = {
@@ -9446,8 +9447,8 @@ export default function FretMasterPage() {
         let fundamentalResult: { frequency: number; probability: number } | null = null
         
         if (currentPitchAlgorithm === 'solo') {
-          const soloAnalyser = getSOLOYinAnalyser()
-          const soloResult = soloAnalyser.analyze(inputData)
+          const soloAnalyser2 = getSOLOYinAnalyser(inputData.length, sampleRate)
+          const soloResult = soloAnalyser2.analyze(inputData)
           if (soloResult && soloResult.valid) {
             fundamentalResult = {
               frequency: soloResult.frequency,
@@ -11453,7 +11454,7 @@ export default function FretMasterPage() {
     setCustomChords([])
   }
 
-  // 保存自定义和弦序列到本地存储
+  // 保存自定义和弦序列到本地存储（仅非 Tauri 环境）
   const saveCustomChords = () => {
     if (customChords.length === 0) {
       toast.error(t('custom_chord_empty'))
@@ -11463,25 +11464,31 @@ export default function FretMasterPage() {
       name: customChordName || t('custom_chord_unnamed'),
       sequence: customChords
     }
-    localStorage.setItem('customChordSequence', JSON.stringify(data))
+    if (typeof window !== 'undefined' && !isTauri) {
+      localStorage.setItem('customChordSequence', JSON.stringify(data))
+    }
     toast.success(t('custom_chord_saved'))
   }
 
-  // 从本地存储加载自定义和弦序列
+  // 从本地存储加载自定义和弦序列（仅非 Tauri 环境）
   const loadCustomChords = () => {
-    const saved = localStorage.getItem('customChordSequence')
-    if (saved) {
-      try {
-        const data = JSON.parse(saved)
-        if (data.sequence && data.sequence.length > 0) {
-          setCustomChords(data.sequence)
-          setCustomChordName(data.name || '')
-          toast.success(t('custom_chord_loaded'))
-        } else {
-          toast.error(t('custom_chord_empty_load'))
+    if (typeof window !== 'undefined' && !isTauri) {
+      const saved = localStorage.getItem('customChordSequence')
+      if (saved) {
+        try {
+          const data = JSON.parse(saved)
+          if (data.sequence && data.sequence.length > 0) {
+            setCustomChords(data.sequence)
+            setCustomChordName(data.name || '')
+            toast.success(t('custom_chord_loaded'))
+          } else {
+            toast.error(t('custom_chord_empty_load'))
+          }
+        } catch (e) {
+          toast.error(t('custom_chord_load_error'))
         }
-      } catch (e) {
-        toast.error(t('custom_chord_load_error'))
+      } else {
+        toast.error(t('custom_chord_not_found'))
       }
     } else {
       toast.error(t('custom_chord_not_found'))
@@ -11959,7 +11966,7 @@ export default function FretMasterPage() {
                         </h4>
                         <div className="h-20 animate-pulse bg-muted rounded-lg" />
                       </div>
-                    ) : isTauri() ? (
+                    ) : isTauri ? (
                       <WindowsAudioSettings language={language as 'zh-CN' | 'en'} />
                     ) : (
                       // Web 版本使用 Web Audio API 设置
