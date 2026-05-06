@@ -277,8 +277,36 @@ export async function setFilters(filters: {
   }
 }
 
+export async function getDefaultAudioDevice(): Promise<AudioDeviceInfo | null> {
+  if (!isTauri()) return null
+  try {
+    return await invoke<AudioDeviceInfo | null>('get_default_audio_device')
+  } catch (error) {
+    console.error('Failed to get default audio device:', error)
+    return null
+  }
+}
+
+export async function setPitchThreshold(threshold: number): Promise<void> {
+  if (!isTauri()) return
+  try { await invoke('set_pitch_threshold', { threshold }) } catch (error) { console.error('Failed to set pitch threshold:', error) }
+}
+
+export async function setGain(gain: number): Promise<void> {
+  if (!isTauri()) return
+  try { await invoke('set_gain', { gain }) } catch (error) { console.error('Failed to set gain:', error) }
+}
+
+export async function getAudioLevel(): Promise<{
+  rms: number; db_spl: number; peak: number; is_voiced: boolean; noise_floor: number; snr_db: number
+} | null> {
+  if (!isTauri()) return null
+  try { return await invoke('get_audio_level') } catch (error) { console.error('Failed to get audio level:', error); return null }
+}
+
 export const nativeAudio = {
   getAudioDevices,
+  getDefaultAudioDevice,
   startAudioCapture,
   startAudioCaptureWithSampleRate,
   stopAudioCapture,
@@ -289,6 +317,9 @@ export const nativeAudio = {
   setSampleRate,
   setNoiseSuppression,
   setFilters,
+  setPitchThreshold,
+  setGain,
+  getAudioLevel,
   startDevicePolling,
   stopDevicePolling,
   listenDeviceChanges,

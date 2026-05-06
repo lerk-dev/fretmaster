@@ -45,6 +45,14 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined)
 
+let globalRestartTutorial: (() => void) | null = null
+
+export function restartTutorial() {
+  if (globalRestartTutorial) {
+    globalRestartTutorial()
+  }
+}
+
 const defaultSteps: OnboardingStep[] = [
   {
     id: "welcome",
@@ -224,6 +232,16 @@ export function OnboardingProvider({ children, config, t: externalT }: Onboardin
       return () => clearTimeout(timer)
     }
   }, [config?.autoStartOnFirstVisit, hasSeenOnboarding, isCompleted, startOnboarding, mounted])
+
+  useEffect(() => {
+    globalRestartTutorial = () => {
+      resetOnboarding()
+      setTimeout(() => startOnboarding(), 100)
+    }
+    return () => {
+      globalRestartTutorial = null
+    }
+  }, [resetOnboarding, startOnboarding])
 
   const value: OnboardingContextType = {
     isActive,

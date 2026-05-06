@@ -1,0 +1,333 @@
+'use client'
+
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
+import { Timer, Eye, EyeOff, Target, Zap, Coffee, Play, Pause, RotateCcw, X, CheckCircle2, Circle } from 'lucide-react'
+import { useAppStore } from '@/lib/store'
+
+interface FocusModeProps {
+  language: 'zh-CN' | 'en'
+  isPlaying: boolean
+  score: { correct: number; total: number }
+  timeLeft: number
+  practiceTime: number
+  onClose?: () => void
+}
+
+export const FocusMode = memo(function FocusMode({
+  language,
+  isPlaying,
+  score,
+  timeLeft,
+  practiceTime,
+  onClose,
+}: FocusModeProps) {
+  const store = useAppStore()
+  const focusMode = store?.focusMode || {}
+  const setFocusModeSettings = store.setFocusModeSettings
+
+  const [pomodoroTime, setPomodoroTime] = useState(0)
+  const [pomodoroRunning, setPomodoroRunning] = useState(false)
+  const [pomodoroPhase, setPomodoroPhase] = useState<'work' | 'break'>('work')
+  const [pomodoroCount, setPomodoroCount] = useState(0)
+  const [showSettings, setShowSettings] = useState(false)
+  const pomodoroRef = useRef<NodeJS.Timeout | null>(null)
+
+  const workDuration = focusMode.targetDuration || 25
+  const breakDuration = 5
+  const currentPhaseDuration = pomodoroPhase === 'work' ? workDuration * 60 : breakDuration * 60
+  const progressPercent = currentPhaseDuration > 0 ? (pomodoroTime / currentPhaseDuration) * 100 : 0
+
+  const t = useCallback((key: string) => {
+    const translations: Record<string, Record<string, string>> = {
+      'zh-CN': {
+        'focus_mode': '专注模式',
+        'pomodoro_timer': '番茄钟',
+        'work_phase': '专注中',
+        'break_phase': '休息中',
+        'start': '开始',
+        'pause': '暂停',
+        'reset': '重置',
+        'work_duration': '专注时长(分钟)',
+        'progress': '练习进度',
+        'correct_rate': '正确率',
+        'remaining': '剩余时间',
+        'completed_pomodoros': '已完成番茄',
+        'settings': '设置',
+        'wake_lock': '保持屏幕常亮',
+        'dim_background': '背景调暗',
+        'hide_distractions': '隐藏干扰元素',
+        'show_timer': '显示计时器',
+        'show_progress': '显示进度',
+        'exit_focus': '退出专注模式',
+        'minutes': '分',
+        'seconds': '秒',
+        'practice_score': '练习得分',
+        'time_elapsed': '已用时间',
+      },
+      'en': {
+        'focus_mode': 'Focus Mode',
+        'pomodoro_timer': 'Pomodoro Timer',
+        'work_phase': 'Focusing',
+        'break_phase': 'Break',
+        'start': 'Start',
+        'pause': 'Pause',
+        'reset': 'Reset',
+        'work_duration': 'Work Duration (min)',
+        'progress': 'Progress',
+        'correct_rate': 'Accuracy',
+        'remaining': 'Remaining',
+        'completed_pomodoros': 'Completed Pomodoros',
+        'settings': 'Settings',
+        'wake_lock': 'Keep Screen On',
+        'dim_background': 'Dim Background',
+        'hide_distractions': 'Hide Distractions',
+        'show_timer': 'Show Timer',
+        'show_progress': 'Show Progress',
+        'exit_focus': 'Exit Focus Mode',
+        'minutes': 'min',
+        'seconds': 'sec',
+        'practice_score': 'Practice Score',
+        'time_elapsed': 'Time Elapsed',
+      }
+    }
+    return translations[language]?.[key] || key
+  }, [language])
+
+  useEffect(() => {
+    if (pomodoroRunning) {
+      pomodoroRef.current = setInterval(() => {
+        setPomodoroTime(prev => {
+          const next = prev + 1
+          if (next >= currentPhaseDuration) {
+            if (pomodoroPhase === 'work') {
+              setPomodoroPhase('break')
+              setPomodoroCount(c => c + 1)
+            } else {
+              setPomodoroPhase('work')
+            }
+            return 0
+          }
+          return next
+        })
+      }, 1000)
+    }
+    return () => {
+      if (pomodoroRef.current) {
+        clearInterval(pomodoroRef.current)
+        pomodoroRef.current = null
+      }
+    }
+  }, [pomodoroRunning, currentPhaseDuration, pomodoroPhase])
+
+  const togglePomodoro = useCallback(() => {
+    setPomodoroRunning(prev => !prev)
+  }, [])
+
+  const resetPomodoro = useCallback(() => {
+    setPomodoroRunning(false)
+    setPomodoroTime(0)
+    setPomodoroPhase('work')
+  }, [])
+
+  const formatTime = useCallback((seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }, [])
+
+  const remainingTime = currentPhaseDuration - pomodoroTime
+  const correctRate = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0
+  const practiceProgress = practiceTime > 0 ? Math.min(100, Math.round(((practiceTime * 60 - timeLeft) / (practiceTime * 60)) * 100)) : 0
+
+  return (
+    <div className={`fixed inset-0 z-[9999] flex flex-col transition-all duration-500 ${
+      focusMode.dimBackground ? 'bg-black/90' : 'bg-black/70'
+    }`}>
+      {/* 顶部栏 */}
+      <div className="flex items-center justify-between px-6 py-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-3 h-3 rounded-full ${pomodoroPhase === 'work' ? 'bg-red-500 animate-pulse' : 'bg-green-500 animate-pulse'}`} />
+          <span className="text-white/80 text-sm font-medium">
+            {pomodoroPhase === 'work' ? t('work_phase') : t('break_phase')}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(prev => !prev)}
+            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            {showSettings ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={() => {
+              store.setFocusModeSettings({ enabled: false })
+              onClose?.()
+            }}
+            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* 设置面板 */}
+      {showSettings && (
+        <div className="mx-6 mb-4 p-4 bg-white/5 rounded-xl border border-white/10 space-y-3">
+          <h4 className="text-white/70 text-sm font-medium">{t('settings')}</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={focusMode.showTimer ?? true}
+                onChange={(e) => setFocusModeSettings({ showTimer: e.target.checked })}
+                className="rounded border-white/30 bg-transparent text-blue-500"
+              />
+              {t('show_timer')}
+            </label>
+            <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={focusMode.showProgress ?? true}
+                onChange={(e) => setFocusModeSettings({ showProgress: e.target.checked })}
+                className="rounded border-white/30 bg-transparent text-blue-500"
+              />
+              {t('show_progress')}
+            </label>
+            <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={focusMode.dimBackground ?? true}
+                onChange={(e) => setFocusModeSettings({ dimBackground: e.target.checked })}
+                className="rounded border-white/30 bg-transparent text-blue-500"
+              />
+              {t('dim_background')}
+            </label>
+            <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={focusMode.hideDistractions ?? true}
+                onChange={(e) => setFocusModeSettings({ hideDistractions: e.target.checked })}
+                className="rounded border-white/30 bg-transparent text-blue-500"
+              />
+              {t('hide_distractions')}
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-white/60 text-sm">{t('work_duration')}</span>
+            <input
+              type="range"
+              min={5}
+              max={60}
+              step={5}
+              value={workDuration}
+              onChange={(e) => setFocusModeSettings({ targetDuration: Number(e.target.value) })}
+              className="flex-1"
+            />
+            <span className="text-white/80 text-sm font-mono w-8">{workDuration}</span>
+          </div>
+        </div>
+      )}
+
+      {/* 主内容区 */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6">
+        {/* 番茄钟计时器 */}
+        {focusMode.showTimer !== false && (
+          <div className="relative flex flex-col items-center">
+            <div className="relative w-64 h-64">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 200 200">
+                <circle
+                  cx="100" cy="100" r="90"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.1)"
+                  strokeWidth="6"
+                />
+                <circle
+                  cx="100" cy="100" r="90"
+                  fill="none"
+                  stroke={pomodoroPhase === 'work' ? '#ef4444' : '#22c55e'}
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 90}`}
+                  strokeDashoffset={`${2 * Math.PI * 90 * (1 - progressPercent / 100)}`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-white text-5xl font-mono font-light tracking-wider">
+                  {formatTime(remainingTime)}
+                </span>
+                <span className="text-white/50 text-sm mt-2">
+                  {pomodoroPhase === 'work' ? t('work_phase') : t('break_phase')}
+                </span>
+              </div>
+            </div>
+
+            {/* 番茄钟控制 */}
+            <div className="flex items-center gap-4 mt-6">
+              <button
+                onClick={resetPomodoro}
+                className="p-3 rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+              <button
+                onClick={togglePomodoro}
+                className="p-4 rounded-full bg-white/15 text-white hover:bg-white/25 transition-colors"
+              >
+                {pomodoroRunning ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+              </button>
+            </div>
+
+            {/* 已完成番茄数 */}
+            <div className="flex items-center gap-1 mt-4">
+              {Array.from({ length: Math.min(pomodoroCount, 8) }).map((_, i) => (
+                <CheckCircle2 key={i} className="w-4 h-4 text-red-400" />
+              ))}
+              {Array.from({ length: Math.max(0, 4 - Math.min(pomodoroCount, 4)) }).map((_, i) => (
+                <Circle key={`empty-${i}`} className="w-4 h-4 text-white/20" />
+              ))}
+              <span className="text-white/40 text-xs ml-2">{pomodoroCount} {t('completed_pomodoros')}</span>
+            </div>
+          </div>
+        )}
+
+        {/* 练习进度 */}
+        {focusMode.showProgress !== false && isPlaying && (
+          <div className="w-full max-w-md space-y-4">
+            <div className="bg-white/5 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-white/60 text-sm">{t('practice_score')}</span>
+                <span className="text-white text-lg font-mono">
+                  {score.correct}/{score.total}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/60 text-sm">{t('correct_rate')}</span>
+                <span className={`text-lg font-mono ${correctRate >= 80 ? 'text-green-400' : correctRate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {correctRate}%
+                </span>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-2">
+                <div
+                  className="h-2 rounded-full transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-500"
+                  style={{ width: `${practiceProgress}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-white/40">
+                <span>{t('time_elapsed')}</span>
+                <span>{practiceProgress}%</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 底部提示 */}
+      <div className="text-center pb-6">
+        <span className="text-white/30 text-xs">
+          {t('focus_mode')} · {t('work_duration')}: {workDuration}{t('minutes')}
+        </span>
+      </div>
+    </div>
+  )
+})

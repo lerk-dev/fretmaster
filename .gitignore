@@ -5,10 +5,14 @@ node_modules/
 # Build outputs
 .next/
 dist/
+dist-tauri/
 dist_backup/
 out/
 *.tsbuildinfo
 dist.zip
+
+# Rust/Tauri build
+src-tauri/target/
 
 # Environment files
 .env*.local

@@ -1,10 +1,10 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List, ListChildComponentProps } from 'react-window'
 import { Button } from "@/components/ui/button"
 import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
-import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings } from "@/lib/store"
+import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser } from "@/lib/store"
 import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
 import { logger } from "@/lib/logger"
 import { SOLO_SONGS, SoloSong, ChordDetailed } from "@/lib/solo-songs"
@@ -50,6 +50,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils"
 import { WindowsAudioSettings } from "@/components/windows-audio-settings"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { FocusMode } from "@/components/focus-mode"
+import { CustomSongEditor } from "@/components/custom-song-editor-ui"
+import { MetronomeVisualizer } from "@/components/metronome-visualizer"
 import Sidebar from "@/components/Sidebar"
 import Header from "@/components/Header"
 import BottomNavigation from "@/components/BottomNavigation"
@@ -109,6 +112,9 @@ import {
   Monitor,
   GripVertical,
   HelpCircle,
+  Edit3,
+  Star,
+  StarOff,
 } from "lucide-react"
 import { toast } from "sonner"
 import { PianoKeyboard, SimplePianoKeyboard } from "@/components/piano-keyboard"
@@ -117,6 +123,11 @@ import { PianoKeyboard, SimplePianoKeyboard } from "@/components/piano-keyboard"
 const TRANSLATIONS = {
                 'zh-CN': {
                     'fullscreen_mode': '全屏模式',
+                    'focus_mode': '专注模式',
+                    'add_to_favorites': '添加收藏',
+                    'remove_from_favorites': '取消收藏',
+                    'favorites': '收藏',
+                    'show_favorites_only': '仅显示收藏',
                     'click_to_exit_fullscreen': '点击退出全屏',
                     'multi_select_hint': '可多选',
                     'clear_all': '清空',
@@ -126,6 +137,12 @@ const TRANSLATIONS = {
                     'stats_detail_breakdown': '详细分类',
                     'stats_total_practices': '总练习次数',
                     'stats_total': '总计',
+                    'export_data': '导出数据',
+                    'export_csv': '导出 CSV',
+                    'export_pdf': '导出 PDF',
+                    'export_json': '导出 JSON',
+                    'export_success': '导出成功',
+                    'export_failed': '导出失败',
                     'stats_month': '本月',
                     'stats_week': '本周',
                     'stats_today': '今天',
@@ -157,6 +174,16 @@ const TRANSLATIONS = {
                     'hide_notes': '隐藏音符',
                     'show_all_notes': '显示所有音符',
                     'settings_practice': '练习设置',
+                    'instrument_select': '选择乐器',
+                    'instrument_guitar_6': '六弦吉他',
+                    'instrument_guitar_6_fourths': '六弦吉他 (四度定弦)',
+                    'instrument_guitar_7': '七弦吉他',
+                    'instrument_guitar_7_fourths': '七弦吉他 (四度定弦)',
+                    'instrument_bass_4': '四弦贝斯',
+                    'instrument_bass_5': '五弦贝斯',
+                    'instrument_horn_bflat': '降B调号',
+                    'instrument_horn_eflat': '降E调号',
+                    'instrument_concert': '音乐会音高',
                     'tuner_e1': '1弦 E',
                     'tuner_b2': '2弦 B',
                     'tuner_g3': '3弦 G',
@@ -175,6 +202,7 @@ const TRANSLATIONS = {
                     'display_chinese': '中文显示',
                     'midi_select_device': '选择MIDI设备',
                     'metronome_flash': '节拍器闪光',
+                    'metronome_visualize': '节拍可视化',
                     'metronome_sound': '节拍器声音',
                     'feedback_sound': '反馈音',
                     'feedback_sound_enabled': '启用反馈音',
@@ -216,6 +244,8 @@ const TRANSLATIONS = {
                     'onboarding_skip': '跳过',
                     'onboarding_finish': '完成',
                     'onboarding_tip': '提示',
+                    'restart_tutorial': '重新开始教程',
+                    'tutorial_completed': '教程已完成',
                     // 排序相关
                     'sort_label': '排序',
                     'sort_title_asc': '标题 A-Z',
@@ -921,6 +951,17 @@ const TRANSLATIONS = {
                     'pitch_finding_current_note': '当前音符',
                     'pitch_finding_time_remaining': '剩余时间',
                     'pitch_finding_practice_complete': '练习完成',
+                    'practice_summary_title': '练习总结',
+                    'practice_summary_accuracy': '正确率',
+                    'practice_summary_correct': '正确',
+                    'practice_summary_wrong': '错误',
+                    'practice_summary_total': '总题数',
+                    'practice_summary_duration': '练习时长',
+                    'practice_summary_again': '再来一次',
+                    'practice_summary_close': '关闭',
+                    'practice_summary_excellent': '太棒了！继续保持！',
+                    'practice_summary_good': '做得不错！再接再厉！',
+                    'practice_summary_keep': '继续加油，多加练习！',
                     'pitch_finding_next_interval': '下一题间隔',
                     'pitch_finding_next_interval_hint': '答对后自动进入下一题的时间间隔',
                     'pitch_finding_no_auto': '手动',
@@ -1203,6 +1244,11 @@ const TRANSLATIONS = {
                 },
                 'en': {
                     'fullscreen_mode': 'Fullscreen Mode',
+                    'focus_mode': 'Focus Mode',
+                    'add_to_favorites': 'Add to Favorites',
+                    'remove_from_favorites': 'Remove from Favorites',
+                    'favorites': 'Favorites',
+                    'show_favorites_only': 'Show Favorites Only',
                     'click_to_exit_fullscreen': 'Click to exit fullscreen',
                     'answer_mode': 'Answer Mode',
                     'keyboard_shortcuts': 'Keyboard Shortcuts',
@@ -1256,6 +1302,8 @@ const TRANSLATIONS = {
                     'onboarding_skip': 'Skip',
                     'onboarding_finish': 'Finish',
                     'onboarding_tip': 'Tip',
+                    'restart_tutorial': 'Restart Tutorial',
+                    'tutorial_completed': 'Tutorial Completed',
                     // Sort
                     'sort_label': 'Sort',
                     'sort_title_asc': 'Title A-Z',
@@ -1847,6 +1895,17 @@ const TRANSLATIONS = {
                     'pitch_finding_current_note': 'Current Note',
                     'pitch_finding_time_remaining': 'Time Remaining',
                     'pitch_finding_practice_complete': 'Practice Complete',
+                    'practice_summary_title': 'Practice Summary',
+                    'practice_summary_accuracy': 'Accuracy',
+                    'practice_summary_correct': 'Correct',
+                    'practice_summary_wrong': 'Wrong',
+                    'practice_summary_total': 'Total',
+                    'practice_summary_duration': 'Duration',
+                    'practice_summary_again': 'Try Again',
+                    'practice_summary_close': 'Close',
+                    'practice_summary_excellent': 'Excellent! Keep it up!',
+                    'practice_summary_good': 'Good job! Keep practicing!',
+                    'practice_summary_keep': 'Keep going, practice makes perfect!',
                     'pitch_finding_next_interval': 'Next Question Interval',
                     'pitch_finding_next_interval_hint': 'Time interval before automatically moving to next question after correct answer',
                     'pitch_finding_no_auto': 'Manual',
@@ -2093,6 +2152,7 @@ const TRANSLATIONS = {
                     'import_success': 'Import Success',
                     'intervals': 'Intervals',
                     'metronome_flash': 'Metronome Flash',
+                    'metronome_visualize': 'Beat Visualization',
                     'metronome_sound': 'Metronome Sound',
                     'feedback_sound': 'Feedback Sound',
                     'feedback_sound_enabled': 'Enable Feedback Sound',
@@ -2122,6 +2182,16 @@ const TRANSLATIONS = {
                     'select_strings': 'Select Strings',
                     'select_this_level': 'Select This Level',
                     'settings_practice': 'Practice Settings',
+                    'instrument_select': 'Select Instrument',
+                    'instrument_guitar_6': '6-String Guitar',
+                    'instrument_guitar_6_fourths': '6-String Guitar (Fourths)',
+                    'instrument_guitar_7': '7-String Guitar',
+                    'instrument_guitar_7_fourths': '7-String Guitar (Fourths)',
+                    'instrument_bass_4': '4-String Bass',
+                    'instrument_bass_5': '5-String Bass',
+                    'instrument_horn_bflat': 'B♭ Horn',
+                    'instrument_horn_eflat': 'E♭ Horn',
+                    'instrument_concert': 'Concert Pitch',
                     'show_all_notes': 'Show All Notes',
                     'show_fretboard': 'Show Fretboard',
                     'show_keyboard': 'Show Keyboard',
@@ -2135,6 +2205,12 @@ const TRANSLATIONS = {
                     'stats_start_practicing': 'Start practicing to record data',
                     'stats_today': 'Today',
                     'stats_total': 'Total',
+                    'export_data': 'Export Data',
+                    'export_csv': 'Export CSV',
+                    'export_pdf': 'Export PDF',
+                    'export_json': 'Export JSON',
+                    'export_success': 'Export Success',
+                    'export_failed': 'Export Failed',
                     'stats_total_practices': 'Total Practices',
                     'stats_week': 'This Week',
                     'target_note': 'Target Note',
@@ -2217,31 +2293,31 @@ const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
 
 // 练习建议数据（参考SOLO的PracticeSuggestionProvider）
 const PRACTICE_SUGGESTIONS = [
-  "Try playing the note on different strings to find the most comfortable position.",
-  "Focus on finding the note in the lower positions first, then move up the neck.",
-  "Practice finding all instances of this note across the fretboard.",
-  "Try to visualize the note position before playing it.",
-  "Use your ear to guide you - sing the note before finding it.",
-  "Practice finding notes in different octaves.",
-  "Try finding the note with your eyes closed to develop muscle memory.",
-  "Practice connecting this note to nearby scale positions.",
-  "Focus on clean fretting and clear tone production.",
-  "Try playing the note with different fingers to build flexibility.",
-  "Practice finding notes in rapid succession to improve speed.",
-  "Use a metronome to time your note finding.",
-  "Try finding the note while maintaining a steady rhythm.",
-  "Practice jumping between distant positions on the fretboard.",
-  "Focus on minimizing hand movement when finding notes.",
-  "Try finding notes in different keys to build versatility.",
-  "Practice finding the root notes of common chord progressions.",
-  "Work on finding notes in the context of songs you know.",
-  "Try finding notes while reading sheet music.",
-  "Practice finding notes by ear without looking at the fretboard.",
-  "Focus on the relationship between string pairs.",
-  "Try finding the same note using different fingerings.",
-  "Practice finding notes in all 12 keys.",
-  "Work on finding chord tones within progressions.",
-  "Try finding notes while maintaining good posture.",
+  "尝试在不同弦上弹奏这个音，找到最舒适的位置。",
+  "先专注于在低把位找到这个音，然后再向高把位移动。",
+  "练习在指板上找到这个音的所有位置。",
+  "尝试在弹奏前先在脑海中可视化音符位置。",
+  "用耳朵引导你——先唱出这个音再找到它。",
+  "练习在不同八度找到这个音。",
+  "尝试闭着眼睛找音来培养肌肉记忆。",
+  "练习将这个音与附近的音阶位置连接起来。",
+  "专注于干净的按弦和清晰的音色。",
+  "尝试用不同的手指弹奏来增加灵活性。",
+  "练习快速连续找音来提高速度。",
+  "使用节拍器来计时你的找音练习。",
+  "尝试在保持稳定节奏的同时找音。",
+  "练习在指板上远距离跳跃。",
+  "专注于在找音时最小化手部移动。",
+  "尝试在不同调性中找音来增加多样性。",
+  "练习找到常见和弦进行的根音。",
+  "在你熟悉的歌曲中练习找音。",
+  "尝试一边看谱一边找音。",
+  "练习不看指板只用耳朵找音。",
+  "专注于相邻弦之间的关系。",
+  "尝试用不同的指法找到同一个音。",
+  "练习在所有12个调中找音。",
+  "练习在和弦进行中找到和弦音。",
+  "尝试在保持良好姿势的同时找音。",
 ]
 
 // 音级到半音的映射（全局常量）
@@ -7423,8 +7499,24 @@ function YINDetector(config: { threshold?: number; probabilityCliff?: number } =
 
 // ==================== 主组件 ====================
 export default function FretMasterPage() {
-  // 语言状态
-  const [language, setLanguage] = useState<'zh-CN' | 'en'>('zh-CN')
+  // ==================== Zustand Store 状态 ====================
+  const store = useAppStore()
+  const audioSettings = useAudioSettings()
+  const practiceSettings = usePracticeSettings()
+  const metronomeSettings = useMetronomeSettings()
+  const feedbackSoundSettings = useFeedbackSoundSettings()
+  const storeScore = useScore()
+  const storeIsPlaying = useIsPlaying()
+  const storeVersion = useVersion()
+  const user = useUser()
+
+  const language = user.language
+  const setLanguage = store.setLanguage
+  const theme = user.theme
+  const setTheme = store.setTheme
+  const chordScaleDisplay = user.chordScaleDisplay
+  const setChordScaleDisplay = store.setChordScaleDisplay
+
   const t = useCallback((key: string) => {
     return TRANSLATIONS[language][key as keyof typeof TRANSLATIONS['zh-CN']] || key
   }, [language])
@@ -7449,13 +7541,10 @@ export default function FretMasterPage() {
     { id: "stats", label: t('nav_stats'), Icon: BarChart3, shortLabel: t('nav_short_stats') },
   ], [t])
 
-  // 主题状态
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  
-  // 客户端挂载状态 - 用于防止 hydration 不匹配
+  // 客户端挂载状态
   const [mounted, setMounted] = useState(false)
   
-  // 检测是否在 Tauri 环境 - 延迟检测避免 hydration 不匹配
+  // 检测是否在 Tauri 环境
   const [isTauri, setIsTauri] = useState(false)
   
   // 应用主题
@@ -7471,16 +7560,20 @@ export default function FretMasterPage() {
     }
   }, [theme])
 
-  // ==================== Zustand Store 状态 ====================
-  const store = useAppStore()
-  const audioSettings = useAudioSettings()
-  const practiceSettings = usePracticeSettings()
-  const metronomeSettings = useMetronomeSettings()
-  const feedbackSoundSettings = useFeedbackSoundSettings()
-  const storeScore = useScore()
-  const storeIsPlaying = useIsPlaying()
-  const storeVersion = useVersion()
-  
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    const isSecure = window.isSecureContext || window.location.protocol === 'https:' || isLocalhost
+    const isTauriEnv = !!(window as any).__TAURI__
+    if (!isSecure && !isTauriEnv) {
+      toast.error(language === 'zh-CN' 
+        ? '⚠️ 当前使用 HTTP，麦克风功能不可用。请使用 HTTPS 访问。'
+        : '⚠️ HTTP detected. Microphone requires HTTPS. Please use HTTPS.',
+        { duration: 8000 }
+      )
+    }
+  }, [])
+
   // 核心状态 - 从 Store 获取
   const activeTab = store.activeTab
   const setActiveTab = store.setActiveTab
@@ -7488,10 +7581,41 @@ export default function FretMasterPage() {
   const setSidebarCollapsed = store.toggleSidebar
   const settingsOpen = store.settingsOpen
   const setSettingsOpen = store.setSettingsOpen
-  const fullscreenMode = store.fullscreenMode
-  const setFullscreenMode = store.toggleFullscreen
+  const isFullscreen = store.isFullscreen
+  const toggleFullscreenState = store.toggleFullscreen
+  const setFullscreenState = store.setFullscreen
   const displayScale = useDisplayScale()
   const setDisplayScale = store.setDisplayScale
+  const focusMode = store.focusMode
+  const favorites = store.favorites
+  const toggleLevelFavorite = store.toggleLevelFavorite
+  const toggleSongFavorite = store.toggleSongFavorite
+  const isLevelFavorite = store.isLevelFavorite
+  const isSongFavorite = store.isSongFavorite
+
+  // 全屏切换处理函数
+  const handleToggleFullscreen = useCallback(async (enable?: boolean) => {
+    const newState = enable !== undefined ? enable : !isFullscreen
+    const fullscreenModeType = focusMode?.fullscreenMode || 'windowed'
+    
+    if (isTauri) {
+      try {
+        if (fullscreenModeType === 'fullscreen') {
+          const { setTrueFullscreen } = await import('@/lib/native-window')
+          await setTrueFullscreen(newState)
+        } else {
+          const { setWindowedFullscreen } = await import('@/lib/native-window')
+          await setWindowedFullscreen(newState)
+        }
+      } catch (e) {
+        console.error('Failed to set fullscreen:', e)
+      }
+    }
+    
+    toggleFullscreenState()
+  }, [isFullscreen, toggleFullscreenState, focusMode?.fullscreenMode])
+  
+  const setFullscreenMode = handleToggleFullscreen
   
   // 练习模式状态
   const isPlaying = storeIsPlaying
@@ -7649,6 +7773,10 @@ export default function FretMasterPage() {
   // 正确答案反馈状态
   const [showCorrectFeedback, setShowCorrectFeedback] = useState(false)
   const [correctFeedbackNote, setCorrectFeedbackNote] = useState<string | null>(null)
+  const [showWrongFeedback, setShowWrongFeedback] = useState(false)
+  const [wrongFeedbackNote, setWrongFeedbackNote] = useState<string | null>(null)
+  const [showPracticeSummary, setShowPracticeSummary] = useState(false)
+  const [practiceSummaryData, setPracticeSummaryData] = useState<{correct: number, total: number, duration: number}>({correct: 0, total: 0, duration: 0})
 
   // 音程练习状态
   const [showIntervalFretboard, setShowIntervalFretboard] = useState(false)
@@ -7674,6 +7802,7 @@ export default function FretMasterPage() {
   const [songSortBy, setSongSortBy] = useState<"title-asc" | "title-desc" | "style-asc" | "style-desc" | "composer-asc" | "composer-desc" | "year-asc" | "year-desc">("title-asc")
   const [selectedSongInfo, setSelectedSongInfo] = useState<typeof SONG_PROGRESSIONS[0] | null>(null)
   const [showSongInfoDialog, setShowSongInfoDialog] = useState(false)
+  const [showCustomSongEditor, setShowCustomSongEditor] = useState(false)
 
   // 缓存歌曲分组结果 - 避免每次渲染重新计算
   const groupedSongs = useMemo(() => 
@@ -7723,7 +7852,12 @@ export default function FretMasterPage() {
   // 音频输入状态 - 从 Store 获取
   const micEnabled = audioSettings.micEnabled
   const setMicEnabled = store.setMicEnabled
-  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
+  const audioDevices = store.audioDevice.devices
+  const setAudioDevices = store.setAudioDevices
+  const audioInitializing = store.audioDevice.initializing
+  const setAudioInitializing = store.setAudioInitializing
+  const audioError = store.audioDevice.error
+  const setAudioError = store.setAudioError
   const selectedAudioDevice = audioSettings.selectedAudioDevice
   const setSelectedAudioDevice = store.setSelectedAudioDevice
   const detectedPitch = store.detectedPitch
@@ -7734,8 +7868,6 @@ export default function FretMasterPage() {
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null)
   const inputGain = audioSettings.inputGain
   const setInputGain = store.setInputGain
-  const [audioInitializing, setAudioInitializing] = useState(false)
-  const [audioError, setAudioError] = useState<string | null>(null)
   
   // 音高检测调试信息
   const [pitchDebugInfo, setPitchDebugInfo] = useState<{
@@ -7761,7 +7893,6 @@ export default function FretMasterPage() {
   const setConfidenceThreshold = store.setConfidenceThreshold
   const sensitivity = audioSettings.sensitivity
   const setSensitivity = store.setSensitivity
-  const [chordScaleDisplay, setChordScaleDisplay] = useState<'chinese' | 'english' | 'english_short' | 'jazz'>('chinese')
 
   // 调音器状态
   const [tunerOpen, setTunerOpen] = useState(false)
@@ -7849,31 +7980,6 @@ export default function FretMasterPage() {
 
   // ==================== 效果 ====================
   
-  // 从localStorage加载设置（仅非 Tauri 环境）
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (isTauri) return
-    const savedSettings = localStorage.getItem('fretmaster-settings')
-    if (savedSettings) {
-      try {
-        const settings = JSON.parse(savedSettings)
-        setLanguage(settings.language || 'zh-CN')
-        setTheme(settings.theme || 'dark')
-        setPracticeTime(settings.practiceTime || 60)
-        setFretCount(settings.fretCount || 15)
-        setMetronomeBpm(settings.metronomeBpm || 80)
-        setInputGain(settings.inputGain || 1)
-        setCooldownEnabled(settings.cooldownEnabled || false)
-        setCooldownDuration(settings.cooldownDuration || 1000)
-        setConfidenceThreshold(settings.confidenceThreshold || 0.8)
-        setSensitivity(settings.sensitivity || 0.5)
-        setChordScaleDisplay(settings.chordScaleDisplay || (settings.language === 'en' ? 'english' : 'chinese'))
-      } catch (e) {
-        console.error('Failed to load settings:', e)
-      }
-    }
-  }, [isTauri])
-
   // 更新状态refs - 确保音高检测回调中能获取最新状态（合并为一个useEffect减少重渲染）
   useEffect(() => {
     isPlayingRef.current = isPlaying
@@ -7903,16 +8009,13 @@ export default function FretMasterPage() {
       currentChordIndex, chordDegreeCurrentStep, practiceLevel, findRootFirst, nextChordInfo,
       shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat])
 
-  // 从服务器加载统计数据
+  // 从服务器/SQLite加载统计数据
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (isTauri) return
     const loadStatsFromServer = async () => {
       try {
-        // 从服务器获取所有练习记录
         const serverStats = await getAllPracticeStats()
         
-        // 将服务器数据转换为本地格式
         const newStats: PracticeStats = {
           daily: [],
           total: {
@@ -7934,7 +8037,6 @@ export default function FretMasterPage() {
           }
         }
         
-        // 练习类型映射
         const typeMapping: Record<string, PracticeType> = {
           '音高识别': 'pitch_finding',
           '音阶练习': 'scale',
@@ -7943,17 +8045,14 @@ export default function FretMasterPage() {
           '和弦进行': 'chord_progression'
         }
         
-        // 处理服务器返回的记录
         serverStats.forEach((record: ServerPracticeStats) => {
           const date = record.created_at ? record.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
           const type = typeMapping[record.exercise_type] || 'pitch_finding'
           const detailName = record.notes?.replace('练习项目: ', '') || record.exercise_type
           
-          // 更新总计
           newStats.total.count += 1
           newStats.total.byType[type] = (newStats.total.byType[type] || 0) + 1
           
-          // 更新详细统计
           const detailList = newStats.total.byDetail[type] || []
           const existingDetail = detailList.find(d => d.name === detailName)
           if (existingDetail) {
@@ -7963,7 +8062,6 @@ export default function FretMasterPage() {
           }
           newStats.total.byDetail[type] = detailList
           
-          // 更新每日统计
           let todayStats = newStats.daily.find(d => d.date === date)
           if (!todayStats) {
             todayStats = {
@@ -8000,7 +8098,7 @@ export default function FretMasterPage() {
           todayStats.byDetail[type] = todayDetailList
         })
         
-        // 只保留最近30天的数据
+        // 只保留最近90天的数据
         newStats.daily = newStats.daily
           .filter(d => {
             const date = new Date(d.date)
@@ -8012,19 +8110,17 @@ export default function FretMasterPage() {
         
         setPracticeStats(newStats)
         
-        // 同时保存到localStorage作为备份
         localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
       } catch (e) {
-        console.error('Failed to load stats from server:', e)
-        // 如果服务器获取失败，尝试从localStorage加载
+        console.error('Failed to load stats:', e)
         const savedStats = localStorage.getItem('fretmaster-stats')
         if (savedStats) {
           try {
             const stats = JSON.parse(savedStats)
             setPracticeStats(stats)
-          } catch (e) {
-            console.error('Failed to load stats from localStorage:', e)
-          }
+            } catch (e) {
+              console.error('Failed to load stats from localStorage:', e)
+            }
         }
       }
     }
@@ -8032,13 +8128,46 @@ export default function FretMasterPage() {
     loadStatsFromServer()
   }, [isTauri])
 
-  // 保存统计数据到localStorage（仅非 Tauri 环境）
+  // 保存统计数据
   const savePracticeStats = useCallback((stats: PracticeStats) => {
     if (typeof window === 'undefined') return
-    if (isTauri) return
     localStorage.setItem('fretmaster-stats', JSON.stringify(stats))
     setPracticeStats(stats)
-  }, [isTauri])
+  }, [])
+
+  const savePracticeState = useCallback(() => {
+    if (typeof window === 'undefined' || !isPlaying) return
+    const state = {
+      activeTab,
+      score: storeScore,
+      timeLeft,
+      isPracticePaused,
+      timestamp: Date.now(),
+    }
+    localStorage.setItem('fretmaster-practice-state', JSON.stringify(state))
+  }, [isPlaying, activeTab, storeScore, timeLeft, isPracticePaused])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleBeforeUnload = () => {
+      savePracticeState()
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [savePracticeState])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const saved = localStorage.getItem('fretmaster-practice-state')
+      if (saved) {
+        const state = JSON.parse(saved)
+        if (Date.now() - state.timestamp < 30 * 60 * 1000) {
+          localStorage.removeItem('fretmaster-practice-state')
+        }
+      }
+    } catch {}
+  }, [])
 
   // 记录练习统计
   const recordPractice = useCallback((type: PracticeType, detailName: string) => {
@@ -8097,7 +8226,7 @@ export default function FretMasterPage() {
       }
       todayStats.byDetail[type] = todayDetailList
       
-      // 只保留最近30天的数据
+      // 只保留最近90天的数据
       newStats.daily = newStats.daily
         .filter(d => {
           const date = new Date(d.date)
@@ -8107,8 +8236,7 @@ export default function FretMasterPage() {
         })
         .sort((a, b) => b.date.localeCompare(a.date))
       
-      // 保存到localStorage（仅非 Tauri 环境）
-      if (typeof window !== 'undefined' && !isTauri) {
+      if (typeof window !== 'undefined') {
         localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
       }
       
@@ -8297,159 +8425,227 @@ export default function FretMasterPage() {
   // ==================== 调音器功能 ====================
   // 启动调音器
   const startTuner = useCallback(async () => {
-    try {
-      const constraints: MediaStreamConstraints = {
-        audio: selectedAudioDevice 
-          ? { 
-              deviceId: { exact: selectedAudioDevice },
-              echoCancellation: false,
-              autoGainControl: false,
-              noiseSuppression: false
-            }
-          : {
-              echoCancellation: false,
-              autoGainControl: false,
-              noiseSuppression: false
-            }
-      }
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
-      tunerStreamRef.current = stream
-
-      // 创建 AudioContext - 与原HTML文件一致，固定48000采样率
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
-        sampleRate: 48000,
-        latencyHint: 'interactive'
-      })
-      tunerAudioContextRef.current = audioContext
-
-      const source = audioContext.createMediaStreamSource(stream)
-      
-      // 创建增益节点
-      const gainNode = audioContext.createGain()
-      gainNode.gain.value = inputGain
-      tunerGainNodeRef.current = gainNode
-      
-      const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 4096  // 与原HTML文件一致
-      tunerAnalyserRef.current = analyser
-
-      // 连接音频链路：source -> gain -> analyser
-      source.connect(gainNode)
-      gainNode.connect(analyser)
-
-      // 清空历史记录
-      tunerHistoryRef.current = []
-      
-      setTunerActive(true)
-      toast.success(t('tuner_start'))
-
-      // 使用 ref 来跟踪调音器状态，避免闭包问题
-      let isActive = true
-      
-      // 开始检测循环
-      const detectPitch = () => {
-        if (!isActive || !analyser || !audioContext) return
-
-        const buffer = new Float32Array(analyser.fftSize)
-        analyser.getFloatTimeDomainData(buffer)
-
-        // 计算 RMS 能量，过滤静音 - 与原HTML文件一致
-        const rms = calculateRMS(buffer)
+    if (isTauri) {
+      // Tauri环境：使用Rust原生音频
+      try {
+        const { startAudioCapture, detectPitch: nativeDetectPitch, stopAudioCapture } = await import('@/lib/native-audio')
         
-        if (rms < 0.002) {
-          // 静音时保持最后状态或显示默认
-          tunerAnimationRef.current = requestAnimationFrame(detectPitch)
-          return
-        }
-
-        // 根据设置选择算法
-        const currentAlgorithm = pitchAlgorithmRef.current
-        let yinResult: { frequency: number; probability: number } | null = null
+        await startAudioCapture(selectedAudioDevice || undefined)
+        setTunerActive(true)
+        toast.success(t('tuner_start'))
         
-        // 调音器使用固定的2048缓冲区大小，与练习模式保持一致
-        const TUNER_BUFFER_SIZE = 2048
+        let isActive = true
         
-        if (currentAlgorithm === 'solo') {
-          // 使用SOLO FFT加速算法 - 使用固定缓冲区大小
-          const soloAnalyser = getSOLOYinAnalyser(TUNER_BUFFER_SIZE, audioContext.sampleRate)
-          // 只取前2048个样本进行分析
-          const analysisBuffer = buffer.length > TUNER_BUFFER_SIZE ? buffer.slice(0, TUNER_BUFFER_SIZE) : buffer
-          const soloResult = soloAnalyser.analyze(analysisBuffer)
-          if (soloResult && soloResult.valid) {
-            yinResult = {
-              frequency: soloResult.frequency,
-              probability: soloResult.probability
-            }
-          }
-        } else {
-          // 使用标准YIN算法 - 使用固定缓冲区大小
-          const analysisBuffer = buffer.length > TUNER_BUFFER_SIZE ? buffer.slice(0, TUNER_BUFFER_SIZE) : buffer
-          yinResult = YINPitchDetection(analysisBuffer, audioContext.sampleRate, 0.1, 0.1)
-        }
-
-        if (yinResult && yinResult.frequency > 0 && yinResult.probability > confidenceThreshold) {
-          const noteName = frequencyToNoteName(yinResult.frequency)
-          const result = frequencyToNote(yinResult.frequency, referenceFrequency)
+        const detectLoop = async () => {
+          if (!isActive) return
           
-          // 添加到历史记录进行平滑处理
-          tunerHistoryRef.current.push({
-            frequency: yinResult.frequency,
-            note: noteName || "-",
-            cents: result.cents
-          })
-          
-          // 保留最近5个检测结果
-          if (tunerHistoryRef.current.length > 5) {
-            tunerHistoryRef.current.shift()
-          }
-          
-          // 使用加权平均进行平滑
-          if (tunerHistoryRef.current.length >= 3) {
-            const weights = [0.1, 0.2, 0.3, 0.4]
-            let weightedFreq = 0
-            let totalWeight = 0
+          try {
+            const result = await nativeDetectPitch()
             
-            tunerHistoryRef.current.forEach((item, index) => {
-              const weight = weights[Math.min(index, weights.length - 1)]
-              weightedFreq += item.frequency * weight
-              totalWeight += weight
+            if (result && result.frequency > 0 && result.confidence.overall > confidenceThreshold) {
+              const noteName = frequencyToNoteName(result.frequency)
+              const noteResult = frequencyToNote(result.frequency, referenceFrequency)
+              
+              tunerHistoryRef.current.push({
+                frequency: result.frequency,
+                note: noteName || "-",
+                cents: noteResult.cents
+              })
+              
+              if (tunerHistoryRef.current.length > 5) {
+                tunerHistoryRef.current.shift()
+              }
+              
+              if (tunerHistoryRef.current.length >= 3) {
+                const weights = [0.1, 0.2, 0.3, 0.4]
+                let weightedFreq = 0
+                let totalWeight = 0
+                
+                tunerHistoryRef.current.forEach((item, index) => {
+                  const weight = weights[Math.min(index, weights.length - 1)]
+                  weightedFreq += item.frequency * weight
+                  totalWeight += weight
+                })
+                
+                const smoothedFreq = weightedFreq / totalWeight
+                const smoothedNote = frequencyToNoteName(smoothedFreq)
+                const smoothedResult = frequencyToNote(smoothedFreq, referenceFrequency)
+                
+                setDetectedNote(smoothedNote || "-")
+                setDetectedFrequency(Math.round(smoothedFreq))
+                setCents(smoothedResult.cents)
+              } else {
+                setDetectedNote(noteName || "-")
+                setDetectedFrequency(Math.round(result.frequency))
+                setCents(noteResult.cents)
+              }
+            }
+          } catch (e) {
+            console.error('Native pitch detection error:', e)
+          }
+          
+          if (isActive) {
+            tunerAnimationRef.current = requestAnimationFrame(detectLoop)
+          }
+        }
+        
+        tunerAnimationRef.current = requestAnimationFrame(detectLoop)
+        
+        return () => {
+          isActive = false
+          stopAudioCapture()
+        }
+      } catch (err) {
+        console.error('Failed to start native tuner:', err)
+        toast.error(t('tuner_need_mic'))
+      }
+    } else {
+      // Web环境：使用Web Audio API
+      try {
+        const constraints: MediaStreamConstraints = {
+          audio: selectedAudioDevice 
+            ? { 
+                deviceId: { ideal: selectedAudioDevice },
+                echoCancellation: false,
+                autoGainControl: false,
+                noiseSuppression: false
+              }
+            : {
+                echoCancellation: false,
+                autoGainControl: false,
+                noiseSuppression: false
+              }
+        }
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        tunerStreamRef.current = stream
+
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+          sampleRate: 48000,
+          latencyHint: 'interactive'
+        })
+        tunerAudioContextRef.current = audioContext
+
+        const source = audioContext.createMediaStreamSource(stream)
+        
+        const gainNode = audioContext.createGain()
+        gainNode.gain.value = inputGain
+        tunerGainNodeRef.current = gainNode
+        
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 4096
+        tunerAnalyserRef.current = analyser
+
+        source.connect(gainNode)
+        gainNode.connect(analyser)
+
+        tunerHistoryRef.current = []
+        
+        setTunerActive(true)
+        toast.success(t('tuner_start'))
+
+        let isActive = true
+        
+        const detectPitch = () => {
+          if (!isActive || !analyser || !audioContext) return
+
+          const buffer = new Float32Array(analyser.fftSize)
+          analyser.getFloatTimeDomainData(buffer)
+
+          const rms = calculateRMS(buffer)
+          
+          if (rms < 0.002) {
+            tunerAnimationRef.current = requestAnimationFrame(detectPitch)
+            return
+          }
+
+          const currentAlgorithm = pitchAlgorithmRef.current
+          let yinResult: { frequency: number; probability: number } | null = null
+          
+          const TUNER_BUFFER_SIZE = 2048
+          
+          if (currentAlgorithm === 'solo') {
+            const soloAnalyser = getSOLOYinAnalyser(TUNER_BUFFER_SIZE, audioContext.sampleRate)
+            const analysisBuffer = buffer.length > TUNER_BUFFER_SIZE ? buffer.slice(0, TUNER_BUFFER_SIZE) : buffer
+            const soloResult = soloAnalyser.analyze(analysisBuffer)
+            if (soloResult && soloResult.valid) {
+              yinResult = {
+                frequency: soloResult.frequency,
+                probability: soloResult.probability
+              }
+            }
+          } else {
+            const analysisBuffer = buffer.length > TUNER_BUFFER_SIZE ? buffer.slice(0, TUNER_BUFFER_SIZE) : buffer
+            yinResult = YINPitchDetection(analysisBuffer, audioContext.sampleRate, 0.1, 0.1)
+          }
+
+          if (yinResult && yinResult.frequency > 0 && yinResult.probability > confidenceThreshold) {
+            const noteName = frequencyToNoteName(yinResult.frequency)
+            const result = frequencyToNote(yinResult.frequency, referenceFrequency)
+            
+            tunerHistoryRef.current.push({
+              frequency: yinResult.frequency,
+              note: noteName || "-",
+              cents: result.cents
             })
             
-            const smoothedFreq = weightedFreq / totalWeight
-            const smoothedNote = frequencyToNoteName(smoothedFreq)
-            const smoothedResult = frequencyToNote(smoothedFreq, referenceFrequency)
+            if (tunerHistoryRef.current.length > 5) {
+              tunerHistoryRef.current.shift()
+            }
             
-            setDetectedNote(smoothedNote || "-")
-            setDetectedFrequency(Math.round(smoothedFreq))
-            setCents(smoothedResult.cents)
-          } else {
-            // 历史记录不足时直接显示
-            setDetectedNote(noteName || "-")
-            setDetectedFrequency(Math.round(yinResult.frequency))
-            setCents(result.cents)
+            if (tunerHistoryRef.current.length >= 3) {
+              const weights = [0.1, 0.2, 0.3, 0.4]
+              let weightedFreq = 0
+              let totalWeight = 0
+              
+              tunerHistoryRef.current.forEach((item, index) => {
+                const weight = weights[Math.min(index, weights.length - 1)]
+                weightedFreq += item.frequency * weight
+                totalWeight += weight
+              })
+              
+              const smoothedFreq = weightedFreq / totalWeight
+              const smoothedNote = frequencyToNoteName(smoothedFreq)
+              const smoothedResult = frequencyToNote(smoothedFreq, referenceFrequency)
+              
+              setDetectedNote(smoothedNote || "-")
+              setDetectedFrequency(Math.round(smoothedFreq))
+              setCents(smoothedResult.cents)
+            } else {
+              setDetectedNote(noteName || "-")
+              setDetectedFrequency(Math.round(yinResult.frequency))
+              setCents(result.cents)
+            }
           }
+
+          tunerAnimationRef.current = requestAnimationFrame(detectPitch)
         }
 
         tunerAnimationRef.current = requestAnimationFrame(detectPitch)
+        
+        return () => {
+          isActive = false
+        }
+      } catch (err) {
+        console.error('Failed to start tuner:', err)
+        toast.error(t('tuner_need_mic'))
       }
-
-      tunerAnimationRef.current = requestAnimationFrame(detectPitch)
-      
-      // 返回停止函数
-      return () => {
-        isActive = false
-      }
-    } catch (err) {
-      console.error('Failed to start tuner:', err)
-      toast.error(t('tuner_need_mic'))
     }
   }, [t, referenceFrequency, selectedAudioDevice, inputGain, confidenceThreshold])
 
   // 停止调音器
-  const stopTuner = useCallback(() => {
+  const stopTuner = useCallback(async () => {
     if (tunerAnimationRef.current) {
       cancelAnimationFrame(tunerAnimationRef.current)
       tunerAnimationRef.current = null
+    }
+
+    if (isTauri) {
+      try {
+        const { stopAudioCapture } = await import('@/lib/native-audio')
+        await stopAudioCapture()
+      } catch (e) {
+        console.error('Failed to stop native audio:', e)
+      }
     }
 
     if (tunerStreamRef.current) {
@@ -8487,48 +8683,14 @@ export default function FretMasterPage() {
     }
   }, [tunerOpen, tunerActive, stopTuner])
 
-  // 保存设置到localStorage（仅非 Tauri 环境）
   const saveSettings = useCallback(() => {
-    if (typeof window === 'undefined') return
-    if (isTauri) {
-      toast.success(t('save_success'))
-      return
-    }
-    const settings = {
-      language,
-      theme,
-      practiceTime,
-      fretCount,
-      metronomeBpm,
-      inputGain,
-      cooldownEnabled,
-      cooldownDuration,
-      confidenceThreshold,
-      sensitivity,
-      chordScaleDisplay,
-    }
-    localStorage.setItem('fretmaster-settings', JSON.stringify(settings))
     toast.success(t('save_success'))
-  }, [language, theme, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, chordScaleDisplay, t, isTauri])
+  }, [t])
 
-  // 重置设置
   const resetSettings = useCallback(() => {
-    setLanguage('zh-CN')
-    setChordScaleDisplay('chinese')
-    setTheme('dark')
-    setPracticeTime(60)
-    setFretCount(15)
-    setMetronomeBpm(80)
-    setInputGain(1)
-    setCooldownEnabled(false)
-    setCooldownDuration(1000)
-    setConfidenceThreshold(0.8)
-    setSensitivity(0.5)
-    if (typeof window !== 'undefined' && !isTauri) {
-      localStorage.removeItem('fretmaster-settings')
-    }
+    store.resetSettings()
     toast.success(t('reset_settings_hint'))
-  }, [t, isTauri])
+  }, [store, t])
 
   // 导出设置
   const exportSettings = useCallback(() => {
@@ -8620,6 +8782,13 @@ export default function FretMasterPage() {
         setTimeLeft(prev => {
           if (prev <= 1) {
             setIsPlaying(false)
+            const elapsed = practiceTime
+            setPracticeSummaryData({
+              correct: storeScore.correct,
+              total: storeScore.total,
+              duration: elapsed,
+            })
+            setShowPracticeSummary(true)
             return 0
           }
           return prev - 1
@@ -8631,23 +8800,45 @@ export default function FretMasterPage() {
     }
   }, [isPlaying, practiceTime])
 
+  const metronomeAudioCtxRef = useRef<AudioContext | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (metronomeAudioCtxRef.current) {
+        metronomeAudioCtxRef.current.close()
+        metronomeAudioCtxRef.current = null
+      }
+    }
+  }, [])
+
   // 节拍器效果
   useEffect(() => {
     if (metronomeEnabled && isPlaying) {
       const interval = 60000 / metronomeBpm
       metronomeRef.current = setInterval(() => {
         if (metronomeSound) {
-          const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
-          const oscillator = ctx.createOscillator()
-          const gainNode = ctx.createGain()
-          oscillator.connect(gainNode)
-          gainNode.connect(ctx.destination)
-          oscillator.frequency.value = 800
-          oscillator.type = "sine"
-          gainNode.gain.setValueAtTime(0.3, ctx.currentTime)
-          gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1)
-          oscillator.start(ctx.currentTime)
-          oscillator.stop(ctx.currentTime + 0.1)
+          try {
+            if (!metronomeAudioCtxRef.current || metronomeAudioCtxRef.current.state === 'closed') {
+              const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+              metronomeAudioCtxRef.current = new AudioCtx()
+            }
+            const ctx = metronomeAudioCtxRef.current
+            if (ctx.state === 'suspended') {
+              ctx.resume()
+            }
+            const oscillator = ctx.createOscillator()
+            const gainNode = ctx.createGain()
+            oscillator.connect(gainNode)
+            gainNode.connect(ctx.destination)
+            oscillator.frequency.value = 800
+            oscillator.type = "sine"
+            gainNode.gain.setValueAtTime(0.3, ctx.currentTime)
+            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1)
+            oscillator.start(ctx.currentTime)
+            oscillator.stop(ctx.currentTime + 0.1)
+          } catch (e) {
+            console.error('Metronome audio error:', e)
+          }
         }
         if (metronomeFlash) {
           const flashLayer = document.getElementById('metronome-flash-layer')
@@ -8659,6 +8850,11 @@ export default function FretMasterPage() {
           }
         }
       }, interval)
+    } else {
+      if (metronomeAudioCtxRef.current) {
+        metronomeAudioCtxRef.current.close()
+        metronomeAudioCtxRef.current = null
+      }
     }
     return () => {
       if (metronomeRef.current) clearInterval(metronomeRef.current)
@@ -8690,7 +8886,11 @@ export default function FretMasterPage() {
   }, [activeTab, isPlaying, showIntervalFretboard, intervalAutoAdvance, intervalFretboardDuration, currentIntervalExercise])
 
   // 获取音频设备
-  // 音频设备枚举函数 - 使用 ref 确保 devicechange 事件处理器始终访问最新状态
+  const audioDevicesRef = useRef(audioDevices)
+  const selectedAudioDeviceRef = useRef(selectedAudioDevice)
+  audioDevicesRef.current = audioDevices
+  selectedAudioDeviceRef.current = selectedAudioDevice
+
   const enumerateAudioDevices = useCallback(async (showNotification = false) => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) return
     
@@ -8698,27 +8898,24 @@ export default function FretMasterPage() {
       const devices = await navigator.mediaDevices.enumerateDevices()
       const audioInputs = devices.filter(d => d.kind === 'audioinput' && d.deviceId)
       logger.debug('枚举到的音频输入设备:', audioInputs.length, audioInputs.map(d => d.label || '未命名设备'))
-      // 检查设备列表是否发生变化
-      const currentDeviceIds = audioDevices.map(d => d.deviceId).sort().join(',')
+      const currentDeviceIds = audioDevicesRef.current.map(d => d.deviceId).sort().join(',')
       const newDeviceIds = audioInputs.map(d => d.deviceId).sort().join(',')
       const hasChanged = currentDeviceIds !== newDeviceIds
       
-      if (hasChanged || audioDevices.length === 0) {
+      if (hasChanged || audioDevicesRef.current.length === 0) {
         setAudioDevices(audioInputs)
         
-        // 如果当前选中的设备不存在了，自动选择第一个可用设备
         if (audioInputs.length > 0) {
-          const currentDeviceExists = audioInputs.some(d => d.deviceId === selectedAudioDevice)
-          if (!selectedAudioDevice || !currentDeviceExists) {
+          const currentDeviceExists = audioInputs.some(d => d.deviceId === selectedAudioDeviceRef.current)
+          if (!selectedAudioDeviceRef.current || !currentDeviceExists) {
             setSelectedAudioDevice(audioInputs[0].deviceId)
             logger.debug('自动选择设备:', audioInputs[0].label || audioInputs[0].deviceId)
           }
         }
         
-        // 显示设备变化提示
         if (showNotification && hasChanged) {
-          const addedCount = audioInputs.filter(d => !audioDevices.some(old => old.deviceId === d.deviceId)).length
-          const removedCount = audioDevices.filter(d => !audioInputs.some(new_ => new_.deviceId === d.deviceId)).length
+          const addedCount = audioInputs.filter(d => !audioDevicesRef.current.some(old => old.deviceId === d.deviceId)).length
+          const removedCount = audioDevicesRef.current.filter(d => !audioInputs.some(new_ => new_.deviceId === d.deviceId)).length
           
           if (addedCount > 0) {
             logger.debug(`🔌 检测到 ${addedCount} 个新音频设备`)
@@ -8731,7 +8928,7 @@ export default function FretMasterPage() {
     } catch (err) {
       console.error('枚举设备失败:', err)
     }
-  }, [audioDevices, selectedAudioDevice])
+  }, [])
 
   // 初始加载和监听设备变化（仅限 Web 版本）
   useEffect(() => {
@@ -8840,7 +9037,6 @@ export default function FretMasterPage() {
     setAudioError(null)
     try {
       if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
-        console.error('startAudioInput: 浏览器不支持 mediaDevices')
         const errorMsg = language === 'zh-CN' 
           ? '浏览器不支持音频输入，请使用 HTTPS 或更换浏览器（Chrome/Firefox/Edge）'
           : 'Browser does not support audio input. Please use HTTPS or try Chrome/Firefox/Edge'
@@ -8848,10 +9044,19 @@ export default function FretMasterPage() {
         setAudioError(errorMsg)
         throw new Error(errorMsg)
       }
+
+      try {
+        const { needsUserInteractionForAudio, handleIOSAudioUnlock } = await import('@/lib/ios-compat')
+        if (needsUserInteractionForAudio()) {
+          await handleIOSAudioUnlock()
+        }
+      } catch (e) {
+        // iOS compat not available, continue
+      }
       // 音频约束 - 与原HTML文件一致
       const constraints: MediaStreamConstraints = {
         audio: {
-          deviceId: selectedAudioDevice ? { exact: selectedAudioDevice } : undefined,
+          deviceId: selectedAudioDevice ? { ideal: selectedAudioDevice } : undefined,
           sampleRate: 48000,
           channelCount: 1,
           echoCancellation: false,
@@ -8991,11 +9196,20 @@ export default function FretMasterPage() {
     setCorrectFeedbackNote(note)
     setShowCorrectFeedback(true)
     
-    // 500ms后隐藏反馈
     setTimeout(() => {
       setShowCorrectFeedback(false)
       setCorrectFeedbackNote(null)
     }, 500)
+  }, [])
+
+  const triggerWrongFeedback = useCallback((note: string) => {
+    setWrongFeedbackNote(note)
+    setShowWrongFeedback(true)
+
+    setTimeout(() => {
+      setShowWrongFeedback(false)
+      setWrongFeedbackNote(null)
+    }, 600)
   }, [])
 
   // 音高匹配处理（供 AudioWorklet 或 ScriptProcessorNode 共用）
@@ -10813,6 +11027,12 @@ export default function FretMasterPage() {
       
       setHighlightedFrets(prev => new Map(prev).set(key, isCorrect))
       
+      if (isCorrect) {
+        triggerCorrectFeedback(clickedNote)
+      } else {
+        triggerWrongFeedback(clickedNote)
+      }
+
       playFeedbackSound(isCorrect)
       
       setTimeout(() => {
@@ -10965,6 +11185,14 @@ export default function FretMasterPage() {
     setCurrentIntervalExercise(null)
     setPracticeSessionStartTime(null)
     setPracticeElapsedTime(0)
+    setShowFretboard(false)
+    setShowIntervalFretboard(false)
+    setShowChordFretboard(false)
+    setShowChordExerciseFretboard(false)
+    setShowScaleFretboard(false)
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fretmaster-practice-state')
+    }
     if (cooldownRef.current) {
       clearTimeout(cooldownRef.current)
       cooldownRef.current = null
@@ -11146,7 +11374,7 @@ export default function FretMasterPage() {
       // ESC - 退出全屏或停止练习
       if (event.key === 'Escape') {
         event.preventDefault()
-        if (fullscreenMode) {
+        if (isFullscreen) {
           setFullscreenMode(false)
         } else if (isPlaying) {
           setIsPlaying(false)
@@ -11166,7 +11394,7 @@ export default function FretMasterPage() {
       // F - 切换全屏模式
       if ((event.key === 'f' || event.key === 'F') && isPlaying) {
         event.preventDefault()
-        setFullscreenMode(prev => !prev)
+        setFullscreenMode(!isFullscreen)
         return
       }
 
@@ -11237,7 +11465,7 @@ export default function FretMasterPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [fullscreenMode, isPlaying, togglePractice, activeTab, generateNewTarget, generateIntervalExercise, nextChordExercise, nextScaleExercise, nextChord])
+  }, [isFullscreen, isPlaying, togglePractice, activeTab, generateNewTarget, generateIntervalExercise, nextChordExercise, nextScaleExercise, nextChord])
 
   // 获取音符颜色
   const getNoteButtonColor = useCallback((note: string, stringIndex: number, fret: number) => {
@@ -11460,7 +11688,7 @@ export default function FretMasterPage() {
     setCustomChords([])
   }
 
-  // 保存自定义和弦序列到本地存储（仅非 Tauri 环境）
+  // 保存自定义和弦序列到本地存储
   const saveCustomChords = () => {
     if (customChords.length === 0) {
       toast.error(t('custom_chord_empty'))
@@ -11470,15 +11698,15 @@ export default function FretMasterPage() {
       name: customChordName || t('custom_chord_unnamed'),
       sequence: customChords
     }
-    if (typeof window !== 'undefined' && !isTauri) {
+    if (typeof window !== 'undefined') {
       localStorage.setItem('customChordSequence', JSON.stringify(data))
     }
     toast.success(t('custom_chord_saved'))
   }
 
-  // 从本地存储加载自定义和弦序列（仅非 Tauri 环境）
+  // 从本地存储加载自定义和弦序列
   const loadCustomChords = () => {
-    if (typeof window !== 'undefined' && !isTauri) {
+    if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('customChordSequence')
       if (saved) {
         try {
@@ -11624,10 +11852,8 @@ export default function FretMasterPage() {
       <div 
         className="min-h-screen bg-background flex flex-col relative"
         style={{ 
-          transform: `scale(${displayScale})`,
-          transformOrigin: 'top left',
-          width: `${100 / displayScale}%`,
-          minHeight: `${100 / displayScale}vh`,
+          zoom: displayScale !== 1 ? displayScale : undefined,
+          minHeight: '100vh',
         }}
       >
         {/* 节拍器闪烁层 */}
@@ -11714,6 +11940,7 @@ export default function FretMasterPage() {
                       size="icon"
                       className="h-8 w-8"
                       title={t('nav_tuner')}
+                      aria-label={t('nav_tuner')}
                     >
                       <Activity className="h-4 w-4" />
                     </Button>
@@ -11834,7 +12061,7 @@ export default function FretMasterPage() {
               <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
                 <SheetTrigger asChild>
                   <div data-onboarding="settings">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t('nav_settings')}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t('nav_settings')} aria-label={t('nav_settings')}>
                       <Settings className="h-4 w-4" />
                     </Button>
                   </div>
@@ -11845,14 +12072,39 @@ export default function FretMasterPage() {
                   </SheetHeader>
                   
                   <ErrorBoundary>
-                  <div className="space-y-6 py-4 px-4">
-                    {/* Language */}
-                    {/* Practice Settings */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <SlidersHorizontal className="h-4 w-4" />
-                        {t('settings_practice')}
-                      </h4>
+                  <Accordion type="multiple" defaultValue={["practice","audio","display","data"]} className="py-4 px-4">
+                    <AccordionItem value="practice" className="border-b-0">
+                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
+                        <span className="flex items-center gap-2">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          {t('settings_practice')}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">{t('instrument_select')}</span>
+                          <Select
+                            value={user.instrument}
+                            onValueChange={(v) => store.setInstrument(v as any)}
+                          >
+                            <SelectTrigger className="w-36 h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="six_string_guitar">{t('instrument_guitar_6')}</SelectItem>
+                              <SelectItem value="six_string_fourths">{t('instrument_guitar_6_fourths')}</SelectItem>
+                              <SelectItem value="seven_string_guitar">{t('instrument_guitar_7')}</SelectItem>
+                              <SelectItem value="seven_string_fourths">{t('instrument_guitar_7_fourths')}</SelectItem>
+                              <SelectItem value="four_string_bass">{t('instrument_bass_4')}</SelectItem>
+                              <SelectItem value="five_string_bass">{t('instrument_bass_5')}</SelectItem>
+                              <SelectItem value="b_flat_horn">{t('instrument_horn_bflat')}</SelectItem>
+                              <SelectItem value="e_flat_horn">{t('instrument_horn_eflat')}</SelectItem>
+                              <SelectItem value="concert_pitch">{t('instrument_concert')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">{t('practice_time')}</span>
@@ -11898,19 +12150,20 @@ export default function FretMasterPage() {
                           />
                         </div>
                       )}
-                    </div>
+                      </AccordionContent>
+                    </AccordionItem>
                     
-                    <Separator />
-                    
-                    {/* Metronome */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Activity className="h-4 w-4" />
-                        {t('device_metronome')}
-                      </h4>
+                    <AccordionItem value="metronome" className="border-b-0">
+                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
+                        <span className="flex items-center gap-2">
+                          <Activity className="h-4 w-4" />
+                          {t('device_metronome')}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{t('device_metronome')}</span>
-                        <Switch checked={metronomeEnabled} onCheckedChange={setMetronomeEnabled} />
+                        <span className="text-sm text-muted-foreground" id="metronome-toggle-label">{t('device_metronome')}</span>
+                        <Switch checked={metronomeEnabled} onCheckedChange={setMetronomeEnabled} aria-labelledby="metronome-toggle-label" />
                       </div>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
@@ -11933,16 +12186,55 @@ export default function FretMasterPage() {
                         <span className="text-sm text-muted-foreground">{t('metronome_flash')}</span>
                         <Switch checked={metronomeFlash} onCheckedChange={setMetronomeFlash} />
                       </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">{t('metronome_visualize')}</span>
+                        <Switch checked={metronomeSettings.visualize ?? false} onCheckedChange={(v) => store.setMetronomeSettings({ ...metronomeSettings, visualize: v })} />
+                      </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                    
+                    <AccordionItem value="audio" className="border-b-0">
+                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
+                        <span className="flex items-center gap-2">
+                          <Volume2 className="h-4 w-4" />
+                          {language === 'zh-CN' ? '音频与输入' : 'Audio & Input'}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-2">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {language === 'zh-CN' ? '全屏类型' : 'Fullscreen Type'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant={focusMode?.fullscreenMode === 'windowed' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => store.setFullscreenMode('windowed')}
+                          >
+                            {language === 'zh-CN' ? '窗口全屏' : 'Windowed'}
+                          </Button>
+                          <Button
+                            variant={focusMode?.fullscreenMode === 'fullscreen' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => store.setFullscreenMode('fullscreen')}
+                          >
+                            {language === 'zh-CN' ? '真全屏' : 'Fullscreen'}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {language === 'zh-CN' 
+                            ? '窗口全屏：保留窗口边框，可快速切换；真全屏：完全覆盖任务栏，沉浸式体验'
+                            : 'Windowed: keep window borders for quick switching; Fullscreen: fully immersive, covers taskbar'}
+                        </p>
+                      </div>
+                    
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Volume2 className="h-3.5 w-3.5" />
+                      {t('feedback_sound')}
                     </div>
-                    
-                    <Separator />
-                    
-                    {/* Feedback Sound */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Volume2 className="h-4 w-4" />
-                        {t('feedback_sound')}
-                      </h4>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">{t('feedback_sound_enabled')}</span>
                         <Switch checked={feedbackSoundSettings.enabled} onCheckedChange={store.setFeedbackSoundEnabled} />
@@ -11959,28 +12251,21 @@ export default function FretMasterPage() {
                           </div>
                         </>
                       )}
+                    
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Mic className="h-3.5 w-3.5" />
+                      {t('device_audio_input')}
                     </div>
                     
-                    <Separator />
-                    
-                    {/* Audio Input - 根据平台显示不同设置 */}
                     {!mounted ? (
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium flex items-center gap-2">
-                          <Mic className="h-4 w-4" />
-                          {t('device_audio_input')}
-                        </h4>
+                      <div className="space-y-2">
                         <div className="h-20 animate-pulse bg-muted rounded-lg" />
                       </div>
                     ) : isTauri ? (
                       <WindowsAudioSettings language={language as 'zh-CN' | 'en'} />
                     ) : (
-                      // Web 版本使用 Web Audio API 设置
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium flex items-center gap-2">
-                          <Mic className="h-4 w-4" />
-                          {t('device_audio_input')}
-                        </h4>
+                      <div className="space-y-2">
                         
                         {/* 权限请求提示 - 当没有设备或设备没有标签时显示 */}
                         {(audioDevices.length === 0 || audioDevices.every(d => !d.label)) && (
@@ -12131,14 +12416,11 @@ export default function FretMasterPage() {
                       </div>
                     )}
                     
-                    <Separator />
-                    
-                    {/* MIDI */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Piano className="h-4 w-4" />
-                        {t('midi_support')}
-                      </h4>
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Piano className="h-3.5 w-3.5" />
+                      {t('midi_support')}
+                    </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">{t('midi_enable')}</span>
                         <Switch checked={midiEnabled} onCheckedChange={setMidiEnabled} />
@@ -12162,16 +12444,17 @@ export default function FretMasterPage() {
                           : t('midi_device_none')
                         }
                       </p>
-                    </div>
-
-                    <Separator />
-
-                    {/* Language Settings */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Languages className="h-4 w-4" />
-                        {t('general_language')}
-                      </h4>
+                      </AccordionContent>
+                    </AccordionItem>
+                    
+                    <AccordionItem value="display" className="border-b-0">
+                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
+                        <span className="flex items-center gap-2">
+                          <Palette className="h-4 w-4" />
+                          {language === 'zh-CN' ? '显示与外观' : 'Display & Appearance'}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-2">
                       <div className="flex gap-2">
                         <Button
                           variant={language === 'zh-CN' ? 'default' : 'outline'}
@@ -12198,16 +12481,12 @@ export default function FretMasterPage() {
                           {t('lang_en')}
                         </Button>
                       </div>
+
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Palette className="h-3.5 w-3.5" />
+                      {t('general_theme')}
                     </div>
-
-                    <Separator />
-
-                    {/* Theme Settings */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Palette className="h-4 w-4" />
-                        {t('general_theme')}
-                      </h4>
                       <div className="flex gap-2">
                         <Button
                           variant={theme === 'dark' ? 'default' : 'outline'}
@@ -12228,16 +12507,12 @@ export default function FretMasterPage() {
                           {t('theme_light')}
                         </Button>
                       </div>
+
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Monitor className="h-3.5 w-3.5" />
+                      {language === 'zh-CN' ? '显示大小' : 'Display Size'}
                     </div>
-
-                    <Separator />
-
-                    {/* Display Scale Settings */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Monitor className="h-4 w-4" />
-                        {language === 'zh-CN' ? '显示大小' : 'Display Size'}
-                      </h4>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
@@ -12258,16 +12533,12 @@ export default function FretMasterPage() {
                             : 'Adjust overall UI size for high resolution screens'}
                         </p>
                       </div>
+
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Music className="h-3.5 w-3.5" />
+                      {t('chord_scale_display')}
                     </div>
-
-                    <Separator />
-
-                    {/* Chord/Scale Display Settings */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Music className="h-4 w-4" />
-                        {t('chord_scale_display')}
-                      </h4>
                       <div className="grid grid-cols-2 gap-2">
                         <Button
                           variant={chordScaleDisplay === 'chinese' ? 'default' : 'outline'}
@@ -12298,16 +12569,17 @@ export default function FretMasterPage() {
                           {t('display_jazz')}
                         </Button>
                       </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Settings Management */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Save className="h-4 w-4" />
-                        {t('settings_management')}
-                      </h4>
+                      </AccordionContent>
+                    </AccordionItem>
+                    
+                    <AccordionItem value="data" className="border-b-0">
+                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
+                        <span className="flex items-center gap-2">
+                          <Save className="h-4 w-4" />
+                          {t('settings_management')}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-2">
                       <p className="text-xs text-muted-foreground">{t('reset_settings_hint')}</p>
                       <div className="grid grid-cols-2 gap-2">
                         <Button variant="outline" size="sm" onClick={saveSettings}>
@@ -12335,30 +12607,39 @@ export default function FretMasterPage() {
                           </Button>
                         </label>
                       </div>
-                    </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                    
+                    <AccordionItem value="help" className="border-b-0">
+                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
+                        <span className="flex items-center gap-2">
+                          <HelpCircle className="h-4 w-4" />
+                          {language === 'zh-CN' ? '帮助' : 'Help'}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={async () => {
+                          const { restartTutorial } = await import('@/components/onboarding')
+                          restartTutorial()
+                        }}
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        {t('restart_tutorial')}
+                      </Button>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                    <Separator />
-
-                    {/* Tutorial */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <HelpCircle className="h-4 w-4" />
-                        {t('onboarding_welcome_title')}
-                      </h4>
-                      <p className="text-xs text-muted-foreground">{t('onboarding_welcome_desc')}</p>
-                      <OnboardingTrigger variant="button" />
-                    </div>
-
-                    <Separator />
-
-                    {/* Version Info */}
                     <div className="pt-2 border-t border-border/30">
                       <div className="flex items-center justify-between text-xs text-muted-foreground/50">
                         <span>Build</span>
                         <span className="font-mono">v{VERSION} ({BUILD_DATE_LOCAL})</span>
                       </div>
                     </div>
-                  </div>
+                  </Accordion>
                   </ErrorBoundary>
                 </SheetContent>
               </Sheet>
@@ -12377,7 +12658,7 @@ export default function FretMasterPage() {
             )}
             style={{ transition: 'width 0.2s ease-in-out' }}
           >
-            <div className="p-2 space-y-1">
+            <div className="p-2 space-y-1" role="tablist" aria-label={t('nav_practice')}>
               {sidebarMenuItems.map((mode) => (
                 <button
                   key={mode.id}
@@ -12390,6 +12671,9 @@ export default function FretMasterPage() {
                   )}
                   style={{ willChange: 'background-color, color' }}
                   title={mode.label}
+                  role="tab"
+                  aria-selected={activeTab === mode.id}
+                  aria-label={mode.label}
                 >
                   <mode.Icon className="h-4 w-4 shrink-0" />
                   {!sidebarCollapsed && <span>{mode.label}</span>}
@@ -12417,6 +12701,8 @@ export default function FretMasterPage() {
                 tabIndex={0} 
                 onKeyDown={handleKeyDown}
                 className="outline-none focus:ring-2 focus:ring-primary/50"
+                role="region"
+                aria-label={t('fretboard_title')}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -12436,6 +12722,14 @@ export default function FretMasterPage() {
                       >
                         <Maximize2 className="h-4 w-4" />
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => store.setFocusModeSettings({ enabled: !focusMode?.enabled })}
+                        title={t('focus_mode')}
+                      >
+                        <Target className="h-4 w-4" />
+                      </Button>
                       {isPlaying && (
                         <Button
                           variant="outline"
@@ -12450,6 +12744,7 @@ export default function FretMasterPage() {
                         variant={isPlaying ? "destructive" : "default"}
                         size="sm"
                         onClick={togglePractice}
+                        aria-label={isPlaying ? t('btn_stop') : t('btn_start')}
                       >
                         {isPlaying ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
                         {isPlaying ? t('btn_stop') : t('btn_start')}
@@ -12459,6 +12754,7 @@ export default function FretMasterPage() {
                         size="sm"
                         onClick={resetPractice}
                         title={t('reset')}
+                        aria-label={t('reset')}
                       >
                         <RotateCcw className="h-4 w-4" />
                       </Button>
@@ -13592,6 +13888,73 @@ export default function FretMasterPage() {
                 </div>
               )}
 
+              {showWrongFeedback && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+                  <div className="bg-red-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl" style={{animation: 'shake 0.4s ease-in-out'}}>
+                    <X className="h-16 w-16 text-white" />
+                  </div>
+                  <div className="absolute mt-32 text-2xl font-bold text-red-500">
+                    ✗ {wrongFeedbackNote}
+                  </div>
+                </div>
+              )}
+
+              {showPracticeSummary && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 max-w-sm w-full mx-4 shadow-2xl">
+                    <div className="text-center mb-6">
+                      <div className="text-4xl mb-2">
+                        {practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.8 ? '🎉' : 
+                         practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.5 ? '👍' : '💪'}
+                      </div>
+                      <h3 className="text-xl font-bold">{t('practice_summary_title')}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.8 ? t('practice_summary_excellent') :
+                         practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.5 ? t('practice_summary_good') : t('practice_summary_keep')}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-center">
+                        <div className="text-2xl font-bold text-green-500">{practiceSummaryData.correct}</div>
+                        <div className="text-xs text-muted-foreground">{t('practice_summary_correct')}</div>
+                      </div>
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center">
+                        <div className="text-2xl font-bold text-red-500">{practiceSummaryData.total - practiceSummaryData.correct}</div>
+                        <div className="text-xs text-muted-foreground">{t('practice_summary_wrong')}</div>
+                      </div>
+                      <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-center">
+                        <div className="text-2xl font-bold text-primary">
+                          {practiceSummaryData.total > 0 ? Math.round((practiceSummaryData.correct / practiceSummaryData.total) * 100) : 0}%
+                        </div>
+                        <div className="text-xs text-muted-foreground">{t('practice_summary_accuracy')}</div>
+                      </div>
+                      <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 text-center">
+                        <div className="text-2xl font-bold text-accent">{Math.floor(practiceSummaryData.duration / 60)}:{String(practiceSummaryData.duration % 60).padStart(2, '0')}</div>
+                        <div className="text-xs text-muted-foreground">{t('practice_summary_duration')}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => setShowPracticeSummary(false)}
+                      >
+                        {t('practice_summary_close')}
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        onClick={() => {
+                          setShowPracticeSummary(false)
+                          togglePractice()
+                        }}
+                      >
+                        {t('practice_summary_again')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Fretboard - 根据模式显示/隐藏，统计页面不显示 */}
               {activeTab !== "stats" &&
                (activeTab !== "chord" || showChordFretboard) &&
@@ -14127,6 +14490,64 @@ export default function FretMasterPage() {
                             {range.label}
                           </Button>
                         ))}
+                        <div className="flex gap-1 ml-auto">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 px-2"
+                            onClick={async () => {
+                              try {
+                                const { getAllPracticeStats } = await import('@/lib/stats-api')
+                                const { exportPracticeData } = await import('@/lib/export-utils')
+                                const allStats = await getAllPracticeStats()
+                                exportPracticeData(allStats, { format: 'csv', language: language as 'zh-CN' | 'en' })
+                                toast.success(t('export_success'))
+                              } catch (e) {
+                                toast.error(t('export_failed'))
+                              }
+                            }}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            CSV
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 px-2"
+                            onClick={async () => {
+                              try {
+                                const { getAllPracticeStats } = await import('@/lib/stats-api')
+                                const { printPDFReport } = await import('@/lib/export-utils')
+                                const allStats = await getAllPracticeStats()
+                                printPDFReport(allStats, { format: 'pdf', language: language as 'zh-CN' | 'en' })
+                              } catch (e) {
+                                toast.error(t('export_failed'))
+                              }
+                            }}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            PDF
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 px-2"
+                            onClick={async () => {
+                              try {
+                                const { getAllPracticeStats } = await import('@/lib/stats-api')
+                                const { exportPracticeData } = await import('@/lib/export-utils')
+                                const allStats = await getAllPracticeStats()
+                                exportPracticeData(allStats, { format: 'json', language: language as 'zh-CN' | 'en' })
+                                toast.success(t('export_success'))
+                              } catch (e) {
+                                toast.error(t('export_failed'))
+                              }
+                            }}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            JSON
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -14209,7 +14630,7 @@ export default function FretMasterPage() {
         </div>
 
         {/* Mobile bottom navigation - 优化显示 */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border/50 p-1 pb-safe z-50 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border/50 p-1 pb-safe z-50 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]" role="tablist" aria-label={t('nav_practice')}>
           <div className="flex justify-around">
             {bottomNavItems.map((mode) => (
               <button
@@ -14222,6 +14643,9 @@ export default function FretMasterPage() {
                     : "text-muted-foreground"
                 )}
                 style={{ willChange: 'background-color, color' }}
+                role="tab"
+                aria-selected={activeTab === mode.id}
+                aria-label={mode.label}
               >
                 <mode.Icon className="h-5 w-5" />
                 <span className="text-[10px] font-medium truncate max-w-full">{mode.shortLabel}</span>
@@ -14231,9 +14655,10 @@ export default function FretMasterPage() {
         </nav>
 
         {/* 全屏模式覆盖层 */}
-        {fullscreenMode && (
+        {isFullscreen && (
           <div 
-            className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-[9999] bg-background flex items-center justify-center"
+            style={{ margin: 0, padding: 0 }}
             onClick={() => setFullscreenMode(false)}
           >
             <div 
@@ -14576,18 +15001,35 @@ export default function FretMasterPage() {
                               </Badge>
                             </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedSongInfo(song)
-                              setShowSongInfoDialog(true)
-                            }}
-                          >
-                            <Info className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleSongFavorite(song.name)
+                              }}
+                            >
+                              {isSongFavorite(song.name) ? (
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                              ) : (
+                                <Star className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedSongInfo(song)
+                                setShowSongInfoDialog(true)
+                              }}
+                            >
+                              <Info className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -14597,6 +15039,15 @@ export default function FretMasterPage() {
             </div>
 
             <DialogFooter className="px-6 py-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCustomSongEditor(true)
+                }}
+              >
+                <Edit3 className="h-4 w-4 mr-2" />
+                {language === 'zh-CN' ? '自定义歌曲编辑器' : 'Song Editor'}
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -14739,19 +15190,36 @@ export default function FretMasterPage() {
                             {t(`level_desc_${level.id.replace(/-/g, '_')}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
-                            setSelectedLevelInfo(fullLevel || null)
-                            setShowLevelInfoDialog(true)
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleLevelFavorite(level.id)
+                            }}
+                          >
+                            {isLevelFavorite(level.id) ? (
+                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            ) : (
+                              <Star className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
+                              setSelectedLevelInfo(fullLevel || null)
+                              setShowLevelInfoDialog(true)
+                            }}
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -15211,6 +15679,30 @@ export default function FretMasterPage() {
 
         {/* 新手教程覆盖层*/}
         <OnboardingOverlay />
+
+        <Dialog open={showCustomSongEditor} onOpenChange={setShowCustomSongEditor}>
+          <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden">
+            <CustomSongEditor language={language as 'zh-CN' | 'en'} onClose={() => setShowCustomSongEditor(false)} />
+          </DialogContent>
+        </Dialog>
+
+        {focusMode?.enabled && (
+          <FocusMode
+            language={language as 'zh-CN' | 'en'}
+            isPlaying={isPlaying}
+            score={{ correct: score.correct, total: score.total }}
+            timeLeft={timeLeft}
+            practiceTime={practiceTime}
+          />
+        )}
+
+        <MetronomeVisualizer
+          bpm={metronomeBpm}
+          enabled={metronomeSettings.visualize ?? false}
+          isPlaying={isPlaying}
+          beatsPerMeasure={4}
+          language={language as 'zh-CN' | 'en'}
+        />
       </div>
     </TooltipProvider>
     </OnboardingProvider>
