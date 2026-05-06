@@ -57,6 +57,11 @@ fn main() {
             fretmaster::commands::close_window,
             fretmaster::commands::is_window_maximized,
             fretmaster::commands::start_dragging,
+            fretmaster::commands::set_fullscreen,
+            fretmaster::commands::is_fullscreen,
+            fretmaster::commands::set_windowed_fullscreen,
+            fretmaster::commands::set_true_fullscreen,
+            fretmaster::commands::is_true_fullscreen,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

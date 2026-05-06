@@ -14,7 +14,6 @@ import {
   Radio,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
-import { nativeAudio, type PitchResult, type AudioStatus, isTauri } from '@/lib/native-audio'
 
 interface DebugData {
   frequency: number
@@ -74,22 +73,7 @@ const defaultDebugData: DebugData = {
 
 const FREQ_HISTORY_LENGTH = 60
 
-interface AudioLevelData {
-  rms: number
-  db_spl: number
-  peak: number
-  is_voiced: boolean
-  noise_floor: number
-  snr_db: number
-}
-
-async function invoke<T>(cmd: string): Promise<T> {
-  const { invoke } = await import('@tauri-apps/api/core')
-  return invoke<T>(cmd)
-}
-
 const DebugPanelInner = memo(function DebugPanelInner() {
-  const store = useAppStore()
   const [visible, setVisible] = useState(false)
   const [minimized, setMinimized] = useState(false)
   const [data, setData] = useState<DebugData>(defaultDebugData)
@@ -97,30 +81,43 @@ const DebugPanelInner = memo(function DebugPanelInner() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const frameCountRef = useRef(0)
   const lastFpsTimeRef = useRef(Date.now())
-  const lastPitchRef = useRef<PitchResult | null>(null)
-  const audioSettings = store.audio
+  
+  const store = useAppStore()
+  const audioSettings = store?.audio || { selectedAudioDevice: '', inputGain: 1 }
 
   const updateDebugData = useCallback(async () => {
     const startTime = performance.now()
 
     try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      
       const [pitch, status, audioLevel] = await Promise.all([
-        nativeAudio.detectPitch().catch(() => null),
-        nativeAudio.getAudioStatus().catch(() => ({
+        invoke<{
+          note: string
+          octave: number
+          frequency: number
+          cents: number
+          confidence: { yin: number; harmonic: number; temporal: number; overall: number }
+        } | null>('detect_pitch').catch(() => null),
+        invoke<{
+          isCapturing: boolean
+          latencyMs: number
+          bufferSize: number
+          sampleRate: number
+        }>('get_audio_status').catch(() => ({
           isCapturing: false, latencyMs: 0, bufferSize: 0, sampleRate: 48000,
-        } as AudioStatus)),
-        invoke<AudioLevelData>('get_audio_level').catch(() => ({
-          rms: 0, db_spl: -96, peak: 0, is_voiced: false, noise_floor: 0, snr_db: 0,
         })),
+        invoke<{
+          rms: number
+          db_spl: number
+          peak: number
+          is_voiced: boolean
+          noise_floor: number
+          snr_db: number
+        } | null>('get_audio_level').catch(() => null),
       ])
 
       const detectTime = performance.now() - startTime
-
-      if (pitch) {
-        lastPitchRef.current = pitch
-      }
-
-      const currentPitch = pitch || lastPitchRef.current
 
       frameCountRef.current++
       const now = Date.now()
@@ -134,44 +131,44 @@ const DebugPanelInner = memo(function DebugPanelInner() {
 
       setData(prev => ({
         ...prev,
-        frequency: currentPitch?.frequency ?? prev.frequency,
-        note: currentPitch?.note ?? '-',
-        octave: currentPitch?.octave ?? 0,
-        cents: currentPitch?.cents ?? 0,
-        confidenceYin: currentPitch?.confidence?.yin ?? 0,
-        confidenceHarmonic: currentPitch?.confidence?.harmonic ?? 0,
-        confidenceTemporal: currentPitch?.confidence?.temporal ?? 0,
-        confidenceOverall: currentPitch?.confidence?.overall ?? 0,
-        isCapturing: status.isCapturing,
-        latencyMs: status.latencyMs,
-        bufferSize: status.bufferSize,
-        sampleRate: status.sampleRate,
-        rms: audioLevel.rms,
-        dbSpl: audioLevel.db_spl,
-        peak: audioLevel.peak,
-        isVoiced: audioLevel.is_voiced,
-        noiseFloor: audioLevel.noise_floor,
-        snrDb: audioLevel.snr_db,
+        frequency: pitch?.frequency ?? prev.frequency,
+        note: pitch?.note ?? '-',
+        octave: pitch?.octave ?? 0,
+        cents: pitch?.cents ?? 0,
+        confidenceYin: pitch?.confidence?.yin ?? 0,
+        confidenceHarmonic: pitch?.confidence?.harmonic ?? 0,
+        confidenceTemporal: pitch?.confidence?.temporal ?? 0,
+        confidenceOverall: pitch?.confidence?.overall ?? 0,
+        isCapturing: status?.isCapturing ?? false,
+        latencyMs: status?.latencyMs ?? 0,
+        bufferSize: status?.bufferSize ?? 0,
+        sampleRate: status?.sampleRate ?? 48000,
+        rms: audioLevel?.rms ?? 0,
+        dbSpl: audioLevel?.db_spl ?? -96,
+        peak: audioLevel?.peak ?? 0,
+        isVoiced: audioLevel?.is_voiced ?? false,
+        noiseFloor: audioLevel?.noise_floor ?? 0,
+        snrDb: audioLevel?.snr_db ?? 0,
         detectTimeMs: detectTime,
-        deviceName: audioSettings.selectedAudioDevice || '-',
-        calibrationOffset: audioSettings.inputGain,
-        gain: audioSettings.inputGain,
+        deviceName: audioSettings?.selectedAudioDevice || '-',
+        calibrationOffset: audioSettings?.inputGain ?? 1,
+        gain: audioSettings?.inputGain ?? 1,
       }))
 
-      if (currentPitch && currentPitch.frequency > 0) {
+      if (pitch && pitch.frequency > 0) {
         setFreqHistory(prev => {
-          const next = [...prev, currentPitch.frequency]
+          const next = [...prev, pitch.frequency]
           return next.length > FREQ_HISTORY_LENGTH ? next.slice(-FREQ_HISTORY_LENGTH) : next
         })
       }
     } catch (e) {
-      // ignore
+      console.warn('Debug update error:', e)
     }
-  }, [audioSettings.selectedAudioDevice, audioSettings.inputGain])
+  }, [audioSettings?.selectedAudioDevice, audioSettings?.inputGain])
 
   useEffect(() => {
     if (visible && !minimized) {
-      intervalRef.current = setInterval(updateDebugData, 100)
+      intervalRef.current = setInterval(updateDebugData, 500)
     }
     return () => {
       if (intervalRef.current) {
@@ -419,7 +416,13 @@ const DebugPanelInner = memo(function DebugPanelInner() {
 })
 
 export function DebugPanel() {
-  if (typeof window === 'undefined' || !isTauri()) {
+  const [isTauriEnv, setIsTauriEnv] = useState(false)
+  
+  useEffect(() => {
+    setIsTauriEnv(typeof window !== 'undefined' && !!(window as any).__TAURI__)
+  }, [])
+  
+  if (!isTauriEnv) {
     return null
   }
   return <DebugPanelInner />

@@ -1,19 +1,38 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { VERSION } from './version'
 import { InstrumentType } from './practice-suggestions'
 import { CustomSong } from './custom-song-editor'
 
+function debounceStorage(storage: Storage): Storage {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let pendingData: string | null = null
+  let pendingKey: string | null = null
+
+  return {
+    getItem: storage.getItem.bind(storage),
+    setItem: (key: string, value: string) => {
+      pendingKey = key
+      pendingData = value
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (pendingKey && pendingData) {
+          storage.setItem(pendingKey, pendingData)
+          pendingKey = null
+          pendingData = null
+        }
+        timer = null
+      }, 300)
+    },
+    removeItem: storage.removeItem.bind(storage),
+    get length() { return storage.length },
+    clear: storage.clear.bind(storage),
+    key: storage.key.bind(storage),
+  }
+}
+
 // 练习类型
 export type PracticeType = 'pitch_finding' | 'interval' | 'scale' | 'chord' | 'chord_progression'
-
-// 练习统计
-export interface PracticeStats {
-  date: string
-  count: number
-  byType: Record<PracticeType, number>
-  byDetail: Record<PracticeType, { name: string; count: number }[]>
-}
 
 // 音频设置
 export interface AudioSettings {
@@ -34,11 +53,21 @@ export interface AudioSettings {
   enableNotch60?: boolean  // 60Hz 陷波
 }
 
+// 全屏模式类型
+export type FullscreenModeType = 'windowed' | 'fullscreen'
+
+export interface AudioDeviceState {
+  devices: MediaDeviceInfo[]
+  initializing: boolean
+  error: string | null
+}
+
 // Focus模式设置
 export interface FocusModeSettings {
   enabled: boolean
   enableWakeLock: boolean
   enableFullscreen: boolean
+  fullscreenMode: FullscreenModeType  // 全屏模式：窗口全屏 或 真全屏
   showTimer: boolean
   showProgress: boolean
   dimBackground: boolean
@@ -46,10 +75,14 @@ export interface FocusModeSettings {
   targetDuration: number
 }
 
-// 用户设置
+export type ThemeMode = 'dark' | 'light'
+export type ChordScaleDisplayMode = 'chinese' | 'english' | 'english_short' | 'jazz'
+
 export interface UserSettings {
   instrument: InstrumentType
-  language: 'zh' | 'en'
+  language: 'zh-CN' | 'en'
+  theme: ThemeMode
+  chordScaleDisplay: ChordScaleDisplayMode
   showPracticeSuggestion: boolean
 }
 
@@ -82,6 +115,7 @@ export interface MetronomeSettings {
   bpm: number
   sound: boolean
   flash: boolean
+  visualize?: boolean
 }
 
 // 反馈音设置
@@ -117,8 +151,8 @@ export interface AppState {
   activeTab: string
   sidebarCollapsed: boolean
   settingsOpen: boolean
-  fullscreenMode: boolean
-  displayScale: number  // 显示缩放比例 (0.8 - 1.5)
+  isFullscreen: boolean
+  displayScale: number
   
   // 练习状态
   isPlaying: boolean
@@ -126,6 +160,7 @@ export interface AppState {
   
   // 音频状态
   audio: AudioSettings
+  audioDevice: AudioDeviceState
   detectedPitch: string | null
   detectedCents: number | null
   
@@ -143,9 +178,6 @@ export interface AppState {
   
   // 音阶练习设置
   scalePractice: ScalePracticeSettings
-  
-  // 统计数据
-  practiceStats: PracticeStats[]
   
   // Focus模式
   focusMode: FocusModeSettings
@@ -176,6 +208,7 @@ export interface AppActions {
   toggleSidebar: () => void
   setSettingsOpen: (open: boolean) => void
   toggleFullscreen: () => void
+  setFullscreen: (fullscreen: boolean) => void
   setDisplayScale: (scale: number) => void
   
   // 练习操作
@@ -203,6 +236,11 @@ export interface AppActions {
   setDetectedPitch: (pitch: string | null) => void
   setDetectedCents: (cents: number | null) => void
   
+  // 音频设备操作
+  setAudioDevices: (devices: MediaDeviceInfo[]) => void
+  setAudioInitializing: (initializing: boolean) => void
+  setAudioError: (error: string | null) => void
+  
   // 练习设置操作
   setPracticeTime: (time: number) => void
   setFretCount: (count: number) => void
@@ -216,6 +254,8 @@ export interface AppActions {
   setMetronomeBpm: (bpm: number) => void
   setMetronomeSound: (sound: boolean) => void
   setMetronomeFlash: (flash: boolean) => void
+  setMetronomeVisualize: (visualize: boolean) => void
+  setMetronomeSettings: (settings: Partial<MetronomeSettings>) => void
   
   // 反馈音操作
   setFeedbackSoundEnabled: (enabled: boolean) => void
@@ -228,17 +268,16 @@ export interface AppActions {
   // 音阶练习设置操作
   setScalePracticeSettings: (settings: Partial<ScalePracticeSettings>) => void
   
-  // 统计操作
-  addPracticeRecord: (type: PracticeType, detailName: string) => void
-  loadPracticeStats: (stats: PracticeStats[]) => void
-  
   // Focus模式操作
   setFocusModeEnabled: (enabled: boolean) => void
   setFocusModeSettings: (settings: Partial<FocusModeSettings>) => void
+  setFullscreenMode: (mode: FullscreenModeType) => void
   
   // 用户设置操作
   setInstrument: (instrument: InstrumentType) => void
-  setLanguage: (language: 'zh' | 'en') => void
+  setLanguage: (language: 'zh-CN' | 'en') => void
+  setTheme: (theme: ThemeMode) => void
+  setChordScaleDisplay: (display: ChordScaleDisplayMode) => void
   setShowPracticeSuggestion: (show: boolean) => void
   setCurrentPracticeSuggestion: (suggestion: string | null) => void
   
@@ -266,7 +305,7 @@ const initialState: AppState = {
   activeTab: 'practice',
   sidebarCollapsed: false,
   settingsOpen: false,
-  fullscreenMode: false,
+  isFullscreen: false,
   displayScale: 1,
   
   isPlaying: false,
@@ -288,6 +327,12 @@ const initialState: AppState = {
     enableLowPass: true,     // Windows 最佳实践：启用低通滤波
     enableNotch50: true,     // Windows 最佳实践：启用50Hz陷波(亚洲/欧洲)
     enableNotch60: false,    // 北美用户可手动启用60Hz陷波
+  },
+  
+  audioDevice: {
+    devices: [],
+    initializing: false,
+    error: null,
   },
   
   detectedPitch: null,
@@ -333,12 +378,11 @@ const initialState: AppState = {
     scalePracticeSequence: '1to1',
   },
   
-  practiceStats: [],
-  
   focusMode: {
     enabled: false,
     enableWakeLock: true,
     enableFullscreen: true,
+    fullscreenMode: 'windowed',  // 默认使用窗口全屏
     showTimer: true,
     showProgress: true,
     dimBackground: true,
@@ -348,7 +392,9 @@ const initialState: AppState = {
   
   user: {
     instrument: 'six_string_guitar',
-    language: 'zh',
+    language: 'zh-CN',
+    theme: 'dark' as ThemeMode,
+    chordScaleDisplay: 'chinese' as ChordScaleDisplayMode,
     showPracticeSuggestion: true,
   },
   
@@ -380,7 +426,8 @@ export const useAppStore = create<AppState & AppActions>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setSettingsOpen: (open) => set({ settingsOpen: open }),
-      toggleFullscreen: () => set((state) => ({ fullscreenMode: !state.fullscreenMode })),
+      toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
+      setFullscreen: (fullscreen) => set({ isFullscreen: fullscreen }),
       setDisplayScale: (scale) => set({ displayScale: scale }),
       
       // 练习操作
@@ -419,6 +466,10 @@ export const useAppStore = create<AppState & AppActions>()(
       setDetectedPitch: (pitch) => set({ detectedPitch: pitch }),
       setDetectedCents: (cents) => set({ detectedCents: cents }),
       
+      setAudioDevices: (devices) => set((state) => ({ audioDevice: { ...state.audioDevice, devices } })),
+      setAudioInitializing: (initializing) => set((state) => ({ audioDevice: { ...state.audioDevice, initializing } })),
+      setAudioError: (error) => set((state) => ({ audioDevice: { ...state.audioDevice, error } })),
+      
       // 练习设置操作
       setPracticeTime: (time) => set((state) => ({ practice: { ...state.practice, practiceTime: time } })),
       setFretCount: (count) => set((state) => ({ practice: { ...state.practice, fretCount: count } })),
@@ -432,6 +483,8 @@ export const useAppStore = create<AppState & AppActions>()(
       setMetronomeBpm: (bpm) => set((state) => ({ metronome: { ...state.metronome, bpm } })),
       setMetronomeSound: (sound) => set((state) => ({ metronome: { ...state.metronome, sound } })),
       setMetronomeFlash: (flash) => set((state) => ({ metronome: { ...state.metronome, flash } })),
+      setMetronomeVisualize: (visualize) => set((state) => ({ metronome: { ...state.metronome, visualize } })),
+      setMetronomeSettings: (settings) => set((state) => ({ metronome: { ...state.metronome, ...settings } })),
       
       // 反馈音操作
       setFeedbackSoundEnabled: (enabled) => set((state) => ({ feedbackSound: { ...state.feedbackSound, enabled } })),
@@ -444,51 +497,16 @@ export const useAppStore = create<AppState & AppActions>()(
       // 音阶练习设置操作
       setScalePracticeSettings: (settings) => set((state) => ({ scalePractice: { ...state.scalePractice, ...settings } })),
       
-      // 统计操作
-      addPracticeRecord: (type, detailName) => set((state) => {
-        const today = new Date().toISOString().split('T')[0]
-        const existingDayIndex = state.practiceStats.findIndex(s => s.date === today)
-        
-        if (existingDayIndex >= 0) {
-          const updatedStats = [...state.practiceStats]
-          const dayStats = { ...updatedStats[existingDayIndex] }
-          
-          dayStats.count++
-          dayStats.byType[type] = (dayStats.byType[type] || 0) + 1
-          
-          if (!dayStats.byDetail[type]) {
-            dayStats.byDetail[type] = []
-          }
-          
-          const detailIndex = dayStats.byDetail[type].findIndex(d => d.name === detailName)
-          if (detailIndex >= 0) {
-            dayStats.byDetail[type][detailIndex].count++
-          } else {
-            dayStats.byDetail[type].push({ name: detailName, count: 1 })
-          }
-          
-          updatedStats[existingDayIndex] = dayStats
-          return { practiceStats: updatedStats }
-        } else {
-          const newDay: PracticeStats = {
-            date: today,
-            count: 1,
-            byType: { [type]: 1 } as Record<PracticeType, number>,
-            byDetail: { [type]: [{ name: detailName, count: 1 }] } as Record<PracticeType, { name: string; count: number }[]>,
-          }
-          return { practiceStats: [newDay, ...state.practiceStats] }
-        }
-      }),
-      
-      loadPracticeStats: (stats) => set({ practiceStats: stats }),
-      
       // Focus模式操作
       setFocusModeEnabled: (enabled) => set((state) => ({ focusMode: { ...state.focusMode, enabled } })),
       setFocusModeSettings: (settings) => set((state) => ({ focusMode: { ...state.focusMode, ...settings } })),
+      setFullscreenMode: (mode) => set((state) => ({ focusMode: { ...state.focusMode, fullscreenMode: mode } })),
       
       // 用户设置操作
       setInstrument: (instrument) => set((state) => ({ user: { ...state.user, instrument } })),
       setLanguage: (language) => set((state) => ({ user: { ...state.user, language } })),
+      setTheme: (theme) => set((state) => ({ user: { ...state.user, theme } })),
+      setChordScaleDisplay: (chordScaleDisplay) => set((state) => ({ user: { ...state.user, chordScaleDisplay } })),
       setShowPracticeSuggestion: (show) => set((state) => ({ user: { ...state.user, showPracticeSuggestion: show } })),
       setCurrentPracticeSuggestion: (suggestion) => set({ currentPracticeSuggestion: suggestion }),
       
@@ -541,19 +559,56 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'fretmaster-store',
+      storage: createJSONStorage(() => debounceStorage(localStorage)),
       partialize: (state) => ({
         displayScale: state.displayScale,
         audio: state.audio,
         practice: state.practice,
         metronome: state.metronome,
         feedbackSound: state.feedbackSound,
-        practiceStats: state.practiceStats,
         focusMode: state.focusMode,
         user: state.user,
         premium: state.premium,
         customSongs: state.customSongs,
         favorites: state.favorites,
       }),
+      // 数据迁移：确保新字段有默认值
+      migrate: (persistedState: any, version) => {
+        if (!persistedState.focusMode) {
+          persistedState.focusMode = initialState.focusMode
+        } else {
+          if (persistedState.focusMode.fullscreenMode === undefined) {
+            persistedState.focusMode.fullscreenMode = 'windowed'
+          }
+          if (persistedState.focusMode.enabled === undefined) {
+            persistedState.focusMode.enabled = false
+          }
+          if (persistedState.focusMode.enableWakeLock === undefined) {
+            persistedState.focusMode.enableWakeLock = true
+          }
+          if (persistedState.focusMode.enableFullscreen === undefined) {
+            persistedState.focusMode.enableFullscreen = true
+          }
+        }
+        if (!persistedState.user) {
+          persistedState.user = initialState.user
+        } else {
+          if (persistedState.user.language === 'zh') {
+            persistedState.user.language = 'zh-CN'
+          }
+          if (persistedState.user.theme === undefined) {
+            persistedState.user.theme = 'dark'
+          }
+          if (persistedState.user.chordScaleDisplay === undefined) {
+            persistedState.user.chordScaleDisplay = 'chinese'
+          }
+        }
+        if (persistedState.fullscreenMode !== undefined) {
+          persistedState.isFullscreen = persistedState.fullscreenMode
+          delete persistedState.fullscreenMode
+        }
+        return persistedState
+      },
     }
   )
 )
@@ -563,7 +618,6 @@ export const useAudioSettings = () => useAppStore((state) => state.audio)
 export const usePracticeSettings = () => useAppStore((state) => state.practice)
 export const useMetronomeSettings = () => useAppStore((state) => state.metronome)
 export const useFeedbackSoundSettings = () => useAppStore((state) => state.feedbackSound)
-export const usePracticeStats = () => useAppStore((state) => state.practiceStats)
 export const useScore = () => useAppStore((state) => state.score)
 export const useIsPlaying = () => useAppStore((state) => state.isPlaying)
 export const useVersion = () => useAppStore((state) => state.version)
@@ -571,3 +625,4 @@ export const useDisplayScale = () => useAppStore((state) => state.displayScale)
 export const useFavorites = () => useAppStore((state) => state.favorites)
 export const useLevelFavorites = () => useAppStore((state) => state.favorites.levelFavorites)
 export const useSongFavorites = () => useAppStore((state) => state.favorites.songFavorites)
+export const useUser = () => useAppStore((state) => state.user)

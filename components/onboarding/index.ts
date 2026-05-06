@@ -1,4 +1,4 @@
-export { OnboardingProvider, useOnboarding } from "./onboarding-context"
+export { OnboardingProvider, useOnboarding, restartTutorial } from "./onboarding-context"
 export { OnboardingOverlay } from "./onboarding-overlay"
 export { OnboardingTrigger } from "./onboarding-trigger"
 export { FeedbackDialog } from "./feedback-dialog"

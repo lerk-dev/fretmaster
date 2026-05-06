@@ -1,6 +1,12 @@
-[target.x86_64-pc-windows-gnu]
-linker = "e:/fretmasterui/b_WXSxmM0U95a-1773316568068/mingw/mingw64/bin/gcc.exe"
-ar = "e:/fretmasterui/b_WXSxmM0U95a-1773316568068/mingw/mingw64/bin/ar.exe"
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"
 
 [build]
-target = "x86_64-pc-windows-gnu"
+target = "x86_64-pc-windows-msvc"
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
