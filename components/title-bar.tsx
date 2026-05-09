@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, memo, useCallback } from 'react'
 import { Minus, Square, X, Maximize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -11,55 +11,48 @@ interface TitleBarProps {
 const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false)
 
-  useEffect(() => {
-    checkMaximized()
-  }, [])
-
-  const checkMaximized = async () => {
+  const checkMaximized = useCallback(async () => {
     try {
       const { isWindowMaximized } = await import('@/lib/native-window')
       const maximized = await isWindowMaximized()
       setIsMaximized(maximized)
-    } catch (e) {
-      console.error('Failed to check window state:', e)
-    }
-  }
+    } catch (_) {}
+  }, [])
+
+  useEffect(() => {
+    checkMaximized()
+
+    const pollInterval = setInterval(checkMaximized, 1000)
+    return () => clearInterval(pollInterval)
+  }, [checkMaximized])
 
   const handleMinimize = async () => {
     try {
       const { minimizeWindow } = await import('@/lib/native-window')
       await minimizeWindow()
-    } catch (e) {
-      console.error('Failed to minimize window:', e)
-    }
+    } catch (_) {}
   }
 
   const handleMaximize = async () => {
     try {
       const { maximizeWindow } = await import('@/lib/native-window')
       await maximizeWindow()
-      await checkMaximized()
-    } catch (e) {
-      console.error('Failed to maximize window:', e)
-    }
+      setTimeout(checkMaximized, 100)
+    } catch (_) {}
   }
 
   const handleClose = async () => {
     try {
       const { closeWindow } = await import('@/lib/native-window')
       await closeWindow()
-    } catch (e) {
-      console.error('Failed to close window:', e)
-    }
+    } catch (_) {}
   }
 
   const handleDragStart = async () => {
     try {
       const { startDragging } = await import('@/lib/native-window')
       await startDragging()
-    } catch (e) {
-      console.error('Failed to start dragging:', e)
-    }
+    } catch (_) {}
   }
 
   return (

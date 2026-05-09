@@ -1,6 +1,13 @@
-// Windows 版本使用 SQLite 数据库的统计 API
-import { invoke } from '@tauri-apps/api/core'
 import { logger } from './logger'
+
+const isTauri = (): boolean => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__
+}
+
+async function getInvoke() {
+  const { invoke } = await import('@tauri-apps/api/core')
+  return invoke
+}
 
 export interface PracticeStats {
   id?: number
@@ -11,7 +18,6 @@ export interface PracticeStats {
   accuracy?: number
   notes?: string
   created_at?: string
-  // 兼容旧版本的字段
   date?: string
   exerciseType?: string
 }
@@ -31,11 +37,14 @@ export interface ExerciseTypeStats {
   total_duration: number
 }
 
-// 保存练习统计数据
 export async function savePracticeStats(
   stats: Omit<PracticeStats, 'id' | 'created_at'>
 ): Promise<{ status: string; message: string; id?: number }> {
+  if (!isTauri()) {
+    throw new Error('Not in Tauri environment')
+  }
   try {
+    const invoke = await getInvoke()
     const id = await invoke<number>('save_practice_stats', {
       exerciseType: stats.exercise_type || stats.exerciseType || '未知练习',
       exerciseDetail: stats.exercise_detail,
@@ -52,11 +61,11 @@ export async function savePracticeStats(
   }
 }
 
-// 获取所有练习统计数据
 export async function getAllPracticeStats(): Promise<PracticeStats[]> {
+  if (!isTauri()) return []
   try {
+    const invoke = await getInvoke()
     const stats = await invoke<PracticeStats[]>('get_all_practice_stats')
-    // 转换字段名以兼容前端显示
     return stats.map(item => ({
       ...item,
       date: item.created_at,
@@ -68,30 +77,27 @@ export async function getAllPracticeStats(): Promise<PracticeStats[]> {
   }
 }
 
-// 获取当前用户的练习数据
 export async function getMyPracticeStats(): Promise<PracticeStats[]> {
   return getAllPracticeStats()
 }
 
-// 获取统计数据摘要
 export async function getStatsSummary(): Promise<StatsSummary> {
+  if (!isTauri()) {
+    return { total_sessions: 0, total_duration: 0, average_score: 0, average_accuracy: 0, last_practice: null }
+  }
   try {
+    const invoke = await getInvoke()
     return await invoke<StatsSummary>('get_practice_stats_summary')
   } catch (error) {
     logger.error('获取统计摘要失败:', error)
-    return {
-      total_sessions: 0,
-      total_duration: 0,
-      average_score: 0,
-      average_accuracy: 0,
-      last_practice: null,
-    }
+    return { total_sessions: 0, total_duration: 0, average_score: 0, average_accuracy: 0, last_practice: null }
   }
 }
 
-// 获取最近 N 天的练习数据
 export async function getRecentStats(days: number = 7): Promise<PracticeStats[]> {
+  if (!isTauri()) return []
   try {
+    const invoke = await getInvoke()
     const stats = await invoke<PracticeStats[]>('get_recent_practice_stats', { days })
     return stats.map(item => ({
       ...item,
@@ -104,9 +110,10 @@ export async function getRecentStats(days: number = 7): Promise<PracticeStats[]>
   }
 }
 
-// 按练习类型分组统计
 export async function getStatsByExerciseType(): Promise<Record<string, { count: number; avgScore: number; totalDuration: number }>> {
+  if (!isTauri()) return {}
   try {
+    const invoke = await getInvoke()
     const stats = await invoke<ExerciseTypeStats[]>('get_stats_by_exercise_type')
     const grouped: Record<string, { count: number; avgScore: number; totalDuration: number }> = {}
     
@@ -125,9 +132,10 @@ export async function getStatsByExerciseType(): Promise<Record<string, { count: 
   }
 }
 
-// 删除单条统计记录
 export async function deletePracticeStat(id: number): Promise<void> {
+  if (!isTauri()) return
   try {
+    const invoke = await getInvoke()
     await invoke('delete_practice_stat', { id })
   } catch (error) {
     logger.error('删除统计数据失败:', error)
@@ -135,9 +143,10 @@ export async function deletePracticeStat(id: number): Promise<void> {
   }
 }
 
-// 清空所有统计数据
 export async function clearAllPracticeStats(): Promise<void> {
+  if (!isTauri()) return
   try {
+    const invoke = await getInvoke()
     await invoke('clear_all_practice_stats')
   } catch (error) {
     logger.error('清空统计数据失败:', error)
@@ -145,12 +154,10 @@ export async function clearAllPracticeStats(): Promise<void> {
   }
 }
 
-// 获取用户 ID（Windows 版本返回固定值）
 export function getCurrentUserId(): string {
   return 'local_user'
 }
 
-// 同步本地备份到服务器（Windows 版本不需要）
 export async function syncLocalBackupToServer(): Promise<number> {
   return 0
 }

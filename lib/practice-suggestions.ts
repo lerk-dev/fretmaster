@@ -8,6 +8,7 @@ export type InstrumentType =
   | 'b_flat_horn'
   | 'e_flat_horn'
   | 'concert_pitch'
+  | 'concert_pitch_minus_one'
 
 export interface PracticeSuggestion {
   id: string
@@ -110,6 +111,14 @@ export const PRACTICE_SUGGESTIONS: Record<InstrumentType, PracticeSuggestion[]> 
     { id: 'c7', text: 'Practice hearing and playing chord progressions', textZh: '练习听辨和演奏和弦进行', category: 'ear_training' },
     { id: 'c8', text: 'Work on improvisation using chord tones', textZh: '用和弦音练习即兴', category: 'creativity' },
   ],
+  concert_pitch_minus_one: [
+    { id: 'cm1', text: 'Practice transposing down one semitone', textZh: '练习向下移调一个半音', category: 'theory' },
+    { id: 'cm2', text: 'Work on interval recognition with -1 transposition', textZh: '练习-1移调中的音程识别', category: 'ear_training' },
+    { id: 'cm3', text: 'Practice scales with transposition in mind', textZh: '练习带移调的音阶', category: 'technique' },
+    { id: 'cm4', text: 'Work on chord tone recognition in transposed keys', textZh: '练习移调后的和弦音识别', category: 'ear_training' },
+    { id: 'cm5', text: 'Practice arpeggios with transposition', textZh: '练习带移调的琶音', category: 'technique' },
+    { id: 'cm6', text: 'Work on sight-reading with transposition', textZh: '练习带移调的视奏', category: 'technique' },
+  ],
 }
 
 export function getRandomPracticeSuggestion(instrument: InstrumentType, language: 'zh' | 'en' = 'zh'): PracticeSuggestion {
@@ -146,6 +155,7 @@ export const INSTRUMENT_NAMES = {
     b_flat_horn: '降B调管乐器',
     e_flat_horn: '降E调管乐器',
     concert_pitch: '音乐会音高乐器',
+    concert_pitch_minus_one: '音乐会音高乐器(-1)',
   },
   en: {
     six_string_guitar: '6-String Guitar',
@@ -157,5 +167,6 @@ export const INSTRUMENT_NAMES = {
     b_flat_horn: 'Bb Horn',
     e_flat_horn: 'Eb Horn',
     concert_pitch: 'Concert Pitch Instrument',
+    concert_pitch_minus_one: 'Concert Pitch -1',
   },
 }

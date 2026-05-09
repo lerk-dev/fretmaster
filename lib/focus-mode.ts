@@ -102,14 +102,19 @@ export class FocusModeManager {
   private timerInterval: NodeJS.Timeout | null = null
   private onStateChange: ((state: FocusModeState) => void) | null = null
   private element: HTMLElement | null = null
+  private boundFullscreenChange: () => void
+  private boundVisibilityChange: () => void
   
   constructor(config?: Partial<FocusModeConfig>) {
     if (config) {
       this.config = { ...DEFAULT_FOCUS_CONFIG, ...config }
     }
     
-    document.addEventListener('fullscreenchange', this.handleFullscreenChange.bind(this))
-    document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this))
+    this.boundFullscreenChange = this.handleFullscreenChange.bind(this)
+    this.boundVisibilityChange = this.handleVisibilityChange.bind(this)
+    
+    document.addEventListener('fullscreenchange', this.boundFullscreenChange)
+    document.addEventListener('visibilitychange', this.boundVisibilityChange)
   }
   
   private handleFullscreenChange(): void {
@@ -234,8 +239,8 @@ export class FocusModeManager {
     if (this.state.wakeLock) {
       releaseWakeLock(this.state.wakeLock)
     }
-    document.removeEventListener('fullscreenchange', this.handleFullscreenChange.bind(this))
-    document.removeEventListener('visibilitychange', this.handleVisibilityChange.bind(this))
+    document.removeEventListener('fullscreenchange', this.boundFullscreenChange)
+    document.removeEventListener('visibilitychange', this.boundVisibilityChange)
   }
 }
 

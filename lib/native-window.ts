@@ -1,55 +1,115 @@
-import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWindow } from '@tauri-apps/api/window'
+import { logger } from './logger'
+
+const isTauri = (): boolean => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__
+}
+
+async function getInvoke() {
+  const { invoke } = await import('@tauri-apps/api/core')
+  return invoke
+}
 
 export async function minimizeWindow(): Promise<void> {
-  await invoke('minimize_window')
+  if (!isTauri()) return
+  try {
+    const invoke = await getInvoke()
+    await invoke('minimize_window')
+  } catch (error) {
+    logger.error('minimizeWindow failed:', error)
+  }
 }
 
 export async function maximizeWindow(): Promise<void> {
-  await invoke('maximize_window')
+  if (!isTauri()) return
+  try {
+    const invoke = await getInvoke()
+    await invoke('maximize_window')
+  } catch (error) {
+    logger.error('maximizeWindow failed:', error)
+  }
 }
 
 export async function closeWindow(): Promise<void> {
-  await invoke('close_window')
+  if (!isTauri()) return
+  try {
+    const invoke = await getInvoke()
+    await invoke('close_window')
+  } catch (error) {
+    logger.error('closeWindow failed:', error)
+  }
 }
 
 export async function isWindowMaximized(): Promise<boolean> {
-  return await invoke('is_window_maximized')
+  if (!isTauri()) return false
+  try {
+    const invoke = await getInvoke()
+    return await invoke('is_window_maximized')
+  } catch (error) {
+    logger.error('isWindowMaximized failed:', error)
+    return false
+  }
 }
 
 export async function startDragging(): Promise<void> {
-  await invoke('start_dragging')
+  if (!isTauri()) return
+  try {
+    const invoke = await getInvoke()
+    await invoke('start_dragging')
+  } catch (error) {
+    logger.error('startDragging failed:', error)
+  }
 }
 
 export async function setFullscreen(fullscreen: boolean): Promise<void> {
-  const window = getCurrentWindow()
-  await window.setFullscreen(fullscreen)
+  if (!isTauri()) return
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const window = getCurrentWindow()
+    await window.setFullscreen(fullscreen)
+  } catch (error) {
+    logger.error('setFullscreen failed:', error)
+  }
 }
 
 export async function isFullscreen(): Promise<boolean> {
-  const window = getCurrentWindow()
-  return await window.isFullscreen()
+  if (!isTauri()) return false
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const window = getCurrentWindow()
+    return await window.isFullscreen()
+  } catch (error) {
+    logger.error('isFullscreen failed:', error)
+    return false
+  }
 }
 
-/**
- * 设置窗口全屏模式 - 最大化窗口，不覆盖任务栏
- * @param enable true 最大化窗口，false 还原窗口
- */
 export async function setWindowedFullscreen(enable: boolean): Promise<void> {
-  await invoke('set_windowed_fullscreen', { enable })
+  if (!isTauri()) return
+  try {
+    const invoke = await getInvoke()
+    await invoke('set_windowed_fullscreen', { enable })
+  } catch (error) {
+    logger.error('setWindowedFullscreen failed:', error)
+  }
 }
 
-/**
- * 设置真全屏模式 - 完全覆盖任务栏
- * @param enable true 启用真全屏，false 退出全屏
- */
 export async function setTrueFullscreen(enable: boolean): Promise<void> {
-  await invoke('set_true_fullscreen', { enable })
+  if (!isTauri()) return
+  try {
+    const invoke = await getInvoke()
+    await invoke('set_true_fullscreen', { enable })
+  } catch (error) {
+    logger.error('setTrueFullscreen failed:', error)
+  }
 }
 
-/**
- * 检查是否处于真全屏模式
- */
 export async function isTrueFullscreen(): Promise<boolean> {
-  return await invoke('is_true_fullscreen')
+  if (!isTauri()) return false
+  try {
+    const invoke = await getInvoke()
+    return await invoke('is_true_fullscreen')
+  } catch (error) {
+    logger.error('isTrueFullscreen failed:', error)
+    return false
+  }
 }

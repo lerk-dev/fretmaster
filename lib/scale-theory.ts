@@ -1,4 +1,4 @@
-E:\fretmasterui\b_WXSxmM0U95a-1773316568068\src-tauri\target\x86_64-pc-windows-gnu\release\fretmaster.exe// ==================== SOLO 风格音阶和调式系统 ====================
+// ==================== SOLO 风格音阶和调式系统 ====================
 // 完整实现 SOLO 的音阶类型、调式系统和和弦音阶选项
 
 import { Note, NoteFlat, noteFromToneId, NOTE_NAMES, NOTE_UNICODE_NAMES, getNoteName } from './chord-theory'
