@@ -1,4 +1,9 @@
 import { PracticeStats } from './stats-api'
+import { jsPDF } from 'jspdf'
+
+const isTauri = (): boolean => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__
+}
 
 export interface ExportOptions {
   format: 'csv' | 'pdf' | 'json'
@@ -33,6 +38,10 @@ const t = (key: string, language: 'zh-CN' | 'en'): string => {
       'interval': '音程练习',
       'chord_exercise': '和弦练习',
       'rhythm': '节奏练习',
+      'export_success': '导出成功',
+      'export_cancelled': '导出已取消',
+      'export_failed': '导出失败',
+      'file_saved_to': '文件已保存到',
     },
     'en': {
       'practice_report': 'FretMaster Practice Report',
@@ -55,6 +64,10 @@ const t = (key: string, language: 'zh-CN' | 'en'): string => {
       'interval': 'Interval Practice',
       'chord_exercise': 'Chord Exercise',
       'rhythm': 'Rhythm Practice',
+      'export_success': 'Export Successful',
+      'export_cancelled': 'Export Cancelled',
+      'export_failed': 'Export Failed',
+      'file_saved_to': 'File saved to',
     },
   }
   return translations[language]?.[key] || key
@@ -89,7 +102,7 @@ export function exportToCSV(stats: PracticeStats[], options: ExportOptions): str
     String(stat.score || 0),
     String(Math.round((stat.duration || 0) / 60)),
     `${stat.accuracy || 0}%`,
-    (stat.notes || '').replace(/"/g, '""'),
+    (stat.notes || '').replace(/"/g, '""').replace(/\r?\n/g, ' '),
   ])
 
   const csvContent = [
@@ -134,8 +147,10 @@ export function exportToJSON(stats: PracticeStats[], options: ExportOptions): st
   return JSON.stringify(report, null, 2)
 }
 
-export function generatePDFContent(stats: PracticeStats[], options: ExportOptions): string {
+export function generatePDF(stats: PracticeStats[], options: ExportOptions): jsPDF {
   const { language } = options
+  const doc = new jsPDF()
+
   const totalDuration = stats.reduce((sum, s) => sum + (s.duration || 0), 0)
   const avgScore = stats.length > 0
     ? Math.round(stats.reduce((sum, s) => sum + (s.score || 0), 0) / stats.length)
@@ -144,142 +159,128 @@ export function generatePDFContent(stats: PracticeStats[], options: ExportOption
     ? Math.round(stats.reduce((sum, s) => sum + (s.accuracy || 0), 0) / stats.length)
     : 0
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>${t('practice_report', language)}</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      color: #1a1a1a;
-    }
-    h1 {
-      color: #2563eb;
-      border-bottom: 2px solid #2563eb;
-      padding-bottom: 10px;
-    }
-    .meta {
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 20px;
-    }
-    .summary {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 30px;
-    }
-    .summary-card {
-      background: #f8fafc;
-      border-radius: 8px;
-      padding: 16px;
-      text-align: center;
-    }
-    .summary-card .value {
-      font-size: 28px;
-      font-weight: bold;
-      color: #2563eb;
-    }
-    .summary-card .label {
-      font-size: 12px;
-      color: #666;
-      margin-top: 4px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      border: 1px solid #e5e7eb;
-      padding: 12px;
-      text-align: left;
-    }
-    th {
-      background: #f8fafc;
-      font-weight: 600;
-    }
-    tr:nth-child(even) {
-      background: #f9fafb;
-    }
-    .footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid #e5e7eb;
-      text-align: center;
-      color: #666;
-      font-size: 12px;
-    }
-    @media print {
-      body { padding: 20px; }
-      .summary { grid-template-columns: repeat(4, 1fr); }
-    }
-  </style>
-</head>
-<body>
-  <h1>🎸 ${t('practice_report', language)}</h1>
-  <div class="meta">
-    ${t('generated_at', language)}: ${new Date().toLocaleString(language === 'zh-CN' ? 'zh-CN' : 'en-US')}
-  </div>
+  const pageWidth = doc.internal.pageSize.getWidth()
 
-  <div class="summary">
-    <div class="summary-card">
-      <div class="value">${stats.length}</div>
-      <div class="label">${t('total_sessions', language)}</div>
-    </div>
-    <div class="summary-card">
-      <div class="value">${Math.round(totalDuration / 60)}</div>
-      <div class="label">${t('total_duration', language)}(${t('minutes', language)})</div>
-    </div>
-    <div class="summary-card">
-      <div class="value">${avgScore}</div>
-      <div class="label">${t('average_score', language)}</div>
-    </div>
-    <div class="summary-card">
-      <div class="value">${avgAccuracy}%</div>
-      <div class="label">${t('average_accuracy', language)}</div>
-    </div>
-  </div>
+  doc.setFontSize(20)
+  doc.setTextColor(37, 99, 235)
+  doc.text(t('practice_report', language), pageWidth / 2, 20, { align: 'center' })
 
-  <table>
-    <thead>
-      <tr>
-        <th>${t('date', language)}</th>
-        <th>${t('exercise_type', language)}</th>
-        <th>${t('score', language)}</th>
-        <th>${t('duration', language)}</th>
-        <th>${t('accuracy', language)}</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${stats.map(stat => `
-        <tr>
-          <td>${stat.created_at || stat.date || '-'}</td>
-          <td>${getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language)}</td>
-          <td>${stat.score || 0}</td>
-          <td>${Math.round((stat.duration || 0) / 60)} ${t('minutes', language)}</td>
-          <td>${stat.accuracy || 0}%</td>
-        </tr>
-      `).join('')}
-    </tbody>
-  </table>
+  doc.setDrawColor(37, 99, 235)
+  doc.setLineWidth(0.5)
+  doc.line(14, 24, pageWidth - 14, 24)
 
-  <div class="footer">
-    Generated by FretMaster · ${new Date().getFullYear()}
-  </div>
-</body>
-</html>
-  `
+  doc.setFontSize(10)
+  doc.setTextColor(102, 102, 102)
+  doc.text(`${t('generated_at', language)}: ${new Date().toLocaleString(language === 'zh-CN' ? 'zh-CN' : 'en-US')}`, 14, 32)
 
-  return html
+  const summaryY = 40
+  const cardWidth = (pageWidth - 14 * 2 - 12) / 4
+  const summaryItems = [
+    { value: String(stats.length), label: t('total_sessions', language) },
+    { value: String(Math.round(totalDuration / 60)), label: `${t('total_duration', language)}(${t('minutes', language)})` },
+    { value: String(avgScore), label: t('average_score', language) },
+    { value: `${avgAccuracy}%`, label: t('average_accuracy', language) },
+  ]
+
+  summaryItems.forEach((item, i) => {
+    const x = 14 + i * (cardWidth + 4)
+    doc.setFillColor(248, 250, 252)
+    doc.roundedRect(x, summaryY, cardWidth, 24, 2, 2, 'F')
+    doc.setFontSize(16)
+    doc.setTextColor(37, 99, 235)
+    doc.text(item.value, x + cardWidth / 2, summaryY + 10, { align: 'center' })
+    doc.setFontSize(8)
+    doc.setTextColor(102, 102, 102)
+    doc.text(item.label, x + cardWidth / 2, summaryY + 18, { align: 'center' })
+  })
+
+  const tableY = summaryY + 34
+  const headers = [
+    t('date', language),
+    t('exercise_type', language),
+    t('score', language),
+    t('duration', language),
+    t('accuracy', language),
+  ]
+  const colWidths = [36, 40, 28, 36, 36]
+  let currentX = 14
+
+  doc.setFillColor(248, 250, 252)
+  doc.rect(14, tableY, pageWidth - 28, 10, 'F')
+  doc.setDrawColor(229, 231, 235)
+  doc.setLineWidth(0.3)
+  doc.rect(14, tableY, pageWidth - 28, 10)
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(26, 26, 26)
+  currentX = 14
+  headers.forEach((header, i) => {
+    doc.text(header, currentX + 2, tableY + 7)
+    currentX += colWidths[i]
+  })
+
+  let rowY = tableY + 10
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+
+  const rowsPerPage = Math.floor((doc.internal.pageSize.getHeight() - rowY - 20) / 8)
+
+  stats.forEach((stat, index) => {
+    if (rowY > doc.internal.pageSize.getHeight() - 20) {
+      doc.addPage()
+      rowY = 20
+
+      doc.setFillColor(248, 250, 252)
+      doc.rect(14, rowY - 10, pageWidth - 28, 10, 'F')
+      doc.setDrawColor(229, 231, 235)
+      doc.rect(14, rowY - 10, pageWidth - 28, 10)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(26, 26, 26)
+      currentX = 14
+      headers.forEach((header, i) => {
+        doc.text(header, currentX + 2, rowY - 3)
+        currentX += colWidths[i]
+      })
+      rowY += 0
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+    }
+
+    if (index % 2 === 0) {
+      doc.setFillColor(249, 250, 251)
+      doc.rect(14, rowY, pageWidth - 28, 8, 'F')
+    }
+    doc.setDrawColor(229, 231, 235)
+    doc.rect(14, rowY, pageWidth - 28, 8)
+
+    doc.setTextColor(26, 26, 26)
+    currentX = 14
+    const rowData = [
+      (stat.created_at || stat.date || '-').substring(0, 10),
+      getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language),
+      String(stat.score || 0),
+      `${Math.round((stat.duration || 0) / 60)} ${t('minutes', language)}`,
+      `${stat.accuracy || 0}%`,
+    ]
+    rowData.forEach((cell, i) => {
+      doc.text(cell, currentX + 2, rowY + 6)
+      currentX += colWidths[i]
+    })
+
+    rowY += 8
+  })
+
+  const footerY = doc.internal.pageSize.getHeight() - 10
+  doc.setFontSize(8)
+  doc.setTextColor(102, 102, 102)
+  doc.text(`Generated by FretMaster · ${new Date().getFullYear()}`, pageWidth / 2, footerY, { align: 'center' })
+
+  return doc
 }
 
-export function downloadFile(content: string, filename: string, mimeType: string): void {
+function downloadFileWeb(content: string, filename: string, mimeType: string): void {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -291,44 +292,120 @@ export function downloadFile(content: string, filename: string, mimeType: string
   URL.revokeObjectURL(url)
 }
 
-export function exportPracticeData(
+function downloadBlobWeb(data: Uint8Array, filename: string, mimeType: string): void {
+  const blob = new Blob([data], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+async function saveFileTauri(content: string, defaultFilename: string, filters: { name: string; extensions: string[] }[]): Promise<{ success: boolean; path?: string; error?: string }> {
+  try {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const { writeFile } = await import('@tauri-apps/plugin-fs')
+
+    const filePath = await save({
+      defaultPath: defaultFilename,
+      filters: filters,
+    })
+
+    if (!filePath) {
+      return { success: false, error: 'cancelled' }
+    }
+
+    const encoder = new TextEncoder()
+    const data = encoder.encode(content)
+    await writeFile(filePath, data)
+
+    return { success: true, path: filePath }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}
+
+async function saveBinaryFileTauri(data: Uint8Array, defaultFilename: string, filters: { name: string; extensions: string[] }[]): Promise<{ success: boolean; path?: string; error?: string }> {
+  try {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const { writeFile } = await import('@tauri-apps/plugin-fs')
+
+    const filePath = await save({
+      defaultPath: defaultFilename,
+      filters: filters,
+    })
+
+    if (!filePath) {
+      return { success: false, error: 'cancelled' }
+    }
+
+    await writeFile(filePath, data)
+
+    return { success: true, path: filePath }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}
+
+export async function exportPracticeData(
   stats: PracticeStats[],
   options: ExportOptions
-): void {
+): Promise<{ success: boolean; path?: string; error?: string }> {
   const timestamp = new Date().toISOString().split('T')[0]
+
+  if (options.format === 'pdf') {
+    const doc = generatePDF(stats, options)
+    const pdfData = new Uint8Array(doc.output('arraybuffer'))
+    const filename = `fretmaster-practice-${timestamp}.pdf`
+    const filters = [{ name: 'PDF', extensions: ['pdf'] }, { name: 'All Files', extensions: ['*'] }]
+
+    if (isTauri()) {
+      return await saveBinaryFileTauri(pdfData, filename, filters)
+    } else {
+      downloadBlobWeb(pdfData, filename, 'application/pdf')
+      return { success: true, path: filename }
+    }
+  }
+
   let content: string
   let filename: string
   let mimeType: string
+  let filters: { name: string; extensions: string[] }[]
 
   switch (options.format) {
     case 'csv':
       content = exportToCSV(stats, options)
       filename = `fretmaster-practice-${timestamp}.csv`
       mimeType = 'text/csv;charset=utf-8'
-      break
-    case 'pdf':
-      content = generatePDFContent(stats, options)
-      filename = `fretmaster-practice-${timestamp}.html`
-      mimeType = 'text/html;charset=utf-8'
+      filters = [{ name: 'CSV', extensions: ['csv'] }, { name: 'All Files', extensions: ['*'] }]
       break
     case 'json':
       content = exportToJSON(stats, options)
       filename = `fretmaster-practice-${timestamp}.json`
       mimeType = 'application/json;charset=utf-8'
+      filters = [{ name: 'JSON', extensions: ['json'] }, { name: 'All Files', extensions: ['*'] }]
       break
     default:
       throw new Error(`Unsupported format: ${options.format}`)
   }
 
-  downloadFile(content, filename, mimeType)
+  if (isTauri()) {
+    return await saveFileTauri(content, filename, filters)
+  } else {
+    downloadFileWeb(content, filename, mimeType)
+    return { success: true, path: filename }
+  }
 }
 
 export function printPDFReport(stats: PracticeStats[], options: ExportOptions): void {
-  const html = generatePDFContent(stats, options)
-  const printWindow = window.open('', '_blank')
+  const doc = generatePDF(stats, options)
+  const pdfBlob = doc.output('blob')
+  const url = URL.createObjectURL(pdfBlob)
+  const printWindow = window.open(url, '_blank')
   if (printWindow) {
-    printWindow.document.write(html)
-    printWindow.document.close()
     printWindow.print()
   }
 }

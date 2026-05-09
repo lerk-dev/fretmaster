@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use rustfft::{FftPlanner, num_complex::Complex};
 
 const MIN_FREQUENCY: f32 = 27.5;
 const MAX_FREQUENCY: f32 = 4186.0;
@@ -49,6 +50,7 @@ pub struct PitchDetectorConfig {
     pub enable_temporal_smoothing: bool,
     pub enable_harmonic_check: bool,
     pub calibration_offset: f32,
+    pub enable_adaptive_buffer: bool,
 }
 
 impl Default for PitchDetectorConfig {
@@ -57,10 +59,11 @@ impl Default for PitchDetectorConfig {
             threshold: DEFAULT_THRESHOLD,
             probability_cliff: PROBABILITY_CLIFF,
             sample_rate: 48000,
-            buffer_size: 4096,
+            buffer_size: 8192,
             enable_temporal_smoothing: true,
             enable_harmonic_check: true,
             calibration_offset: 0.0,
+            enable_adaptive_buffer: true,
         }
     }
 }
@@ -72,6 +75,7 @@ pub struct PitchDetector {
     smoothed_frequency: Option<f32>,
     adaptive_threshold: f32,
     noise_floor: f32,
+    adaptive_buffer_size: usize,
 }
 
 impl PitchDetector {
@@ -79,6 +83,7 @@ impl PitchDetector {
         let half_size = config.buffer_size / 2;
         Self {
             yin_buffer: vec![0.0; half_size],
+            adaptive_buffer_size: config.buffer_size,
             config,
             frequency_history: Vec::with_capacity(MAX_HISTORY),
             smoothed_frequency: None,
@@ -111,13 +116,24 @@ impl PitchDetector {
     }
 
     pub fn update_noise_floor(&mut self, rms: f32) {
-        self.noise_floor = self.noise_floor * 0.95 + rms * 0.05;
-        self.adaptive_threshold = (self.config.threshold + self.noise_floor * 2.0).min(0.5);
+        self.noise_floor = self.noise_floor * 0.98 + rms * 0.02;
+        self.adaptive_threshold = (self.config.threshold + self.noise_floor * 1.5).min(0.5);
     }
 
     pub fn detect(&mut self, buffer: &[f32]) -> Option<PitchResult> {
         if buffer.len() < self.config.buffer_size {
             return None;
+        }
+
+        let effective_buffer_size = if self.config.enable_adaptive_buffer {
+            self.calculate_adaptive_buffer_size(buffer.len())
+        } else {
+            self.config.buffer_size
+        };
+
+        let half_size = effective_buffer_size / 2;
+        if self.yin_buffer.len() < half_size {
+            self.yin_buffer.resize(half_size, 0.0);
         }
 
         let timestamp = std::time::SystemTime::now()
@@ -139,7 +155,7 @@ impl PitchDetector {
             return None;
         }
 
-        let half_size = self.config.buffer_size / 2;
+        let half_size = effective_buffer_size / 2;
 
         self.compute_difference_function(buffer, half_size);
         self.cumulative_mean_normalized(half_size);
@@ -148,6 +164,10 @@ impl PitchDetector {
         let refined_tau = self.parabolic_interpolation(tau);
 
         let frequency = self.config.sample_rate as f32 / refined_tau;
+
+        if frequency < MIN_FREQUENCY * 0.95 || frequency > MAX_FREQUENCY * 1.05 {
+            return None;
+        }
 
         if frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY {
             return None;
@@ -205,16 +225,67 @@ impl PitchDetector {
         })
     }
 
+    fn calculate_adaptive_buffer_size(&self, buffer_len: usize) -> usize {
+        let desired_size = if let Some(prev_freq) = self.smoothed_frequency {
+            if prev_freq > 600.0 || prev_freq < 150.0 {
+                (self.config.buffer_size * 2).min(16384)
+            } else {
+                self.config.buffer_size
+            }
+        } else {
+            self.config.buffer_size
+        };
+        
+        desired_size.min(buffer_len)
+    }
+
     fn compute_difference_function(&mut self, buffer: &[f32], half_size: usize) {
         self.yin_buffer[0] = 1.0;
-        
-        for tau in 1..half_size {
-            let mut sum = 0.0f32;
-            for j in 0..half_size {
-                let delta = buffer[j] - buffer[j + tau];
-                sum += delta * delta;
+
+        let n = buffer.len();
+        let fft_size = n.next_power_of_two();
+        let mut planner = FftPlanner::new();
+        let fft = planner.plan_fft_forward(fft_size);
+        let ifft = planner.plan_fft_inverse(fft_size);
+
+        let mut signal: Vec<Complex<f32>> = buffer.iter()
+            .map(|&x| Complex { re: x, im: 0.0 })
+            .chain(std::iter::repeat(Complex { re: 0.0, im: 0.0 }))
+            .take(fft_size)
+            .collect();
+
+        let mut reversed: Vec<Complex<f32>> = buffer.iter().rev()
+            .map(|&x| Complex { re: x, im: 0.0 })
+            .chain(std::iter::repeat(Complex { re: 0.0, im: 0.0 }))
+            .take(fft_size)
+            .collect();
+
+        fft.process(&mut signal);
+        fft.process(&mut reversed);
+
+        let mut product: Vec<Complex<f32>> = signal.iter().zip(reversed.iter())
+            .map(|(a, b)| a * b)
+            .collect();
+
+        ifft.process(&mut product);
+
+        let scale = 1.0 / fft_size as f32;
+        let acf: Vec<f32> = product.iter().take(half_size)
+            .map(|c| c.re * scale)
+            .collect();
+
+        let energy: Vec<f32> = {
+            let mut e = vec![0.0f32; half_size];
+            e[0] = buffer.iter().take(half_size).map(|x| x * x).sum();
+            for tau in 1..half_size {
+                e[tau] = e[tau - 1] - buffer[tau - 1] * buffer[tau - 1]
+                    + buffer[tau + half_size - 1] * buffer[tau + half_size - 1];
             }
-            self.yin_buffer[tau] = sum;
+            e
+        };
+
+        for tau in 1..half_size {
+            self.yin_buffer[tau] = energy[0] + energy[tau] - 2.0 * acf[tau];
         }
     }
 
@@ -251,12 +322,18 @@ impl PitchDetector {
                 }
                 
                 if best_val < self.adaptive_threshold * 0.5 {
+                    if let Some(octave_tau) = self.check_octave_candidate(best_tau, min_tau, max_tau) {
+                        return Some(octave_tau);
+                    }
                     return Some(best_tau);
                 }
             }
         }
 
         if best_val < self.adaptive_threshold {
+            if let Some(octave_tau) = self.check_octave_candidate(best_tau, min_tau, max_tau) {
+                return Some(octave_tau);
+            }
             return Some(best_tau);
         }
 
@@ -270,14 +347,47 @@ impl PitchDetector {
         }
     }
 
+    fn check_octave_candidate(&self, tau: usize, min_tau: usize, max_tau: usize) -> Option<usize> {
+        if tau < min_tau * 2 {
+            return None;
+        }
+        
+        let octave_tau = tau / 2;
+        
+        if octave_tau < min_tau || octave_tau >= max_tau {
+            return None;
+        }
+        
+        let octave_val = self.yin_buffer[octave_tau];
+        
+        if octave_val < self.adaptive_threshold * 0.8 {
+            if self.verify_octave_relationship(tau, octave_tau) {
+                return Some(octave_tau);
+            }
+        }
+        
+        None
+    }
+
+    fn verify_octave_relationship(&self, tau: usize, octave_tau: usize) -> bool {
+        if (octave_tau * 2).abs_diff(tau) <= 2 {
+            let tau_val = self.yin_buffer[tau];
+            let octave_val = self.yin_buffer[octave_tau];
+            
+            octave_val <= tau_val * 1.2
+        } else {
+            false
+        }
+    }
+
     fn parabolic_interpolation(&self, tau: usize) -> f32 {
         if tau == 0 || tau >= self.yin_buffer.len() - 1 {
             return tau as f32;
         }
 
-        let s0 = self.yin_buffer[tau - 1];
-        let s1 = self.yin_buffer[tau];
-        let s2 = self.yin_buffer[tau + 1];
+        let s0 = self.yin_buffer[tau - 1] as f64;
+        let s1 = self.yin_buffer[tau] as f64;
+        let s2 = self.yin_buffer[tau + 1] as f64;
 
         let denom = 2.0 * s1 - s2 - s0;
         if denom.abs() < 1e-10 {
@@ -285,12 +395,16 @@ impl PitchDetector {
         }
 
         let adjustment = (s2 - s0) / (2.0 * denom);
-
+        
         if adjustment.is_finite() && adjustment.abs() < 1.0 {
-            tau as f32 + adjustment
-        } else {
-            tau as f32
+            let refined_tau = tau as f64 + adjustment;
+            
+            if refined_tau > 0.0 && refined_tau < self.yin_buffer.len() as f64 {
+                return refined_tau as f32;
+            }
         }
+        
+        tau as f32
     }
 
     fn check_harmonics(&self, frequency: f32, half_size: usize) -> f32 {
@@ -483,3 +597,7 @@ fn frequency_to_note(frequency: f32) -> (String, i32, f32) {
 
     (note_names[note_index].to_string(), octave, cents)
 }
+
+#[cfg(test)]
+#[path = "pitch_tests.rs"]
+mod pitch_tests;

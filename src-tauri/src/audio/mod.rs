@@ -6,7 +6,7 @@ pub mod device_monitor;
 pub mod pipeline;
 
 pub use capture::AudioCapture;
-pub use pitch::{PitchDetector, PitchResult};
+pub use pitch::{PitchDetector, PitchResult, PitchConfidence};
 pub use device::AudioDeviceInfo;
 pub use preprocessor::AudioPreprocessor;
 pub use device_monitor::{DeviceMonitor, DeviceChangeEvent};

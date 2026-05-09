@@ -5,6 +5,7 @@ import { TitleBar } from '@/components/title-bar'
 import { DebugPanel } from '@/components/debug-panel'
 import { Toaster } from 'sonner'
 import { ClientOnly } from '@/components/client-only'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { useAppStore } from '@/lib/store'
 
 export default function RootLayout({
@@ -66,9 +67,9 @@ export default function RootLayout({
           </ClientOnly>
         )}
         <div className="flex-1 overflow-hidden">
-          <ClientOnly>
+          <ErrorBoundary>
             {children}
-          </ClientOnly>
+          </ErrorBoundary>
         </div>
         {!isFullscreen && (
           <ClientOnly>

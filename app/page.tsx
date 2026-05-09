@@ -1,14 +1,14 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
-import { VariableSizeList as List, ListChildComponentProps } from 'react-window'
+import { VariableSizeList as List } from 'react-window'
 import { Button } from "@/components/ui/button"
 import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
 import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser } from "@/lib/store"
 import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
 import { logger } from "@/lib/logger"
-import { SOLO_SONGS, SoloSong, ChordDetailed } from "@/lib/solo-songs"
-import { PRACTICE_MODE_GROUPS, ALL_PRACTICE_LEVELS as IMPORTED_PRACTICE_LEVELS, PracticeLevel } from "@/lib/practice-levels"
+import { SOLO_SONGS } from "@/lib/solo-songs"
+import { PRACTICE_MODE_GROUPS, ALTERED_LEVELS, DIMINISHED_SCALES_LEVELS } from "@/lib/practice-levels"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
@@ -115,6 +115,7 @@ import {
   Edit3,
   Star,
   StarOff,
+  Square,
 } from "lucide-react"
 import { toast } from "sonner"
 import { PianoKeyboard, SimplePianoKeyboard } from "@/components/piano-keyboard"
@@ -184,6 +185,7 @@ const TRANSLATIONS = {
                     'instrument_horn_bflat': '降B调号',
                     'instrument_horn_eflat': '降E调号',
                     'instrument_concert': '音乐会音高',
+                    'instrument_concert_minus_one': '音乐会音高(-1)',
                     'tuner_e1': '1弦 E',
                     'tuner_b2': '2弦 B',
                     'tuner_g3': '3弦 G',
@@ -526,6 +528,7 @@ const TRANSLATIONS = {
                     // 顺序按钮
                     'order_ascending': '上行',
                     'order_descending': '下行',
+                    'order_asc_desc': '先升后降',
                     'order_random': '随机',
                     
                     // 和弦类型
@@ -986,6 +989,8 @@ const TRANSLATIONS = {
                     'root_note_setting_hint': '选择根音或随机',
                     'find_root_first': '先找根音',
                     'find_root_first_hint': '开启后先练习根音，再练习音程',
+                    'add_root_back': '回弹根音',
+                    'add_root_back_hint': '弹完音程后回到根音',
                     'start_practice': '开始练习',
                     
                     // 音程练习设置
@@ -1034,6 +1039,10 @@ const TRANSLATIONS = {
                     'progression_voice_leading_hint': '开启后相邻和弦音保持最小距离（仅顺序/倒序可用）',
                     'progression_randomize_key': '随机转调',
                     'progression_randomize_key_hint': '每次重复时随机选择新的调（仅重复练习可用）',
+                    'song_sort_title_asc': '标题↑',
+                    'song_sort_title_desc': '标题↓',
+                    'song_sort_style_asc': '风格↑',
+                    'song_sort_style_desc': '风格↓',
                     'order_ordered': '顺序',
                     'order_reverse': '倒序',
                     
@@ -1539,6 +1548,7 @@ const TRANSLATIONS = {
                     // 顺序按钮
                     'order_ascending': 'Ascending',
                     'order_descending': 'Descending',
+                    'order_asc_desc': 'Asc & Desc',
                     'order_random': 'Random',
                     
                     // 和弦类型
@@ -1930,6 +1940,8 @@ const TRANSLATIONS = {
                     'root_note_setting_hint': 'Choose root note or random',
                     'find_root_first': 'Find Root First',
                     'find_root_first_hint': 'Practice root note first, then intervals',
+                    'add_root_back': 'Return to Root',
+                    'add_root_back_hint': 'Return to root note after each interval',
                     'start_practice': 'Start Practice',
                     
                     // Interval Practice Settings
@@ -1978,6 +1990,10 @@ const TRANSLATIONS = {
                     'progression_voice_leading_hint': 'Keep minimal distance between adjacent chord tones (forward/reverse order only)',
                     'progression_randomize_key': 'Randomize Key',
                     'progression_randomize_key_hint': 'Randomize key on each repeat (repeat practice only)',
+                    'song_sort_title_asc': 'Title↑',
+                    'song_sort_title_desc': 'Title↓',
+                    'song_sort_style_asc': 'Style↑',
+                    'song_sort_style_desc': 'Style↓',
                     'order_ordered': 'Ordered',
                     'order_reverse': 'Reverse',
                     'device_count_detected': '{count} Audio Input Devices',
@@ -2192,6 +2208,7 @@ const TRANSLATIONS = {
                     'instrument_horn_bflat': 'B♭ Horn',
                     'instrument_horn_eflat': 'E♭ Horn',
                     'instrument_concert': 'Concert Pitch',
+                    'instrument_concert_minus_one': 'Concert Pitch -1',
                     'show_all_notes': 'Show All Notes',
                     'show_fretboard': 'Show Fretboard',
                     'show_keyboard': 'Show Keyboard',
@@ -6144,10 +6161,27 @@ const ALL_SOLO_LEVELS: PracticeLevel[] = [
   ...SUSPENDED_LEVELS,
   ...CHORD_SCALES_LEVELS,
   ...PASSING_NOTE_SCALES_LEVELS,
+  ...ALTERED_LEVELS,
+  ...DIMINISHED_SCALES_LEVELS,
 ]
 
 // UI渲染所需的别名变量
 const ALL_PRACTICE_LEVELS = ALL_SOLO_LEVELS
+
+const LOCAL_PRACTICE_MODE_GROUPS = [
+  { id: 'single_chord_tones', name: 'Single Chord Tones', nameZh: '单和弦音', levels: SINGLE_CHORD_TONES_LEVELS },
+  { id: 'two_chord_tones', name: 'Two Chord Tones', nameZh: '双和弦音', levels: TWO_CHORD_TONES_LEVELS },
+  { id: 'three_chord_tones', name: 'Three Chord Tones', nameZh: '三和弦音', levels: THREE_CHORD_TONES_LEVELS },
+  { id: 'four_chord_tones', name: 'Four Chord Tones', nameZh: '四和弦音', levels: FOUR_CHORD_TONES_LEVELS },
+  { id: 'melodic_root_to_5th', name: 'Melodic Structures - Root to 5th', nameZh: '旋律结构 - 根音到五音', levels: MELODIC_ROOT_TO_5TH_LEVELS },
+  { id: 'melodic_5th_to_9th', name: 'Melodic Structures - 5th to 9th', nameZh: '旋律结构 - 五音到九音', levels: MELODIC_5TH_TO_9TH_LEVELS },
+  { id: 'voice_led', name: 'Voice Led Structures', nameZh: 'Voice Led 声部连接', levels: VOICE_LED_LEVELS },
+  { id: 'suspended', name: 'Suspended Structures', nameZh: '挂留结构', levels: SUSPENDED_LEVELS },
+  { id: 'chord_scales', name: 'Chord Scales', nameZh: '和弦音阶', levels: CHORD_SCALES_LEVELS },
+  { id: 'passing_note_chord_scales', name: 'Passing Note Chord Scales', nameZh: '经过音和弦音阶', levels: PASSING_NOTE_SCALES_LEVELS },
+  { id: 'altered', name: 'Altered Dominant Structures', nameZh: '变化属和弦结构', levels: ALTERED_LEVELS },
+  { id: 'diminished_scales', name: 'Diminished Scales', nameZh: '减音阶', levels: DIMINISHED_SCALES_LEVELS },
+]
 
 // 基础练习模式 (单和弦音 + 双和弦音 + 三和弦音)
 const PRACTICE_LEVELS = [
@@ -6525,6 +6559,113 @@ function getChordDegrees(type: string, level?: string, options?: {
   if (!chordType) return ["1"]
   
   if (level && level !== 'all') {
+    const practiceLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level)
+    
+    if (practiceLevel) {
+      const getSequenceType = (chordTypeStr: string): string => {
+        if (['7', '7b5', '7#5', '7b9', '7#9', '7#11', '7b13', '7#5b9', '7#5#9', '7b5b9', '7b5#9', '7b9b13', '7alt'].includes(chordTypeStr)) return 'dominant'
+        if (['9', '9b13', '9#11', '9sus4'].includes(chordTypeStr)) return 'dominant'
+        if (['13', '13b9', '13#9', '13#11'].includes(chordTypeStr)) return 'dominant'
+        if (['Maj7', 'maj7#5', 'maj7#11', 'maj7b6', 'maj7#9'].includes(chordTypeStr)) return 'major'
+        if (['Maj9', 'maj9#11', 'maj9#5', 'maj9b6'].includes(chordTypeStr)) return 'major'
+        if (['maj13', 'maj13#11', 'maj13#5'].includes(chordTypeStr)) return 'major'
+        if (['m7', 'm7b5', 'm7b5nat9', 'm7b6', 'mMaj7', 'mMaj9', 'mMaj13'].includes(chordTypeStr)) return 'minor'
+        if (['m9', 'm9b5'].includes(chordTypeStr)) return 'minor'
+        if (['m11', 'm13'].includes(chordTypeStr)) return 'minor'
+        if (['Dim', 'dim', 'dim7'].includes(chordTypeStr)) return 'diminished'
+        if (['dimMaj7'].includes(chordTypeStr)) return 'diminishedMajorSeven'
+        if (['Aug', 'aug', 'aug7'].includes(chordTypeStr)) return 'augmented'
+        if (['sus4', '7sus4', '7sus4b9', 'sus4b9', '13sus4', '13sus4b9'].includes(chordTypeStr)) return 'sus'
+        if (['sus2'].includes(chordTypeStr)) return 'sus2'
+        if (['6', 'm6'].includes(chordTypeStr)) return 'six'
+        if (chordTypeStr === 'Major' || chordTypeStr === 'minor') {
+          return chordTypeStr === 'minor' ? 'minor' : 'major'
+        }
+        return 'major'
+      }
+      
+      const seqType = getSequenceType(type) as keyof typeof practiceLevel.sequences
+      const degreeNumbers = practiceLevel.sequences[seqType] || practiceLevel.sequences.major || [1, 3, 5, 7]
+      
+      const degreeToPosition = (deg: number): number => {
+        if (deg === 1) return 0
+        if (deg <= 4) return 1
+        if (deg <= 6) return 2
+        if (deg <= 8) return 3
+        if (deg <= 11) return 4
+        if (deg <= 13) return 5
+        return 6
+      }
+      
+      const chordIntervals = chordType.intervals
+      let intervals: string[] = degreeNumbers
+        .filter(deg => degreeToPosition(deg) < chordIntervals.length)
+        .map(deg => {
+          const pos = degreeToPosition(deg)
+          const semitone = chordIntervals[pos]
+          return semitonesToDegree(semitone)
+        })
+      
+      if (options?.forceNaturalFive && isAlteredChord(type)) {
+        intervals = intervals.map(degree => {
+          if (degree === '#5' || degree === 'b5' || degree === 'b13' || degree === '#11') {
+            return '5'
+          }
+          return degree
+        })
+      }
+      
+      if (options?.usePassingNoteBebopScale) {
+        const bebopScale = getBebopScaleForChordType(type)
+        if (bebopScale) {
+          const levelSequence = intervals
+          const bebopIntervals: string[] = []
+          
+          for (const interval of levelSequence) {
+            bebopIntervals.push(interval)
+            
+            const currentIdx = bebopScale.intervals.indexOf(interval)
+            if (currentIdx !== -1 && currentIdx < bebopScale.intervals.length - 1) {
+              const nextInterval = bebopScale.intervals[currentIdx + 1]
+              if (bebopScale.passingToneIndices.includes(currentIdx + 1)) {
+                bebopIntervals.push(nextInterval)
+              }
+            }
+          }
+          
+          intervals = bebopIntervals
+        }
+      }
+
+      const startingOption = practiceLevel.startingIntervalOption || 'first'
+      const takeBeforeOrder = practiceLevel.takeStartingIntervalBeforeOrder
+
+      if (startingOption === 'chordTone' && intervals.length > 0) {
+        const chordToneSet = new Set(chordIntervals.map(s => semitonesToDegree(s)))
+        const chordToneInSequence = intervals.filter(i => chordToneSet.has(i))
+        if (chordToneInSequence.length > 0) {
+          const startInterval = chordToneInSequence[Math.floor(Math.random() * chordToneInSequence.length)]
+          if (takeBeforeOrder) {
+            const idx = intervals.indexOf(startInterval)
+            if (idx > 0) {
+              intervals = [...intervals.slice(idx), ...intervals.slice(0, idx)]
+            }
+          }
+        }
+      } else if (startingOption === 'any' && intervals.length > 0) {
+        const startIdx = Math.floor(Math.random() * intervals.length)
+        if (takeBeforeOrder && startIdx > 0) {
+          intervals = [...intervals.slice(startIdx), ...intervals.slice(0, startIdx)]
+        }
+      }
+      
+      if ((options?.endOnStartingInterval || practiceLevel.endOnStartingInterval) && intervals.length > 0) {
+        intervals = [...intervals, intervals[0]]
+      }
+      
+      return intervals
+    }
+    
     let intervals = getIntervalsForLevel(level, type)
     
     if (options?.forceNaturalFive && isAlteredChord(type)) {
@@ -7195,15 +7336,106 @@ class SOLOYinAnalyser {
   private kernel: Float32Array | null = null
   private yinStyleACF: Float32Array | null = null
   private fft: FloatFFT | null = null
-  
   private pitch: number = -1
   private probability: number = -1
   private valid: boolean = false
   private volumeRMS: number = 0
   private maxAmplitude: number = 0
+  private octaveHistory: number[] = []
+  private maxOctaveHistory: number = 5
+  private lastAmplitude: number = 0
+  private noiseFloor: number = 0.003
+  private noiseAlpha: number = 0.995
+  private hpFilterState: { b0: number; b1: number; b2: number; a1: number; a2: number; x1: number; x2: number; y1: number; y2: number } | null = null
+  private lpFilterState: { b0: number; b1: number; b2: number; a1: number; a2: number; x1: number; x2: number; y1: number; y2: number } | null = null
+  private enableHighPass: boolean = true
+  private enableLowPass: boolean = true
+  private highPassCutoff: number = 35
+  private lowPassCutoff: number = 4500
   
   setSampleRate(rate: number): void {
     this.sampleRate = rate
+    this._rebuildFilters()
+  }
+  
+  private _createBiquad(type: 'highpass' | 'lowpass', freq: number, q: number) {
+    const sr = this.sampleRate
+    const w0 = 2 * Math.PI * freq / sr
+    const cosW0 = Math.cos(w0)
+    const sinW0 = Math.sin(w0)
+    const alpha = sinW0 / (2 * q)
+    let b0: number, b1: number, b2: number, a0: number, a1: number, a2: number
+    if (type === 'highpass') {
+      b0 = (1 + cosW0) / 2; b1 = -(1 + cosW0); b2 = (1 + cosW0) / 2
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha
+    } else {
+      b0 = (1 - cosW0) / 2; b1 = 1 - cosW0; b2 = (1 - cosW0) / 2
+      a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha
+    }
+    return { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0, x1: 0, x2: 0, y1: 0, y2: 0 }
+  }
+  
+  private _rebuildFilters(): void {
+    this.hpFilterState = this._createBiquad('highpass', this.highPassCutoff, 0.707)
+    this.lpFilterState = this._createBiquad('lowpass', this.lowPassCutoff, 0.707)
+  }
+  
+  private _applyBiquad(filter: { b0: number; b1: number; b2: number; a1: number; a2: number; x1: number; x2: number; y1: number; y2: number }, sample: number): number {
+    const y0 = filter.b0 * sample + filter.b1 * filter.x1 + filter.b2 * filter.x2 - filter.a1 * filter.y1 - filter.a2 * filter.y2
+    filter.x2 = filter.x1; filter.x1 = sample; filter.y2 = filter.y1; filter.y1 = y0
+    return y0
+  }
+  
+  private _prefilterBuffer(buffer: Float32Array): Float32Array {
+    if (!this.hpFilterState) this._rebuildFilters()
+    const output = new Float32Array(buffer.length)
+    for (let i = 0; i < buffer.length; i++) {
+      let sample = buffer[i]
+      if (this.enableHighPass && this.hpFilterState) sample = this._applyBiquad(this.hpFilterState, sample)
+      if (this.enableLowPass && this.lpFilterState) sample = this._applyBiquad(this.lpFilterState, sample)
+      output[i] = sample
+    }
+    return output
+  }
+  
+  private _octaveCorrection(frequency: number, tau: number, yinBuffer: Float32Array, sampleRate: number): { frequency: number; probability: number } {
+    const minTau = Math.floor(sampleRate / 1400)
+    const maxTau = Math.min(Math.floor(sampleRate / 70), yinBuffer.length - 1)
+    if (tau < minTau * 2) return { frequency, probability: 1 - yinBuffer[tau] }
+    const octaveTau = Math.round(tau / 2)
+    if (octaveTau < minTau || octaveTau >= maxTau) return { frequency, probability: 1 - yinBuffer[tau] }
+    const octaveVal = yinBuffer[octaveTau]
+    const currentVal = yinBuffer[tau]
+    const octaveProb = 1 - octaveVal
+    const currentProb = 1 - currentVal
+    if (octaveVal < this.threshold * 0.8 && Math.abs(octaveTau * 2 - tau) <= 2) {
+      const octaveFreq = sampleRate / octaveTau
+      if (this.octaveHistory.length >= 2) {
+        const recent = this.octaveHistory.slice(-3)
+        const avg = recent.reduce((a, b) => a + b, 0) / recent.length
+        const currentOct = Math.floor(12 * Math.log2(frequency / 440) / 12 + 4)
+        const octaveOct = Math.floor(12 * Math.log2(octaveFreq / 440) / 12 + 4)
+        if (Math.abs(octaveOct - avg) < Math.abs(currentOct - avg)) {
+          this.octaveHistory.push(octaveOct)
+          if (this.octaveHistory.length > this.maxOctaveHistory) this.octaveHistory.shift()
+          return { frequency: octaveFreq, probability: octaveProb }
+        }
+      }
+      if (octaveProb > currentProb * 0.9) {
+        this.octaveHistory.push(Math.floor(12 * Math.log2(octaveFreq / 440) / 12 + 4))
+        if (this.octaveHistory.length > this.maxOctaveHistory) this.octaveHistory.shift()
+        return { frequency: octaveFreq, probability: octaveProb }
+      }
+    }
+    this.octaveHistory.push(Math.floor(12 * Math.log2(frequency / 440) / 12 + 4))
+    if (this.octaveHistory.length > this.maxOctaveHistory) this.octaveHistory.shift()
+    return { frequency, probability: currentProb }
+  }
+  
+  detectAmplitudeDiff(): boolean {
+    const diff = this.volumeRMS - this.lastAmplitude
+    this.lastAmplitude = this.lastAmplitude * 0.9 + this.volumeRMS * 0.1
+    return diff > 0.15
   }
   
   setAudioBufferSize(size: number): void {
@@ -7355,10 +7587,19 @@ class SOLOYinAnalyser {
       this.setAudioBufferSize(buffer.length)
     }
     
-    this.calculateRMS(buffer)
-    this.calculateMaxAmplitude(buffer)
+    const filteredBuffer = this._prefilterBuffer(buffer)
     
-    this.difference(buffer)
+    this.calculateRMS(filteredBuffer)
+    this.calculateMaxAmplitude(filteredBuffer)
+    
+    this.noiseFloor = this.noiseAlpha * this.noiseFloor + (1 - this.noiseAlpha) * Math.min(this.volumeRMS, this.noiseFloor)
+    const adaptiveThreshold = Math.max(0.003, this.noiseFloor * 2.5)
+    if (this.volumeRMS < adaptiveThreshold) {
+      this.octaveHistory = []
+      return null
+    }
+    
+    this.difference(filteredBuffer)
     this.cumulativeMeanNormalizedDifference()
     
     const tauEstimate = this.absoluteThreshold()
@@ -7368,7 +7609,11 @@ class SOLOYinAnalyser {
     }
     
     const betterTau = this.parabolicInterpolation(tauEstimate)
-    this.pitch = this.sampleRate / betterTau
+    const rawFrequency = this.sampleRate / betterTau
+    
+    const corrected = this._octaveCorrection(rawFrequency, tauEstimate, this.yinBuffer!, this.sampleRate)
+    this.pitch = corrected.frequency
+    this.probability = corrected.probability
     this.valid = true
     
     return {
@@ -7421,14 +7666,86 @@ function frequencyToNote(frequency: number, referenceA4: number = 440): { note: 
   }
 }
 
-// YIN算法检测基频（完全按照原HTML文件实现）
+// YIN算法检测基频（完全按照原HTML文件实现 + 八度修正 + 前置滤波）
+let yinOctaveHistory: number[] = []
+let yinLastAmplitude = 0
+let yinNoiseFloor = 0.003
+const YIN_NOISE_ALPHA = 0.995
+
+function YINPrefilter(buffer: Float32Array, sampleRate: number): Float32Array {
+  const output = new Float32Array(buffer.length)
+  const hpW0 = 2 * Math.PI * 35 / sampleRate
+  const hpCos = Math.cos(hpW0), hpSin = Math.sin(hpW0), hpAlpha = hpSin / 1.414
+  const hpA0 = 1 + hpAlpha
+  const hpB0 = (1 + hpCos) / 2 / hpA0, hpB1 = -(1 + hpCos) / hpA0, hpB2 = (1 + hpCos) / 2 / hpA0, hpA1 = -2 * hpCos / hpA0, hpA2 = (1 - hpAlpha) / hpA0
+  const lpW0 = 2 * Math.PI * 4500 / sampleRate
+  const lpCos = Math.cos(lpW0), lpSin = Math.sin(lpW0), lpAlpha = lpSin / 1.414
+  const lpA0 = 1 + lpAlpha
+  const lpB0 = (1 - lpCos) / 2 / lpA0, lpB1 = (1 - lpCos) / lpA0, lpB2 = (1 - lpCos) / 2 / lpA0, lpA1 = -2 * lpCos / lpA0, lpA2 = (1 - lpAlpha) / lpA0
+  let hpX1 = 0, hpX2 = 0, hpY1 = 0, hpY2 = 0
+  let lpX1 = 0, lpX2 = 0, lpY1 = 0, lpY2 = 0
+  for (let i = 0; i < buffer.length; i++) {
+    let s = buffer[i]
+    const hpY0 = hpB0 * s + hpB1 * hpX1 + hpB2 * hpX2 - hpA1 * hpY1 - hpA2 * hpY2
+    hpX2 = hpX1; hpX1 = s; hpY2 = hpY1; hpY1 = hpY0
+    s = hpY0
+    const lpY0 = lpB0 * s + lpB1 * lpX1 + lpB2 * lpX2 - lpA1 * lpY1 - lpA2 * lpY2
+    lpX2 = lpX1; lpX1 = s; lpY2 = lpY1; lpY1 = lpY0
+    output[i] = lpY0
+  }
+  return output
+}
+
+function YINOcctaveCorrection(frequency: number, tau: number, d: Float32Array, sampleRate: number, threshold: number): { frequency: number; probability: number } {
+  const minTau = Math.floor(sampleRate / 1400)
+  const maxTau = Math.min(Math.floor(sampleRate / 70), d.length - 1)
+  if (tau < minTau * 2) return { frequency, probability: 1 - d[tau] }
+  const octaveTau = Math.round(tau / 2)
+  if (octaveTau < minTau || octaveTau >= maxTau) return { frequency, probability: 1 - d[tau] }
+  const octaveVal = d[octaveTau]
+  const currentProb = 1 - d[tau]
+  const octaveProb = 1 - octaveVal
+  if (octaveVal < threshold * 0.8 && Math.abs(octaveTau * 2 - tau) <= 2) {
+    const octaveFreq = sampleRate / octaveTau
+    if (yinOctaveHistory.length >= 2) {
+      const recent = yinOctaveHistory.slice(-3)
+      const avg = recent.reduce((a, b) => a + b, 0) / recent.length
+      const currentOct = Math.floor(12 * Math.log2(frequency / 440) / 12 + 4)
+      const octaveOct = Math.floor(12 * Math.log2(octaveFreq / 440) / 12 + 4)
+      if (Math.abs(octaveOct - avg) < Math.abs(currentOct - avg)) {
+        yinOctaveHistory.push(octaveOct)
+        if (yinOctaveHistory.length > 5) yinOctaveHistory.shift()
+        return { frequency: octaveFreq, probability: octaveProb }
+      }
+    }
+    if (octaveProb > currentProb * 0.9) {
+      yinOctaveHistory.push(Math.floor(12 * Math.log2(octaveFreq / 440) / 12 + 4))
+      if (yinOctaveHistory.length > 5) yinOctaveHistory.shift()
+      return { frequency: octaveFreq, probability: octaveProb }
+    }
+  }
+  yinOctaveHistory.push(Math.floor(12 * Math.log2(frequency / 440) / 12 + 4))
+  if (yinOctaveHistory.length > 5) yinOctaveHistory.shift()
+  return { frequency, probability: currentProb }
+}
+
 function YINPitchDetection(float32AudioBuffer: Float32Array, sampleRate: number, threshold: number = 0.15, probabilityCliff: number = 0.1): { frequency: number; probability: number } | null {
-  const buffer = float32AudioBuffer
+  const filtered = YINPrefilter(float32AudioBuffer, sampleRate)
+  const buffer = filtered
   const N = buffer.length
   const halfN = Math.floor(N / 2)
   const d = new Float32Array(halfN)
 
-  // 步骤1: 差分函数
+  let rms = 0
+  for (let i = 0; i < N; i++) rms += buffer[i] * buffer[i]
+  rms = Math.sqrt(rms / N)
+  yinNoiseFloor = YIN_NOISE_ALPHA * yinNoiseFloor + (1 - YIN_NOISE_ALPHA) * Math.min(rms, yinNoiseFloor)
+  const adaptiveThreshold = Math.max(0.003, yinNoiseFloor * 2.5)
+  if (rms < adaptiveThreshold) {
+    yinOctaveHistory = []
+    return null
+  }
+
   for (let tau = 0; tau < halfN; tau++) {
     let sum = 0
     for (let i = 0; i < halfN; i++) {
@@ -7438,7 +7755,6 @@ function YINPitchDetection(float32AudioBuffer: Float32Array, sampleRate: number,
     d[tau] = sum
   }
 
-  // 步骤2: 累积平均归一化
   let runningSum = 0
   d[0] = 1
   for (let tau = 1; tau < halfN; tau++) {
@@ -7446,7 +7762,6 @@ function YINPitchDetection(float32AudioBuffer: Float32Array, sampleRate: number,
     d[tau] = d[tau] * tau / runningSum
   }
 
-  // 步骤3: 阈值检测
   let tauEstimate = -1
   for (let tau = 1; tau < halfN; tau++) {
     if (d[tau] < threshold) {
@@ -7458,7 +7773,6 @@ function YINPitchDetection(float32AudioBuffer: Float32Array, sampleRate: number,
 
   if (tauEstimate === -1) return null
 
-  // 步骤4: 抛物线插值提高精度
   let betterTau = tauEstimate
   if (tauEstimate > 0 && tauEstimate < halfN - 1) {
     const s0 = d[tauEstimate - 1], s1 = d[tauEstimate], s2 = d[tauEstimate + 1]
@@ -7469,12 +7783,12 @@ function YINPitchDetection(float32AudioBuffer: Float32Array, sampleRate: number,
     }
   }
 
-  const frequency = sampleRate / betterTau
-  const probability = Math.max(0, Math.min(1, 1 - d[tauEstimate]))
+  const rawFrequency = sampleRate / betterTau
+  const corrected = YINOcctaveCorrection(rawFrequency, tauEstimate, d, sampleRate, threshold)
 
-  if (probability < probabilityCliff) return null
+  if (corrected.probability < probabilityCliff) return null
 
-  return { frequency, probability }
+  return { frequency: corrected.frequency, probability: corrected.probability }
 }
 
 // Pitchfinder对象 - 与原HTML完全一致
@@ -7514,11 +7828,29 @@ export default function FretMasterPage() {
   const setLanguage = store.setLanguage
   const theme = user.theme
   const setTheme = store.setTheme
+  
+  const getInstrumentTranspose = useCallback((instrument: string): number => {
+    switch (instrument) {
+      case 'b_flat_horn': return 2
+      case 'e_flat_horn': return 9
+      case 'concert_pitch_minus_one': return 1
+      default: return 0
+    }
+  }, [])
+  
+  const transposeNoteForInstrument = useCallback((note: string, instrument: string): string => {
+    const offset = getInstrumentTranspose(instrument)
+    if (offset === 0) return note
+    const noteIndex = NOTES.indexOf(note)
+    if (noteIndex === -1) return note
+    return NOTES[(noteIndex + offset) % 12]
+  }, [getInstrumentTranspose])
   const chordScaleDisplay = user.chordScaleDisplay
   const setChordScaleDisplay = store.setChordScaleDisplay
 
   const t = useCallback((key: string) => {
-    return TRANSLATIONS[language][key as keyof typeof TRANSLATIONS['zh-CN']] || key
+    const lang = language || 'zh-CN'
+    return TRANSLATIONS[lang]?.[key as keyof typeof TRANSLATIONS['zh-CN']] || key
   }, [language])
 
   // 侧边栏菜单 - useMemo缓存避免每次渲染重新创建
@@ -7669,12 +8001,11 @@ export default function FretMasterPage() {
   const [pitchFindingTime, setPitchFindingTime] = useState(5) // 找音练习时长（分钟）
 
   // 音程状态
-  const [rootNote, setRootNote] = useState("C")
-  const [selectedIntervals, setSelectedIntervals] = useState<number[]>([0, 7])
-  const [intervalMode, setIntervalMode] = useState<"single" | "interval">("interval")
-  const [intervalRootMode, setIntervalRootMode] = useState<"fixed" | "random">("fixed")
-  const [findRootFirst, setFindRootFirst] = useState(false)
-  const [currentIntervalTarget, setCurrentIntervalTarget] = useState<string | null>(null)
+  const [rootNote, setRootNote] = useState(store.intervalPractice.rootNote)
+  const [selectedIntervals, setSelectedIntervals] = useState<number[]>(store.intervalPractice.selectedIntervals)
+  const [intervalRootMode, setIntervalRootMode] = useState<"fixed" | "random">(store.intervalPractice.rootMode)
+  const [findRootFirst, setFindRootFirst] = useState(store.intervalPractice.findRootFirst)
+  const [addRootBack, setAddRootBack] = useState(store.intervalPractice.addRootBack)
   const [intervalPracticeStep, setIntervalPracticeStep] = useState<"root" | "interval">("root")
   const [currentIntervalExercise, setCurrentIntervalExercise] = useState<{
     rootNote: string;
@@ -7690,8 +8021,8 @@ export default function FretMasterPage() {
   const [selectedSong, setSelectedSong] = useState(SONG_PROGRESSIONS[0])
   const [customChords, setCustomChords] = useState<{ root: string; type: string; bass?: string }[]>([])
   const [currentChordIndex, setCurrentChordIndex] = useState(0)
-  const [chordPlayOrder, setChordPlayOrder] = useState<"asc" | "desc" | "random">("asc")
-  const [practiceLevel, setPracticeLevel] = useState("all")
+  const [chordPlayOrder, setChordPlayOrder] = useState<"asc" | "desc" | "random">(store.chordProgression.playOrder)
+  const [practiceLevel, setPracticeLevel] = useState(store.chordProgression.selectedLevelId)
   // 调性状态：存储音名（如 "E"），小调状态单独存储
   const getKeyNote = (key: string): string => {
     // 提取音名部分（去掉小调标记 'm'）
@@ -7708,11 +8039,12 @@ export default function FretMasterPage() {
     return notePart
   }
   const isKeyMinor = (key: string): boolean => key.endsWith('m')
-  const [progressionKey, setProgressionKey] = useState(getKeyNote(SONG_PROGRESSIONS[0]?.key || "C"))
+  const [progressionKey, setProgressionKey] = useState(store.chordProgression.progressionKey || getKeyNote(SONG_PROGRESSIONS[0]?.key || "C"))
   const [isMinor, setIsMinor] = useState(isKeyMinor(SONG_PROGRESSIONS[0]?.key || "C"))
-  const [progressionRepeat, setProgressionRepeat] = useState(false)
-  const [shouldVoiceLead, setShouldVoiceLead] = useState(false)
-  const [shouldRandomizeKeyOnRepeat, setShouldRandomizeKeyOnRepeat] = useState(false)
+  const [progressionRepeat, setProgressionRepeat] = useState(store.chordProgression.shouldRepeat)
+  const [shouldVoiceLead, setShouldVoiceLead] = useState(store.chordProgression.shouldVoiceLead)
+  const [shouldRandomizeKeyOnRepeat, setShouldRandomizeKeyOnRepeat] = useState(store.chordProgression.randomizeKeyOnRepeat)
+  const [songSortOption, setSongSortOption] = useState<'titleAsc' | 'titleDesc' | 'styleAsc' | 'styleDesc'>(store.chordProgression.songSortOption)
   const [lastChordNote, setLastChordNote] = useState<string | null>(null) // 用于 voice leading
   
   const [levelOrderOption, setLevelOrderOption] = useState(false)
@@ -7722,6 +8054,12 @@ export default function FretMasterPage() {
   const [levelNotesPerChord, setLevelNotesPerChord] = useState(1)
   const [levelEndOnStartingInterval, setLevelEndOnStartingInterval] = useState(false)
   const [levelUsePassingNoteBebopScale, setLevelUsePassingNoteBebopScale] = useState(false)
+
+  const getLevelOptions = useCallback(() => ({
+    forceNaturalFive: levelForceNaturalFive,
+    endOnStartingInterval: levelEndOnStartingInterval,
+    usePassingNoteBebopScale: levelUsePassingNoteBebopScale,
+  }), [levelForceNaturalFive, levelEndOnStartingInterval, levelUsePassingNoteBebopScale])
   const [isPracticePaused, setIsPracticePaused] = useState(false)
   const [practiceSessionStartTime, setPracticeSessionStartTime] = useState<number | null>(null)
   const [practiceElapsedTime, setPracticeElapsedTime] = useState(0)
@@ -7738,9 +8076,8 @@ export default function FretMasterPage() {
   const [selectedScaleCategory, setSelectedScaleCategory] = useState<keyof typeof SCALE_MODES>("pentatonic")
   const [selectedScale, setSelectedScale] = useState(SCALE_MODES.pentatonic[0])
   const [selectedScales, setSelectedScales] = useState<typeof SCALE_MODES.basic>([SCALE_MODES.pentatonic[0]])
-  const [scaleDirection, setScaleDirection] = useState<"up" | "down" | "random">("up")
+  const [scaleDirection, setScaleDirection] = useState<"up" | "down" | "up_down" | "random">("up")
   const [scaleRootMovement, setScaleRootMovement] = useState<"static" | "random" | "upSemiTone" | "downSemiTone" | "circleOfFifths" | "circleOfFourths">("static")
-  const [scaleCurrentNote, setScaleCurrentNote] = useState(0)
   const [showScaleFretboard, setShowScaleFretboard] = useState(false)
   const [scalePracticeSequence, setScalePracticeSequence] = useState<string>("1to1")
   const [scaleExerciseSequence, setScaleExerciseSequence] = useState<string[]>([])
@@ -7750,8 +8087,9 @@ export default function FretMasterPage() {
   const [nextScaleExerciseInfo, setNextScaleExerciseInfo] = useState<{key: string, scaleName: string, sequence: string[]} | null>(null)
   
   // 和弦转换练习状态
-  const [showChordFretboard, setShowChordFretboard] = useState(false)
-  const [showChordStructure, setShowChordStructure] = useState(false)
+  const [showFretboard, setShowFretboard] = useState(false)
+  const [showChordFretboard, setShowChordFretboard] = useState(store.chordProgression.showFretboard)
+  const [showChordStructure, setShowChordStructure] = useState(store.chordProgression.showStructure)
   const [nextChordInfo, setNextChordInfo] = useState<{index: number, root: string, type: string, bass?: string, degrees: string[]} | null>(null)
   const [chordDegreeCurrentStep, setChordDegreeCurrentStep] = useState(0)
 
@@ -7779,13 +8117,13 @@ export default function FretMasterPage() {
   const [practiceSummaryData, setPracticeSummaryData] = useState<{correct: number, total: number, duration: number}>({correct: 0, total: 0, duration: 0})
 
   // 音程练习状态
-  const [showIntervalFretboard, setShowIntervalFretboard] = useState(false)
+  const [showIntervalFretboard, setShowIntervalFretboard] = useState(store.intervalPractice.showFretboard)
   const [showIntervalKeyboard, setShowIntervalKeyboard] = useState(false)
-  const [intervalPracticeDuration, setIntervalPracticeDuration] = useState(5) // 练习时长（分钟）
-  const [intervalRandomizeOrder, setIntervalRandomizeOrder] = useState(true) // 随机顺序
-  const [intervalDirection, setIntervalDirection] = useState<"up" | "down" | "random">("up") // 音程方向
-  const [intervalFretboardDuration, setIntervalFretboardDuration] = useState(3) // 指板显示时长（秒）
-  const [intervalAutoAdvance, setIntervalAutoAdvance] = useState(false) // 指板自动推进
+  const [intervalPracticeDuration, setIntervalPracticeDuration] = useState(store.intervalPractice.practiceDuration)
+  const [intervalRandomizeOrder, setIntervalRandomizeOrder] = useState(store.intervalPractice.randomizeOrder)
+  const [intervalDirection, setIntervalDirection] = useState<"up" | "down" | "random">(store.intervalPractice.direction)
+  const [intervalFretboardDuration, setIntervalFretboardDuration] = useState(store.intervalPractice.fretboardDuration)
+  const [intervalAutoAdvance, setIntervalAutoAdvance] = useState(store.intervalPractice.autoAdvance)
   const [intervalTimeLeft, setIntervalTimeLeft] = useState(0) // 剩余时间（秒）
   const [intervalExerciseQueue, setIntervalExerciseQueue] = useState<number[]>([]) // 音程练习队列
   const [intervalCurrentQueueIndex, setIntervalCurrentQueueIndex] = useState(0) // 当前队列索引
@@ -7794,7 +8132,7 @@ export default function FretMasterPage() {
   const [showChordExerciseKeyboard, setShowChordExerciseKeyboard] = useState(false)
 
   // 和弦转换练习状态
-  const [showChordKeyboard, setShowChordKeyboard] = useState(false)
+  const [showChordKeyboard, setShowChordKeyboard] = useState(store.chordProgression.showKeyboard)
 
   // 乐曲选择弹窗状态
   const [showSongSelector, setShowSongSelector] = useState(false)
@@ -7953,12 +8291,24 @@ export default function FretMasterPage() {
   const handleAudioWorkletMessageRef = useRef<((message: { type: string; data: unknown }) => void) | null>(null)
   const [useAudioWorklet, setUseAudioWorklet] = useState(true)
   
+  // 根据运行环境获取 AudioWorklet 模块的正确路径
+  // Tauri: 从根路径加载; Web子路径部署: 自动检测前缀
+  const getAudioWorkletModulePath = (): string => {
+    if (typeof window === 'undefined') return '/js/audio-worklet-processor.js'
+    if ((window as any).__TAURI__) return '/js/audio-worklet-processor.js'
+    const path = window.location.pathname
+    const match = path.match(/^(\/[^/]+)\//)
+    if (match) return match[1] + '/js/audio-worklet-processor.js'
+    return '/js/audio-worklet-processor.js'
+  }
+  
   // 状态refs - 用于音高检测回调中获取最新状态
   const isPlayingRef = useRef(isPlaying)
   const activeTabRef = useRef(activeTab)
   const sensitivityRef = useRef(sensitivity)
   const confidenceThresholdRef = useRef(confidenceThreshold)
   const pitchAlgorithmRef = useRef(audioSettings.pitchAlgorithm)
+  const scoreRef = useRef(score)
   const targetNoteRef = useRef(targetNote)
   const scaleKeyRef = useRef(scaleKey)
   const scaleExerciseSequenceRef = useRef(scaleExerciseSequence)
@@ -7971,12 +8321,14 @@ export default function FretMasterPage() {
   const chordDegreeCurrentStepRef = useRef(chordDegreeCurrentStep)
   const practiceLevelRef = useRef(practiceLevel)
   const findRootFirstRef = useRef(findRootFirst)
+  const addRootBackRef = useRef(addRootBack)
   const nextChordInfoRef = useRef(nextChordInfo)
   const getTransposedChordsRef = useRef<(() => { root: string; type: string }[]) | null>(null)
   const lastChordNoteRef = useRef<string | null>(null) // 用于 voice leading
   const shouldVoiceLeadRef = useRef(shouldVoiceLead)
   const shouldRandomizeKeyOnRepeatRef = useRef(shouldRandomizeKeyOnRepeat)
   const progressionRepeatRef = useRef(progressionRepeat)
+  const levelOptionsRef = useRef(getLevelOptions())
 
   // ==================== 效果 ====================
   
@@ -7987,6 +8339,7 @@ export default function FretMasterPage() {
     sensitivityRef.current = sensitivity
     confidenceThresholdRef.current = confidenceThreshold
     pitchAlgorithmRef.current = audioSettings.pitchAlgorithm
+    scoreRef.current = score
     targetNoteRef.current = targetNote
     scaleKeyRef.current = scaleKey
     scaleExerciseSequenceRef.current = scaleExerciseSequence
@@ -7999,15 +8352,48 @@ export default function FretMasterPage() {
     chordDegreeCurrentStepRef.current = chordDegreeCurrentStep
     practiceLevelRef.current = practiceLevel
     findRootFirstRef.current = findRootFirst
+    addRootBackRef.current = addRootBack
     nextChordInfoRef.current = nextChordInfo
     shouldVoiceLeadRef.current = shouldVoiceLead
     shouldRandomizeKeyOnRepeatRef.current = shouldRandomizeKeyOnRepeat
     progressionRepeatRef.current = progressionRepeat
+    levelOptionsRef.current = getLevelOptions()
   }, [isPlaying, activeTab, sensitivity, confidenceThreshold, targetNote, scaleKey, 
       scaleExerciseSequence, scaleExerciseCurrentStep, chordExerciseTargetChord, 
       chordExerciseSequence, chordExerciseCurrentStep, currentIntervalExercise, 
       currentChordIndex, chordDegreeCurrentStep, practiceLevel, findRootFirst, nextChordInfo,
-      shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat])
+      shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat, getLevelOptions])
+
+  useEffect(() => {
+    store.setIntervalPracticeSettings({
+      selectedIntervals,
+      rootMode: intervalRootMode,
+      rootNote,
+      findRootFirst,
+      addRootBack,
+      direction: intervalDirection,
+      randomizeOrder: intervalRandomizeOrder,
+      practiceDuration: intervalPracticeDuration,
+      showFretboard: showIntervalFretboard,
+      fretboardDuration: intervalFretboardDuration,
+      autoAdvance: intervalAutoAdvance,
+    })
+  }, [selectedIntervals, intervalRootMode, rootNote, findRootFirst, addRootBack, intervalDirection, intervalRandomizeOrder, intervalPracticeDuration, showIntervalFretboard, intervalFretboardDuration, intervalAutoAdvance])
+
+  useEffect(() => {
+    store.setChordProgressionSettings({
+      selectedLevelId: practiceLevel,
+      progressionKey,
+      playOrder: chordPlayOrder,
+      shouldRepeat: progressionRepeat,
+      shouldVoiceLead,
+      randomizeKeyOnRepeat: shouldRandomizeKeyOnRepeat,
+      showFretboard: showChordFretboard,
+      showKeyboard: showChordKeyboard,
+      showStructure: showChordStructure,
+      songSortOption,
+    })
+  }, [practiceLevel, progressionKey, chordPlayOrder, progressionRepeat, shouldVoiceLead, shouldRandomizeKeyOnRepeat, showChordFretboard, showChordKeyboard, showChordStructure, songSortOption])
 
   // 从服务器/SQLite加载统计数据
   useEffect(() => {
@@ -8166,7 +8552,7 @@ export default function FretMasterPage() {
           localStorage.removeItem('fretmaster-practice-state')
         }
       }
-    } catch {}
+    } catch { /* ignore */ }
   }, [])
 
   // 记录练习统计
@@ -8425,6 +8811,10 @@ export default function FretMasterPage() {
   // ==================== 调音器功能 ====================
   // 启动调音器
   const startTuner = useCallback(async () => {
+    if (micEnabled) {
+      await stopAudioInput()
+      setMicEnabled(false)
+    }
     if (isTauri) {
       // Tauri环境：使用Rust原生音频
       try {
@@ -8442,7 +8832,7 @@ export default function FretMasterPage() {
           try {
             const result = await nativeDetectPitch()
             
-            if (result && result.frequency > 0 && result.confidence.overall > confidenceThreshold) {
+            if (result && result.frequency > 0 && (result.confidence?.overall ?? 0) > confidenceThreshold) {
               const noteName = frequencyToNoteName(result.frequency)
               const noteResult = frequencyToNote(result.frequency, referenceFrequency)
               
@@ -8782,10 +9172,10 @@ export default function FretMasterPage() {
         setTimeLeft(prev => {
           if (prev <= 1) {
             setIsPlaying(false)
-            const elapsed = practiceTime
+            const elapsed = practiceTime - (timeLeft - 1)
             setPracticeSummaryData({
-              correct: storeScore.correct,
-              total: storeScore.total,
+              correct: scoreRef.current.correct,
+              total: scoreRef.current.total,
               duration: elapsed,
             })
             setShowPracticeSummary(true)
@@ -8952,10 +9342,15 @@ export default function FretMasterPage() {
     requestPermissionAndGetDevices()
     
     // 监听设备变化（插入/拔出USB音频设备）
-    const handleDeviceChange = async () => {
-      logger.debug('🔄 音频设备发生变化，重新枚举设备...')
-      await enumerateAudioDevices(true)
-    }
+    const handleDeviceChange = (() => {
+      let debounceTimer: NodeJS.Timeout | null = null
+      return async () => {
+        if (debounceTimer) clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(async () => {
+          await enumerateAudioDevices(true)
+        }, 500)
+      }
+    })()
     
     navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
     
@@ -9032,6 +9427,12 @@ export default function FretMasterPage() {
 
   // 音频输入处理
   const startAudioInput = useCallback(async () => {
+    if (tunerActive) {
+      stopTuner()
+    }
+    if (audioContext) {
+      return
+    }
     logger.debug('startAudioInput: 开始初始化音频...')
     setAudioInitializing(true)
     setAudioError(null)
@@ -9113,14 +9514,15 @@ export default function FretMasterPage() {
       analyser.fftSize = 4096
       
       // 尝试使用 AudioWorklet，如果不支持则回退到 ScriptProcessorNode
-      let useWorklet = false
+      let useWorklet = useAudioWorklet && !!ctx.audioWorklet
       logger.debug('startAudioInput: 检查 AudioWorklet 支持...', 'useAudioWorklet:', useAudioWorklet, 'ctx.audioWorklet:', !!ctx.audioWorklet)
       if (useAudioWorklet && ctx.audioWorklet) {
         try {
           // 加载 AudioWorklet 处理器
           logger.debug('startAudioInput: 正在加载 AudioWorklet 模块...')
-          await ctx.audioWorklet.addModule('/fretmaster/js/audio-worklet-processor.js')
-          logger.debug('startAudioInput: AudioWorklet 模块加载成功')
+          const workletPath = getAudioWorkletModulePath()
+          await ctx.audioWorklet.addModule(workletPath)
+          logger.debug('startAudioInput: AudioWorklet 模块加载成功, path:', workletPath)
           
           // 创建 AudioWorkletNode
           const workletNode = new AudioWorkletNode(ctx, 'pitch-detection-processor', {
@@ -9220,18 +9622,19 @@ export default function FretMasterPage() {
     
     // 音符到半音映射
     const noteToSemitones: Record<string, number> = {
-      "C": 0, "C#": 1, "Cb": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, 
+      "C": 0, "C#": 1, "Cb": 11, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, 
       "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
     }
     
     // 音级到半音映射
     const intervalToSemitones: Record<string, number> = {
       "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8, 
-      "b6": 8, "6": 9, "#6": 9, "b7": 10, "7": 11, "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
+      "b6": 8, "6": 9, "#6": 10, "b7": 10, "7": 11, "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
     }
     
     if (currentActiveTab === 'practice') {
       // 找音练习
+      if (isCoolingDownRef.current) return
       const currentTargetNote = targetNoteRef.current
       if (!currentTargetNote) return
       
@@ -9247,11 +9650,16 @@ export default function FretMasterPage() {
       
       if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
         logger.debug('找音练习匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1))
+        isCoolingDownRef.current = true
         triggerCorrectFeedback(detectedNote)
         setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
         if (generateNewTargetRef.current) {
           generateNewTargetRef.current()
         }
+        cooldownRef.current = setTimeout(() => {
+          isCoolingDownRef.current = false
+          cooldownRef.current = null
+        }, 800)
       }
     } else if (currentActiveTab === 'interval') {
       // 音程练习
@@ -9296,13 +9704,17 @@ export default function FretMasterPage() {
         if (newCompletedIntervals.length >= intervals.length) {
           setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals, answered: true })
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          if (generateIntervalExerciseRef.current) {
+          if (addRootBackRef.current && matchedInterval !== '1') {
+            setIntervalPracticeStep('root')
+          } else if (generateIntervalExerciseRef.current) {
             generateIntervalExerciseRef.current()
           }
         } else {
           setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals })
           if (findRootFirstRef.current && matchedInterval === '1') {
             setIntervalPracticeStep('interval')
+          } else if (addRootBackRef.current && matchedInterval !== '1') {
+            setIntervalPracticeStep('root')
           }
         }
       }
@@ -9391,7 +9803,7 @@ export default function FretMasterPage() {
       if (!currentChord) return
       
       // 获取和弦音级，如果开启 voice leading 则应用
-      let degrees = getChordDegrees(currentChord.type, practiceLevelRef.current)
+      let degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
       if (shouldVoiceLeadRef.current && lastChordNoteRef.current) {
         degrees = applyVoiceLeading(degrees, currentChord.root, lastChordNoteRef.current)
       }
@@ -9504,7 +9916,7 @@ export default function FretMasterPage() {
       mediaStreamRef.current = null
     }
     if (audioContext) {
-      audioContext.close()
+      audioContext.close().catch(() => {})
       setAudioContext(null)
     }
     if (pitchDetectionRef.current) {
@@ -9544,13 +9956,13 @@ export default function FretMasterPage() {
     
     // 音级到半音映射
     const intervalToSemitones: Record<string, number> = {
-      "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8, "b6": 8, "6": 9, "#6": 9, "b7": 10, "7": 11,
+      "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8, "b6": 8, "6": 9, "#6": 10, "b7": 10, "7": 11,
       "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
     }
     
     // 音符到半音映射
     const noteToSemitones: Record<string, number> = {
-      "C": 0, "C#": 1, "Cb": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
+      "C": 0, "C#": 1, "Cb": 11, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
     }
     
     // 性能优化：防抖和节流变量
@@ -9601,7 +10013,7 @@ export default function FretMasterPage() {
         const chords = getTransposedChordsRef.current ? getTransposedChordsRef.current() : []
         const currentChord = chords[currentChordIndexRef.current]
         if (currentChord) {
-          const degrees = getChordDegrees(currentChord.type, practiceLevelRef.current)
+          const degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
           currentSequence = degrees
           currentStep = chordDegreeCurrentStepRef.current
           rootNote = currentChord.root
@@ -9872,7 +10284,7 @@ export default function FretMasterPage() {
         const currentChord = chords[currentChordIndexRef.current]
         if (!currentChord) return
         
-        const degrees = getChordDegrees(currentChord.type, practiceLevelRef.current)
+        const degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
         const currentStep = chordDegreeCurrentStepRef.current
         if (currentStep >= degrees.length) return
         
@@ -10016,29 +10428,31 @@ export default function FretMasterPage() {
   // ==================== 练习逻辑 ====================
 
   // 生成新的目标音符
+  const previousTargetRef = useRef<string | null>(null)
+  
   const generateNewTarget = useCallback(() => {
-    const newNote = NOTES[Math.floor(Math.random() * NOTES.length)]
-    setTargetNote(newNote)
+    if (practiceAnswerMode === "buttons") {
+      const availableStrings = selectedStrings.length > 0 ? selectedStrings : [1, 2, 3, 4, 5, 6]
+      const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
+      const stringIndex = 6 - randomStringNum
+      const randomFret = Math.floor(Math.random() * (fretCount + 1))
+      setHighlightedTargetPosition({ stringIndex, fret: randomFret })
+      const noteAtPosition = getNoteAtPosition(stringIndex, randomFret)
+      setTargetNote(noteAtPosition)
+      previousTargetRef.current = noteAtPosition
+    } else {
+      let availableNotes = NOTES.filter(n => n !== previousTargetRef.current)
+      if (availableNotes.length === 0) availableNotes = [...NOTES]
+      const newNote = availableNotes[Math.floor(Math.random() * availableNotes.length)]
+      setTargetNote(newNote)
+      setHighlightedTargetPosition(null)
+      previousTargetRef.current = newNote
+    }
+    
     if (intervalRootMode === "random") {
       setRootNote(NOTES[Math.floor(Math.random() * NOTES.length)])
     }
     
-    // 如果是按钮答题模式，随机选择一个位置高亮显示
-    if (practiceAnswerMode === "buttons") {
-      // 在选中的琴弦中随机选择
-      const availableStrings = selectedStrings.length > 0 ? selectedStrings : [1, 2, 3, 4, 5, 6]
-      const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
-      const stringIndex = 6 - randomStringNum // 转换弦号到索引（1-6弦对应0-5索引）
-      
-      // 随机选择品位（0到fretCount）
-      const randomFret = Math.floor(Math.random() * (fretCount + 1))
-      
-      setHighlightedTargetPosition({ stringIndex, fret: randomFret })
-    } else {
-      setHighlightedTargetPosition(null)
-    }
-    
-    // 记录找音练习统计（只统计次数，不区分类型）
     recordPractice('pitch_finding', '练习')
   }, [intervalRootMode, recordPractice, practiceAnswerMode, selectedStrings, fretCount])
 
@@ -10046,21 +10460,22 @@ export default function FretMasterPage() {
   const generateIntervalExerciseQueue = useCallback(() => {
     if (selectedIntervals.length === 0) return []
     
-    // 创建音程索引队列
-    let queue = [...selectedIntervals]
+    let effectiveIntervals = [...selectedIntervals]
+    if (findRootFirst) {
+      effectiveIntervals = effectiveIntervals.filter(idx => idx !== 0)
+    }
+    if (effectiveIntervals.length === 0) return []
     
-    // 根据方向设置音程（支持上下行）
+    let queue = [...effectiveIntervals]
+    
     if (intervalDirection === "down") {
-      // 下行：音程取反（12 - semitones）
       queue = queue.map(idx => {
         const interval = INTERVALS[idx]
-        // 查找下行对应的音程索引
         const downSemitones = (12 - interval.semitones) % 12
         const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
         return downIndex !== -1 ? downIndex : idx
       })
     } else if (intervalDirection === "random") {
-      // 随机方向：混合上行和下行
       queue = queue.map(idx => {
         if (Math.random() > 0.5) {
           const interval = INTERVALS[idx]
@@ -10072,13 +10487,12 @@ export default function FretMasterPage() {
       })
     }
     
-    // 随机顺序
     if (intervalRandomizeOrder) {
       queue = queue.sort(() => Math.random() - 0.5)
     }
     
     return queue
-  }, [selectedIntervals, intervalRandomizeOrder, intervalDirection])
+  }, [selectedIntervals, intervalRandomizeOrder, intervalDirection, findRootFirst])
 
   // 生成音程练习题目
   const generateIntervalExercise = useCallback(() => {
@@ -10124,13 +10538,14 @@ export default function FretMasterPage() {
     // 先找根音模式: "1 3" (根音 + 音程)
     // 不先找根音模式: "3" (仅音程)
     const currentIntervalDisplay = findRootFirst ? `1 ${selectedInterval.symbol}` : selectedInterval.symbol
+    const rootBackDisplay = addRootBack ? ` ${selectedInterval.symbol} 1` : ''
     
     setCurrentIntervalExercise({
       rootNote: exerciseRoot,
       interval: selectedInterval,
       targetNote: targetNoteName,
       allIntervals: selectedIntervalObjects,
-      currentIntervalDisplay: currentIntervalDisplay,
+      currentIntervalDisplay: currentIntervalDisplay + rootBackDisplay,
       completedIntervals: [] as string[],
       answered: false
     })
@@ -10143,7 +10558,7 @@ export default function FretMasterPage() {
     
     // 记录音程练习统计（只统计次数，不区分类型）
     recordPractice('interval', '练习')
-  }, [rootNote, intervalRootMode, selectedIntervals, findRootFirst, recordPractice, intervalExerciseQueue, intervalCurrentQueueIndex])
+  }, [rootNote, intervalRootMode, selectedIntervals, findRootFirst, addRootBack, recordPractice, intervalExerciseQueue, intervalCurrentQueueIndex])
 
   // 辅助函数：生成和弦练习序列
   const generateChordSequence = useCallback((root: string, chordType: string, levelId: string, order: string, bass: string) => {
@@ -10300,6 +10715,21 @@ export default function FretMasterPage() {
           return degree
       }
     })
+
+    // 应用低音音符（旋转序列使指定音级排在最前）
+    if (bass && bass !== "root") {
+      const bassDegreeMap: Record<string, string> = {
+        "3rd": "3", "5th": "5", "7th": "7",
+        "b3": "b3", "b5": "b5", "bb7": "bb7", "#5": "#5"
+      }
+      const targetDegree = bassDegreeMap[bass]
+      if (targetDegree) {
+        const bassIdx = sequence.indexOf(targetDegree)
+        if (bassIdx > 0) {
+          sequence = [...sequence.slice(bassIdx), ...sequence.slice(0, bassIdx)]
+        }
+      }
+    }
 
     // 应用演奏顺序
     if (order === "desc") {
@@ -10515,6 +10945,17 @@ export default function FretMasterPage() {
         const middleIntervals = intervals.slice(1).reverse()
         intervals = [intervals[0], ...middleIntervals, intervals[0]]
       }
+    } else if (order === 'up_down') {
+      const startEndIndex = intervals.indexOf(startEndInterval)
+      if (startEndIndex !== -1) {
+        const ascendingMiddle = [...intervals.slice(startEndIndex + 1), ...intervals.slice(0, startEndIndex)]
+        const descendingMiddle = [...ascendingMiddle].reverse()
+        intervals = [startEndInterval, ...ascendingMiddle, startEndInterval, ...descendingMiddle, startEndInterval]
+      } else {
+        const ascendingMiddle = intervals.slice(1)
+        const descendingMiddle = [...ascendingMiddle].reverse()
+        intervals = [intervals[0], ...ascendingMiddle, intervals[0], ...descendingMiddle, intervals[0]]
+      }
     } else if (order === 'random') {
       // 方向随机时，首尾音从1→1、3→3、5→5、7→7中随机选择，中间是音阶其他音的随机排列
       const availableStartEndTones: string[] = ['1'] // 1音始终可用
@@ -10562,23 +11003,56 @@ export default function FretMasterPage() {
     return intervals
   }, [findFirstIntervalOfType, findNearestIntervalInScale])
 
+  const SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'a', 'e', 'b', 'f#', 'c#', 'g#', 'd#']
+  const FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'd', 'g', 'c', 'f', 'bb', 'eb']
+  
+  const ENHARMONIC_MAP: Record<string, string> = {
+    'C#': 'Db', 'Db': 'C#',
+    'D#': 'Eb', 'Eb': 'D#',
+    'F#': 'Gb', 'Gb': 'F#',
+    'G#': 'Ab', 'Ab': 'G#',
+    'A#': 'Bb', 'Bb': 'A#',
+  }
+  
+  const preferSharp = (note: string): string => {
+    if (['Db', 'Eb', 'Gb', 'Ab', 'Bb'].includes(note)) return ENHARMONIC_MAP[note] || note
+    return note
+  }
+  
+  const preferFlat = (note: string): string => {
+    if (['C#', 'D#', 'F#', 'G#', 'A#'].includes(note)) return ENHARMONIC_MAP[note] || note
+    return note
+  }
+  
   const getNextKeyByMovement = useCallback((currentKey: string, movement: typeof scaleRootMovement): string => {
     const noteIndex = NOTES.indexOf(currentKey)
     if (noteIndex === -1) return currentKey
+    
+    const isSharpKey = SHARP_KEYS.includes(currentKey)
+    const isFlatKey = FLAT_KEYS.includes(currentKey)
+    const useSharps = isSharpKey || (!isFlatKey && Math.random() > 0.5)
     
     switch (movement) {
       case 'static':
         return currentKey
       case 'random':
         return NOTES[Math.floor(Math.random() * NOTES.length)]
-      case 'upSemiTone':
-        return NOTES[(noteIndex + 1) % 12]
-      case 'downSemiTone':
-        return NOTES[(noteIndex - 1 + 12) % 12]
-      case 'circleOfFifths':
-        return NOTES[(noteIndex + 7) % 12]
-      case 'circleOfFourths':
-        return NOTES[(noteIndex + 5) % 12]
+      case 'upSemiTone': {
+        const next = NOTES[(noteIndex + 1) % 12]
+        return useSharps ? preferSharp(next) : preferFlat(next)
+      }
+      case 'downSemiTone': {
+        const next = NOTES[(noteIndex - 1 + 12) % 12]
+        return useSharps ? preferSharp(next) : preferFlat(next)
+      }
+      case 'circleOfFifths': {
+        const next = NOTES[(noteIndex + 7) % 12]
+        return preferSharp(next)
+      }
+      case 'circleOfFourths': {
+        const next = NOTES[(noteIndex + 5) % 12]
+        return preferFlat(next)
+      }
       default:
         return currentKey
     }
@@ -10854,7 +11328,7 @@ export default function FretMasterPage() {
         }
         break
     }
-  }, [isPlaying, activeTab, targetNote, generateNewTarget, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, currentIntervalTarget, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise])
+  }, [isPlaying, activeTab, targetNote, generateNewTarget, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise])
 
   // 更新 ref 以便在 startPitchDetection 中使用（不含 nextChord，它在后面定义）
   useEffect(() => {
@@ -10936,11 +11410,11 @@ export default function FretMasterPage() {
           root: chord.root,
           type: chord.type,
           bass: chord.bass,
-          degrees: getChordDegrees(chord.type, practiceLevel)
+          degrees: getChordDegrees(chord.type, practiceLevel, getLevelOptions())
         })
       }
     }
-  }, [activeTab, isPlaying, currentChordIndex, customChords, selectedSong, chordPlayOrder, progressionKey, practiceLevel])
+  }, [activeTab, isPlaying, currentChordIndex, customChords, selectedSong, chordPlayOrder, progressionKey, practiceLevel, getLevelOptions])
 
   // 处理指板点击
   const handleFretClick = useCallback((stringIndex: number, fret: number) => {
@@ -11117,7 +11591,6 @@ export default function FretMasterPage() {
       setTimeLeft(timeInSeconds)
       generateNewTarget()
       setIntervalPracticeStep("root")
-      setScaleCurrentNote(0)
       // 重置音程练习队列
       if (activeTab === "interval") {
         // 使用函数式更新避免依赖循环
@@ -11159,6 +11632,12 @@ export default function FretMasterPage() {
       if (activeTab === "scale") {
         generateScaleExercise()
       }
+      if (activeTab === "chord") {
+        setCurrentChordIndex(0)
+        setChordDegreeCurrentStep(0)
+        setNextChordInfo(null)
+        setLastChordNote(null)
+      }
       setIsPlaying(true)
       setIsPracticePaused(false)
       setPracticeSessionStartTime(Date.now())
@@ -11181,7 +11660,6 @@ export default function FretMasterPage() {
     setHighlightedFrets(new Map())
     setHighlightedTargetPosition(null)
     setIntervalPracticeStep("root")
-    setScaleCurrentNote(0)
     setCurrentIntervalExercise(null)
     setPracticeSessionStartTime(null)
     setPracticeElapsedTime(0)
@@ -11190,6 +11668,16 @@ export default function FretMasterPage() {
     setShowChordFretboard(false)
     setShowChordExerciseFretboard(false)
     setShowScaleFretboard(false)
+    setChordExerciseTargetChord(null)
+    setChordExerciseSequence([])
+    setChordExerciseCurrentStep(0)
+    setScaleExerciseSequence([])
+    setScaleExerciseCurrentStep(0)
+    setIntervalPracticeStep("root")
+    setChordDegreeCurrentStep(0)
+    setNextChordInfo(null)
+    setNextChordExerciseInfo(null)
+    setNextScaleExerciseInfo(null)
     if (typeof window !== 'undefined') {
       localStorage.removeItem('fretmaster-practice-state')
     }
@@ -11424,7 +11912,7 @@ export default function FretMasterPage() {
       const tabs = ['practice', 'interval', 'chord_exercise', 'chord', 'scale']
       if (tabKeys.includes(event.key)) {
         event.preventDefault()
-        setActiveTab(tabs[parseInt(event.key) - 1])
+        handleTabChange(tabs[parseInt(event.key) - 1])
         return
       }
 
@@ -11810,7 +12298,7 @@ export default function FretMasterPage() {
     }
     // 转调
     return selectedSong.chords.map(chordString => {
-      const transposed = transposeChord(chordString, songKey, progressionKey)
+      const transposed = transposeChord(chordString, songKeyNote, progressionKey)
       return parseChord(transposed)
     })
   }, [customChords, selectedSong, progressionKey])
@@ -12101,6 +12589,7 @@ export default function FretMasterPage() {
                               <SelectItem value="b_flat_horn">{t('instrument_horn_bflat')}</SelectItem>
                               <SelectItem value="e_flat_horn">{t('instrument_horn_eflat')}</SelectItem>
                               <SelectItem value="concert_pitch">{t('instrument_concert')}</SelectItem>
+                              <SelectItem value="concert_pitch_minus_one">{t('instrument_concert_minus_one')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -12746,7 +13235,7 @@ export default function FretMasterPage() {
                         onClick={togglePractice}
                         aria-label={isPlaying ? t('btn_stop') : t('btn_start')}
                       >
-                        {isPlaying ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+                        {isPlaying ? <Square className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
                         {isPlaying ? t('btn_stop') : t('btn_start')}
                       </Button>
                       <Button
@@ -12973,6 +13462,15 @@ export default function FretMasterPage() {
                             className="h-4 w-4"
                           />
                           <Label htmlFor="findRootFirst" className="text-xs cursor-pointer">{t('find_root_first')}</Label>
+                        </div>
+                        <div className="flex items-center gap-2 px-2">
+                          <Checkbox 
+                            id="addRootBack" 
+                            checked={addRootBack} 
+                            onCheckedChange={(c) => setAddRootBack(c as boolean)}
+                            className="h-4 w-4"
+                          />
+                          <Label htmlFor="addRootBack" className="text-xs cursor-pointer">{t('add_root_back')}</Label>
                         </div>
                         <div className="flex items-center gap-2 px-2">
                           <Switch 
@@ -13629,13 +14127,14 @@ export default function FretMasterPage() {
                             {[
                               { id: "up", label: t('order_ascending') },
                               { id: "down", label: t('order_descending') },
+                              { id: "up_down", label: t('order_asc_desc') },
                               { id: "random", label: t('order_random') },
                             ].map((order) => (
                               <Button
                                 key={order.id}
                                 variant={scaleDirection === order.id ? "default" : "outline"}
                                 size="sm"
-                                onClick={() => setScaleDirection(order.id as "up" | "down" | "random")}
+                                onClick={() => setScaleDirection(order.id as "up" | "down" | "up_down" | "random")}
                                 className="h-7 text-xs flex-1 px-1"
                               >
                                 {order.label}
@@ -14156,7 +14655,7 @@ export default function FretMasterPage() {
                       highlightedNotes={(() => {
                         const targetChord = chordExerciseTargetChord
                         if (targetChord) {
-                          const degrees = getChordDegrees(targetChord.type, chordExerciseLevel)
+                          const degrees = getChordDegrees(targetChord.type, chordExerciseLevel, getLevelOptions())
                           const rootIdx = getNoteIndex(targetChord.root)
                           return degrees.map(degree => {
                             const semitone = DEGREE_TO_SEMITONE[degree]
@@ -14166,7 +14665,7 @@ export default function FretMasterPage() {
                           }).filter((n): n is string => n !== null)
                         } else {
                           const chordType = chordExerciseTypes[0] || "Major"
-                          const degrees = getChordDegrees(chordType, chordExerciseLevel)
+                          const degrees = getChordDegrees(chordType, chordExerciseLevel, getLevelOptions())
                           const rootIdx = getNoteIndex(chordExerciseRoot)
                           return degrees.map(degree => {
                             const semitone = DEGREE_TO_SEMITONE[degree]
@@ -14177,7 +14676,7 @@ export default function FretMasterPage() {
                         }
                       })()}
                       currentStepNote={chordExerciseTargetChord ? (() => {
-                        const degrees = getChordDegrees(chordExerciseTargetChord.type, chordExerciseLevel)
+                        const degrees = getChordDegrees(chordExerciseTargetChord.type, chordExerciseLevel, getLevelOptions())
                         const currentDegree = degrees[chordExerciseCurrentStep]
                         if (!currentDegree) return undefined
                         const semitone = DEGREE_TO_SEMITONE[currentDegree]
@@ -14201,7 +14700,7 @@ export default function FretMasterPage() {
                       <SimplePianoKeyboard
                         rootNote={currentChord.root}
                         highlightedNotes={(() => {
-                          const degrees = getChordDegrees(currentChord.type, practiceLevel)
+                          const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
                           const rootIdx = getNoteIndex(currentChord.root)
                           return degrees.map(degree => {
                             const semitone = DEGREE_TO_SEMITONE[degree]
@@ -14211,7 +14710,7 @@ export default function FretMasterPage() {
                           }).filter((n): n is string => n !== null)
                         })()}
                         currentStepNote={(() => {
-                          const degrees = getChordDegrees(currentChord.type, practiceLevel)
+                          const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
                           const currentDegree = degrees[chordDegreeCurrentStep]
                           if (!currentDegree) return undefined
                           const semitone = DEGREE_TO_SEMITONE[currentDegree]
@@ -14268,7 +14767,7 @@ export default function FretMasterPage() {
                             const chords = transposedChords
                             const currentChord = chords[currentChordIndex]
                             if (!currentChord) return null
-                            const degrees = getChordDegrees(currentChord.type, practiceLevel)
+                            const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
                             return degrees.map((degree, i) => (
                               <Badge 
                                 key={i} 
@@ -14500,8 +14999,12 @@ export default function FretMasterPage() {
                                 const { getAllPracticeStats } = await import('@/lib/stats-api')
                                 const { exportPracticeData } = await import('@/lib/export-utils')
                                 const allStats = await getAllPracticeStats()
-                                exportPracticeData(allStats, { format: 'csv', language: language as 'zh-CN' | 'en' })
-                                toast.success(t('export_success'))
+                                const result = await exportPracticeData(allStats, { format: 'csv', language: language as 'zh-CN' | 'en' })
+                                if (result.success) {
+                                  toast.success(result.path ? `${t('export_success')} ${result.path}` : t('export_success'))
+                                } else if (result.error !== 'cancelled') {
+                                  toast.error(t('export_failed'))
+                                }
                               } catch (e) {
                                 toast.error(t('export_failed'))
                               }
@@ -14517,9 +15020,14 @@ export default function FretMasterPage() {
                             onClick={async () => {
                               try {
                                 const { getAllPracticeStats } = await import('@/lib/stats-api')
-                                const { printPDFReport } = await import('@/lib/export-utils')
+                                const { exportPracticeData } = await import('@/lib/export-utils')
                                 const allStats = await getAllPracticeStats()
-                                printPDFReport(allStats, { format: 'pdf', language: language as 'zh-CN' | 'en' })
+                                const result = await exportPracticeData(allStats, { format: 'pdf', language: language as 'zh-CN' | 'en' })
+                                if (result.success) {
+                                  toast.success(result.path ? `${t('export_success')} ${result.path}` : t('export_success'))
+                                } else if (result.error !== 'cancelled') {
+                                  toast.error(t('export_failed'))
+                                }
                               } catch (e) {
                                 toast.error(t('export_failed'))
                               }
@@ -14537,8 +15045,12 @@ export default function FretMasterPage() {
                                 const { getAllPracticeStats } = await import('@/lib/stats-api')
                                 const { exportPracticeData } = await import('@/lib/export-utils')
                                 const allStats = await getAllPracticeStats()
-                                exportPracticeData(allStats, { format: 'json', language: language as 'zh-CN' | 'en' })
-                                toast.success(t('export_success'))
+                                const result = await exportPracticeData(allStats, { format: 'json', language: language as 'zh-CN' | 'en' })
+                                if (result.success) {
+                                  toast.success(result.path ? `${t('export_success')} ${result.path}` : t('export_success'))
+                                } else if (result.error !== 'cancelled') {
+                                  toast.error(t('export_failed'))
+                                }
                               } catch (e) {
                                 toast.error(t('export_failed'))
                               }
@@ -14697,7 +15209,7 @@ export default function FretMasterPage() {
                       const chords = transposedChords
                       const currentChord = chords[currentChordIndex]
                       if (!currentChord) return null
-                      const degrees = getChordDegrees(currentChord.type, practiceLevel)
+                      const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
                       return degrees.map((degree, i) => (
                         <span key={i} className="text-5xl font-bold text-primary">{formatDegree(degree)}</span>
                       ))
@@ -15444,6 +15956,92 @@ export default function FretMasterPage() {
                     ))}
                   </div>
                 </div>
+
+                {/* 变化属和弦结构 */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
+                    {language === 'zh-CN' ? '变化属和弦结构' : 'Altered Dominant Structures'}
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2">
+                    {ALTERED_LEVELS.map((level) => (
+                      <div
+                        key={level.id}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
+                          practiceLevel === level.id
+                            ? "bg-primary/10 border-primary/30"
+                            : "hover:bg-muted/50 border-transparent"
+                        )}
+                        onClick={() => {
+                          setPracticeLevel(level.id)
+                          setShowLevelSelector(false)
+                        }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{language === 'zh-CN' ? level.nameZh : level.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {language === 'zh-CN' ? level.descriptionZh : level.description}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedLevelInfo(level)
+                            setShowLevelInfoDialog(true)
+                          }}
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 减音阶 */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
+                    {language === 'zh-CN' ? '减音阶' : 'Diminished Scales'}
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2">
+                    {DIMINISHED_SCALES_LEVELS.map((level) => (
+                      <div
+                        key={level.id}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
+                          practiceLevel === level.id
+                            ? "bg-primary/10 border-primary/30"
+                            : "hover:bg-muted/50 border-transparent"
+                        )}
+                        onClick={() => {
+                          setPracticeLevel(level.id)
+                          setShowLevelSelector(false)
+                        }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{language === 'zh-CN' ? level.nameZh : level.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {language === 'zh-CN' ? level.descriptionZh : level.description}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedLevelInfo(level)
+                            setShowLevelInfoDialog(true)
+                          }}
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </ScrollArea>
 
@@ -15623,7 +16221,7 @@ export default function FretMasterPage() {
             {/* 练习模式列表 */}
             <ScrollArea className="max-h-[60vh]">
               <div className="p-4 space-y-4">
-                {PRACTICE_MODE_GROUPS.map((group) => (
+                {LOCAL_PRACTICE_MODE_GROUPS.map((group) => (
                   <div key={group.id} className="space-y-2">
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
                       {language === 'zh-CN' ? group.nameZh : group.name}

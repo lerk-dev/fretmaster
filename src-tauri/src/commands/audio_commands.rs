@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 use crate::audio::{AudioDeviceInfo, AudioLevelInfo, device, preprocessor};
-use crate::audio::pipeline::AppState;
+use crate::audio::pipeline::{self, AppState};
 
 #[tauri::command]
 pub async fn get_audio_devices() -> Result<Vec<AudioDeviceInfo>, String> {
@@ -276,4 +276,58 @@ pub async fn is_device_monitor_running(
 ) -> Result<bool, String> {
     let monitor = state.inner().device_monitor.lock();
     Ok(monitor.is_running())
+}
+
+#[tauri::command]
+pub async fn start_pitch_stream(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    interval_ms: Option<u64>,
+) -> Result<(), String> {
+    let interval = interval_ms.unwrap_or(50);
+    let pipeline = state.inner().pipeline.clone();
+    let running = state.inner().pitch_stream_running.clone();
+    pipeline::start_pitch_stream(app, pipeline, running, interval);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn stop_pitch_stream(
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    pipeline::stop_pitch_stream(&state.inner().pitch_stream_running);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn is_pitch_stream_running(
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    Ok(state.inner().pitch_stream_running.load(std::sync::atomic::Ordering::SeqCst))
+}
+
+#[tauri::command]
+pub async fn set_agc_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut pipeline = state.inner().pipeline.lock();
+    pipeline.set_agc_enabled(enabled);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn is_agc_enabled(
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    let pipeline = state.inner().pipeline.lock();
+    Ok(pipeline.is_agc_enabled())
+}
+
+#[tauri::command]
+pub async fn get_agc_gain(
+    state: State<'_, AppState>,
+) -> Result<f32, String> {
+    let pipeline = state.inner().pipeline.lock();
+    Ok(pipeline.get_agc_gain())
 }

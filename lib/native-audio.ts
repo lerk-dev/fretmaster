@@ -1,8 +1,15 @@
-import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-
 export const isTauri = (): boolean => {
   return typeof window !== 'undefined' && !!(window as any).__TAURI__
+}
+
+async function getInvoke() {
+  const { invoke } = await import('@tauri-apps/api/core')
+  return invoke
+}
+
+async function getListen() {
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen
 }
 
 export interface AudioDeviceInfo {
@@ -39,16 +46,17 @@ export interface DeviceChangeEvent {
   devices: AudioDeviceInfo[]
 }
 
+type UnlistenFn = () => void
+
 let deviceChangeListener: UnlistenFn | null = null
 let devicePollInterval: NodeJS.Timeout | null = null
 let lastDevices: AudioDeviceInfo[] = []
 let monitorStarted = false
 
 export async function getAudioDevices(): Promise<AudioDeviceInfo[]> {
-  if (!isTauri()) {
-    return []
-  }
+  if (!isTauri()) return []
   try {
+    const invoke = await getInvoke()
     const devices = await invoke<AudioDeviceInfo[]>('get_audio_devices')
     lastDevices = devices
     return devices
@@ -58,21 +66,18 @@ export async function getAudioDevices(): Promise<AudioDeviceInfo[]> {
   }
 }
 
-/**
- * 启动设备热插拔监控（Rust 后端事件驱动）
- * 优先使用 Tauri 事件，如果不可用则回退到前端轮询
- */
 export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) => void): Promise<UnlistenFn | null> {
   if (!isTauri()) return null
 
-  // 1. 启动 Rust 后端设备监控线程（通过 Tauri 事件推送变化）
   try {
+    const invoke = await getInvoke()
+    const listen = await getListen()
+
     if (!monitorStarted) {
       await invoke('start_device_monitor', { intervalMs: 1500 })
       monitorStarted = true
     }
 
-    // 2. 监听后端推送的 audio-device-changed 事件
     deviceChangeListener = await listen<DeviceChangeEvent>('audio-device-changed', (event) => {
       lastDevices = event.payload.devices
       callback(event.payload)
@@ -80,15 +85,11 @@ export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) =
     return deviceChangeListener
   } catch (error) {
     console.warn('Tauri event-based monitoring unavailable, falling back to polling:', error)
-    // 3. 回退：前端轮询
     startDevicePolling(callback, 2000)
     return () => stopDevicePolling()
   }
 }
 
-/**
- * 停止设备变化监听，同时停止后端监控线程
- */
 export function unlistenDeviceChanges(): void {
   if (deviceChangeListener) {
     deviceChangeListener()
@@ -96,34 +97,26 @@ export function unlistenDeviceChanges(): void {
   }
   stopDevicePolling()
   
-  // 停止 Rust 后端监控线程
   if (monitorStarted && isTauri()) {
-    invoke('stop_device_monitor').catch(() => {})
+    getInvoke().then(invoke => invoke('stop_device_monitor')).catch(() => {})
     monitorStarted = false
   }
 }
 
-/**
- * 前端轮询方案（备用）
- */
 export function startDevicePolling(callback: (event: DeviceChangeEvent) => void, intervalMs: number = 2000): void {
   if (!isTauri()) return
   
   getAudioDevices().then(() => {
     devicePollInterval = setInterval(async () => {
       try {
+        const invoke = await getInvoke()
         const newDevices = await invoke<AudioDeviceInfo[]>('get_audio_devices')
         
         const added = newDevices.filter(d => !lastDevices.some(ld => ld.name === d.name))
         const removed = lastDevices.filter(d => !newDevices.some(nd => nd.name === d.name)).map(d => d.name)
         
         if (added.length > 0 || removed.length > 0) {
-          const event: DeviceChangeEvent = {
-            added,
-            removed,
-            devices: newDevices
-          }
-          callback(event)
+          callback({ added, removed, devices: newDevices })
         }
         
         lastDevices = newDevices
@@ -142,10 +135,9 @@ export function stopDevicePolling(): void {
 }
 
 export async function startAudioCapture(deviceName?: string): Promise<void> {
-  if (!isTauri()) {
-    throw new Error('Not in Tauri environment')
-  }
+  if (!isTauri()) throw new Error('Not in Tauri environment')
   try {
+    const invoke = await getInvoke()
     await invoke('start_audio_capture', { deviceName })
   } catch (error) {
     console.error('Failed to start audio capture:', error)
@@ -157,10 +149,9 @@ export async function startAudioCaptureWithSampleRate(
   deviceName?: string,
   sampleRate?: number
 ): Promise<void> {
-  if (!isTauri()) {
-    throw new Error('Not in Tauri environment')
-  }
+  if (!isTauri()) throw new Error('Not in Tauri environment')
   try {
+    const invoke = await getInvoke()
     await invoke('start_audio_capture_with_sample_rate', { 
       deviceName, 
       sampleRate: sampleRate || 48000 
@@ -172,10 +163,9 @@ export async function startAudioCaptureWithSampleRate(
 }
 
 export async function stopAudioCapture(): Promise<void> {
-  if (!isTauri()) {
-    return
-  }
+  if (!isTauri()) return
   try {
+    const invoke = await getInvoke()
     await invoke('stop_audio_capture')
   } catch (error) {
     console.error('Failed to stop audio capture:', error)
@@ -183,10 +173,9 @@ export async function stopAudioCapture(): Promise<void> {
 }
 
 export async function detectPitch(): Promise<PitchResult | null> {
-  if (!isTauri()) {
-    return null
-  }
+  if (!isTauri()) return null
   try {
+    const invoke = await getInvoke()
     return await invoke<PitchResult | null>('detect_pitch')
   } catch (error) {
     console.error('Failed to detect pitch:', error)
@@ -195,10 +184,9 @@ export async function detectPitch(): Promise<PitchResult | null> {
 }
 
 export async function getLatencyMs(): Promise<number> {
-  if (!isTauri()) {
-    return 0
-  }
+  if (!isTauri()) return 0
   try {
+    const invoke = await getInvoke()
     return await invoke<number>('get_latency_ms')
   } catch (error) {
     console.error('Failed to get latency:', error)
@@ -208,57 +196,39 @@ export async function getLatencyMs(): Promise<number> {
 
 export async function getAudioStatus(): Promise<AudioStatus> {
   if (!isTauri()) {
-    return {
-      isCapturing: false,
-      latencyMs: 0,
-      bufferSize: 2048,
-      sampleRate: 48000
-    }
+    return { isCapturing: false, latencyMs: 0, bufferSize: 2048, sampleRate: 48000 }
   }
   try {
+    const invoke = await getInvoke()
     return await invoke<AudioStatus>('get_audio_status')
   } catch (error) {
     console.error('Failed to get audio status:', error)
-    return {
-      isCapturing: false,
-      latencyMs: 0,
-      bufferSize: 2048,
-      sampleRate: 48000
-    }
+    return { isCapturing: false, latencyMs: 0, bufferSize: 2048, sampleRate: 48000 }
   }
 }
 
 export async function setBufferSize(size: number): Promise<void> {
-  if (!isTauri()) {
-    return
-  }
+  if (!isTauri()) return
   try {
+    const invoke = await getInvoke()
     await invoke('set_buffer_size', { size })
-  } catch (error) {
-    console.error('Failed to set buffer size:', error)
-  }
+  } catch (error) { console.error('Failed to set buffer size:', error) }
 }
 
 export async function setSampleRate(rate: number): Promise<void> {
-  if (!isTauri()) {
-    return
-  }
+  if (!isTauri()) return
   try {
+    const invoke = await getInvoke()
     await invoke('set_sample_rate', { rate })
-  } catch (error) {
-    console.error('Failed to set sample rate:', error)
-  }
+  } catch (error) { console.error('Failed to set sample rate:', error) }
 }
 
 export async function setNoiseSuppression(level: number): Promise<void> {
-  if (!isTauri()) {
-    return
-  }
+  if (!isTauri()) return
   try {
+    const invoke = await getInvoke()
     await invoke('set_noise_suppression', { level })
-  } catch (error) {
-    console.error('Failed to set noise suppression:', error)
-  }
+  } catch (error) { console.error('Failed to set noise suppression:', error) }
 }
 
 export async function setFilters(filters: {
@@ -267,19 +237,17 @@ export async function setFilters(filters: {
   notch50?: boolean
   notch60?: boolean
 }): Promise<void> {
-  if (!isTauri()) {
-    return
-  }
+  if (!isTauri()) return
   try {
+    const invoke = await getInvoke()
     await invoke('set_audio_filters', { filters })
-  } catch (error) {
-    console.error('Failed to set filters:', error)
-  }
+  } catch (error) { console.error('Failed to set filters:', error) }
 }
 
 export async function getDefaultAudioDevice(): Promise<AudioDeviceInfo | null> {
   if (!isTauri()) return null
   try {
+    const invoke = await getInvoke()
     return await invoke<AudioDeviceInfo | null>('get_default_audio_device')
   } catch (error) {
     console.error('Failed to get default audio device:', error)
@@ -289,19 +257,103 @@ export async function getDefaultAudioDevice(): Promise<AudioDeviceInfo | null> {
 
 export async function setPitchThreshold(threshold: number): Promise<void> {
   if (!isTauri()) return
-  try { await invoke('set_pitch_threshold', { threshold }) } catch (error) { console.error('Failed to set pitch threshold:', error) }
+  try {
+    const invoke = await getInvoke()
+    await invoke('set_pitch_threshold', { threshold })
+  } catch (error) { console.error('Failed to set pitch threshold:', error) }
 }
 
 export async function setGain(gain: number): Promise<void> {
   if (!isTauri()) return
-  try { await invoke('set_gain', { gain }) } catch (error) { console.error('Failed to set gain:', error) }
+  try {
+    const invoke = await getInvoke()
+    await invoke('set_gain', { gain })
+  } catch (error) { console.error('Failed to set gain:', error) }
 }
 
 export async function getAudioLevel(): Promise<{
   rms: number; db_spl: number; peak: number; is_voiced: boolean; noise_floor: number; snr_db: number
 } | null> {
   if (!isTauri()) return null
-  try { return await invoke('get_audio_level') } catch (error) { console.error('Failed to get audio level:', error); return null }
+  try {
+    const invoke = await getInvoke()
+    return await invoke('get_audio_level')
+  } catch (error) { console.error('Failed to get audio level:', error); return null }
+}
+
+export interface PitchStreamEvent {
+  pitch: PitchResult
+  isNoteOnset: boolean
+  agcGain: number
+}
+
+export async function startPitchStream(intervalMs?: number): Promise<void> {
+  if (!isTauri()) throw new Error('Not in Tauri environment')
+  try {
+    const invoke = await getInvoke()
+    await invoke('start_pitch_stream', { intervalMs })
+  } catch (error) {
+    console.error('Failed to start pitch stream:', error)
+    throw error
+  }
+}
+
+export async function stopPitchStream(): Promise<void> {
+  if (!isTauri()) return
+  try {
+    const invoke = await getInvoke()
+    await invoke('stop_pitch_stream')
+  } catch (error) {
+    console.error('Failed to stop pitch stream:', error)
+  }
+}
+
+export async function isPitchStreamRunning(): Promise<boolean> {
+  if (!isTauri()) return false
+  try {
+    const invoke = await getInvoke()
+    return await invoke<boolean>('is_pitch_stream_running')
+  } catch (error) {
+    console.error('Failed to check pitch stream:', error)
+    return false
+  }
+}
+
+export async function listenPitchDetected(callback: (event: PitchStreamEvent) => void): Promise<UnlistenFn | null> {
+  if (!isTauri()) return null
+  try {
+    const listen = await getListen()
+    return await listen<PitchStreamEvent>('pitch-detected', (event) => {
+      callback(event.payload)
+    })
+  } catch (error) {
+    console.error('Failed to listen pitch detected:', error)
+    return null
+  }
+}
+
+export async function setAgcEnabled(enabled: boolean): Promise<void> {
+  if (!isTauri()) return
+  try {
+    const invoke = await getInvoke()
+    await invoke('set_agc_enabled', { enabled })
+  } catch (error) { console.error('Failed to set AGC:', error) }
+}
+
+export async function isAgcEnabled(): Promise<boolean> {
+  if (!isTauri()) return false
+  try {
+    const invoke = await getInvoke()
+    return await invoke<boolean>('is_agc_enabled')
+  } catch (error) { console.error('Failed to check AGC:', error); return false }
+}
+
+export async function getAgcGain(): Promise<number> {
+  if (!isTauri()) return 1.0
+  try {
+    const invoke = await getInvoke()
+    return await invoke<number>('get_agc_gain')
+  } catch (error) { console.error('Failed to get AGC gain:', error); return 1.0 }
 }
 
 export const nativeAudio = {
@@ -324,6 +376,11 @@ export const nativeAudio = {
   stopDevicePolling,
   listenDeviceChanges,
   unlistenDeviceChanges,
+  startPitchStream,
+  stopPitchStream,
+  isPitchStreamRunning,
+  listenPitchDetected,
+  setAgcEnabled,
+  isAgcEnabled,
+  getAgcGain,
 }
-
-export default nativeAudio

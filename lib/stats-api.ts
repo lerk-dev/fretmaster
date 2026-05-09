@@ -265,7 +265,6 @@ function getLocalBackup(): PracticeStats[] {
 
 // 同步本地备份到服务器
 export async function syncLocalBackupToServer(): Promise<number> {
-  // Windows 版本不需要同步
   if (isTauri) {
     const { syncLocalBackupToServer: nativeSync } = await import('./native-stats');
     return nativeSync();
@@ -274,24 +273,27 @@ export async function syncLocalBackupToServer(): Promise<number> {
   const localData = getLocalBackup();
   if (localData.length === 0) return 0;
 
+  localStorage.setItem(LOCAL_BACKUP_KEY, '[]');
+
   let syncedCount = 0;
   for (const record of localData) {
     try {
-      await savePracticeStats({
-        exercise_type: record.exercise_type || record.exerciseType || '未知练习',
-        score: record.score,
-        duration: record.duration,
-        accuracy: record.accuracy,
-        notes: record.notes,
+      await fetch(`${API_BASE_URL}/stats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exercise_type: record.exercise_type || record.exerciseType || '未知练习',
+          score: record.score,
+          duration: record.duration,
+          accuracy: record.accuracy,
+          notes: record.notes,
+        }),
       });
       syncedCount++;
     } catch (e) {
       logger.error('同步记录失败:', e);
     }
   }
-  
-  // 清空本地备份
-  localStorage.setItem(LOCAL_BACKUP_KEY, '[]');
   
   return syncedCount;
 }

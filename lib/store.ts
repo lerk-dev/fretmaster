@@ -134,15 +134,45 @@ export interface ChordSymbolSettings {
   useJazzNotation: boolean  // 使用爵士乐记谱法
 }
 
+// 音程练习设置
+export interface IntervalPracticeSettings {
+  selectedIntervals: number[]
+  rootMode: 'fixed' | 'random'
+  rootNote: string
+  findRootFirst: boolean
+  addRootBack: boolean
+  direction: 'up' | 'down' | 'random'
+  randomizeOrder: boolean
+  practiceDuration: number
+  showFretboard: boolean
+  fretboardDuration: number
+  autoAdvance: boolean
+}
+
+// 和弦进行练习设置
+export interface ChordProgressionSettings {
+  selectedSongId: string
+  selectedLevelId: string
+  progressionKey: string
+  playOrder: 'asc' | 'desc' | 'random'
+  shouldRepeat: boolean
+  shouldVoiceLead: boolean
+  randomizeKeyOnRepeat: boolean
+  showFretboard: boolean
+  showKeyboard: boolean
+  showStructure: boolean
+  songSortOption: 'titleAsc' | 'titleDesc' | 'styleAsc' | 'styleDesc'
+}
+
 // 音阶练习设置
 export interface ScalePracticeSettings {
-  scaleKey: string  // 音阶主音
-  isScaleKeyRandom: boolean  // 是否随机主音
-  selectedScaleCategory: string  // 音阶分类
-  selectedScales: string[]  // 选中的音阶列表
-  scaleDirection: 'up' | 'down' | 'random'  // 音阶方向
-  scaleRootMovement: 'static' | 'random' | 'upSemiTone' | 'downSemiTone' | 'circleOfFifths' | 'circleOfFourths'  // 主音移动方式
-  scalePracticeSequence: string  // 音阶练习序列类型
+  scaleKey: string
+  isScaleKeyRandom: boolean
+  selectedScaleCategory: string
+  selectedScales: string[]
+  scaleDirection: 'up' | 'down' | 'up_down' | 'random'
+  scaleRootMovement: 'static' | 'random' | 'upSemiTone' | 'downSemiTone' | 'circleOfFifths' | 'circleOfFourths'
+  scalePracticeSequence: string
 }
 
 // 应用状态
@@ -178,6 +208,12 @@ export interface AppState {
   
   // 音阶练习设置
   scalePractice: ScalePracticeSettings
+  
+  // 音程练习设置
+  intervalPractice: IntervalPracticeSettings
+  
+  // 和弦进行练习设置
+  chordProgression: ChordProgressionSettings
   
   // Focus模式
   focusMode: FocusModeSettings
@@ -267,6 +303,12 @@ export interface AppActions {
   
   // 音阶练习设置操作
   setScalePracticeSettings: (settings: Partial<ScalePracticeSettings>) => void
+  
+  // 音程练习设置操作
+  setIntervalPracticeSettings: (settings: Partial<IntervalPracticeSettings>) => void
+  
+  // 和弦进行练习设置操作
+  setChordProgressionSettings: (settings: Partial<ChordProgressionSettings>) => void
   
   // Focus模式操作
   setFocusModeEnabled: (enabled: boolean) => void
@@ -376,6 +418,34 @@ const initialState: AppState = {
     scaleDirection: 'up',
     scaleRootMovement: 'static',
     scalePracticeSequence: '1to1',
+  },
+  
+  intervalPractice: {
+    selectedIntervals: [0, 7],
+    rootMode: 'fixed',
+    rootNote: 'C',
+    findRootFirst: false,
+    addRootBack: false,
+    direction: 'up',
+    randomizeOrder: true,
+    practiceDuration: 5,
+    showFretboard: false,
+    fretboardDuration: 3,
+    autoAdvance: false,
+  },
+  
+  chordProgression: {
+    selectedSongId: '',
+    selectedLevelId: 'three_chord_tones_root_3rd_5th',
+    progressionKey: 'C',
+    playOrder: 'asc',
+    shouldRepeat: false,
+    shouldVoiceLead: false,
+    randomizeKeyOnRepeat: false,
+    showFretboard: false,
+    showKeyboard: false,
+    showStructure: false,
+    songSortOption: 'titleAsc',
   },
   
   focusMode: {
@@ -497,6 +567,12 @@ export const useAppStore = create<AppState & AppActions>()(
       // 音阶练习设置操作
       setScalePracticeSettings: (settings) => set((state) => ({ scalePractice: { ...state.scalePractice, ...settings } })),
       
+      // 音程练习设置操作
+      setIntervalPracticeSettings: (settings) => set((state) => ({ intervalPractice: { ...state.intervalPractice, ...settings } })),
+      
+      // 和弦进行练习设置操作
+      setChordProgressionSettings: (settings) => set((state) => ({ chordProgression: { ...state.chordProgression, ...settings } })),
+      
       // Focus模式操作
       setFocusModeEnabled: (enabled) => set((state) => ({ focusMode: { ...state.focusMode, enabled } })),
       setFocusModeSettings: (settings) => set((state) => ({ focusMode: { ...state.focusMode, ...settings } })),
@@ -559,6 +635,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'fretmaster-store',
+      version: 1,
       storage: createJSONStorage(() => debounceStorage(localStorage)),
       partialize: (state) => ({
         displayScale: state.displayScale,
@@ -572,42 +649,49 @@ export const useAppStore = create<AppState & AppActions>()(
         customSongs: state.customSongs,
         favorites: state.favorites,
       }),
-      // 数据迁移：确保新字段有默认值
       migrate: (persistedState: any, version) => {
-        if (!persistedState.focusMode) {
-          persistedState.focusMode = initialState.focusMode
-        } else {
-          if (persistedState.focusMode.fullscreenMode === undefined) {
-            persistedState.focusMode.fullscreenMode = 'windowed'
+        try {
+          if (!persistedState || typeof persistedState !== 'object') {
+            return initialState
           }
-          if (persistedState.focusMode.enabled === undefined) {
-            persistedState.focusMode.enabled = false
+          if (!persistedState.focusMode) {
+            persistedState.focusMode = initialState.focusMode
+          } else {
+            if (persistedState.focusMode.fullscreenMode === undefined) {
+              persistedState.focusMode.fullscreenMode = 'windowed'
+            }
+            if (persistedState.focusMode.enabled === undefined) {
+              persistedState.focusMode.enabled = false
+            }
+            if (persistedState.focusMode.enableWakeLock === undefined) {
+              persistedState.focusMode.enableWakeLock = true
+            }
+            if (persistedState.focusMode.enableFullscreen === undefined) {
+              persistedState.focusMode.enableFullscreen = true
+            }
           }
-          if (persistedState.focusMode.enableWakeLock === undefined) {
-            persistedState.focusMode.enableWakeLock = true
+          if (!persistedState.user) {
+            persistedState.user = initialState.user
+          } else {
+            if (persistedState.user.language === 'zh') {
+              persistedState.user.language = 'zh-CN'
+            }
+            if (persistedState.user.theme === undefined) {
+              persistedState.user.theme = 'dark'
+            }
+            if (persistedState.user.chordScaleDisplay === undefined) {
+              persistedState.user.chordScaleDisplay = 'chinese'
+            }
           }
-          if (persistedState.focusMode.enableFullscreen === undefined) {
-            persistedState.focusMode.enableFullscreen = true
+          if (persistedState.fullscreenMode !== undefined) {
+            persistedState.isFullscreen = persistedState.fullscreenMode
+            delete persistedState.fullscreenMode
           }
+          return persistedState
+        } catch (error) {
+          console.error('Store migration failed, resetting to defaults:', error)
+          return initialState
         }
-        if (!persistedState.user) {
-          persistedState.user = initialState.user
-        } else {
-          if (persistedState.user.language === 'zh') {
-            persistedState.user.language = 'zh-CN'
-          }
-          if (persistedState.user.theme === undefined) {
-            persistedState.user.theme = 'dark'
-          }
-          if (persistedState.user.chordScaleDisplay === undefined) {
-            persistedState.user.chordScaleDisplay = 'chinese'
-          }
-        }
-        if (persistedState.fullscreenMode !== undefined) {
-          persistedState.isFullscreen = persistedState.fullscreenMode
-          delete persistedState.fullscreenMode
-        }
-        return persistedState
       },
     }
   )

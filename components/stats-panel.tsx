@@ -242,7 +242,7 @@ export const StatsPanel = memo(function StatsPanel() {
               {summary?.averageScore?.toFixed(1) || 0}
             </p>
             <p className="text-[10px] text-muted-foreground">
-              准确率 {(summary?.averageAccuracy * 100)?.toFixed(0) || 0}%
+              准确率 {isNaN(summary?.averageAccuracy) ? 0 : Math.round((summary?.averageAccuracy || 0) * 100)}%
             </p>
           </CardContent>
         </Card>

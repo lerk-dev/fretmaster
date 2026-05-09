@@ -7,6 +7,8 @@ fn main() {
     
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             // Audio commands
@@ -43,6 +45,14 @@ fn main() {
             fretmaster::commands::start_device_monitor,
             fretmaster::commands::stop_device_monitor,
             fretmaster::commands::is_device_monitor_running,
+            // Pitch stream commands
+            fretmaster::commands::start_pitch_stream,
+            fretmaster::commands::stop_pitch_stream,
+            fretmaster::commands::is_pitch_stream_running,
+            // AGC commands
+            fretmaster::commands::set_agc_enabled,
+            fretmaster::commands::is_agc_enabled,
+            fretmaster::commands::get_agc_gain,
             // Database commands
             fretmaster::commands::save_practice_stats,
             fretmaster::commands::get_all_practice_stats,
