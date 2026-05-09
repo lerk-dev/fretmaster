@@ -112,3 +112,43 @@ rustup-init.exe
 # Deployment scripts
 deploy-simple.ps1
 deploy-ssh.ps1
+
+# Non-project directories and files
+2.4.1/
+bibviz/
+skeptics-annotated-scripture/
+.workbuddy/
+
+# Non-project files
+bibviz-*.tar.gz
+bibviz_key
+bibviz_key.pub
+billiards-simulator.html
+comparison-report.md
+COMPARISON_REPORT.md
+AUDIO_COMPARISON.md
+DEPLOY.md
+DEPLOYMENT.md
+ROUTER-DEPLOY.md
+SOLO_vs_FretMaster_Comparison_Report2.md
+STATS-README.md
+TUTORIAL.md
+WINDOWS_AUDIO_SETTINGS.md
+solo-vs-fretmaster-comparison.md
+deploy-to-router.ps1
+deploy.sh
+deploy_vbs.vbs
+fretmaster-lighttpd.conf
+icon.ico
+openwrt-index.html
+pitch-recognition-test-report.json
+run-pitch-tests.js
+ssh-deploy.ps1
+ssh-test.ps1
+windres.bat
+代码对比分析报告.md
+平台对比分析报告.md
+音高识别改进效果报告.md
+音高识别改进方案.md
+音高识别改进最终报告.md
+音高识别测试报告.md
