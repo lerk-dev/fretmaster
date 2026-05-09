@@ -62,25 +62,53 @@ pub async fn set_true_fullscreen<R: Runtime>(window: tauri::Window<R>, enable: b
             return Ok(());
         }
 
-        window.set_fullscreen(true).map_err(|e| e.to_string())?;
-
         let hwnd = window.hwnd().map_err(|e| e.to_string())?;
         let hwnd_handle = hwnd.0 as windows_sys::Win32::Foundation::HWND;
 
         unsafe {
             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE, SWP_FRAMECHANGED,
+                SetWindowPos, SetWindowLongPtrW, GetWindowLongPtrW,
+                HWND_TOPMOST, SWP_FRAMECHANGED,
+                GWL_STYLE, WS_OVERLAPPED, WS_CAPTION, WS_SYSMENU,
+                WS_THICKFRAME, WS_MINIMIZEBOX, WS_MAXIMIZEBOX,
+                MONITOR_DEFAULTTONEAREST, MONITORINFOEXW,
             };
+            use windows_sys::Win32::Graphics::Gdi::{MonitorFromWindow, GetMonitorInfoW};
+            use windows_sys::Win32::Foundation::{RECT, BOOL};
+
+            let monitor = MonitorFromWindow(hwnd_handle, MONITOR_DEFAULTTONEAREST);
+            let mut monitor_info: MONITORINFOEXW = std::mem::zeroed();
+            monitor_info.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+            let result = GetMonitorInfoW(
+                monitor,
+                &mut monitor_info as *mut MONITORINFOEXW as *mut _,
+            );
+            if result == 0 {
+                return Err("Failed to get monitor info".to_string());
+            }
+
+            let monitor_rect = monitor_info.monitorInfo.rcMonitor;
+            let screen_x = monitor_rect.left;
+            let screen_y = monitor_rect.top;
+            let screen_w = monitor_rect.right - monitor_rect.left;
+            let screen_h = monitor_rect.bottom - monitor_rect.top;
+
+            let current_style = GetWindowLongPtrW(hwnd_handle, GWL_STYLE);
+            let new_style = current_style
+                & !(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+            SetWindowLongPtrW(hwnd_handle, GWL_STYLE, new_style);
 
             SetWindowPos(
                 hwnd_handle,
                 HWND_TOPMOST,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED,
+                screen_x,
+                screen_y,
+                screen_w,
+                screen_h,
+                SWP_FRAMECHANGED,
             );
+
+            window.set_fullscreen(true).map_err(|e| e.to_string())?;
         }
 
         TRUE_FULLSCREEN_ACTIVE.store(true, Ordering::SeqCst);
@@ -94,8 +122,17 @@ pub async fn set_true_fullscreen<R: Runtime>(window: tauri::Window<R>, enable: b
 
         unsafe {
             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                SetWindowPos, HWND_NOTOPMOST, SWP_NOMOVE, SWP_NOSIZE, SWP_FRAMECHANGED,
+                SetWindowLongPtrW, GetWindowLongPtrW,
+                SetWindowPos, HWND_NOTOPMOST, SWP_FRAMECHANGED,
+                GWL_STYLE, WS_OVERLAPPED, WS_CAPTION, WS_SYSMENU,
+                WS_THICKFRAME, WS_MINIMIZEBOX, WS_MAXIMIZEBOX,
             };
+
+            let current_style = GetWindowLongPtrW(hwnd_handle, GWL_STYLE);
+            let new_style = current_style
+                | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU
+                | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+            SetWindowLongPtrW(hwnd_handle, GWL_STYLE, new_style);
 
             SetWindowPos(
                 hwnd_handle,
@@ -104,7 +141,7 @@ pub async fn set_true_fullscreen<R: Runtime>(window: tauri::Window<R>, enable: b
                 0,
                 0,
                 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED,
+                SWP_FRAMECHANGED,
             );
         }
 

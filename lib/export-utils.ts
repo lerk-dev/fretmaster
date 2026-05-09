@@ -15,61 +15,64 @@ export interface ExportOptions {
   exerciseTypes?: string[]
 }
 
+const translations: Record<string, Record<string, string>> = {
+  'zh-CN': {
+    'practice_report': 'FretMaster Practice Report',
+    'practice_report_zh': 'FretMaster 练习报告',
+    'generated_at': 'Generated',
+    'total_sessions': 'Sessions',
+    'total_duration': 'Duration(min)',
+    'average_score': 'Avg Score',
+    'average_accuracy': 'Avg Accuracy',
+    'exercise_type': 'Type',
+    'score': 'Score',
+    'duration': 'Duration',
+    'accuracy': 'Accuracy',
+    'date': 'Date',
+    'notes': 'Notes',
+    'minutes': 'min',
+    'seconds': 'sec',
+    'find_note': 'Find Note',
+    'chord_progression': 'Chord Prog.',
+    'scale': 'Scale',
+    'interval': 'Interval',
+    'chord_exercise': 'Chord Exer.',
+    'rhythm': 'Rhythm',
+    'export_success': '导出成功',
+    'export_cancelled': '导出已取消',
+    'export_failed': '导出失败',
+    'file_saved_to': '文件已保存到',
+  },
+  'en': {
+    'practice_report': 'FretMaster Practice Report',
+    'practice_report_zh': '',
+    'generated_at': 'Generated',
+    'total_sessions': 'Sessions',
+    'total_duration': 'Duration(min)',
+    'average_score': 'Avg Score',
+    'average_accuracy': 'Avg Accuracy',
+    'exercise_type': 'Type',
+    'score': 'Score',
+    'duration': 'Duration',
+    'accuracy': 'Accuracy',
+    'date': 'Date',
+    'notes': 'Notes',
+    'minutes': 'min',
+    'seconds': 'sec',
+    'find_note': 'Find Note',
+    'chord_progression': 'Chord Prog.',
+    'scale': 'Scale',
+    'interval': 'Interval',
+    'chord_exercise': 'Chord Exer.',
+    'rhythm': 'Rhythm',
+    'export_success': 'Export Successful',
+    'export_cancelled': 'Export Cancelled',
+    'export_failed': 'Export Failed',
+    'file_saved_to': 'File saved to',
+  },
+}
+
 const t = (key: string, language: 'zh-CN' | 'en'): string => {
-  const translations: Record<string, Record<string, string>> = {
-    'zh-CN': {
-      'practice_report': 'FretMaster 练习报告',
-      'generated_at': '生成时间',
-      'total_sessions': '总练习次数',
-      'total_duration': '总练习时长',
-      'average_score': '平均得分',
-      'average_accuracy': '平均准确率',
-      'exercise_type': '练习类型',
-      'score': '得分',
-      'duration': '时长(分钟)',
-      'accuracy': '准确率',
-      'date': '日期',
-      'notes': '备注',
-      'minutes': '分钟',
-      'seconds': '秒',
-      'find_note': '找音练习',
-      'chord_progression': '和弦进行',
-      'scale': '音阶练习',
-      'interval': '音程练习',
-      'chord_exercise': '和弦练习',
-      'rhythm': '节奏练习',
-      'export_success': '导出成功',
-      'export_cancelled': '导出已取消',
-      'export_failed': '导出失败',
-      'file_saved_to': '文件已保存到',
-    },
-    'en': {
-      'practice_report': 'FretMaster Practice Report',
-      'generated_at': 'Generated At',
-      'total_sessions': 'Total Sessions',
-      'total_duration': 'Total Duration',
-      'average_score': 'Average Score',
-      'average_accuracy': 'Average Accuracy',
-      'exercise_type': 'Exercise Type',
-      'score': 'Score',
-      'duration': 'Duration(min)',
-      'accuracy': 'Accuracy',
-      'date': 'Date',
-      'notes': 'Notes',
-      'minutes': 'min',
-      'seconds': 'sec',
-      'find_note': 'Find Note',
-      'chord_progression': 'Chord Progression',
-      'scale': 'Scale Practice',
-      'interval': 'Interval Practice',
-      'chord_exercise': 'Chord Exercise',
-      'rhythm': 'Rhythm Practice',
-      'export_success': 'Export Successful',
-      'export_cancelled': 'Export Cancelled',
-      'export_failed': 'Export Failed',
-      'file_saved_to': 'File saved to',
-    },
-  }
   return translations[language]?.[key] || key
 }
 
@@ -87,25 +90,39 @@ const getExerciseTypeName = (type: string, language: 'zh-CN' | 'en'): string => 
 
 export function exportToCSV(stats: PracticeStats[], options: ExportOptions): string {
   const { language } = options
-  const headers = [
-    t('date', language),
-    t('exercise_type', language),
-    t('score', language),
-    t('duration', language),
-    t('accuracy', language),
-    t('notes', language),
-  ]
+
+  const zhTranslations: Record<string, string> = {
+    'Date': '日期',
+    'Type': '练习类型',
+    'Score': '得分',
+    'Duration(min)': '时长(分钟)',
+    'Accuracy': '准确率',
+    'Notes': '备注',
+    'Find Note': '找音练习',
+    'Chord Prog.': '和弦进行',
+    'Scale': '音阶练习',
+    'Interval': '音程练习',
+    'Chord Exer.': '和弦练习',
+    'Rhythm': '节奏练习',
+  }
+
+  const headers = language === 'zh-CN'
+    ? ['日期', '练习类型', '得分', '时长(分钟)', '准确率', '备注']
+    : ['Date', 'Type', 'Score', 'Duration(min)', 'Accuracy', 'Notes']
 
   const rows = stats.map(stat => [
     stat.created_at || stat.date || '',
-    getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language),
+    language === 'zh-CN'
+      ? (zhTranslations[getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', 'en')] || getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', 'en'))
+      : getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language),
     String(stat.score || 0),
     String(Math.round((stat.duration || 0) / 60)),
     `${stat.accuracy || 0}%`,
     (stat.notes || '').replace(/"/g, '""').replace(/\r?\n/g, ' '),
   ])
 
-  const csvContent = [
+  const BOM = '\uFEFF'
+  const csvContent = BOM + [
     headers.join(','),
     ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
   ].join('\n')
@@ -117,7 +134,7 @@ export function exportToJSON(stats: PracticeStats[], options: ExportOptions): st
   const { language, dateRange } = options
 
   const report = {
-    title: t('practice_report', language),
+    title: language === 'zh-CN' ? 'FretMaster 练习报告' : 'FretMaster Practice Report',
     generatedAt: new Date().toISOString(),
     dateRange: dateRange ? {
       start: dateRange.start.toISOString(),
@@ -147,8 +164,67 @@ export function exportToJSON(stats: PracticeStats[], options: ExportOptions): st
   return JSON.stringify(report, null, 2)
 }
 
+function drawChineseTextAsImage(
+  doc: jsPDF,
+  text: string,
+  x: number,
+  y: number,
+  fontSize: number,
+  color: [number, number, number] = [26, 26, 26],
+  maxWidth: number = 0,
+  align: 'left' | 'center' | 'right' = 'left'
+): void {
+  const canvas = document.createElement('canvas')
+  const scale = 3
+  const canvasFontSize = fontSize * scale
+
+  canvas.style.display = 'none'
+  document.body.appendChild(canvas)
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    document.body.removeChild(canvas)
+    doc.setFontSize(fontSize)
+    doc.setTextColor(color[0], color[1], color[2])
+    doc.text(text, x, y, { align })
+    return
+  }
+
+  ctx.font = `${canvasFontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "SimHei", sans-serif`
+
+  const metrics = ctx.measureText(text)
+  const textWidth = metrics.width
+  const textHeight = canvasFontSize * 1.3
+
+  canvas.width = Math.ceil(textWidth + 4 * scale)
+  canvas.height = Math.ceil(textHeight + 4 * scale)
+
+  ctx.font = `${canvasFontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "SimHei", sans-serif`
+  ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`
+  ctx.textBaseline = 'top'
+  ctx.fillText(text, 2 * scale, 2 * scale)
+
+  const imageData = canvas.toDataURL('image/png')
+  document.body.removeChild(canvas)
+
+  const imgWidth = (canvas.width / scale) * (72 / 96)
+  const imgHeight = (canvas.height / scale) * (72 / 96)
+
+  let imgX = x
+  if (align === 'center') {
+    imgX = x - imgWidth / 2
+  } else if (align === 'right') {
+    imgX = x - imgWidth
+  }
+
+  const imgY = y - imgHeight * 0.75
+
+  doc.addImage(imageData, 'PNG', imgX, imgY, imgWidth, imgHeight)
+}
+
 export function generatePDF(stats: PracticeStats[], options: ExportOptions): jsPDF {
   const { language } = options
+  const isZh = language === 'zh-CN'
   const doc = new jsPDF()
 
   const totalDuration = stats.reduce((sum, s) => sum + (s.duration || 0), 0)
@@ -165,19 +241,24 @@ export function generatePDF(stats: PracticeStats[], options: ExportOptions): jsP
   doc.setTextColor(37, 99, 235)
   doc.text(t('practice_report', language), pageWidth / 2, 20, { align: 'center' })
 
+  if (isZh) {
+    drawChineseTextAsImage(doc, 'FretMaster 练习报告', pageWidth / 2, 28, 12, [37, 99, 235], 0, 'center')
+  }
+
   doc.setDrawColor(37, 99, 235)
   doc.setLineWidth(0.5)
-  doc.line(14, 24, pageWidth - 14, 24)
+  doc.line(14, isZh ? 34 : 24, pageWidth - 14, isZh ? 34 : 24)
 
   doc.setFontSize(10)
   doc.setTextColor(102, 102, 102)
-  doc.text(`${t('generated_at', language)}: ${new Date().toLocaleString(language === 'zh-CN' ? 'zh-CN' : 'en-US')}`, 14, 32)
+  const genTime = new Date().toLocaleString(isZh ? 'zh-CN' : 'en-US')
+  doc.text(`${t('generated_at', language)}: ${genTime}`, 14, isZh ? 40 : 32)
 
-  const summaryY = 40
+  const summaryY = isZh ? 48 : 40
   const cardWidth = (pageWidth - 14 * 2 - 12) / 4
   const summaryItems = [
     { value: String(stats.length), label: t('total_sessions', language) },
-    { value: String(Math.round(totalDuration / 60)), label: `${t('total_duration', language)}(${t('minutes', language)})` },
+    { value: String(Math.round(totalDuration / 60)), label: t('total_duration', language) },
     { value: String(avgScore), label: t('average_score', language) },
     { value: `${avgAccuracy}%`, label: t('average_accuracy', language) },
   ]
@@ -224,8 +305,6 @@ export function generatePDF(stats: PracticeStats[], options: ExportOptions): jsP
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
 
-  const rowsPerPage = Math.floor((doc.internal.pageSize.getHeight() - rowY - 20) / 8)
-
   stats.forEach((stat, index) => {
     if (rowY > doc.internal.pageSize.getHeight() - 20) {
       doc.addPage()
@@ -243,7 +322,6 @@ export function generatePDF(stats: PracticeStats[], options: ExportOptions): jsP
         doc.text(header, currentX + 2, rowY - 3)
         currentX += colWidths[i]
       })
-      rowY += 0
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(8)
     }
