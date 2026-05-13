@@ -1,4 +1,4 @@
-﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -6327,9 +6327,27 @@ function frequencyToNoteName(frequency: number): string {
 
 // 计算音分数(cents)
 function calculateCents(detectedFreq: number, targetFreq: number): number {
+  if (targetFreq <= 0 || detectedFreq <= 0) return 0
+  const cents = 1200 * Math.log2(detectedFreq / targetFreq)
+  return Math.round(cents * 10) / 10
+}
+
+function getAdjustedCents(detectedFreq: number, targetFreq: number): number {
+  if (targetFreq <= 0 || detectedFreq <= 0) return 1200
   const cents = 1200 * Math.log2(detectedFreq / targetFreq)
   const centsMod = Math.abs(cents) % 1200
   return centsMod > 600 ? 1200 - centsMod : centsMod
+}
+
+const intervalToSemitones: Record<string, number> = {
+  "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8,
+  "b6": 8, "6": 9, "bb7": 9, "#6": 10, "b7": 10, "7": 11,
+  "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
+}
+
+const noteToSemitones: Record<string, number> = {
+  "C": 0, "C#": 1, "Cb": 11, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5,
+  "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
 }
 
 // 检查两个音符是否为等音（如 C# = Db） 与原文件相同
@@ -6603,7 +6621,7 @@ function getChordDegrees(type: string, level?: string, options?: {
         .map(deg => {
           const pos = degreeToPosition(deg)
           const semitone = chordIntervals[pos]
-          return semitonesToDegree(semitone)
+          return semitonesToDegree(semitone, type)
         })
       
       if (options?.forceNaturalFive && isAlteredChord(type)) {
@@ -6641,7 +6659,7 @@ function getChordDegrees(type: string, level?: string, options?: {
       const takeBeforeOrder = practiceLevel.takeStartingIntervalBeforeOrder
 
       if (startingOption === 'chordTone' && intervals.length > 0) {
-        const chordToneSet = new Set(chordIntervals.map(s => semitonesToDegree(s)))
+        const chordToneSet = new Set(chordIntervals.map(s => semitonesToDegree(s, type)))
         const chordToneInSequence = intervals.filter(i => chordToneSet.has(i))
         if (chordToneInSequence.length > 0) {
           const startInterval = chordToneInSequence[Math.floor(Math.random() * chordToneInSequence.length)]
@@ -6732,7 +6750,7 @@ function getChordDegrees(type: string, level?: string, options?: {
   }
   
   return chordType.intervals.map(interval => {
-    return semitonesToDegree(interval)
+    return semitonesToDegree(interval, type)
   })
 }
 
@@ -6746,14 +6764,17 @@ function getIntervalsForLevel(level: string, chordType?: string): string[] {
     const normalizedType = normalizeChordType(type)
     const ct = CHORD_TYPES.find(c => c.name === normalizedType || c.symbol === normalizedType || c.name === type || c.symbol === type)
     if (!ct) return ['1', '3', '5', '7']
-    return ct.intervals.map(i => semitonesToDegree(i))
+    return ct.intervals.map(i => semitonesToDegree(i, type))
   }
   
   const chordIntervals = getChordTypeIntervals(chordType)
   
   // 辅助函数：查找包含特定数字的音级
   const findInterval = (num: string): string | undefined => {
-    return chordIntervals.find(i => i.includes(num))
+    return chordIntervals.find(i => {
+      const numericPart = i.replace(/[^0-9]/g, '')
+      return numericPart === num
+    })
   }
 
   switch (level) {
@@ -6939,7 +6960,9 @@ function applyVoiceLeading(degrees: string[], chordRoot: string, previousNote: s
 }
 
 // 将半音数转换为音级表示
-function semitonesToDegree(semitones: number): string {
+function semitonesToDegree(semitones: number, chordContext?: string): string {
+  const isDiminished = chordContext === 'diminished' || chordContext === 'dim7' || chordContext === 'dim'
+  const isMinor = chordContext === 'minor' || chordContext === 'm7' || chordContext === 'm9' || chordContext === 'm11' || chordContext === 'm13' || chordContext === 'mMaj7'
   const degreeMap: Record<number, string> = {
     0: "1",
     1: "b2",
@@ -6947,20 +6970,20 @@ function semitonesToDegree(semitones: number): string {
     3: "b3",
     4: "3",
     5: "4",
-    6: "b5",
+    6: isDiminished ? "b5" : "#4",
     7: "5",
-    8: "#5",
-    9: "6",
+    8: isMinor ? "b6" : "#5",
+    9: isDiminished ? "bb7" : "6",
     10: "b7",
     11: "7",
-    12: "8",
+    12: "1",
     13: "b9",
     14: "9",
     15: "#9",
-    16: "10",
+    16: "#9",
     17: "11",
     18: "#11",
-    19: "12",
+    19: "b5",
     20: "b13",
     21: "13",
   }
@@ -6980,7 +7003,7 @@ function getNoteDegreeInChord(note: string, chordRoot: string, chordType: string
   // 检查这个音程是否在和弦中
   if (!chordTypeData.intervals.includes(interval)) return null
 
-  return semitonesToDegree(interval)
+  return semitonesToDegree(interval, chordType)
 }
 
 // 根据音级和根音生成正确的音名
@@ -9620,18 +9643,6 @@ export default function FretMasterPage() {
     const currentSensitivity = sensitivityRef.current || 0.5
     const currentConfidenceThreshold = confidenceThresholdRef.current || 0.8
     
-    // 音符到半音映射
-    const noteToSemitones: Record<string, number> = {
-      "C": 0, "C#": 1, "Cb": 11, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, 
-      "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
-    }
-    
-    // 音级到半音映射
-    const intervalToSemitones: Record<string, number> = {
-      "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8, 
-      "b6": 8, "6": 9, "#6": 10, "b7": 10, "7": 11, "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
-    }
-    
     if (currentActiveTab === 'practice') {
       // 找音练习
       if (isCoolingDownRef.current) return
@@ -9641,9 +9652,7 @@ export default function FretMasterPage() {
       const targetSemitone = noteToSemitones[currentTargetNote] || 0
       const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
       
-      const cents = 1200 * Math.log2(frequency / targetFrequency)
-      const centsMod = Math.abs(cents) % 1200
-      const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+      const adjustedCents = getAdjustedCents(frequency, targetFrequency)
       
       const baseThreshold = frequency < 110 ? 35 : 25
       const matchThreshold = baseThreshold * (2 - currentSensitivity)
@@ -9683,9 +9692,7 @@ export default function FretMasterPage() {
         const targetSemitone = (rootValue + intervalSemitone) % 12
         const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
         
-        const cents = 1200 * Math.log2(frequency / targetFrequency)
-        const centsMod = Math.abs(cents) % 1200
-        const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+        const adjustedCents = getAdjustedCents(frequency, targetFrequency)
         
         const baseThreshold = frequency < 110 ? 35 : interval === '1' ? 25 : 15
         const matchThreshold = baseThreshold * (2 - currentSensitivity)
@@ -9734,9 +9741,7 @@ export default function FretMasterPage() {
       const targetSemitone = (keyValue + semitone) % 12
       const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
       
-      const cents = 1200 * Math.log2(frequency / targetFrequency)
-      const centsMod = Math.abs(cents) % 1200
-      const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+      const adjustedCents = getAdjustedCents(frequency, targetFrequency)
       
       const baseThreshold = frequency < 110 ? 35 : currentDegree === '1' ? 25 : 15
       const matchThreshold = baseThreshold * (2 - currentSensitivity)
@@ -9772,9 +9777,7 @@ export default function FretMasterPage() {
       const targetSemitone = (rootValue + semitone) % 12
       const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
       
-      const cents = 1200 * Math.log2(frequency / targetFrequency)
-      const centsMod = Math.abs(cents) % 1200
-      const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+      const adjustedCents = getAdjustedCents(frequency, targetFrequency)
       
       const baseThreshold = frequency < 110 ? 35 : currentDegree === '1' ? 25 : 15
       const matchThreshold = baseThreshold * (2 - currentSensitivity)
@@ -9821,9 +9824,7 @@ export default function FretMasterPage() {
       const targetSemitone = (rootValue + semitone) % 12
       const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
       
-      const cents = 1200 * Math.log2(frequency / targetFrequency)
-      const centsMod = Math.abs(cents) % 1200
-      const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+      const adjustedCents = getAdjustedCents(frequency, targetFrequency)
       
       const baseThreshold = frequency < 110 ? 35 : currentDegree === '1' ? 25 : 15
       const matchThreshold = baseThreshold * (2 - currentSensitivity)
@@ -9953,17 +9954,6 @@ export default function FretMasterPage() {
   const runPitchDetection = useCallback((analyser: AnalyserNode, ctx: AudioContext, scriptProcessor: ScriptProcessorNode) => {
     logger.debug('音高检测已启动，使用 ScriptProcessorNode，sampleRate:', ctx.sampleRate)
     setPitchDebugInfo(prev => ({ ...prev, isRunning: true }))
-    
-    // 音级到半音映射
-    const intervalToSemitones: Record<string, number> = {
-      "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8, "b6": 8, "6": 9, "#6": 10, "b7": 10, "7": 11,
-      "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
-    }
-    
-    // 音符到半音映射
-    const noteToSemitones: Record<string, number> = {
-      "C": 0, "C#": 1, "Cb": 11, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
-    }
     
     // 性能优化：防抖和节流变量
     let lastPitchUpdateTime = 0
@@ -10130,12 +10120,8 @@ export default function FretMasterPage() {
         const targetSemitone = noteToSemitones[currentTargetNote] || 0
         const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
         
-        // 优化音高匹配算法
-        const cents = 1200 * Math.log2(detectedFreq / targetFrequency)
-        const centsMod = Math.abs(cents) % 1200
-        const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
         
-        // 动态调整匹配阈值 - 与原文件一致
         const baseThreshold = detectedFreq < 110 ? 35 : 25
         const matchThreshold = baseThreshold * (2 - currentSensitivity)
         
@@ -10166,9 +10152,7 @@ export default function FretMasterPage() {
           const targetSemitone = (rootValue + intervalSemitone) % 12
           const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
           
-          const cents = 1200 * Math.log2(detectedFreq / targetFrequency)
-          const centsMod = Math.abs(cents) % 1200
-          const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+          const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
           
           const baseThreshold = detectedFreq < 110 ? 35 : interval === '1' ? 25 : 15
           const matchThreshold = baseThreshold * (2 - currentSensitivity)
@@ -10212,12 +10196,8 @@ export default function FretMasterPage() {
         const targetSemitone = (keyValue + semitone) % 12
         const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
         
-        // 优化音高匹配算法
-        const cents = 1200 * Math.log2(detectedFreq / targetFrequency)
-        const centsMod = Math.abs(cents) % 1200
-        const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
         
-        // 动态调整匹配阈值
         const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
         const matchThreshold = baseThreshold * (2 - currentSensitivity)
         
@@ -10251,12 +10231,8 @@ export default function FretMasterPage() {
         const targetSemitone = (rootValue + semitone) % 12
         const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
         
-        // 优化音高匹配算法
-        const cents = 1200 * Math.log2(detectedFreq / targetFrequency)
-        const centsMod = Math.abs(cents) % 1200
-        const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
         
-        // 动态调整匹配阈值
         const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
         const matchThreshold = baseThreshold * (2 - currentSensitivity)
         
@@ -10298,12 +10274,8 @@ export default function FretMasterPage() {
         const targetSemitone = (rootValue + semitone) % 12
         const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
         
-        // 优化音高匹配算法
-        const cents = 1200 * Math.log2(detectedFreq / targetFrequency)
-        const centsMod = Math.abs(cents) % 1200
-        const adjustedCents = centsMod > 600 ? 1200 - centsMod : centsMod
+        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
         
-        // 动态调整匹配阈值
         const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
         const matchThreshold = baseThreshold * (2 - currentSensitivity)
         
@@ -10606,10 +10578,6 @@ export default function FretMasterPage() {
       }
       // 减和弦系列
       if (['Dim', 'dim', 'dim7'].includes(type)) {
-        return 'diminished'
-      }
-      // 半减七和弦
-      if (['m7b5', 'm7b5nat9'].includes(type)) {
         return 'diminished'
       }
       // 减大七和弦

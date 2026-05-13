@@ -648,6 +648,10 @@ export const useAppStore = create<AppState & AppActions>()(
         premium: state.premium,
         customSongs: state.customSongs,
         favorites: state.favorites,
+        chordSymbols: state.chordSymbols,
+        scalePractice: state.scalePractice,
+        intervalPractice: state.intervalPractice,
+        chordProgression: state.chordProgression,
       }),
       migrate: (persistedState: any, version) => {
         try {

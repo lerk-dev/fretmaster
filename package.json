@@ -1,6 +1,6 @@
 {
   "name": "fretmaster",
-  "version": "0.2.81",
+  "version": "0.2.84",
   "private": true,
   "scripts": {
     "dev": "next dev",
