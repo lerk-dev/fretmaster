@@ -55,6 +55,25 @@ use std::sync::atomic::{AtomicBool, Ordering};
 static TRUE_FULLSCREEN_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_os = "windows")]
+use std::sync::Mutex;
+
+#[cfg(target_os = "windows")]
+#[derive(Clone)]
+struct SavedWindowRect {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+    style: isize,
+}
+
+#[cfg(target_os = "windows")]
+use once_cell::sync::Lazy;
+
+#[cfg(target_os = "windows")]
+static SAVED_WINDOW_RECT: Lazy<Mutex<Option<SavedWindowRect>>> = Lazy::new(|| Mutex::new(None));
+
+#[cfg(target_os = "windows")]
 #[tauri::command]
 pub async fn set_true_fullscreen<R: Runtime>(window: tauri::Window<R>, enable: bool) -> Result<(), String> {
     if enable {
@@ -68,20 +87,42 @@ pub async fn set_true_fullscreen<R: Runtime>(window: tauri::Window<R>, enable: b
         unsafe {
             use windows_sys::Win32::UI::WindowsAndMessaging::{
                 SetWindowPos, SetWindowLongPtrW, GetWindowLongPtrW,
-                HWND_TOPMOST, SWP_FRAMECHANGED,
-                GWL_STYLE, WS_OVERLAPPED, WS_CAPTION, WS_SYSMENU,
+                GetWindowRect, HWND_TOPMOST, SWP_FRAMECHANGED,
+                GWL_STYLE, WS_CAPTION, WS_SYSMENU,
                 WS_THICKFRAME, WS_MINIMIZEBOX, WS_MAXIMIZEBOX,
-                MONITOR_DEFAULTTONEAREST, MONITORINFOEXW,
             };
-            use windows_sys::Win32::Graphics::Gdi::{MonitorFromWindow, GetMonitorInfoW};
-            use windows_sys::Win32::Foundation::{RECT, BOOL};
+            use windows_sys::Win32::Graphics::Gdi::{MonitorFromWindow, GetMonitorInfoW, MONITOR_DEFAULTTONEAREST};
+            use windows_sys::Win32::Foundation::RECT;
+
+            let mut window_rect: RECT = std::mem::zeroed();
+            GetWindowRect(hwnd_handle, &mut window_rect);
+
+            let current_style = GetWindowLongPtrW(hwnd_handle, GWL_STYLE);
+
+            if let Ok(mut saved) = SAVED_WINDOW_RECT.lock() {
+                *saved = Some(SavedWindowRect {
+                    left: window_rect.left,
+                    top: window_rect.top,
+                    right: window_rect.right,
+                    bottom: window_rect.bottom,
+                    style: current_style,
+                });
+            }
 
             let monitor = MonitorFromWindow(hwnd_handle, MONITOR_DEFAULTTONEAREST);
-            let mut monitor_info: MONITORINFOEXW = std::mem::zeroed();
-            monitor_info.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+
+            #[repr(C)]
+            #[allow(non_snake_case)]
+            struct MonitorInfoExW {
+                monitorInfo: windows_sys::Win32::Graphics::Gdi::MONITORINFO,
+                deviceName: [u16; 32],
+            }
+
+            let mut monitor_info: MonitorInfoExW = std::mem::zeroed();
+            monitor_info.monitorInfo.cbSize = std::mem::size_of::<MonitorInfoExW>() as u32;
             let result = GetMonitorInfoW(
                 monitor,
-                &mut monitor_info as *mut MONITORINFOEXW as *mut _,
+                &mut monitor_info as *mut MonitorInfoExW as *mut _,
             );
             if result == 0 {
                 return Err("Failed to get monitor info".to_string());
@@ -93,9 +134,8 @@ pub async fn set_true_fullscreen<R: Runtime>(window: tauri::Window<R>, enable: b
             let screen_w = monitor_rect.right - monitor_rect.left;
             let screen_h = monitor_rect.bottom - monitor_rect.top;
 
-            let current_style = GetWindowLongPtrW(hwnd_handle, GWL_STYLE);
             let new_style = current_style
-                & !(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+                & !(WS_CAPTION as isize | WS_THICKFRAME as isize | WS_SYSMENU as isize | WS_MINIMIZEBOX as isize | WS_MAXIMIZEBOX as isize);
             SetWindowLongPtrW(hwnd_handle, GWL_STYLE, new_style);
 
             SetWindowPos(
@@ -128,21 +168,45 @@ pub async fn set_true_fullscreen<R: Runtime>(window: tauri::Window<R>, enable: b
                 WS_THICKFRAME, WS_MINIMIZEBOX, WS_MAXIMIZEBOX,
             };
 
-            let current_style = GetWindowLongPtrW(hwnd_handle, GWL_STYLE);
-            let new_style = current_style
-                | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU
-                | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
-            SetWindowLongPtrW(hwnd_handle, GWL_STYLE, new_style);
+            let saved_rect = SAVED_WINDOW_RECT.lock().ok().and_then(|s| s.clone());
 
-            SetWindowPos(
-                hwnd_handle,
-                HWND_NOTOPMOST,
-                0,
-                0,
-                0,
-                0,
-                SWP_FRAMECHANGED,
-            );
+            let restored_style = if let Some(ref saved) = saved_rect {
+                saved.style
+            } else {
+                let current_style = GetWindowLongPtrW(hwnd_handle, GWL_STYLE);
+                current_style
+                    | WS_OVERLAPPED as isize | WS_CAPTION as isize | WS_SYSMENU as isize
+                    | WS_THICKFRAME as isize | WS_MINIMIZEBOX as isize | WS_MAXIMIZEBOX as isize
+            };
+            SetWindowLongPtrW(hwnd_handle, GWL_STYLE, restored_style);
+
+            if let Some(saved) = saved_rect {
+                let w = saved.right - saved.left;
+                let h = saved.bottom - saved.top;
+                SetWindowPos(
+                    hwnd_handle,
+                    HWND_NOTOPMOST,
+                    saved.left,
+                    saved.top,
+                    w,
+                    h,
+                    SWP_FRAMECHANGED,
+                );
+            } else {
+                SetWindowPos(
+                    hwnd_handle,
+                    HWND_NOTOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_FRAMECHANGED,
+                );
+            }
+
+            if let Ok(mut saved) = SAVED_WINDOW_RECT.lock() {
+                *saved = None;
+            }
         }
 
         window.set_fullscreen(false).map_err(|e| e.to_string())?;
