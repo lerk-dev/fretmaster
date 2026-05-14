@@ -84,7 +84,6 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
     try {
       const deviceList = await nativeAudio.getAudioDevices()
       setDevices(deviceList)
-      // 如果没有选择设备但有默认设备，自动选择
       if (!audioSettings.selectedAudioDevice && deviceList.length > 0) {
         const defaultDevice = deviceList.find(d => d.isDefault) || deviceList[0]
         store.setSelectedAudioDevice(defaultDevice.name)
@@ -93,7 +92,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
       console.error('Failed to load audio devices:', error)
       toast.error(language === 'zh-CN' ? '加载音频设备失败' : 'Failed to load audio devices')
     }
-  }, [language, audioSettings.selectedAudioDevice, store])
+  }, [language, store])
   
   useEffect(() => {
     try {

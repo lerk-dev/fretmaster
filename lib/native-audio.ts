@@ -48,17 +48,19 @@ export interface DeviceChangeEvent {
 
 type UnlistenFn = () => void
 
-let deviceChangeListener: UnlistenFn | null = null
-let devicePollInterval: NodeJS.Timeout | null = null
-let lastDevices: AudioDeviceInfo[] = []
-let monitorStarted = false
+const deviceMonitorState = {
+  deviceChangeListener: null as UnlistenFn | null,
+  devicePollInterval: null as NodeJS.Timeout | null,
+  lastDevices: [] as AudioDeviceInfo[],
+  monitorStarted: false,
+}
 
 export async function getAudioDevices(): Promise<AudioDeviceInfo[]> {
   if (!isTauri()) return []
   try {
     const invoke = await getInvoke()
     const devices = await invoke<AudioDeviceInfo[]>('get_audio_devices')
-    lastDevices = devices
+    deviceMonitorState.lastDevices = devices
     return devices
   } catch (error) {
     console.error('Failed to get audio devices:', error)
@@ -73,16 +75,16 @@ export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) =
     const invoke = await getInvoke()
     const listen = await getListen()
 
-    if (!monitorStarted) {
+    if (!deviceMonitorState.monitorStarted) {
       await invoke('start_device_monitor', { intervalMs: 1500 })
-      monitorStarted = true
+      deviceMonitorState.monitorStarted = true
     }
 
-    deviceChangeListener = await listen<DeviceChangeEvent>('audio-device-changed', (event) => {
-      lastDevices = event.payload.devices
+    deviceMonitorState.deviceChangeListener = await listen<DeviceChangeEvent>('audio-device-changed', (event) => {
+      deviceMonitorState.lastDevices = event.payload.devices
       callback(event.payload)
     })
-    return deviceChangeListener
+    return deviceMonitorState.deviceChangeListener
   } catch (error) {
     console.warn('Tauri event-based monitoring unavailable, falling back to polling:', error)
     startDevicePolling(callback, 2000)
@@ -91,15 +93,15 @@ export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) =
 }
 
 export function unlistenDeviceChanges(): void {
-  if (deviceChangeListener) {
-    deviceChangeListener()
-    deviceChangeListener = null
+  if (deviceMonitorState.deviceChangeListener) {
+    deviceMonitorState.deviceChangeListener()
+    deviceMonitorState.deviceChangeListener = null
   }
   stopDevicePolling()
   
-  if (monitorStarted && isTauri()) {
+  if (deviceMonitorState.monitorStarted && isTauri()) {
     getInvoke().then(invoke => invoke('stop_device_monitor')).catch(() => {})
-    monitorStarted = false
+    deviceMonitorState.monitorStarted = false
   }
 }
 
@@ -107,19 +109,19 @@ export function startDevicePolling(callback: (event: DeviceChangeEvent) => void,
   if (!isTauri()) return
   
   getAudioDevices().then(() => {
-    devicePollInterval = setInterval(async () => {
+    deviceMonitorState.devicePollInterval = setInterval(async () => {
       try {
         const invoke = await getInvoke()
         const newDevices = await invoke<AudioDeviceInfo[]>('get_audio_devices')
         
-        const added = newDevices.filter(d => !lastDevices.some(ld => ld.name === d.name))
-        const removed = lastDevices.filter(d => !newDevices.some(nd => nd.name === d.name)).map(d => d.name)
+        const added = newDevices.filter(d => !deviceMonitorState.lastDevices.some(ld => ld.name === d.name))
+        const removed = deviceMonitorState.lastDevices.filter(d => !newDevices.some(nd => nd.name === d.name)).map(d => d.name)
         
         if (added.length > 0 || removed.length > 0) {
           callback({ added, removed, devices: newDevices })
         }
         
-        lastDevices = newDevices
+        deviceMonitorState.lastDevices = newDevices
       } catch (error) {
         console.error('Device polling error:', error)
       }
@@ -128,9 +130,9 @@ export function startDevicePolling(callback: (event: DeviceChangeEvent) => void,
 }
 
 export function stopDevicePolling(): void {
-  if (devicePollInterval) {
-    clearInterval(devicePollInterval)
-    devicePollInterval = null
+  if (deviceMonitorState.devicePollInterval) {
+    clearInterval(deviceMonitorState.devicePollInterval)
+    deviceMonitorState.devicePollInterval = null
   }
 }
 

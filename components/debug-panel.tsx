@@ -81,7 +81,8 @@ const DebugPanelInner = memo(function DebugPanelInner() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const frameCountRef = useRef(0)
   const lastFpsTimeRef = useRef(Date.now())
-  
+  const invokeRef = useRef<((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | null>(null)
+
   const store = useAppStore()
   const audioSettings = store?.audio || { selectedAudioDevice: '', inputGain: 1 }
 
@@ -89,7 +90,11 @@ const DebugPanelInner = memo(function DebugPanelInner() {
     const startTime = performance.now()
 
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
+      if (!invokeRef.current) {
+        const { invoke } = await import('@tauri-apps/api/core')
+        invokeRef.current = invoke
+      }
+      const invoke = invokeRef.current
       
       const [pitch, status, audioLevel] = await Promise.all([
         invoke<{

@@ -68,8 +68,11 @@ const EXERCISE_TYPE_LABELS: Record<string, string> = {
   'scale': '音阶练习',
   'chord': '和弦练习',
   'chord_progression': '和弦进行',
-  '未知练习': '其他',
 };
+
+function getExerciseTypeLabel(type: string): string {
+  return EXERCISE_TYPE_LABELS[type] || '其他'
+}
 
 export const StatsPanel = memo(function StatsPanel() {
   const [summary, setSummary] = useState<StatsSummary | null>(null);
@@ -160,7 +163,7 @@ export const StatsPanel = memo(function StatsPanel() {
   // 练习类型分布（饼图）
   const exerciseTypePieData = useMemo(() => {
     return Object.entries(exerciseTypes).map(([type, stats]: [string, any], index) => ({
-      name: EXERCISE_TYPE_LABELS[type] || type,
+      name: getExerciseTypeLabel(type),
       value: stats.count,
       color: COLORS[index % COLORS.length],
       duration: stats.totalDuration,
@@ -170,7 +173,7 @@ export const StatsPanel = memo(function StatsPanel() {
   // 练习类型得分（柱状图）
   const exerciseTypeBarData = useMemo(() => {
     return Object.entries(exerciseTypes).map(([type, stats]: [string, any], index) => ({
-      name: EXERCISE_TYPE_LABELS[type] || type,
+      name: getExerciseTypeLabel(type),
       avgScore: stats.avgScore,
       count: stats.count,
       duration: Math.round(stats.totalDuration / 60),
@@ -184,7 +187,7 @@ export const StatsPanel = memo(function StatsPanel() {
       index: i + 1,
       score: stat.score || 0,
       accuracy: stat.accuracy ? Math.round(stat.accuracy * 100) : 0,
-      type: EXERCISE_TYPE_LABELS[stat.exercise_type || stat.exerciseType || ''] || stat.exercise_type || '',
+      type: getExerciseTypeLabel(stat.exercise_type || stat.exerciseType || ''),
     }));
   }, [recentStats]);
 
@@ -526,7 +529,7 @@ export const StatsPanel = memo(function StatsPanel() {
                     <div className="w-2 h-2 rounded-full bg-primary" />
                     <div>
                       <p className="text-sm font-medium">
-                        {EXERCISE_TYPE_LABELS[stat.exercise_type || stat.exerciseType || ''] || stat.exercise_type || stat.exerciseType || '未知'}
+                        {getExerciseTypeLabel(stat.exercise_type || stat.exerciseType || '')}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
                         {formatDate(stat.created_at || stat.date || '')} · {formatDuration(stat.duration || 0)}

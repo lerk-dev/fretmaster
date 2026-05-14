@@ -31,10 +31,15 @@ export const FocusMode = memo(function FocusMode({
   const [pomodoroCount, setPomodoroCount] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const pomodoroRef = useRef<NodeJS.Timeout | null>(null)
+  const phaseDurationRef = useRef(25 * 60)
+  const phaseRef = useRef<'work' | 'break'>('work')
 
   const workDuration = focusMode.targetDuration || 25
   const breakDuration = 5
   const currentPhaseDuration = pomodoroPhase === 'work' ? workDuration * 60 : breakDuration * 60
+
+  phaseDurationRef.current = currentPhaseDuration
+  phaseRef.current = pomodoroPhase
   const progressPercent = currentPhaseDuration > 0 ? (pomodoroTime / currentPhaseDuration) * 100 : 0
 
   const t = useCallback((key: string) => {
@@ -98,8 +103,8 @@ export const FocusMode = memo(function FocusMode({
       pomodoroRef.current = setInterval(() => {
         setPomodoroTime(prev => {
           const next = prev + 1
-          if (next >= currentPhaseDuration) {
-            if (pomodoroPhase === 'work') {
+          if (next >= phaseDurationRef.current) {
+            if (phaseRef.current === 'work') {
               setPomodoroPhase('break')
               setPomodoroCount(c => c + 1)
             } else {
@@ -117,7 +122,7 @@ export const FocusMode = memo(function FocusMode({
         pomodoroRef.current = null
       }
     }
-  }, [pomodoroRunning, currentPhaseDuration, pomodoroPhase])
+  }, [pomodoroRunning])
 
   const togglePomodoro = useCallback(() => {
     setPomodoroRunning(prev => !prev)

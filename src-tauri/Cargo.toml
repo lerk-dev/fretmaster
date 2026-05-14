@@ -1,6 +1,6 @@
 [package]
 name = "fretmaster"
-version = "0.2.70"
+version = "0.2.86"
 description = "FretMaster - Professional Guitar Fretboard Practice Tool"
 authors = ["FretMaster Team"]
 edition = "2021"

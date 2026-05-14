@@ -181,45 +181,49 @@ function drawChineseTextAsImage(
   canvas.style.display = 'none'
   document.body.appendChild(canvas)
 
-  const ctx = canvas.getContext('2d')
-  if (!ctx) {
-    document.body.removeChild(canvas)
-    doc.setFontSize(fontSize)
-    doc.setTextColor(color[0], color[1], color[2])
-    doc.text(text, x, y, { align })
-    return
+  try {
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      doc.setFontSize(fontSize)
+      doc.setTextColor(color[0], color[1], color[2])
+      doc.text(text, x, y, { align })
+      return
+    }
+
+    ctx.font = `${canvasFontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "SimHei", sans-serif`
+
+    const metrics = ctx.measureText(text)
+    const textWidth = metrics.width
+    const textHeight = canvasFontSize * 1.3
+
+    canvas.width = Math.ceil(textWidth + 4 * scale)
+    canvas.height = Math.ceil(textHeight + 4 * scale)
+
+    ctx.font = `${canvasFontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "SimHei", sans-serif`
+    ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`
+    ctx.textBaseline = 'top'
+    ctx.fillText(text, 2 * scale, 2 * scale)
+
+    const imageData = canvas.toDataURL('image/png')
+
+    const imgWidth = (canvas.width / scale) * (72 / 96)
+    const imgHeight = (canvas.height / scale) * (72 / 96)
+
+    let imgX = x
+    if (align === 'center') {
+      imgX = x - imgWidth / 2
+    } else if (align === 'right') {
+      imgX = x - imgWidth
+    }
+
+    const imgY = y - imgHeight * 0.75
+
+    doc.addImage(imageData, 'PNG', imgX, imgY, imgWidth, imgHeight)
+  } finally {
+    if (canvas.parentNode) {
+      document.body.removeChild(canvas)
+    }
   }
-
-  ctx.font = `${canvasFontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "SimHei", sans-serif`
-
-  const metrics = ctx.measureText(text)
-  const textWidth = metrics.width
-  const textHeight = canvasFontSize * 1.3
-
-  canvas.width = Math.ceil(textWidth + 4 * scale)
-  canvas.height = Math.ceil(textHeight + 4 * scale)
-
-  ctx.font = `${canvasFontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "SimHei", sans-serif`
-  ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`
-  ctx.textBaseline = 'top'
-  ctx.fillText(text, 2 * scale, 2 * scale)
-
-  const imageData = canvas.toDataURL('image/png')
-  document.body.removeChild(canvas)
-
-  const imgWidth = (canvas.width / scale) * (72 / 96)
-  const imgHeight = (canvas.height / scale) * (72 / 96)
-
-  let imgX = x
-  if (align === 'center') {
-    imgX = x - imgWidth / 2
-  } else if (align === 'right') {
-    imgX = x - imgWidth
-  }
-
-  const imgY = y - imgHeight * 0.75
-
-  doc.addImage(imageData, 'PNG', imgX, imgY, imgWidth, imgHeight)
 }
 
 export function generatePDF(stats: PracticeStats[], options: ExportOptions): jsPDF {

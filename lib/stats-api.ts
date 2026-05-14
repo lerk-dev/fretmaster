@@ -6,7 +6,13 @@ import { logger } from './logger'
 const API_BASE_URL = '/cgi-bin';
 
 // 检查是否在开发环境
-const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const isDev = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname.startsWith('192.168.') ||
+  window.location.hostname.startsWith('10.') ||
+  window.location.hostname.startsWith('172.')
+);
 
 // 检查是否在 Tauri 环境（Windows 桌面版）
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
