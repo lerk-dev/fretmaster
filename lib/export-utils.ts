@@ -110,6 +110,14 @@ export function exportToCSV(stats: PracticeStats[], options: ExportOptions): str
     ? ['日期', '练习类型', '得分', '时长(分钟)', '准确率', '备注']
     : ['Date', 'Type', 'Score', 'Duration(min)', 'Accuracy', 'Notes']
 
+  const sanitizeCsvCell = (value: string): string => {
+    let sanitized = value.replace(/"/g, '""').replace(/\r?\n/g, ' ')
+    if (/^[=+\-@\t\r]/.test(sanitized)) {
+      sanitized = "'" + sanitized
+    }
+    return sanitized
+  }
+
   const rows = stats.map(stat => [
     stat.created_at || stat.date || '',
     language === 'zh-CN'
@@ -118,7 +126,7 @@ export function exportToCSV(stats: PracticeStats[], options: ExportOptions): str
     String(stat.score || 0),
     String(Math.round((stat.duration || 0) / 60)),
     `${stat.accuracy || 0}%`,
-    (stat.notes || '').replace(/"/g, '""').replace(/\r?\n/g, ' '),
+    sanitizeCsvCell(stat.notes || ''),
   ])
 
   const BOM = '\uFEFF'
@@ -174,6 +182,13 @@ function drawChineseTextAsImage(
   maxWidth: number = 0,
   align: 'left' | 'center' | 'right' = 'left'
 ): void {
+  if (typeof document === 'undefined') {
+    doc.setFontSize(fontSize)
+    doc.setTextColor(color[0], color[1], color[2])
+    doc.text(text, x, y, { align })
+    return
+  }
+
   const canvas = document.createElement('canvas')
   const scale = 3
   const canvasFontSize = fontSize * scale
@@ -223,6 +238,9 @@ function drawChineseTextAsImage(
     if (canvas.parentNode) {
       document.body.removeChild(canvas)
     }
+    // P1 Fix: Explicitly clear canvas to free memory
+    canvas.width = 0
+    canvas.height = 0
   }
 }
 

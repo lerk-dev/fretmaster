@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use rustfft::{FftPlanner, num_complex::Complex};
+use rustfft::{FftPlanner, num_complex::Complex, Fft};
+use std::sync::Arc;
 
 const MIN_FREQUENCY: f32 = 27.5;
 const MAX_FREQUENCY: f32 = 4186.0;
@@ -76,6 +77,9 @@ pub struct PitchDetector {
     adaptive_threshold: f32,
     noise_floor: f32,
     adaptive_buffer_size: usize,
+    cached_fft_size: usize,
+    cached_fft_forward: Option<Arc<dyn Fft<f32>>>,
+    cached_fft_inverse: Option<Arc<dyn Fft<f32>>>,
 }
 
 impl PitchDetector {
@@ -89,6 +93,9 @@ impl PitchDetector {
             smoothed_frequency: None,
             adaptive_threshold: DEFAULT_THRESHOLD,
             noise_floor: 0.0,
+            cached_fft_size: 0,
+            cached_fft_forward: None,
+            cached_fft_inverse: None,
         }
     }
 
@@ -165,12 +172,21 @@ impl PitchDetector {
 
         let frequency = self.config.sample_rate as f32 / refined_tau;
 
+        // P0 Fix: Enhanced low-frequency stability check
         if frequency < MIN_FREQUENCY * 0.95 || frequency > MAX_FREQUENCY * 1.05 {
             return None;
         }
 
         if frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY {
             return None;
+        }
+
+        // P0 Fix: Reject unstable low-frequency detections (< 80Hz)
+        if frequency < 80.0 {
+            let harmonic_check = self.check_harmonics(frequency, half_size);
+            if harmonic_check < 0.6 {
+                return None;
+            }
         }
 
         let yin_probability = 1.0 - self.yin_buffer[tau];
@@ -244,9 +260,16 @@ impl PitchDetector {
 
         let n = buffer.len();
         let fft_size = n.next_power_of_two();
-        let mut planner = FftPlanner::new();
-        let fft = planner.plan_fft_forward(fft_size);
-        let ifft = planner.plan_fft_inverse(fft_size);
+
+        if self.cached_fft_size != fft_size {
+            let mut planner = FftPlanner::new();
+            self.cached_fft_forward = Some(planner.plan_fft_forward(fft_size));
+            self.cached_fft_inverse = Some(planner.plan_fft_inverse(fft_size));
+            self.cached_fft_size = fft_size;
+        }
+
+        let fft = self.cached_fft_forward.as_ref().unwrap();
+        let ifft = self.cached_fft_inverse.as_ref().unwrap();
 
         let mut signal: Vec<Complex<f32>> = buffer.iter()
             .map(|&x| Complex { re: x, im: 0.0 })

@@ -34,41 +34,60 @@ export interface PracticeStats {
   accuracy?: number;
   notes?: string;
   created_at?: string;
-  // 兼容旧版本的字段
   date?: string;
   exerciseType?: string;
+}
+
+function normalizeStatsFields(stats: PracticeStats): PracticeStats {
+  const exerciseType = stats.exercise_type || stats.exerciseType || '未知练习'
+  return {
+    ...stats,
+    exercise_type: exerciseType,
+    exerciseType: exerciseType,
+    date: stats.date || stats.created_at,
+    created_at: stats.created_at || stats.date,
+  }
 }
 
 // 保存练习数据
 export async function savePracticeStats(
   stats: Omit<PracticeStats, 'id' | 'created_at' | 'device_id'>
 ): Promise<{ status: string; message: string; id?: number }> {
+  const validatedScore = typeof stats.score === 'number' && isFinite(stats.score) ? Math.max(0, Math.round(stats.score)) : 0
+  const validatedDuration = typeof stats.duration === 'number' && isFinite(stats.duration) ? Math.max(0, Math.round(stats.duration)) : 0
+  const validatedAccuracy = typeof stats.accuracy === 'number' && isFinite(stats.accuracy) ? Math.max(0, Math.min(100, stats.accuracy)) : 0
+  const validatedExerciseType = (stats.exercise_type || stats.exerciseType || '').toString().slice(0, 100) || '未知练习'
+  const validatedNotes = (stats.notes || '').toString().slice(0, 1000)
+
   // Windows 版本使用 SQLite
   if (isTauri) {
     const { savePracticeStats: nativeSave } = await import('./native-stats');
-    return nativeSave(stats);
+    return nativeSave({
+      exercise_type: validatedExerciseType,
+      score: validatedScore,
+      duration: validatedDuration,
+      accuracy: validatedAccuracy,
+      notes: validatedNotes,
+    });
   }
   
   const userId = getUserId();
   
-  // 转换字段名以匹配 API 期望的格式
   const data = {
     device_id: userId,
-    exercise_type: stats.exercise_type || stats.exerciseType || '未知练习',
-    score: stats.score,
-    duration: stats.duration,
-    accuracy: stats.accuracy,
-    notes: stats.notes || '',
+    exercise_type: validatedExerciseType,
+    score: validatedScore,
+    duration: validatedDuration,
+    accuracy: validatedAccuracy,
+    notes: validatedNotes,
   };
 
   // 开发环境下只保存到本地
   if (isDev) {
-    const backupData: PracticeStats = {
+    const backupData: PracticeStats = normalizeStatsFields({
       ...data,
       created_at: new Date().toISOString(),
-      date: new Date().toISOString(),
-      exerciseType: data.exercise_type,
-    };
+    });
     saveToLocalBackup(backupData);
     return { status: 'success', message: '已保存到本地（开发模式）', id: Date.now() };
   }
@@ -89,25 +108,21 @@ export async function savePracticeStats(
     const result = await response.json();
     
     // 同时保存到本地备份
-    const backupData: PracticeStats = {
+    const backupData: PracticeStats = normalizeStatsFields({
       ...data,
       id: result.id,
       created_at: new Date().toISOString(),
-      date: new Date().toISOString(),
-      exerciseType: data.exercise_type,
-    };
+    });
     saveToLocalBackup(backupData);
     
     return result;
   } catch (error) {
     logger.error('保存统计数据失败:', error);
     // 如果网络请求失败，保存到本地 LocalStorage 作为备份
-    const backupData: PracticeStats = {
+    const backupData: PracticeStats = normalizeStatsFields({
       ...data,
       created_at: new Date().toISOString(),
-      date: new Date().toISOString(),
-      exerciseType: data.exercise_type,
-    };
+    });
     saveToLocalBackup(backupData);
     throw error;
   }
@@ -136,11 +151,7 @@ export async function getAllPracticeStats(): Promise<PracticeStats[]> {
     const data = await response.json();
     
     // 转换字段名以兼容前端显示
-    const formatted = Array.isArray(data) ? data.map(item => ({
-      ...item,
-      date: item.created_at,
-      exerciseType: item.exercise_type,
-    })) : [];
+    const formatted = Array.isArray(data) ? data.map((item: PracticeStats) => normalizeStatsFields(item)) : [];
     
     return formatted;
   } catch (error) {

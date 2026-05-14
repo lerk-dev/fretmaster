@@ -525,10 +525,20 @@ export const useAppStore = create<AppState & AppActions>()(
       setUseAudioWorklet: (use) => set((state) => ({ audio: { ...state.audio, useAudioWorklet: use } })),
       setSelectedAudioDevice: (deviceId) => set((state) => ({ audio: { ...state.audio, selectedAudioDevice: deviceId } })),
       setPitchAlgorithm: (algorithm) => set((state) => ({ audio: { ...state.audio, pitchAlgorithm: algorithm } })),
-      // Windows 版本音频设置
-      setBufferSize: (size) => set((state) => ({ audio: { ...state.audio, bufferSize: size } })),
-      setSampleRate: (rate) => set((state) => ({ audio: { ...state.audio, sampleRate: rate } })),
-      setNoiseSuppression: (level) => set((state) => ({ audio: { ...state.audio, noiseSuppression: level } })),
+      // Windows 版本音频设置 - P1 Fix: Added input validation
+      setBufferSize: (size) => set((state) => {
+        const validSizes = [256, 512, 1024, 2048, 4096]
+        const validSize = validSizes.includes(size) ? size : 2048
+        return { audio: { ...state.audio, bufferSize: validSize } }
+      }),
+      setSampleRate: (rate) => set((state) => {
+        const validRates = [44100, 48000, 96000, 192000]
+        const validRate = validRates.includes(rate) ? rate : 48000
+        return { audio: { ...state.audio, sampleRate: validRate } }
+      }),
+      setNoiseSuppression: (level) => set((state) => ({
+        audio: { ...state.audio, noiseSuppression: Math.max(0, Math.min(100, level)) }
+      })),
       setEnableHighPass: (enabled) => set((state) => ({ audio: { ...state.audio, enableHighPass: enabled } })),
       setEnableLowPass: (enabled) => set((state) => ({ audio: { ...state.audio, enableLowPass: enabled } })),
       setEnableNotch50: (enabled) => set((state) => ({ audio: { ...state.audio, enableNotch50: enabled } })),

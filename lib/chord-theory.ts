@@ -137,6 +137,80 @@ export function getPreferredVisualNote(toneId: number, preferSharp: boolean = tr
   return toneId
 }
 
+// ==================== 等音处理 (Enharmonic) ====================
+
+export interface EnharmonicGroup {
+  toneId: number
+  sharpName: string
+  flatName: string
+  unicodeSharp: string
+  unicodeFlat: string
+}
+
+export const ENHARMONIC_GROUPS: EnharmonicGroup[] = [
+  { toneId: 0, sharpName: 'C', flatName: 'C', unicodeSharp: 'C', unicodeFlat: 'C' },
+  { toneId: 1, sharpName: 'C#', flatName: 'Db', unicodeSharp: 'C♯', unicodeFlat: 'D♭' },
+  { toneId: 2, sharpName: 'D', flatName: 'D', unicodeSharp: 'D', unicodeFlat: 'D' },
+  { toneId: 3, sharpName: 'D#', flatName: 'Eb', unicodeSharp: 'D♯', unicodeFlat: 'E♭' },
+  { toneId: 4, sharpName: 'E', flatName: 'E', unicodeSharp: 'E', unicodeFlat: 'E' },
+  { toneId: 5, sharpName: 'F', flatName: 'F', unicodeSharp: 'F', unicodeFlat: 'F' },
+  { toneId: 6, sharpName: 'F#', flatName: 'Gb', unicodeSharp: 'F♯', unicodeFlat: 'G♭' },
+  { toneId: 7, sharpName: 'G', flatName: 'G', unicodeSharp: 'G', unicodeFlat: 'G' },
+  { toneId: 8, sharpName: 'G#', flatName: 'Ab', unicodeSharp: 'G♯', unicodeFlat: 'A♭' },
+  { toneId: 9, sharpName: 'A', flatName: 'A', unicodeSharp: 'A', unicodeFlat: 'A' },
+  { toneId: 10, sharpName: 'A#', flatName: 'Bb', unicodeSharp: 'A♯', unicodeFlat: 'B♭' },
+  { toneId: 11, sharpName: 'B', flatName: 'B', unicodeSharp: 'B', unicodeFlat: 'B' },
+]
+
+export function getEnharmonicGroup(toneId: number): EnharmonicGroup {
+  const normalized = ((toneId % 12) + 12) % 12
+  return ENHARMONIC_GROUPS[normalized]
+}
+
+export function areEnharmonicEquivalent(noteA: number, noteB: number): boolean {
+  return ((noteA % 12) + 12) % 12 === ((noteB % 12) + 12) % 12
+}
+
+export function normalizeNoteName(noteStr: string): string {
+  const toneId = noteFromString(noteStr)
+  if (toneId === null) return noteStr.trim().toUpperCase()
+  const group = getEnharmonicGroup(toneId)
+  if (noteStr.includes('b') || noteStr.includes('♭')) {
+    return group.flatName
+  }
+  return group.sharpName
+}
+
+export function getNoteNameWithEnharmonicPreference(
+  toneId: number,
+  contextKey: number | null = null,
+  preferSharp: boolean = true,
+  useUnicode: boolean = false
+): string {
+  const normalized = ((toneId % 12) + 12) % 12
+  const group = ENHARMONIC_GROUPS[normalized]
+
+  if (contextKey !== null) {
+    const keyNormalized = ((contextKey % 12) + 12) % 12
+    const keyGroup = ENHARMONIC_GROUPS[keyNormalized]
+    const keyName = keyGroup.sharpName
+    const hasSharpInKey = keyName.includes('#') || ['G', 'D', 'A', 'E', 'B', 'F#', 'C#'].includes(keyName)
+    const preferSharpForContext = !hasSharpInKey && ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'].includes(keyName)
+      ? false
+      : true
+
+    if (useUnicode) {
+      return preferSharpForContext ? group.unicodeSharp : group.unicodeFlat
+    }
+    return preferSharpForContext ? group.sharpName : group.flatName
+  }
+
+  if (useUnicode) {
+    return preferSharp ? group.unicodeSharp : group.unicodeFlat
+  }
+  return preferSharp ? group.sharpName : group.flatName
+}
+
 // ==================== 和声功能枚举 (Function) ====================
 export enum ChordFunction {
   I = 'I',
@@ -405,18 +479,16 @@ export function chordTypeToTokens(chordType: ChordType): ChordToken[] {
   return tokenMap[chordType] ?? []
 }
 
+const chordTypeTokenMap: Map<string, ChordType> = new Map(
+  Object.values(ChordType).map(t => {
+    const tokens = chordTypeToTokens(t as ChordType)
+    return [tokens.map(tk => tk).join(','), t as ChordType]
+  })
+)
+
 export function chordTypeFromTokens(tokens: ChordToken[]): ChordType | null {
   const tokenStr = tokens.map(t => t).join(',')
-  for (const [type, typeTokens] of Object.entries(
-    Object.fromEntries(
-      Object.values(ChordType).map(t => [t, chordTypeToTokens(t as ChordType)])
-    )
-  )) {
-    if ((typeTokens as ChordToken[]).join(',') === tokenStr) {
-      return type as ChordType
-    }
-  }
-  return null
+  return chordTypeTokenMap.get(tokenStr) ?? null
 }
 
 export function getChordTypeDisplayString(chordType: ChordType, minorSymbol: string = 'm', minor7flat5Symbol: string = 'ø7'): string {
@@ -667,100 +739,108 @@ export class ChordTokenizer {
     const firstTwoChars = str.slice(0, 2).toLowerCase()
     const firstThreeChars = str.slice(0, 3).toLowerCase()
     const firstFourChars = str.slice(0, 4).toLowerCase()
-    
+
+    if (firstThreeChars === 'b13' || firstThreeChars === '♭13') {
+      return { token: ChordToken.FLAT_THIRTEEN, remaining: str.slice(3) }
+    }
+
+    if (firstThreeChars === '#11' || firstThreeChars === '♯11') {
+      return { token: ChordToken.SHARP_ELEVEN, remaining: str.slice(3) }
+    }
+
+    if (firstTwoChars === '#9' || firstTwoChars === '♯9') {
+      return { token: ChordToken.SHARP_NINE, remaining: str.slice(2) }
+    }
+
+    if (firstTwoChars === 'b9' || firstTwoChars === '♭9') {
+      return { token: ChordToken.FLAT_NINE, remaining: str.slice(2) }
+    }
+
+    if (firstTwoChars === 'b6' || firstTwoChars === '♭6') {
+      return { token: ChordToken.FLAT_SIX, remaining: str.slice(2) }
+    }
+
+    if (firstTwoChars === '#5' || firstTwoChars === '♯5') {
+      return { token: ChordToken.SHARP_FIVE, remaining: str.slice(2) }
+    }
+
+    if (firstTwoChars === 'b5' || firstTwoChars === '♭5') {
+      return { token: ChordToken.FLAT_FIVE, remaining: str.slice(2) }
+    }
+
+    if (firstChar === 'b' || firstChar === '♭') {
+      return { token: ChordToken.FLAT, remaining: str.slice(1) }
+    }
+
+    if (firstChar === '#' || firstChar === '♯') {
+      return { token: ChordToken.SHARP, remaining: str.slice(1) }
+    }
+
     if (ROOT_NOTE_TOKENS.map(t => getChordTokenDisplayString(t)).includes(firstChar)) {
       const token = Object.values(ChordToken).find(t => getChordTokenDisplayString(t) === firstChar)
       if (token) {
         return { token, remaining: str.slice(1) }
       }
     }
-    
+
     if (firstChar === '/') {
       return { token: ChordToken.SLASH, remaining: str.slice(1) }
     }
-    
-    if (firstChar === 'b' || firstChar === '♭') {
-      return { token: ChordToken.FLAT, remaining: str.slice(1) }
-    }
-    
-    if (firstChar === '#' || firstChar === '♯') {
-      return { token: ChordToken.SHARP, remaining: str.slice(1) }
-    }
-    
+
     if (firstFourChars === 'maj7' || firstFourChars === 'maj9' || firstFourChars === 'maj13' || firstFourChars === 'majΔ') {
       return { token: ChordToken.MAJOR, remaining: str.slice(3) }
     }
-    
+
     if (firstThreeChars === 'maj' || firstThreeChars === 'Δ') {
       return { token: ChordToken.MAJOR, remaining: str.slice(3) }
     }
-    
-    if (firstThreeChars === 'min' || firstThreeChars === 'min') {
+
+    if (firstThreeChars === 'min') {
       return { token: ChordToken.MINOR, remaining: str.slice(3) }
     }
-    
-    if (firstChar === 'm' && str.length > 1 && !['a', 'i', 'n'].includes(str[1].toLowerCase())) {
+
+    if (firstChar === 'M' && str.length > 1 && /^[0-9]/.test(str.slice(1))) {
+      return { token: ChordToken.MAJOR, remaining: str.slice(1) }
+    }
+
+    if (firstChar === 'M' && str.length > 1 && !['a', 'j'].includes(str[1].toLowerCase())) {
       return { token: ChordToken.MINOR, remaining: str.slice(1) }
     }
-    
+
+    if (firstChar === 'M' && str.length === 1) {
+      return { token: ChordToken.MAJOR, remaining: str.slice(1) }
+    }
+
     if (firstChar === '-' || firstChar === '−') {
       return { token: ChordToken.MINOR, remaining: str.slice(1) }
     }
-    
+
     if (firstFourChars === 'dim7' || firstFourChars === '°7') {
       return { token: ChordToken.DIMINISHED, remaining: str.slice(3) }
     }
-    
+
     if (firstThreeChars === 'dim' || firstChar === '°') {
       return { token: ChordToken.DIMINISHED, remaining: str.slice(firstChar === '°' ? 1 : 3) }
     }
-    
+
     if (firstThreeChars === 'aug' || firstChar === '+') {
       return { token: ChordToken.AUGMENTED, remaining: str.slice(firstChar === '+' ? 1 : 3) }
     }
-    
+
     if (firstFourChars === 'sus2') {
       return { token: ChordToken.SUS2, remaining: str.slice(4) }
     }
-    
+
     if (firstFourChars === 'sus4' || firstThreeChars === 'sus') {
       return { token: ChordToken.SUS4, remaining: str.slice(firstThreeChars === 'sus' ? 3 : 4) }
     }
-    
+
     if (firstFourChars === 'add9') {
       return { token: ChordToken.ADD9, remaining: str.slice(4) }
     }
-    
+
     if (firstThreeChars === 'alt') {
       return { token: ChordToken.ALT, remaining: str.slice(3) }
-    }
-    
-    if (firstThreeChars === 'b13' || firstThreeChars === '♭13') {
-      return { token: ChordToken.FLAT_THIRTEEN, remaining: str.slice(3) }
-    }
-    
-    if (firstThreeChars === '#11' || firstThreeChars === '♯11') {
-      return { token: ChordToken.SHARP_ELEVEN, remaining: str.slice(3) }
-    }
-    
-    if (firstTwoChars === '#9' || firstTwoChars === '♯9') {
-      return { token: ChordToken.SHARP_NINE, remaining: str.slice(2) }
-    }
-    
-    if (firstTwoChars === 'b9' || firstTwoChars === '♭9') {
-      return { token: ChordToken.FLAT_NINE, remaining: str.slice(2) }
-    }
-    
-    if (firstTwoChars === 'b6' || firstTwoChars === '♭6') {
-      return { token: ChordToken.FLAT_SIX, remaining: str.slice(2) }
-    }
-    
-    if (firstTwoChars === '#5' || firstTwoChars === '♯5') {
-      return { token: ChordToken.SHARP_FIVE, remaining: str.slice(2) }
-    }
-    
-    if (firstTwoChars === 'b5' || firstTwoChars === '♭5') {
-      return { token: ChordToken.FLAT_FIVE, remaining: str.slice(2) }
     }
     
     if (firstTwoChars === '13') {
@@ -783,8 +863,11 @@ export class ChordTokenizer {
       return { token: ChordToken.SIX, remaining: str.slice(1) }
     }
     
-    if (firstTwoChars === 'ø7' || firstTwoChars === 'ø') {
-      return { token: ChordToken.MINOR, remaining: str.slice(0) }
+    if (firstTwoChars === 'ø7') {
+      return { token: ChordToken.MINOR, remaining: str.slice(2) }
+    }
+    if (firstChar === 'ø') {
+      return { token: ChordToken.MINOR, remaining: str.slice(1) }
     }
     
     return { token: null, remaining: str.slice(1) }
@@ -979,9 +1062,36 @@ export function getIntervalDisplayName(interval: string, useUnicode: boolean = t
   return useUnicode ? info.unicode : info.standard
 }
 
-// ==================== 导出便捷函数 ====================
+// ==================== 缓存系统 ====================
+const chordParseCache = new Map<string, ParsedChord | null>()
+const chordNotesCache = new Map<string, number[]>()
+const chordDisplayCache = new Map<string, string>()
+const chordTypeTokenCache = new Map<ChordType, ChordToken[]>()
+
+const MAX_CACHE_SIZE = 1000
+
+function getCacheKey<T extends Record<string, unknown>>(prefix: string, params: T): string {
+  return prefix + ':' + Object.entries(params).map(([k, v]) => `${k}=${v}`).join(',')
+}
+
+function setCacheWithLRU<K, V>(map: Map<K, V>, key: K, value: V, maxSize: number = MAX_CACHE_SIZE): void {
+  if (map.size >= maxSize) {
+    const firstKey = map.keys().next().value
+    if (firstKey !== undefined) {
+      map.delete(firstKey)
+    }
+  }
+  map.set(key, value)
+}
+
+// ==================== 导出便捷函数 (带缓存) ====================
 export function parseChord(chordString: string): ParsedChord | null {
-  return ChordParser.parse(chordString)
+  const cached = chordParseCache.get(chordString)
+  if (cached !== undefined) return cached
+
+  const result = ChordParser.parse(chordString)
+  setCacheWithLRU(chordParseCache, chordString, result)
+  return result
 }
 
 export function tokenizeChord(chordString: string): ChordToken[] {
@@ -989,8 +1099,14 @@ export function tokenizeChord(chordString: string): ChordToken[] {
 }
 
 export function getChordNotes(rootNote: number, chordType: ChordType): number[] {
+  const cacheKey = `${rootNote}-${chordType}`
+  const cached = chordNotesCache.get(cacheKey)
+  if (cached !== undefined) return cached
+
   const intervals = CHORD_INTERVALS[chordType] ?? []
-  return intervals.map(interval => noteFromToneId(rootNote + interval, false))
+  const result = intervals.map(interval => noteFromToneId(rootNote + interval, false))
+  setCacheWithLRU(chordNotesCache, cacheKey, result)
+  return result
 }
 
 export function formatChord(
@@ -1003,10 +1119,24 @@ export function formatChord(
     minor7flat5Symbol?: string
   }
 ): string {
-  const { slashRootNote, useUnicode = true, minorSymbol = 'm', minor7flat5Symbol = 'ø7' } = options ?? {}
-  
+  const { slashRootNote = null, useUnicode = true, minorSymbol = 'm', minor7flat5Symbol = 'ø7' } = options ?? {}
+  const cacheKey = `${rootNote}-${chordType}-${slashRootNote}-${useUnicode}-${minorSymbol}-${minor7flat5Symbol}`
+  const cached = chordDisplayCache.get(cacheKey)
+  if (cached !== undefined) return cached
+
+  let result: string
   if (useUnicode) {
-    return displayChordUnicode(rootNote, chordType, slashRootNote, minorSymbol, minor7flat5Symbol)
+    result = displayChordUnicode(rootNote, chordType, slashRootNote, minorSymbol, minor7flat5Symbol)
+  } else {
+    result = displayChordStandard(rootNote, chordType, slashRootNote, minorSymbol, minor7flat5Symbol)
   }
-  return displayChordStandard(rootNote, chordType, slashRootNote, minorSymbol, minor7flat5Symbol)
+  setCacheWithLRU(chordDisplayCache, cacheKey, result)
+  return result
+}
+
+export function clearChordTheoryCache(): void {
+  chordParseCache.clear()
+  chordNotesCache.clear()
+  chordDisplayCache.clear()
+  chordTypeTokenCache.clear()
 }

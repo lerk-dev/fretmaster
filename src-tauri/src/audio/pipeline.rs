@@ -101,6 +101,8 @@ impl AudioPipeline {
             } else {
                 self.agc_current_gain += (target_gain - self.agc_current_gain) * self.agc_release;
             }
+
+            self.agc_current_gain = self.agc_current_gain.max(0.05);
         }
 
         buffer.iter().map(|&x| (x * self.agc_current_gain).clamp(-1.0, 1.0)).collect()

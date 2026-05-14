@@ -61,6 +61,10 @@ pub async fn set_sample_rate(
     state: State<'_, AppState>,
     sample_rate: u32,
 ) -> Result<(), String> {
+    const VALID_SAMPLE_RATES: [u32; 4] = [44100, 48000, 96000, 192000];
+    if !VALID_SAMPLE_RATES.contains(&sample_rate) {
+        return Err(format!("Invalid sample rate: {}. Valid rates: {:?}", sample_rate, VALID_SAMPLE_RATES));
+    }
     let mut pipeline = state.inner().pipeline.lock();
     pipeline.get_capture_mut().set_sample_rate(sample_rate).map_err(|e| e.to_string())
 }
@@ -89,6 +93,9 @@ pub async fn set_pitch_threshold(
     state: State<'_, AppState>,
     threshold: f32,
 ) -> Result<(), String> {
+    if threshold.is_nan() || threshold.is_infinite() || threshold < 0.05 || threshold > 0.5 {
+        return Err(format!("Invalid pitch threshold: {}. Must be between 0.05 and 0.5", threshold));
+    }
     let mut pipeline = state.inner().pipeline.lock();
     pipeline.get_detector_mut().set_threshold(threshold);
     Ok(())
@@ -105,6 +112,9 @@ pub async fn set_gain(
     state: State<'_, AppState>,
     gain: f32,
 ) -> Result<(), String> {
+    if gain.is_nan() || gain.is_infinite() || gain < 0.0 || gain > 10.0 {
+        return Err(format!("Invalid gain: {}. Must be between 0.0 and 10.0", gain));
+    }
     let mut pipeline = state.inner().pipeline.lock();
     pipeline.get_capture_mut().set_gain(gain);
     Ok(())
@@ -122,6 +132,12 @@ pub async fn calibrate(
     reference_frequency: f32,
     detected_frequency: f32,
 ) -> Result<f32, String> {
+    if reference_frequency.is_nan() || reference_frequency.is_infinite() || reference_frequency <= 0.0 {
+        return Err(format!("Invalid reference frequency: {}", reference_frequency));
+    }
+    if detected_frequency.is_nan() || detected_frequency.is_infinite() || detected_frequency <= 0.0 {
+        return Err(format!("Invalid detected frequency: {}", detected_frequency));
+    }
     let mut pipeline = state.inner().pipeline.lock();
     Ok(pipeline.get_capture_mut().calibrate(reference_frequency, detected_frequency))
 }
@@ -201,6 +217,10 @@ pub async fn set_buffer_size(
     state: State<'_, AppState>,
     size: usize,
 ) -> Result<(), String> {
+    const VALID_BUFFER_SIZES: [usize; 5] = [256, 512, 1024, 2048, 4096];
+    if !VALID_BUFFER_SIZES.contains(&size) {
+        return Err(format!("Invalid buffer size: {}. Valid sizes: {:?}", size, VALID_BUFFER_SIZES));
+    }
     let mut pipeline = state.inner().pipeline.lock();
     pipeline.get_capture_mut().set_buffer_size(size).map_err(|e| e.to_string())
 }

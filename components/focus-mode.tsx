@@ -30,9 +30,10 @@ export const FocusMode = memo(function FocusMode({
   const [pomodoroPhase, setPomodoroPhase] = useState<'work' | 'break'>('work')
   const [pomodoroCount, setPomodoroCount] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
-  const pomodoroRef = useRef<NodeJS.Timeout | null>(null)
+  const pomodoroRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const phaseDurationRef = useRef(25 * 60)
   const phaseRef = useRef<'work' | 'break'>('work')
+  const wakeLockRef = useRef<any>(null)
 
   const workDuration = focusMode.targetDuration || 25
   const breakDuration = 5
@@ -98,6 +99,22 @@ export const FocusMode = memo(function FocusMode({
     return translations[language]?.[key] || key
   }, [language])
 
+  const togglePomodoro = useCallback(() => {
+    setPomodoroRunning(prev => !prev)
+  }, [])
+
+  const resetPomodoro = useCallback(() => {
+    setPomodoroRunning(false)
+    setPomodoroTime(0)
+    setPomodoroPhase('work')
+  }, [])
+
+  const formatTime = useCallback((seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }, [])
+
   useEffect(() => {
     if (pomodoroRunning) {
       pomodoroRef.current = setInterval(() => {
@@ -124,21 +141,43 @@ export const FocusMode = memo(function FocusMode({
     }
   }, [pomodoroRunning])
 
-  const togglePomodoro = useCallback(() => {
-    setPomodoroRunning(prev => !prev)
-  }, [])
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        store.setFocusModeSettings({ enabled: false })
+        onClose?.()
+      }
+      if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault()
+        togglePomodoro()
+      }
+    }
 
-  const resetPomodoro = useCallback(() => {
-    setPomodoroRunning(false)
-    setPomodoroTime(0)
-    setPomodoroPhase('work')
-  }, [])
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose, store, togglePomodoro])
 
-  const formatTime = useCallback((seconds: number) => {
-    const m = Math.floor(seconds / 60)
-    const s = seconds % 60
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }, [])
+  useEffect(() => {
+    let cancelled = false
+    if (focusMode.wakeLock && 'wakeLock' in navigator) {
+      (navigator as any).wakeLock.request('screen').then((lock: any) => {
+        if (!cancelled) {
+          wakeLockRef.current = lock
+        } else {
+          lock.release()
+        }
+      }).catch(() => {})
+    }
+    return () => {
+      cancelled = true
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {})
+        wakeLockRef.current = null
+      }
+    }
+  }, [focusMode.wakeLock])
 
   const remainingTime = currentPhaseDuration - pomodoroTime
   const correctRate = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0
