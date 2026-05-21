@@ -10514,36 +10514,6 @@ export default function FretMasterPage() {
                         </span>
                       </AccordionTrigger>
                       <AccordionContent className="space-y-3 pb-2">
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            {language === 'zh-CN' ? '全屏类型' : 'Fullscreen Type'}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            variant={focusMode?.fullscreenMode === 'windowed' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => store.setFullscreenMode('windowed')}
-                          >
-                            {language === 'zh-CN' ? '窗口全屏' : 'Windowed'}
-                          </Button>
-                          <Button
-                            variant={focusMode?.fullscreenMode === 'fullscreen' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => store.setFullscreenMode('fullscreen')}
-                          >
-                            {language === 'zh-CN' ? '真全屏' : 'Fullscreen'}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {language === 'zh-CN' 
-                            ? '窗口全屏：保留窗口边框，可快速切换；真全屏：完全覆盖任务栏，沉浸式体验'
-                            : 'Windowed: keep window borders for quick switching; Fullscreen: fully immersive, covers taskbar'}
-                        </p>
-                      </div>
-                    
-                    <Separator className="my-1" />
                     <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
                       <Volume2 className="h-3.5 w-3.5" />
                       {t('feedback_sound')}
@@ -10769,6 +10739,40 @@ export default function FretMasterPage() {
                         </span>
                       </AccordionTrigger>
                       <AccordionContent className="space-y-3 pb-2">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {language === 'zh-CN' ? '全屏类型' : 'Fullscreen Type'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant={focusMode?.fullscreenMode === 'windowed' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => store.setFullscreenMode('windowed')}
+                          >
+                            {language === 'zh-CN' ? '窗口全屏' : 'Windowed'}
+                          </Button>
+                          <Button
+                            variant={focusMode?.fullscreenMode === 'fullscreen' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => store.setFullscreenMode('fullscreen')}
+                          >
+                            {language === 'zh-CN' ? '真全屏' : 'Fullscreen'}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {language === 'zh-CN' 
+                            ? '窗口全屏：保留窗口边框，可快速切换；真全屏：完全覆盖任务栏，沉浸式体验'
+                            : 'Windowed: keep window borders for quick switching; Fullscreen: fully immersive, covers taskbar'}
+                        </p>
+                      </div>
+
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Globe className="h-3.5 w-3.5" />
+                      {t('language')}
+                    </div>
                       <div className="flex gap-2">
                         <Button
                           variant={language === 'zh-CN' ? 'default' : 'outline'}
