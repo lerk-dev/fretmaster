@@ -77,6 +77,40 @@
     overflow-y: scroll;
     scrollbar-gutter: stable;
   }
+  html.fullscreen-mode {
+    overflow: hidden !important;
+    scrollbar-gutter: auto !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+  html.fullscreen-mode body {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    border: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+  }
+  html.fullscreen-mode * {
+    scrollbar-gutter: auto !important;
+  }
+  html.fullscreen-mode #__next,
+  html.fullscreen-mode #root,
+  html.fullscreen-mode #app {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
   body {
     @apply bg-background text-foreground;
     transition: background-color 0.3s ease, color 0.3s ease;

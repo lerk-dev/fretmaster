@@ -365,7 +365,8 @@ export function importSongFromJSON(json: string): CustomSong | null {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
-  } catch {
+  } catch (e) {
+    console.error('Failed to import song from JSON:', e)
     return null
   }
 }

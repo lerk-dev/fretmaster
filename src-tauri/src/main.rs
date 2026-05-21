@@ -1,8 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use fretmaster::AppState;
+use tauri::Manager;
 
 fn main() {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::set_var("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF0B0F14");
+    }
     env_logger::init();
     
     tauri::Builder::default()
@@ -10,6 +15,17 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(AppState::default())
+        .setup(|app| {
+            #[cfg(target_os = "windows")]
+            {
+                use tauri::webview::Color;
+                
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_background_color(Some(Color(11, 15, 20, 255)));
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Audio commands
             fretmaster::commands::get_audio_devices,

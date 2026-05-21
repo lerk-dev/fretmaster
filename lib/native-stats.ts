@@ -1,7 +1,8 @@
 import { logger } from './logger'
+import { isTauriEnv } from './utils'
 
 const isTauri = (): boolean => {
-  return typeof window !== 'undefined' && !!(window as any).__TAURI__
+  return isTauriEnv()
 }
 
 async function getInvoke() {

@@ -1,5 +1,8 @@
+import { isTauriEnv } from './utils'
+import { logger } from './logger'
+
 export const isTauri = (): boolean => {
-  return typeof window !== 'undefined' && !!(window as any).__TAURI__
+  return isTauriEnv()
 }
 
 async function getInvoke() {
@@ -63,7 +66,7 @@ export async function getAudioDevices(): Promise<AudioDeviceInfo[]> {
     deviceMonitorState.lastDevices = devices
     return devices
   } catch (error) {
-    console.error('Failed to get audio devices:', error)
+    logger.error('Failed to get audio devices:', error)
     return []
   }
 }
@@ -86,7 +89,7 @@ export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) =
     })
     return deviceMonitorState.deviceChangeListener
   } catch (error) {
-    console.warn('Tauri event-based monitoring unavailable, falling back to polling:', error)
+    logger.warn('Tauri event-based monitoring unavailable, falling back to polling:', error)
     startDevicePolling(callback, 2000)
     return () => stopDevicePolling()
   }
@@ -123,7 +126,7 @@ export function startDevicePolling(callback: (event: DeviceChangeEvent) => void,
         
         deviceMonitorState.lastDevices = newDevices
       } catch (error) {
-        console.error('Device polling error:', error)
+        logger.error('Device polling error:', error)
       }
     }, intervalMs)
   })

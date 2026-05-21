@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, memo, useCallback } from 'react'
+import { useState, useEffect, memo, useCallback, useRef } from 'react'
 import { Minus, Square, X, Maximize2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, isTauriEnv } from '@/lib/utils'
 
 interface TitleBarProps {
   className?: string
@@ -10,49 +10,91 @@ interface TitleBarProps {
 
 const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false)
+  const isTauri = isTauriEnv()
+  const unlistenRef = useRef<(() => void) | null>(null)
 
   const checkMaximized = useCallback(async () => {
+    if (!isTauri) return
     try {
       const { isWindowMaximized } = await import('@/lib/native-window')
       const maximized = await isWindowMaximized()
       setIsMaximized(maximized)
-    } catch (_) {}
-  }, [])
+    } catch (e) {
+      console.debug('checkMaximized failed:', e)
+    }
+  }, [isTauri])
 
   useEffect(() => {
+    if (!isTauri) return
+
     checkMaximized()
 
-    const pollInterval = setInterval(checkMaximized, 1000)
-    return () => clearInterval(pollInterval)
-  }, [checkMaximized])
+    const setupListener = async () => {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window')
+        const window = getCurrentWindow()
+        
+        const unlisten = await window.onResized(async () => {
+          checkMaximized()
+        })
+        
+        unlistenRef.current = unlisten
+      } catch (e) {
+        console.debug('Failed to setup window resize listener, falling back to polling:', e)
+        const pollInterval = setInterval(checkMaximized, 2000)
+        return () => clearInterval(pollInterval)
+      }
+    }
+
+    setupListener()
+
+    return () => {
+      if (unlistenRef.current) {
+        unlistenRef.current()
+        unlistenRef.current = null
+      }
+    }
+  }, [isTauri, checkMaximized])
 
   const handleMinimize = async () => {
+    if (!isTauri) return
     try {
       const { minimizeWindow } = await import('@/lib/native-window')
       await minimizeWindow()
-    } catch (_) {}
+    } catch (e) {
+      console.debug('handleMinimize failed:', e)
+    }
   }
 
   const handleMaximize = async () => {
+    if (!isTauri) return
     try {
       const { maximizeWindow } = await import('@/lib/native-window')
       await maximizeWindow()
       setTimeout(checkMaximized, 100)
-    } catch (_) {}
+    } catch (e) {
+      console.debug('handleMaximize failed:', e)
+    }
   }
 
   const handleClose = async () => {
+    if (!isTauri) return
     try {
       const { closeWindow } = await import('@/lib/native-window')
       await closeWindow()
-    } catch (_) {}
+    } catch (e) {
+      console.debug('handleClose failed:', e)
+    }
   }
 
   const handleDragStart = async () => {
+    if (!isTauri) return
     try {
       const { startDragging } = await import('@/lib/native-window')
       await startDragging()
-    } catch (_) {}
+    } catch (e) {
+      console.debug('handleDragStart failed:', e)
+    }
   }
 
   return (

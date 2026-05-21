@@ -273,9 +273,6 @@ export const TRANSLATIONS = {
                     'level_passing_3': '经过音3 - 三音经过',
                     'level_passing_4': '经过音4 - 四音经过',
                     'level_passing_5': '经过音5 - 五音经过',
-                    // 挂留结构
-                    'level_suspended_2_resolution': '挂留2解决 (2-3-1)',
-                    'level_suspended_4_resolution': '挂留4解决 (4-3-1)',
                     // 和弦音阶
                     'level_chord_scale_root': '和弦音阶 (根音到根音)',
                     'level_chord_scale_3rd': '和弦音阶 (三音到三音)',
@@ -309,7 +306,6 @@ export const TRANSLATIONS = {
                     'import_settings': '导入设置',
                     'import_success': '导入成功',
                     'export_settings': '导出设置',
-                    'export_success': '导出成功',
                     'save_success': '保存成功',
                     'tuner_need_mic': '需要麦克风权限',
                     'tuner_stop': '停止调音',
@@ -567,10 +563,6 @@ export const TRANSLATIONS = {
                     'device_harmonic': '谐波权重',
                     'device_zero_crossing': '零交叉阈值',
                     
-                    // 通用设置
-                    'general_language': '语言设置',
-                    'interface_language': '界面语言',
-                    
                     // 按钮和操作
                     'btn_save': '保存设置',
                     'btn_reset': '重置设置',
@@ -609,7 +601,6 @@ export const TRANSLATIONS = {
                     'hint_select_scale': '请选择音阶类型',
                     'device_count_detected': '{count} 个音频输入设备',
                     'chord_sequence_empty': '点击"添加和弦"开始创建和弦进行',
-                    'select_song': '请选择一首歌曲',
                     'select_scale_mode': '请选择要练习的调式！',
                     'device_count_none': '未检测到音频输入设备',
                     'default_device': '默认设备',
@@ -652,12 +643,8 @@ export const TRANSLATIONS = {
                     'song_year': '年代:',
                     'song_style': '风格:',
                     'song_tempo': '速度:',
-                    'song_key': '原调:',
                     'song_description': '曲目介绍',
-                    'select_this_song': '选择此曲目',
                     'unknown': '未知',
-                    'jazz_standard': '爵士标准曲',
-                    'chord_progression': '和弦进行',
 
                     // 和弦练习分组
                     'chord_single_notes': '单和弦音',
@@ -720,10 +707,6 @@ export const TRANSLATIONS = {
                     'progression_settings': '转换设置',
                     'progression_level': '练习模式',
                     'progression_level_hint': '选择和弦复杂度',
-                    'single_chord_notes': '单和弦音',
-                    'double_chord_notes': '双和弦音',
-                    'triple_chord_notes': '三和弦音',
-                    'quad_chord_notes': '四和弦音',
                     'progression_key': '乐曲',
                     'progression_key_hint': '选择乐曲',
                     'progression_tunes': '乐曲',
@@ -796,12 +779,6 @@ export const TRANSLATIONS = {
                     'blues_scales': '布鲁斯音阶',
                     'special_scales': '特殊音阶',
                     'exotic_scales': '异国风格',
-                    
-                    // 和弦转换设置optgroup标签
-                    'single_chord_notes': '单和弦音',
-                    'double_chord_notes': '双和弦音',
-                    'triple_chord_notes': '三和弦音',
-                    'quad_chord_notes': '四和弦音',
                     
                     // 和弦转换设置选项
                     'single_chord_tones': '单和弦音',
@@ -911,7 +888,6 @@ export const TRANSLATIONS = {
                     'progression_repeat': '重复练习',
                     'progression_repeat_hint': '开启后对歌曲进行重复练习',
                     'progression_key_label': '调',
-                    'progression_key_hint': '选择练习的调性',
                     'progression_voice_leading': '声部连接',
                     'progression_voice_leading_hint': '开启后相邻和弦音保持最小距离（仅顺序/倒序可用）',
                     'progression_randomize_key': '随机转调',
@@ -924,8 +900,6 @@ export const TRANSLATIONS = {
                     'order_reverse': '倒序',
                     
                     // MIDI设备
-                    'midi_support': 'MIDI设备支持',
-                    'midi_support_hint': '连接MIDI键盘或控制器进行练习',
                     'midi_enable': 'MIDI设备',
 
                     // 音乐风格和速度术语
@@ -947,7 +921,6 @@ export const TRANSLATIONS = {
                     // MIDI状态消息
                     'midi_connected': '已连接',
                     'midi_disconnected': '已断开',
-                    'midi_device_detected': '检测到 {count} 个MIDI设备',
                     'midi_no_device': '未检测到MIDI设备',
                     'midi_connect': '连接',
                     'midi_connected_status': '已连接',
@@ -960,7 +933,6 @@ export const TRANSLATIONS = {
                     'midi_permission_denied': 'MIDI权限被拒绝，请检查浏览器设置',
                     'midi_access_interrupted': 'MIDI设备访问被中断',
                     'midi_invalid_state': 'MIDI设备状态无效',
-                    'midi_device_disconnected': '设备 {name} 已断开',
                     'midi_check_connection': '请确保MIDI设备已连接并刷新页面',
 
                     // 工具提示和状态消息
@@ -970,15 +942,10 @@ export const TRANSLATIONS = {
                     'shape_switch': '点击切换到',
                     'shape_not_selected': '未选中',
                     'fullscreen_selector_title': '选择',
-                    'random_inversions': '随机转位',
                     'default_tempo': '中等',
                     'unknown_composer': '未知',
                     'unknown_year': '未知',
 
-                    // 调性选择
-                    'key_c_default': 'C 默认',
-                    'select_song': '选择歌曲',
-                    'select_key': '选择调性',
                     // 缺失的翻译补全
                     'chord_type_intervals': '和弦音程',
                     'description': '描述',
@@ -1338,9 +1305,6 @@ export const TRANSLATIONS = {
                     'level_passing_3': 'Passing 3 - Three-note',
                     'level_passing_4': 'Passing 4 - Four-note',
                     'level_passing_5': 'Passing 5 - Five-note',
-                    // Suspended Structures
-                    'level_suspended_2_resolution': 'Suspended 2 Resolution (2-3-1)',
-                    'level_suspended_4_resolution': 'Suspended 4 Resolution (4-3-1)',
                     // Chord Scales
                     'level_chord_scale_root': 'Chord Scale (Root to Root)',
                     'level_chord_scale_3rd': 'Chord Scale (3rd to 3rd)',
@@ -1461,12 +1425,6 @@ export const TRANSLATIONS = {
                     'chord_major9': 'Major 9',
                     'chord_minor9': 'Minor 9',
                     'chord_dominant7sharp9': 'Dominant 7♯9',
-                    'chord_sus2': 'Sus2',
-                    'chord_sus4': 'Sus4',
-                    'chord_add9': 'Add9',
-                    'chord_madd9': 'mAdd9',
-                    'chord_6add9': '6Add9',
-                    'chord_m6add9': 'm6Add9',
                     
                     // 随机选项
                     'random': 'Random',
@@ -1602,10 +1560,6 @@ export const TRANSLATIONS = {
                     'device_harmonic': 'Harmonic Weights',
                     'device_zero_crossing': 'Zero Crossing Threshold',
                     
-                    // 通用设置
-                    'general_language': 'Language Settings',
-                    'interface_language': 'Interface Language',
-                    
                     // 按钮和操作
                     'btn_save': 'Save Settings',
                     'btn_reset': 'Reset Settings',
@@ -1643,7 +1597,6 @@ export const TRANSLATIONS = {
                     'hint_select_chord_type': 'Please select at least one chord type',
                     'hint_select_scale': 'Please select a scale type',
                     'chord_sequence_empty': 'Click "Add Chord" to start creating chord progression',
-                    'select_song': 'Please select a song',
                     'select_scale_mode': 'Please select practice mode!',
                     
                     // 练习相关
@@ -1671,10 +1624,6 @@ export const TRANSLATIONS = {
                     'progression_settings': 'Progression Settings',
                     'progression_level': 'Practice Level',
                     'progression_level_hint': 'Select chord complexity',
-                    'single_chord_notes': 'Single Chord Notes',
-                    'double_chord_notes': 'Double Chord Notes',
-                    'triple_chord_notes': 'Triple Chord Notes',
-                    'quad_chord_notes': 'Quad Chord Notes',
                     'progression_key': 'Tunes',
                     'progression_key_hint': 'Select a Tune',
                     'progression_tunes': 'Tunes',
@@ -1747,12 +1696,6 @@ export const TRANSLATIONS = {
                     'blues_scales': 'Blues Scales',
                     'special_scales': 'Special Scales',
                     'exotic_scales': 'Exotic Scales',
-                    
-                    // 和弦转换设置optgroup标签
-                    'single_chord_notes': 'Single Chord Notes',
-                    'double_chord_notes': 'Double Chord Notes',
-                    'triple_chord_notes': 'Triple Chord Notes',
-                    'quad_chord_notes': 'Quad Chord Notes',
                     
                     // 和弦转换设置选项
                     'single_chord_tones': 'Single Chord Tones',
@@ -1862,7 +1805,6 @@ export const TRANSLATIONS = {
                     'progression_repeat': 'Repeat Practice',
                     'progression_repeat_hint': 'Enable to repeat the song for practice',
                     'progression_key_label': 'Key',
-                    'progression_key_hint': 'Select practice key',
                     'progression_voice_leading': 'Voice Leading',
                     'progression_voice_leading_hint': 'Keep minimal distance between adjacent chord tones (forward/reverse order only)',
                     'progression_randomize_key': 'Randomize Key',
@@ -1927,7 +1869,6 @@ export const TRANSLATIONS = {
                     // MIDI status messages
                     'midi_connected': 'Connected',
                     'midi_disconnected': 'Disconnected',
-                    'midi_device_detected': 'Detected {count} MIDI devices',
                     'midi_no_device': 'No MIDI devices detected',
                     'midi_connect': 'Connect',
                     'midi_connected_status': 'Connected',
@@ -1940,7 +1881,6 @@ export const TRANSLATIONS = {
                     'midi_permission_denied': 'MIDI permission denied, please check browser settings',
                     'midi_access_interrupted': 'MIDI device access interrupted',
                     'midi_invalid_state': 'MIDI device state invalid',
-                    'midi_device_disconnected': 'Device {name} disconnected',
                     'midi_check_connection': 'Please ensure MIDI device is connected and refresh the page',
 
                     // Tooltips and status messages
@@ -1950,15 +1890,9 @@ export const TRANSLATIONS = {
                     'shape_switch': 'Switch to',
                     'shape_not_selected': 'Not selected',
                     'fullscreen_selector_title': 'Select',
-                    'random_inversions': 'Random Inversions',
                     'default_tempo': 'Medium',
                     'unknown_composer': 'Unknown',
                     'unknown_year': 'Unknown',
-
-                    // Key selection
-                    'key_c_default': 'C Default',
-                    'select_song': 'Select Song',
-                    'select_key': 'Select Key',
 
                     // 歌曲信息相关
                     'basic_info': 'Basic Information',
@@ -1966,12 +1900,8 @@ export const TRANSLATIONS = {
                     'song_year': 'Year:',
                     'song_style': 'Style:',
                     'song_tempo': 'Tempo:',
-                    'song_key': 'Original Key:',
                     'song_description': 'Song Description',
-                    'select_this_song': 'Select This Song',
                     'unknown': 'Unknown',
-                    'jazz_standard': 'Jazz Standard',
-                    'chord_progression': 'Chord Progression',
 
                     // 和弦练习分组
                     'chord_single_notes': 'Single Chord Notes',
@@ -2103,7 +2033,6 @@ export const TRANSLATIONS = {
                     'export_csv': 'Export CSV',
                     'export_pdf': 'Export PDF',
                     'export_json': 'Export JSON',
-                    'export_success': 'Export Success',
                     'export_failed': 'Export Failed',
                     'stats_total_practices': 'Total Practices',
                     'stats_week': 'This Week',

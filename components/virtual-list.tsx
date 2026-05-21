@@ -58,6 +58,7 @@ export function VirtualList<T extends VirtualListItem>({
   return (
     <List
       height={height}
+      width="100%"
       itemCount={items.length}
       itemSize={itemHeight}
       overscanCount={overscanCount}
@@ -160,8 +161,9 @@ export function GroupedVirtualList<T extends VirtualListItem>({
   return (
     <List
       height={height}
+      width="100%"
       itemCount={flattenedItems.length}
-      itemSize={getItemSize}
+      itemSize={itemHeight}
       overscanCount={overscanCount}
       className={className}
     >

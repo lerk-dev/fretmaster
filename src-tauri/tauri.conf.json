@@ -21,7 +21,8 @@
         "center": true,
         "minWidth": 800,
         "minHeight": 500,
-        "devtools": false
+        "devtools": false,
+        "backgroundColor": "#0b0f14"
       }
     ],
     "security": {

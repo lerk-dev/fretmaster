@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { VERSION } from './version'
 import { InstrumentType } from './practice-suggestions'
 import { CustomSong } from './custom-song-editor'
+import { logger } from './logger'
 
 function debounceStorage(storage: Storage): Storage {
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -53,7 +54,6 @@ export interface AudioSettings {
   enableNotch60?: boolean  // 60Hz 陷波
 }
 
-// 全屏模式类型
 export type FullscreenModeType = 'windowed' | 'fullscreen'
 
 export interface AudioDeviceState {
@@ -703,7 +703,7 @@ export const useAppStore = create<AppState & AppActions>()(
           }
           return persistedState
         } catch (error) {
-          console.error('Store migration failed, resetting to defaults:', error)
+          logger.error('Store migration failed, resetting to defaults:', error)
           return initialState
         }
       },

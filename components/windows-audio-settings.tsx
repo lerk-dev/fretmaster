@@ -98,9 +98,10 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
     try {
       console.log('[WindowsAudioSettings] Mounting, loading devices...')
       loadDevices()
-    } catch (err: any) {
-      console.error('[WindowsAudioSettings] Init error:', err?.message || err)
-      setInitError(err?.message || 'Unknown init error')
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err))
+      console.error('[WindowsAudioSettings] Init error:', error.message)
+      setInitError(error.message)
     }
   }, [loadDevices])
   

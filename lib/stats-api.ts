@@ -2,6 +2,7 @@
 // Web 版本使用 CGI API，Windows 版本使用 SQLite
 
 import { logger } from './logger'
+import { isTauriEnv } from './utils'
 
 const API_BASE_URL = '/cgi-bin';
 
@@ -15,7 +16,7 @@ const isDev = typeof window !== 'undefined' && (
 );
 
 // 检查是否在 Tauri 环境（Windows 桌面版）
-const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
+const isTauri = isTauriEnv();
 
 // 使用统一的用户标识，所有设备共享同一个用户数据
 const USER_ID = 'fretmaster_user';
@@ -178,7 +179,15 @@ export async function getStatsSummary() {
   // Windows 版本使用 SQLite
   if (isTauri) {
     const { getStatsSummary: nativeGetSummary } = await import('./native-stats');
-    return nativeGetSummary();
+    const nativeSummary = await nativeGetSummary();
+    // 转换 snake_case 到 camelCase
+    return {
+      totalSessions: nativeSummary.total_sessions,
+      totalDuration: nativeSummary.total_duration,
+      averageScore: nativeSummary.average_score,
+      averageAccuracy: nativeSummary.average_accuracy,
+      lastPractice: nativeSummary.last_practice ?? null,
+    };
   }
   
   const stats = await getAllPracticeStats();
@@ -189,7 +198,7 @@ export async function getStatsSummary() {
       totalDuration: 0,
       averageScore: 0,
       averageAccuracy: 0,
-      lastPractice: null,
+      lastPractice: null as string | null,
     };
   }
 
@@ -197,7 +206,7 @@ export async function getStatsSummary() {
   const totalDuration = stats.reduce((sum, s) => sum + (s.duration || 0), 0);
   const averageScore = stats.reduce((sum, s) => sum + (s.score || 0), 0) / totalSessions;
   const averageAccuracy = stats.reduce((sum, s) => sum + (s.accuracy || 0), 0) / totalSessions;
-  const lastPractice = stats[0]?.created_at || stats[0]?.date;
+  const lastPractice = stats[0]?.created_at || stats[0]?.date || null;
 
   return {
     totalSessions,

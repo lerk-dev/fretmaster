@@ -43,8 +43,12 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
       userAgent: navigator.userAgent,
     }
     
-    const existing = JSON.parse(localStorage.getItem("fretmaster-feedback") || "[]")
-    localStorage.setItem("fretmaster-feedback", JSON.stringify([...existing, feedbackData]))
+    try {
+      const existing = JSON.parse(localStorage.getItem("fretmaster-feedback") || "[]")
+      localStorage.setItem("fretmaster-feedback", JSON.stringify([...existing, feedbackData]))
+    } catch (e) {
+      console.error('Failed to save feedback:', e)
+    }
     
     setIsSubmitting(false)
     setIsSubmitted(true)

@@ -145,18 +145,26 @@ export function OnboardingProvider({ children, config, t: externalT }: Onboardin
     
     const saved = localStorage.getItem(storageKey)
     if (saved) {
-      const data = JSON.parse(saved)
-      setHasSeenOnboarding(data.hasSeen || false)
-      setIsCompleted(data.completed || false)
+      try {
+        const data = JSON.parse(saved)
+        setHasSeenOnboarding(data.hasSeen || false)
+        setIsCompleted(data.completed || false)
+      } catch (e) {
+        console.error('Failed to parse onboarding state:', e)
+      }
     }
   }, [storageKey])
 
   const saveState = useCallback((updates: Partial<{ hasSeen: boolean; completed: boolean }>) => {
     if (typeof window === "undefined") return
     
-    const current = localStorage.getItem(storageKey)
-    const data = current ? JSON.parse(current) : {}
-    localStorage.setItem(storageKey, JSON.stringify({ ...data, ...updates }))
+    try {
+      const current = localStorage.getItem(storageKey)
+      const data = current ? JSON.parse(current) : {}
+      localStorage.setItem(storageKey, JSON.stringify({ ...data, ...updates }))
+    } catch (e) {
+      console.error('Failed to save onboarding state:', e)
+    }
   }, [storageKey])
 
   const startOnboarding = useCallback(() => {

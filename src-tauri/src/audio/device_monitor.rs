@@ -81,10 +81,17 @@ impl DeviceMonitor {
 
                     last_devices = new_devices;
                 }
-            })
-            .expect("Failed to spawn device monitor thread");
+            });
 
-        self.handle = Some(handle);
+        match handle {
+            Ok(h) => {
+                self.handle = Some(h);
+            }
+            Err(e) => {
+                log::error!("Failed to spawn device monitor thread: {}", e);
+                self.running.store(false, Ordering::SeqCst);
+            }
+        }
     }
 
     pub fn stop(&mut self) {

@@ -24,6 +24,10 @@ export const INTERVAL_TO_SEMITONES: Record<string, number> = {
   '11': 17, '#11': 18, 'b13': 20, '13': 21
 }
 
+function findNoteIndex(note: string, noteArray: readonly string[]): number {
+  return noteArray.findIndex(n => n === note)
+}
+
 // 获取音符索引 (0-11)
 export function getNoteIndex(note: string): number {
   if (!note) return -1
@@ -32,18 +36,18 @@ export function getNoteIndex(note: string): number {
   const normalizedNote = note.replace('♯', '#').replace('♭', 'b')
   
   // 直接匹配
-  const sharpIndex = NOTE_NAMES.indexOf(normalizedNote as any)
+  const sharpIndex = findNoteIndex(normalizedNote, NOTE_NAMES)
   if (sharpIndex !== -1) return sharpIndex
   
-  const flatIndex = NOTE_NAMES_FLAT.indexOf(normalizedNote as any)
+  const flatIndex = findNoteIndex(normalizedNote, NOTE_NAMES_FLAT)
   if (flatIndex !== -1) return flatIndex
   
   // 尝试解析带八度的音符 (如 "C4", "C#4")
   const noteOnly = normalizedNote.replace(/[0-9]/g, '')
-  const sharpIdx = NOTE_NAMES.indexOf(noteOnly as any)
+  const sharpIdx = findNoteIndex(noteOnly, NOTE_NAMES)
   if (sharpIdx !== -1) return sharpIdx
   
-  const flatIdx = NOTE_NAMES_FLAT.indexOf(noteOnly as any)
+  const flatIdx = findNoteIndex(noteOnly, NOTE_NAMES_FLAT)
   if (flatIdx !== -1) return flatIdx
   
   return -1

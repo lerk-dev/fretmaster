@@ -1,7 +1,8 @@
 import { logger } from './logger'
+import { isTauriEnv } from './utils'
 
 const isTauri = (): boolean => {
-  return typeof window !== 'undefined' && !!(window as any).__TAURI__
+  return isTauriEnv()
 }
 
 async function getInvoke() {
@@ -98,8 +99,20 @@ export async function setTrueFullscreen(enable: boolean): Promise<void> {
   try {
     const invoke = await getInvoke()
     await invoke('set_true_fullscreen', { enable })
+    await setWebViewBackgroundColor('#0b0f14')
   } catch (error) {
     logger.error('setTrueFullscreen failed:', error)
+  }
+}
+
+export async function setWebViewBackgroundColor(color: string): Promise<void> {
+  if (!isTauri()) return
+  try {
+    const { getCurrentWebview } = await import('@tauri-apps/api/webview')
+    const webview = getCurrentWebview()
+    await webview.setBackgroundColor(color)
+  } catch (error) {
+    logger.error('setWebViewBackgroundColor failed:', error)
   }
 }
 

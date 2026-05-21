@@ -1,4 +1,4 @@
-﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -9,6 +9,7 @@ import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
 import { logger } from "@/lib/logger"
 import { SOLO_SONGS } from "@/lib/solo-songs"
 import { PRACTICE_MODE_GROUPS, ALTERED_LEVELS, DIMINISHED_SCALES_LEVELS } from "@/lib/practice-levels"
+import { InstrumentType } from "@/lib/practice-suggestions"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
@@ -47,15 +48,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+import { cn, isTauriEnv, getAudioContextClass } from "@/lib/utils"
 import { WindowsAudioSettings } from "@/components/windows-audio-settings"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { FocusMode } from "@/components/focus-mode"
 import { CustomSongEditor } from "@/components/custom-song-editor-ui"
 import { MetronomeVisualizer } from "@/components/metronome-visualizer"
-import Sidebar from "@/components/Sidebar"
-import Header from "@/components/Header"
-import BottomNavigation from "@/components/BottomNavigation"
+import Sidebar from "@/app/components/Sidebar"
+import Header from "@/app/components/Header"
+import BottomNavigation from "@/app/components/BottomNavigation"
 import { 
   OnboardingProvider,
   OnboardingOverlay,
@@ -127,6 +128,10 @@ const NOTES_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", 
 const STRING_TUNING = [4, 11, 7, 2, 9, 4] // E B G D A E (high to low, as semitones from C)
 const GUITAR_TUNING = ["E", "B", "G", "D", "A", "E"] // 1弦到6弦的开放音 (high to low)
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
+
+function findNoteIndexInArray(note: string, arr: string[]): number {
+  return arr.findIndex(n => n === note)
+}
 
 // 练习建议数据（参考SOLO的PracticeSuggestionProvider）
 const PRACTICE_SUGGESTIONS = [
@@ -1582,7 +1587,8 @@ function getChordDisplayName(chordType: string, displayMode: 'chinese' | 'englis
 
 // 获取音阶显示名称
 function getScaleDisplayName(scaleName: string, displayMode: 'chinese' | 'english' | 'english_short' | 'jazz'): string {
-  return DISPLAY_NAMES[displayMode].scaleTypes[scaleName as keyof typeof DISPLAY_NAMES.chinese.scaleTypes] || scaleName
+  const scaleTypes = DISPLAY_NAMES[displayMode].scaleTypes as Record<string, string>
+  return scaleTypes[scaleName] || scaleName
 }
 
 // 将音程度数中的 # 和 b 转换为 ♯ 和 ♭
@@ -5693,7 +5699,8 @@ export default function FretMasterPage() {
 
   const t = useCallback((key: string) => {
     const lang = language || 'zh-CN'
-    return TRANSLATIONS[lang]?.[key as keyof typeof TRANSLATIONS['zh-CN']] || key
+    const translations = TRANSLATIONS[lang] as Record<string, string>
+    return translations?.[key] || key
   }, [language])
 
   // 侧边栏菜单 - useMemo缓存避免每次渲染重新创建
@@ -5725,7 +5732,7 @@ export default function FretMasterPage() {
   // 应用主题
   useEffect(() => {
     setMounted(true)
-    setIsTauri(typeof window !== 'undefined' && !!(window as any).__TAURI__)
+    setIsTauri(isTauriEnv())
     if (theme === 'light') {
       document.documentElement.classList.add('light')
       document.documentElement.classList.remove('dark')
@@ -5739,8 +5746,8 @@ export default function FretMasterPage() {
     if (typeof window === 'undefined') return
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     const isSecure = window.isSecureContext || window.location.protocol === 'https:' || isLocalhost
-    const isTauriEnv = !!(window as any).__TAURI__
-    if (!isSecure && !isTauriEnv) {
+    const isTauriEnvCheck = isTauriEnv()
+    if (!isSecure && !isTauriEnvCheck) {
       toast.error(language === 'zh-CN' 
         ? '⚠️ 当前使用 HTTP，麦克风功能不可用。请使用 HTTPS 访问。'
         : '⚠️ HTTP detected. Microphone requires HTTPS. Please use HTTPS.',
@@ -5771,26 +5778,46 @@ export default function FretMasterPage() {
   // 全屏切换处理函数
   const handleToggleFullscreen = useCallback(async (enable?: boolean) => {
     const newState = enable !== undefined ? enable : !isFullscreen
-    const fullscreenModeType = focusMode?.fullscreenMode || 'windowed'
     
     if (isTauri) {
       try {
-        if (fullscreenModeType === 'fullscreen') {
-          const { setTrueFullscreen } = await import('@/lib/native-window')
-          await setTrueFullscreen(newState)
-        } else {
-          const { setWindowedFullscreen } = await import('@/lib/native-window')
-          await setWindowedFullscreen(newState)
-        }
+        const { setTrueFullscreen } = await import('@/lib/native-window')
+        await setTrueFullscreen(newState)
       } catch (e) {
         console.error('Failed to set fullscreen:', e)
       }
     }
     
     toggleFullscreenState()
-  }, [isFullscreen, toggleFullscreenState, focusMode?.fullscreenMode])
+  }, [isFullscreen, toggleFullscreenState])
   
   const setFullscreenMode = handleToggleFullscreen
+  
+  // 专注模式启用时自动进入全屏（仅在 focusMode.enabled 变化时触发）
+  const prevFocusModeEnabled = useRef(focusMode?.enabled)
+  useEffect(() => {
+    if (focusMode?.enabled !== prevFocusModeEnabled.current) {
+      prevFocusModeEnabled.current = focusMode?.enabled
+      if (focusMode?.enabled && focusMode?.enableFullscreen) {
+        handleToggleFullscreen(true)
+      } else if (!focusMode?.enabled && isFullscreen) {
+        handleToggleFullscreen(false)
+      }
+    }
+  }, [focusMode?.enabled, focusMode?.enableFullscreen, isFullscreen, handleToggleFullscreen])
+  
+  // 全屏时切换 html 元素的 fullscreen-mode 类，防止 scrollbar-gutter 导致白条
+  useEffect(() => {
+    const htmlEl = document.documentElement
+    if (isFullscreen) {
+      htmlEl.classList.add('fullscreen-mode')
+    } else {
+      htmlEl.classList.remove('fullscreen-mode')
+    }
+    return () => {
+      htmlEl.classList.remove('fullscreen-mode')
+    }
+  }, [isFullscreen])
   
   // 练习模式状态
   const isPlaying = storeIsPlaying
@@ -5873,7 +5900,7 @@ export default function FretMasterPage() {
     
     // 处理降号调性 (如 Db -> C#, Bb -> A#)
     if (notePart.includes('b') && !notePart.includes('#')) {
-      const flatIndex = NOTES_FLAT.indexOf(notePart as any)
+      const flatIndex = findNoteIndexInArray(notePart, NOTES_FLAT)
       if (flatIndex !== -1) {
         return NOTES[flatIndex]
       }
@@ -6138,7 +6165,7 @@ export default function FretMasterPage() {
   // Tauri: 从根路径加载; Web子路径部署: 自动检测前缀
   const getAudioWorkletModulePath = (): string => {
     if (typeof window === 'undefined') return '/js/audio-worklet-processor.js'
-    if ((window as any).__TAURI__) return '/js/audio-worklet-processor.js'
+    if (isTauriEnv()) return '/js/audio-worklet-processor.js'
     const path = window.location.pathname
     const match = path.match(/^(\/[^/]+)\//)
     if (match) return match[1] + '/js/audio-worklet-processor.js'
@@ -6395,7 +6422,9 @@ export default function FretMasterPage() {
           localStorage.removeItem('fretmaster-practice-state')
         }
       }
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error('Failed to parse practice state:', e)
+    }
   }, [])
 
   // 记录练习统计
@@ -6516,7 +6545,13 @@ export default function FretMasterPage() {
     
     const filtered = practiceStats.daily.filter(d => new Date(d.date) >= startDate)
     
-    const result = {
+    interface StatsResult {
+      count: number
+      byType: Record<PracticeType, number>
+      byDetail: Record<PracticeType, Array<{ name: string; count: number }>>
+    }
+    
+    const result: StatsResult = {
       count: 0,
       byType: {
         pitch_finding: 0,
@@ -6752,7 +6787,7 @@ export default function FretMasterPage() {
         const stream = await navigator.mediaDevices.getUserMedia(constraints)
         tunerStreamRef.current = stream
 
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        const audioContext = new (getAudioContextClass())({
           sampleRate: 48000,
           latencyHint: 'interactive'
         })
@@ -8156,7 +8191,7 @@ export default function FretMasterPage() {
       
       const result = yinDetector(buffer)
       
-      if (result.frequency && result.probability > confidenceThreshold) {
+      if (result && result.frequency && result.probability > confidenceThreshold) {
         const detectedNote = frequencyToNoteName(result.frequency)
         setDetectedPitch(detectedNote)
         
@@ -9010,22 +9045,23 @@ export default function FretMasterPage() {
           const noteIdx = getNoteIndex(note)
           const interval = (noteIdx - rootIdx + 12) % 12
           
-          // 获取当前和弦质量
-          const chordQuality = chordType?.quality || 'major'
+          // 获取当前和弦质量 (使用 group 属性)
+          const chordQuality = chordType.group || 'major'
           
           // 判断音符是否正确
           let isCorrect = false
           
           if ('chordTypes' in level && level.chordTypes) {
             // 旋律结构和Voice Led结构 - 根据和弦类型使用不同的音级
-            const chordIntervals = level.chordTypes[chordQuality as keyof typeof level.chordTypes] || level.intervals
-            isCorrect = chordIntervals?.includes(interval) || false
-          } else if ('type' in level && level.type) {
-            // 经过音技巧
-            isCorrect = level.intervals?.includes(interval) || false
-          } else if (level.intervals) {
-            // 基础练习模式
-            isCorrect = level.intervals.includes(interval)
+            const chordIntervals = level.chordTypes[chordQuality as keyof typeof level.chordTypes] as number[] | undefined
+            isCorrect = Array.isArray(chordIntervals) && chordIntervals.includes(interval)
+          } else {
+            // 基础练习模式 - 使用 sequences 中的对应和弦类型
+            const sequenceKey = chordQuality === 'triad' ? 'major' : 
+                               chordQuality === 'dominant' ? 'dominant' :
+                               chordQuality === 'minor' ? 'minor' : 'major'
+            const intervals = level.sequences[sequenceKey as keyof typeof level.sequences] as number[] | undefined
+            isCorrect = Array.isArray(intervals) && intervals.includes(interval)
           }
           
           if (isCorrect) {
@@ -9677,7 +9713,7 @@ export default function FretMasterPage() {
       // M - 切换麦克风
       if (event.key === 'm' || event.key === 'M') {
         event.preventDefault()
-        setMicEnabled(prev => !prev)
+        setMicEnabled(!micEnabled)
         return
       }
 
@@ -10362,7 +10398,7 @@ export default function FretMasterPage() {
                           <span className="text-sm text-muted-foreground">{t('instrument_select')}</span>
                           <Select
                             value={user.instrument}
-                            onValueChange={(v) => store.setInstrument(v as any)}
+                            onValueChange={(v) => store.setInstrument(v as InstrumentType)}
                           >
                             <SelectTrigger className="w-36 h-8 text-xs">
                               <SelectValue />
@@ -10572,14 +10608,15 @@ export default function FretMasterPage() {
                                   } else {
                                     toast.warning('未检测到音频输入设备')
                                   }
-                                } catch (err: any) {
+                                } catch (err: unknown) {
                                   console.error('麦克风权限错误', err)
-                                  if (err.name === 'NotAllowedError') {
+                                  const error = err instanceof Error ? err : new Error(String(err))
+                                  if (error.name === 'NotAllowedError') {
                                     toast.error('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风')
-                                  } else if (err.name === 'NotFoundError') {
+                                  } else if (error.name === 'NotFoundError') {
                                     toast.error('未找到麦克风设备')
                                   } else {
-                                    toast.error('无法获取麦克风权限 ' + (err.message || '未知错误'))
+                                    toast.error('无法获取麦克风权限 ' + (error.message || '未知错误'))
                                   }
                                 }
                               }}
@@ -10960,7 +10997,7 @@ export default function FretMasterPage() {
             
             <div className="mt-auto p-2">
               <button
-                onClick={() => setSidebarCollapsed(prev => !prev)}
+                onClick={() => setSidebarCollapsed()}
                 className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-accent transition-colors"
               >
                 {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -12847,6 +12884,29 @@ export default function FretMasterPage() {
                             <Download className="h-3 w-3 mr-1" />
                             JSON
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 px-2"
+                            onClick={async () => {
+                              try {
+                                const { getAllPracticeStats } = await import('@/lib/stats-api')
+                                const { exportPracticeData } = await import('@/lib/export-utils')
+                                const allStats = await getAllPracticeStats()
+                                const result = await exportPracticeData(allStats, { format: 'html', language: language as 'zh-CN' | 'en' })
+                                if (result.success) {
+                                  toast.success(result.path ? `${t('export_success')} ${result.path}` : t('export_success'))
+                                } else if (result.error !== 'cancelled') {
+                                  toast.error(t('export_failed'))
+                                }
+                              } catch (e) {
+                                toast.error(t('export_failed'))
+                              }
+                            }}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            HTML
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -12859,8 +12919,7 @@ export default function FretMasterPage() {
                         scale: t('nav_scale'),
                         chord_exercise: t('nav_chord_exercise'),
                         interval: t('nav_interval'),
-                        chord_progression: t('nav_chord'),
-                        arpeggio: t('nav_arpeggio')
+                        chord_progression: t('nav_chord')
                       }
                       
                       return (
@@ -12958,7 +13017,7 @@ export default function FretMasterPage() {
         {isFullscreen && (
           <div 
             className="fixed inset-0 z-[9999] bg-background flex items-center justify-center"
-            style={{ margin: 0, padding: 0 }}
+            style={{ margin: 0, padding: 0, width: '100vw', height: '100vh', top: 0, left: 0, right: 0, bottom: 0 }}
             onClick={() => setFullscreenMode(false)}
           >
             <div 
@@ -13275,7 +13334,7 @@ export default function FretMasterPage() {
                               
                               let normalizedKey = notePart
                               if (notePart.includes('b') && !notePart.includes('#')) {
-                                const flatIndex = NOTES_FLAT.indexOf(notePart as any)
+                                const flatIndex = findNoteIndexInArray(notePart, NOTES_FLAT)
                                 if (flatIndex !== -1) {
                                   normalizedKey = NOTES[flatIndex]
                                 }
@@ -13351,7 +13410,7 @@ export default function FretMasterPage() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  setSelectedSong({ name: '__custom__', chords: [], displayName: t('chord_custom') })
+                  setSelectedSong({ name: '__custom__', composer: '', year: '', style: '', tempo: '', key: 'C', chords: [] })
                   setCurrentChordIndex(0)
                   setShowSongSelector(false)
                 }}
@@ -13847,10 +13906,10 @@ export default function FretMasterPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Layers className="h-5 w-5" />
-                {selectedLevelInfo?.name}
+                {selectedLevelInfo ? t(selectedLevelInfo.nameKey) : ''}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {selectedLevelInfo?.name}
+                {selectedLevelInfo ? t(selectedLevelInfo.nameKey) : ''}
               </DialogDescription>
             </DialogHeader>
 
@@ -13860,7 +13919,7 @@ export default function FretMasterPage() {
                 <div className="space-y-3">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">{t('practice_level')}</Label>
-                    <p className="text-sm font-medium">{selectedLevelInfo.name}</p>
+                    <p className="text-sm font-medium">{t(selectedLevelInfo.nameKey)}</p>
                   </div>
                   
                   <div className="space-y-1">
@@ -14030,9 +14089,9 @@ export default function FretMasterPage() {
                           }}
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">{language === 'zh-CN' ? level.nameZh : level.name}</div>
+                            <div className="font-medium text-sm">{t(level.nameKey)}</div>
                             <div className="text-xs text-muted-foreground truncate">
-                              {language === 'zh-CN' ? level.descriptionZh : level.description}
+                              {level.description}
                             </div>
                           </div>
                           <Button

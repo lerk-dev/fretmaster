@@ -243,16 +243,3 @@ export class FocusModeManager {
     document.removeEventListener('visibilitychange', this.boundVisibilityChange)
   }
 }
-
-declare global {
-  interface WakeLockSentinel {
-    released: boolean
-    release(): Promise<void>
-  }
-  
-  interface Navigator {
-    wakeLock: {
-      request(type: 'screen'): Promise<WakeLockSentinel>
-    }
-  }
-}

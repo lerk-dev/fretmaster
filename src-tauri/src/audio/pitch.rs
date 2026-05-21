@@ -1,13 +1,19 @@
 use serde::{Deserialize, Serialize};
-use rustfft::{FftPlanner, num_complex::Complex, Fft};
-use std::sync::Arc;
 
 const MIN_FREQUENCY: f32 = 27.5;
 const MAX_FREQUENCY: f32 = 4186.0;
-const DEFAULT_THRESHOLD: f32 = 0.12;
-const PROBABILITY_CLIFF: f32 = 0.1;
-const SMOOTHING_FACTOR: f32 = 0.85;
+const A4_FREQUENCY: f64 = 440.0;
+const A4_MIDI: i32 = 69;
+const NOTE_START: i32 = 23;
 const MAX_HISTORY: usize = 8;
+const PITCH_QUEUE_SIZE: usize = 3;
+const PITCH_MAJOR_QUEUE_SIZE: usize = 7;
+const CONFUSION_TTL_MILLIS: u64 = 3000;
+const SMOOTHING_RATIO: f64 = 0.75;
+const SIMILAR_THRESHOLD: f64 = 0.05;
+const VOLUME_DECAY: f64 = 0.97;
+const CONFUSION_DECAY: f64 = 0.95;
+const BOX_FILTER_ROUNDS: usize = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PitchResult {
@@ -57,8 +63,8 @@ pub struct PitchDetectorConfig {
 impl Default for PitchDetectorConfig {
     fn default() -> Self {
         Self {
-            threshold: DEFAULT_THRESHOLD,
-            probability_cliff: PROBABILITY_CLIFF,
+            threshold: 0.12,
+            probability_cliff: 0.1,
             sample_rate: 48000,
             buffer_size: 8192,
             enable_temporal_smoothing: true,
@@ -71,36 +77,56 @@ impl Default for PitchDetectorConfig {
 
 pub struct PitchDetector {
     config: PitchDetectorConfig,
-    yin_buffer: Vec<f32>,
+    note_frequencies: Vec<f64>,
+    note_id_to_frame: Vec<i32>,
+    smoothed_buffer: Vec<f64>,
+    ac_results: Vec<f64>,
+    diff_func: Vec<f64>,
+    cmndf: Vec<f64>,
     frequency_history: Vec<f32>,
-    smoothed_frequency: Option<f32>,
-    adaptive_threshold: f32,
-    noise_floor: f32,
-    adaptive_buffer_size: usize,
-    cached_fft_size: usize,
-    cached_fft_forward: Option<Arc<dyn Fft<f32>>>,
-    cached_fft_inverse: Option<Arc<dyn Fft<f32>>>,
+    smoothed_frequency: Option<f64>,
+    pitch_queue: Vec<i32>,
+    pitch_major_queue: Vec<i32>,
+    last_major: f64,
+    confused: bool,
+    confusion_level: f64,
+    last_stable_time: u64,
+    base_volume: f64,
+    latest_pitch: f64,
 }
 
 impl PitchDetector {
     pub fn new(config: PitchDetectorConfig) -> Self {
-        let half_size = config.buffer_size / 2;
+        let note_frequencies = Self::create_note_frequencies(A4_FREQUENCY);
+        let note_id_to_frame = Self::build_note_id_to_frame(&note_frequencies, config.sample_rate);
+        let freq_count = note_frequencies.len();
+
         Self {
-            yin_buffer: vec![0.0; half_size],
-            adaptive_buffer_size: config.buffer_size,
             config,
+            note_frequencies,
+            note_id_to_frame,
+            smoothed_buffer: Vec::new(),
+            ac_results: vec![0.0; freq_count],
+            diff_func: Vec::new(),
+            cmndf: Vec::new(),
             frequency_history: Vec::with_capacity(MAX_HISTORY),
             smoothed_frequency: None,
-            adaptive_threshold: DEFAULT_THRESHOLD,
-            noise_floor: 0.0,
-            cached_fft_size: 0,
-            cached_fft_forward: None,
-            cached_fft_inverse: None,
+            pitch_queue: Vec::with_capacity(PITCH_QUEUE_SIZE),
+            pitch_major_queue: Vec::with_capacity(PITCH_MAJOR_QUEUE_SIZE),
+            last_major: 0.0,
+            confused: false,
+            confusion_level: -1.0,
+            last_stable_time: 0,
+            base_volume: -1.99,
+            latest_pitch: 0.0,
         }
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: u32) {
-        self.config.sample_rate = sample_rate;
+        if self.config.sample_rate != sample_rate {
+            self.config.sample_rate = sample_rate;
+            self.note_id_to_frame = Self::build_note_id_to_frame(&self.note_frequencies, sample_rate);
+        }
     }
 
     pub fn get_sample_rate(&self) -> u32 {
@@ -109,94 +135,75 @@ impl PitchDetector {
 
     pub fn set_buffer_size(&mut self, buffer_size: usize) {
         self.config.buffer_size = buffer_size;
-        let half_size = buffer_size / 2;
-        self.yin_buffer.resize(half_size, 0.0);
     }
 
     pub fn set_threshold(&mut self, threshold: f32) {
         self.config.threshold = threshold.clamp(0.05, 0.5);
-        self.adaptive_threshold = self.config.threshold;
     }
 
     pub fn set_calibration_offset(&mut self, offset: f32) {
         self.config.calibration_offset = offset;
     }
 
-    pub fn update_noise_floor(&mut self, rms: f32) {
-        self.noise_floor = self.noise_floor * 0.98 + rms * 0.02;
-        self.adaptive_threshold = (self.config.threshold + self.noise_floor * 1.5).min(0.5);
-    }
+    pub fn update_noise_floor(&mut self, _rms: f32) {}
 
     pub fn detect(&mut self, buffer: &[f32]) -> Option<PitchResult> {
         if buffer.len() < self.config.buffer_size {
             return None;
         }
 
-        let effective_buffer_size = if self.config.enable_adaptive_buffer {
-            self.calculate_adaptive_buffer_size(buffer.len())
-        } else {
-            self.config.buffer_size
-        };
-
-        let half_size = effective_buffer_size / 2;
-        if self.yin_buffer.len() < half_size {
-            self.yin_buffer.resize(half_size, 0.0);
-        }
-
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
 
         let volume_rms = Self::compute_rms(buffer);
         let volume_db_spl = Self::compute_db_spl(buffer);
         let max_amplitude = Self::compute_max_amplitude(buffer);
 
-        self.update_noise_floor(volume_rms as f32);
+        let peak_volume = self.get_volume(buffer);
 
-        let is_voiced = volume_rms as f32 > self.noise_floor * 2.0;
-
-        if !is_voiced {
+        if peak_volume < 0.1 || peak_volume < self.base_volume * 0.3 {
             self.frequency_history.clear();
             self.smoothed_frequency = None;
+            self.pitch_queue.clear();
+            self.pitch_major_queue.clear();
+            self.confused = false;
+            self.confusion_level = -1.0;
             return None;
         }
 
-        let half_size = effective_buffer_size / 2;
+        let double_buffer: Vec<f64> = buffer.iter().map(|&x| x as f64).collect();
 
-        self.compute_difference_function(buffer, half_size);
-        self.cumulative_mean_normalized(half_size);
+        let filtered = self.box_filter(&double_buffer, BOX_FILTER_ROUNDS);
 
-        let tau = self.find_fundamental(half_size)?;
-        let refined_tau = self.parabolic_interpolation(tau);
+        let pitch_result = self.get_pitch(&filtered, &double_buffer);
 
-        let frequency = self.config.sample_rate as f32 / refined_tau;
+        let (detected_freq, ac_confidence, _) = match pitch_result {
+            Some(r) => r,
+            None => return None,
+        };
 
-        // P0 Fix: Enhanced low-frequency stability check
-        if frequency < MIN_FREQUENCY * 0.95 || frequency > MAX_FREQUENCY * 1.05 {
+        if detected_freq >= 99999.0 {
             return None;
         }
+
+        let frequency = detected_freq as f32;
 
         if frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY {
             return None;
         }
 
-        // P0 Fix: Reject unstable low-frequency detections (< 80Hz)
-        if frequency < 80.0 {
-            let harmonic_check = self.check_harmonics(frequency, half_size);
-            if harmonic_check < 0.6 {
-                return None;
-            }
-        }
+        let closest_note_idx = self.closest_note(frequency as f64);
 
-        let yin_probability = 1.0 - self.yin_buffer[tau];
+        let yin_probability = (1.0 - ac_confidence.clamp(0.0, 1.0)) as f32;
 
-        if yin_probability < PROBABILITY_CLIFF {
+        if yin_probability < self.config.probability_cliff {
             return None;
         }
 
         let harmonic_score = if self.config.enable_harmonic_check {
-            self.enhanced_harmonic_check(frequency, half_size)
+            self.compute_harmonic_score(frequency as f64, &self.smoothed_buffer)
         } else {
             1.0
         };
@@ -207,20 +214,22 @@ impl PitchDetector {
             + harmonic_score * 0.25
             + temporal_consistency * 0.25;
 
+        let final_frequency = self.apply_confusion_smoothing(frequency as f64, closest_note_idx);
+
         let final_frequency = if self.config.enable_temporal_smoothing {
-            self.apply_temporal_smoothing(frequency, yin_probability)
+            self.apply_smoothing(final_frequency)
         } else {
-            frequency
-        };
+            final_frequency
+        } as f32;
 
-        let calibrated_frequency = self.apply_calibration(final_frequency);
+        let calibrated_final = self.apply_calibration(final_frequency);
 
-        let (note, octave, cents) = frequency_to_note(calibrated_frequency);
+        let (note, octave, cents) = frequency_to_note(calibrated_final);
 
         let clarity = yin_probability * harmonic_score;
 
         Some(PitchResult {
-            frequency: calibrated_frequency,
+            frequency: calibrated_final,
             note,
             octave,
             cents,
@@ -230,7 +239,7 @@ impl PitchDetector {
             volume_db_spl,
             max_amplitude,
             timestamp,
-            is_voiced,
+            is_voiced: true,
             confidence: PitchConfidence {
                 yin_probability,
                 harmonic_score,
@@ -241,286 +250,458 @@ impl PitchDetector {
         })
     }
 
-    fn calculate_adaptive_buffer_size(&self, buffer_len: usize) -> usize {
-        let desired_size = if let Some(prev_freq) = self.smoothed_frequency {
-            if prev_freq > 600.0 || prev_freq < 150.0 {
-                (self.config.buffer_size * 2).min(16384)
+    fn create_note_frequencies(a4_freq: f64) -> Vec<f64> {
+        let a4_index = (A4_MIDI - NOTE_START) as i32;
+        let min_octave = NOTE_START / 12 - 1;
+        let max_octave = 6;
+        let freq_to_note_offset = NOTE_START % 12;
+        let range = ((max_octave - min_octave + 1) * 12 - freq_to_note_offset + 1) as usize;
+
+        (0..range)
+            .map(|i| {
+                let freq = a4_freq * 2.0_f64.powf((i as f64 - a4_index as f64) / 12.0);
+                (freq * 100.0).round() / 100.0
+            })
+            .collect()
+    }
+
+    fn build_note_id_to_frame(note_frequencies: &[f64], sample_rate: u32) -> Vec<i32> {
+        note_frequencies
+            .iter()
+            .map(|&freq| (sample_rate as f64 / freq + 0.5) as i32)
+            .collect()
+    }
+
+    fn box_filter(&mut self, buffer: &[f64], rounds: usize) -> Vec<f64> {
+        let mut current = buffer.to_vec();
+        let mut window = 1;
+        for _ in 0..rounds {
+            current = self.smooth(&current, window);
+            window <<= 1;
+        }
+        self.smoothed_buffer = current.clone();
+        current
+    }
+
+    fn smooth(&self, buffer: &[f64], window: usize) -> Vec<f64> {
+        if window == 0 || window >= buffer.len() {
+            return buffer.to_vec();
+        }
+        let len = buffer.len();
+        let mut result = Vec::with_capacity(len);
+        for i in 0..len {
+            if i + window < len {
+                result.push((buffer[i] + buffer[i + window]) * 0.5);
             } else {
-                self.config.buffer_size
+                result.push(buffer[i]);
             }
-        } else {
-            self.config.buffer_size
-        };
-        
-        desired_size.min(buffer_len)
+        }
+        result
     }
 
-    fn compute_difference_function(&mut self, buffer: &[f32], half_size: usize) {
-        self.yin_buffer[0] = 1.0;
-
-        let n = buffer.len();
-        let fft_size = n.next_power_of_two();
-
-        if self.cached_fft_size != fft_size {
-            let mut planner = FftPlanner::new();
-            self.cached_fft_forward = Some(planner.plan_fft_forward(fft_size));
-            self.cached_fft_inverse = Some(planner.plan_fft_inverse(fft_size));
-            self.cached_fft_size = fft_size;
+    fn auto_correlation(&self, buffer: &[f64], frame: i32) -> f64 {
+        let frame = frame as usize;
+        if frame == 0 || frame >= buffer.len() {
+            return 0.0;
         }
-
-        let fft = self.cached_fft_forward.as_ref().unwrap();
-        let ifft = self.cached_fft_inverse.as_ref().unwrap();
-
-        let mut signal: Vec<Complex<f32>> = buffer.iter()
-            .map(|&x| Complex { re: x, im: 0.0 })
-            .chain(std::iter::repeat(Complex { re: 0.0, im: 0.0 }))
-            .take(fft_size)
-            .collect();
-
-        let mut reversed: Vec<Complex<f32>> = buffer.iter().rev()
-            .map(|&x| Complex { re: x, im: 0.0 })
-            .chain(std::iter::repeat(Complex { re: 0.0, im: 0.0 }))
-            .take(fft_size)
-            .collect();
-
-        fft.process(&mut signal);
-        fft.process(&mut reversed);
-
-        let mut product: Vec<Complex<f32>> = signal.iter().zip(reversed.iter())
-            .map(|(a, b)| a * b)
-            .collect();
-
-        ifft.process(&mut product);
-
-        let scale = 1.0 / fft_size as f32;
-        let acf: Vec<f32> = product.iter().take(half_size)
-            .map(|c| c.re * scale)
-            .collect();
-
-        let energy: Vec<f32> = {
-            let mut e = vec![0.0f32; half_size];
-            e[0] = buffer.iter().take(half_size).map(|x| x * x).sum();
-            for tau in 1..half_size {
-                e[tau] = e[tau - 1] - buffer[tau - 1] * buffer[tau - 1]
-                    + buffer[tau + half_size - 1] * buffer[tau + half_size - 1];
-            }
-            e
-        };
-
-        for tau in 1..half_size {
-            self.yin_buffer[tau] = energy[0] + energy[tau] - 2.0 * acf[tau];
-        }
+        let length = buffer.len() - frame;
+        let sum: f64 = (0..length).map(|i| buffer[i] * buffer[i + frame]).sum();
+        sum / length as f64
     }
 
-    fn cumulative_mean_normalized(&mut self, half_size: usize) {
-        let mut running_sum = 0.0f32;
-
-        for tau in 1..half_size {
-            running_sum += self.yin_buffer[tau];
-            if running_sum > 0.0 {
-                self.yin_buffer[tau] = self.yin_buffer[tau] * tau as f32 / running_sum;
-            } else {
-                self.yin_buffer[tau] = 1.0;
-            }
+    fn difference_function(&self, buffer: &[f64], frame: i32) -> f64 {
+        let frame = frame as usize;
+        if frame == 0 || frame >= buffer.len() {
+            return 1e10;
         }
+        let length = buffer.len() - frame;
+        let sum: f64 = (0..length).map(|i| {
+            let diff = buffer[i] - buffer[i + frame];
+            diff * diff
+        }).sum();
+        sum / length as f64
     }
 
-    fn find_fundamental(&self, half_size: usize) -> Option<usize> {
-        let min_tau = ((self.config.sample_rate as f32 / MAX_FREQUENCY) as usize).max(2);
-        let max_tau = ((self.config.sample_rate as f32 / MIN_FREQUENCY) as usize).min(half_size - 1);
-
-        let mut best_tau = 0usize;
-        let mut best_val = 1.0f32;
-
-        for tau in min_tau..max_tau {
-            let val = self.yin_buffer[tau];
-            
-            if val < self.adaptive_threshold && val < best_val {
-                best_tau = tau;
-                best_val = val;
-                
-                while best_tau + 1 < max_tau && self.yin_buffer[best_tau + 1] < best_val {
-                    best_tau += 1;
-                    best_val = self.yin_buffer[best_tau];
-                }
-                
-                if best_val < self.adaptive_threshold * 0.5 {
-                    if let Some(octave_tau) = self.check_octave_candidate(best_tau, min_tau, max_tau) {
-                        return Some(octave_tau);
-                    }
-                    return Some(best_tau);
-                }
-            }
+    fn get_pitch(&mut self, buffer: &[f64], raw_buffer: &[f64]) -> Option<(f64, f64, &[f64])> {
+        let note_count = self.note_id_to_frame.len();
+        if self.ac_results.len() < note_count {
+            self.ac_results.resize(note_count, 0.0);
         }
 
-        if best_val < self.adaptive_threshold {
-            if let Some(octave_tau) = self.check_octave_candidate(best_tau, min_tau, max_tau) {
-                return Some(octave_tau);
-            }
-            return Some(best_tau);
-        }
+        let half_len = buffer.len() / 2;
 
-        let min_val_tau = (min_tau..max_tau)
-            .min_by(|&a, &b| self.yin_buffer[a].partial_cmp(&self.yin_buffer[b]).unwrap())?;
-
-        if self.yin_buffer[min_val_tau] < 0.5 {
-            Some(min_val_tau)
-        } else {
-            None
-        }
-    }
-
-    fn check_octave_candidate(&self, tau: usize, min_tau: usize, max_tau: usize) -> Option<usize> {
-        if tau < min_tau * 2 {
+        let max_frame = *self.note_id_to_frame.iter().filter(|&&f| f > 0 && (f as usize) < half_len).max().unwrap_or(&0);
+        if max_frame == 0 {
             return None;
         }
-        
-        let octave_tau = tau / 2;
-        
-        if octave_tau < min_tau || octave_tau >= max_tau {
+        let max_frame_usize = max_frame as usize;
+
+        if self.diff_func.len() <= max_frame_usize {
+            self.diff_func.resize(max_frame_usize + 1, 0.0);
+        }
+        if self.cmndf.len() <= max_frame_usize {
+            self.cmndf.resize(max_frame_usize + 1, 1e10);
+        }
+
+        for tau in 1..=max_frame_usize {
+            let length = raw_buffer.len() - tau;
+            let sum: f64 = (0..length).map(|i| {
+                let diff = raw_buffer[i] - raw_buffer[i + tau];
+                diff * diff
+            }).sum();
+            self.diff_func[tau] = sum / length as f64;
+        }
+
+        if self.diff_func.len() > 1 && self.diff_func[1] < 1e-10 {
             return None;
         }
-        
-        let octave_val = self.yin_buffer[octave_tau];
-        
-        if octave_val < self.adaptive_threshold * 0.8 {
-            if self.verify_octave_relationship(tau, octave_tau) {
-                return Some(octave_tau);
-            }
-        }
-        
-        None
-    }
 
-    fn verify_octave_relationship(&self, tau: usize, octave_tau: usize) -> bool {
-        if (octave_tau * 2).abs_diff(tau) <= 2 {
-            let tau_val = self.yin_buffer[tau];
-            let octave_val = self.yin_buffer[octave_tau];
-            
-            octave_val <= tau_val * 1.2
-        } else {
-            false
-        }
-    }
-
-    fn parabolic_interpolation(&self, tau: usize) -> f32 {
-        if tau == 0 || tau >= self.yin_buffer.len() - 1 {
-            return tau as f32;
+        let mut running_sum = 0.0f64;
+        for tau in 1..=max_frame_usize {
+            running_sum += self.diff_func[tau];
+            self.cmndf[tau] = if running_sum > 1e-10 {
+                self.diff_func[tau] * tau as f64 / running_sum
+            } else {
+                1e10
+            };
         }
 
-        let s0 = self.yin_buffer[tau - 1] as f64;
-        let s1 = self.yin_buffer[tau] as f64;
-        let s2 = self.yin_buffer[tau + 1] as f64;
+        let threshold = self.config.threshold as f64;
 
-        let denom = 2.0 * s1 - s2 - s0;
-        if denom.abs() < 1e-10 {
-            return tau as f32;
-        }
+        let min_note_frame = *self.note_id_to_frame.iter()
+            .filter(|&&f| f > 0)
+            .min()
+            .unwrap_or(&1) as usize;
+        let max_note_frame = *self.note_id_to_frame.iter()
+            .filter(|&&f| f > 0 && (f as usize) < raw_buffer.len() / 2)
+            .max()
+            .unwrap_or(&1) as usize;
 
-        let adjustment = (s2 - s0) / (2.0 * denom);
-        
-        if adjustment.is_finite() && adjustment.abs() < 1.0 {
-            let refined_tau = tau as f64 + adjustment;
-            
-            if refined_tau > 0.0 && refined_tau < self.yin_buffer.len() as f64 {
-                return refined_tau as f32;
-            }
-        }
-        
-        tau as f32
-    }
-
-    fn check_harmonics(&self, frequency: f32, half_size: usize) -> f32 {
-        let mut score = 0.0f32;
-        let mut count = 0;
-
-        for harmonic in [2.0f32, 3.0, 4.0, 5.0] {
-            let harmonic_freq = frequency * harmonic;
-            if harmonic_freq > MAX_FREQUENCY {
+        let mut first_below_tau: usize = 0;
+        for tau in min_note_frame..=max_note_frame {
+            if self.cmndf[tau] < threshold {
+                first_below_tau = tau;
                 break;
             }
+        }
 
-            let harmonic_tau = (self.config.sample_rate as f32 / harmonic_freq) as usize;
-            if harmonic_tau > 0 && harmonic_tau < half_size {
-                let val = self.yin_buffer[harmonic_tau];
-                if val < 0.5 {
-                    score += 1.0 - val;
+        let best_tau = if first_below_tau > 0 {
+            let mut local_min_tau = first_below_tau;
+            let mut local_min_val = self.cmndf[first_below_tau];
+            let mut rising_count = 0;
+            for tau in (first_below_tau + 1)..=max_note_frame {
+                if self.cmndf[tau] < local_min_val {
+                    local_min_val = self.cmndf[tau];
+                    local_min_tau = tau;
+                    rising_count = 0;
+                } else {
+                    rising_count += 1;
+                    if self.cmndf[tau] > local_min_val * 5.0 || rising_count > 8 {
+                        break;
+                    }
                 }
-                count += 1;
+            }
+            local_min_tau
+        } else {
+            let mut min_val: f64 = 1e10;
+            let mut min_tau: usize = 0;
+            for tau in min_note_frame..=max_note_frame {
+                if self.cmndf[tau] < min_val {
+                    min_val = self.cmndf[tau];
+                    min_tau = tau;
+                }
+            }
+            min_tau
+        };
+
+        if best_tau == 0 || self.cmndf[best_tau] > 1.0 {
+            return None;
+        }
+
+        let best_freq = self.config.sample_rate as f64 / best_tau as f64;
+
+        if best_freq > MAX_FREQUENCY as f64 || best_freq < MIN_FREQUENCY as f64 {
+            return None;
+        }
+
+        for i in 0..note_count {
+            let frame = self.note_id_to_frame[i] as usize;
+            if frame > 0 && frame <= max_frame_usize {
+                self.ac_results[i] = self.auto_correlation(raw_buffer, frame as i32);
             }
         }
 
-        if count > 0 { score / count as f32 } else { 0.5 }
+        let (final_frame, _) = self.range_search_diff(raw_buffer, best_tau as i32);
+        let fine_freq = self.fine_tune_diff(raw_buffer, final_frame);
+        let best_cmndf = self.cmndf[best_tau];
+
+        Some((fine_freq, best_cmndf, &self.ac_results))
     }
 
-    fn check_subharmonics(&self, frequency: f32, half_size: usize) -> f32 {
-        let mut score = 0.0f32;
-        let mut count = 0;
+    fn range_search_diff(&self, buffer: &[f64], center_frame: i32) -> (i32, f64) {
+        let step = if center_frame > 2080 {
+            32
+        } else if center_frame > 1040 {
+            16
+        } else if center_frame > 520 {
+            8
+        } else if center_frame > 260 {
+            4
+        } else if center_frame > 130 {
+            2
+        } else {
+            1
+        };
 
-        for sub_harmonic in [2.0f32, 3.0] {
-            let sub_freq = frequency / sub_harmonic;
-            if sub_freq < MIN_FREQUENCY {
+        let range = if center_frame > 33 { 4 } else { 2 };
+
+        let mut best_frame = center_frame;
+        let mut best_diff = self.difference_function(buffer, center_frame);
+
+        let start = center_frame - range * step;
+        let end = center_frame + range * step;
+
+        for offset in (start..=end).step_by(step as usize) {
+            if offset <= 0 || offset as usize >= buffer.len() {
                 continue;
             }
-
-            let sub_tau = (self.config.sample_rate as f32 / sub_freq) as usize;
-            if sub_tau > 0 && sub_tau < half_size {
-                let val = self.yin_buffer[sub_tau];
-                if val < 0.3 {
-                    score += 0.5;
-                }
-                count += 1;
+            let diff = self.difference_function(buffer, offset);
+            if diff < best_diff {
+                best_diff = diff;
+                best_frame = offset;
             }
         }
 
-        if count > 0 { 1.0 - (score / count as f32) } else { 1.0 }
+        (best_frame, best_diff)
     }
 
-    fn analyze_harmonic_spectrum(&self, frequency: f32, half_size: usize) -> HarmonicAnalysis {
-        let mut harmonics_found = Vec::new();
-        let total_energy = 0.0f32;
-        let mut harmonic_energy = 0.0f32;
-
-        for harmonic in 1..=8 {
-            let harmonic_freq = frequency * harmonic as f32;
-            if harmonic_freq > MAX_FREQUENCY {
-                break;
-            }
-
-            let harmonic_tau = (self.config.sample_rate as f32 / harmonic_freq) as usize;
-            if harmonic_tau > 0 && harmonic_tau < half_size {
-                let val = self.yin_buffer[harmonic_tau];
-                let strength = if val < 0.5 { 1.0 - val } else { 0.0 };
-                harmonics_found.push((harmonic, strength));
-                if harmonic <= 5 {
-                    harmonic_energy += strength;
-                }
-            }
+    fn fine_tune_diff(&self, buffer: &[f64], frame: i32) -> f64 {
+        if frame <= 1 || frame as usize >= buffer.len() - 1 {
+            return self.frame_to_freq(frame as f64);
         }
 
-        let fundamental_strength = harmonics_found.first().map(|&(_, s)| s).unwrap_or(0.0);
-        let harmonic_ratio = if total_energy > 0.0 {
-            harmonic_energy / total_energy
+        let d_prev = self.difference_function(buffer, frame - 1);
+        let d_curr = self.difference_function(buffer, frame);
+        let d_next = self.difference_function(buffer, frame + 1);
+
+        let denom = 2.0 * d_curr - d_prev - d_next;
+        let adjustment = if denom.abs() > 1e-10 {
+            let adj = (d_next - d_prev) / (2.0 * denom);
+            adj.clamp(-1.0, 1.0)
         } else {
             0.0
         };
 
-        HarmonicAnalysis {
-            harmonics: harmonics_found,
-            fundamental_strength,
-            harmonic_ratio,
-            inharmonicity: 1.0 - harmonic_ratio,
+        self.frame_to_freq(frame as f64 + adjustment)
+    }
+
+    fn frame_to_freq(&self, frame: f64) -> f64 {
+        if frame > 0.0 {
+            self.config.sample_rate as f64 / frame
+        } else {
+            0.0
         }
     }
 
-    fn enhanced_harmonic_check(&self, frequency: f32, half_size: usize) -> f32 {
-        let basic_score = self.check_harmonics(frequency, half_size);
-        let sub_score = self.check_subharmonics(frequency, half_size);
-        let analysis = self.analyze_harmonic_spectrum(frequency, half_size);
+    fn closest_note(&self, frequency: f64) -> usize {
+        if frequency.is_nan() {
+            return self.note_frequencies.len() / 2;
+        }
 
-        let harmonic_confidence = basic_score * 0.5 + sub_score * 0.3 + analysis.fundamental_strength * 0.2;
+        let clamped = frequency
+            .clamp(self.note_frequencies[0], self.note_frequencies[self.note_frequencies.len() - 1]);
 
-        harmonic_confidence.clamp(0.0, 1.0)
+        let mut best_idx = 0;
+        let mut best_diff = f64::MAX;
+
+        for (i, &note_freq) in self.note_frequencies.iter().enumerate() {
+            let diff = (note_freq - clamped).abs();
+            if diff < best_diff {
+                best_diff = diff;
+                best_idx = i;
+            }
+        }
+
+        best_idx
+    }
+
+    fn get_volume(&mut self, buffer: &[f32]) -> f64 {
+        let len = buffer.len();
+        let check_len = if len < 1000 { len } else { 1000 };
+        let step = if len < 500 { 1 } else { 2 };
+        let mut peak: f64 = -1000.0;
+        for i in (0..check_len).step_by(step) {
+            let abs_val = buffer[i].abs() as f64;
+            if abs_val > peak {
+                peak = abs_val;
+            }
+        }
+        let volume = peak * 100.0;
+
+        if self.base_volume <= 0.0 {
+            self.base_volume += 1.0;
+        } else {
+            let effective = volume.max(self.base_volume);
+            self.base_volume = effective * VOLUME_DECAY;
+        }
+
+        volume
+    }
+
+    fn apply_confusion_smoothing(&mut self, frequency: f64, note_idx: usize) -> f64 {
+        if let Some(prev) = self.smoothed_frequency {
+            let ratio = frequency / prev;
+            if ratio < 0.94 || ratio > 1.06 {
+                self.pitch_queue.clear();
+                self.pitch_major_queue.clear();
+                self.confused = false;
+                self.confusion_level = -1.0;
+            }
+        }
+
+        self.pitch_queue.push(note_idx as i32);
+        if self.pitch_queue.len() > PITCH_QUEUE_SIZE {
+            self.pitch_queue.remove(0);
+        }
+
+        self.pitch_major_queue.push(note_idx as i32);
+        if self.pitch_major_queue.len() > PITCH_MAJOR_QUEUE_SIZE {
+            self.pitch_major_queue.remove(0);
+        }
+
+        let all_same_major = self.pitch_major_queue.iter().all(|&n| n == self.pitch_major_queue[0]);
+        if all_same_major {
+            self.last_major = frequency;
+        }
+
+        let unique_notes: std::collections::HashSet<i32> = self.pitch_queue.iter().copied().collect();
+        let new_confused = self.confused || unique_notes.len() > 2;
+
+        if !new_confused {
+            self.last_stable_time = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+        }
+
+        let not_confused = unique_notes.len() == 1;
+        self.confused = new_confused && !not_confused;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        let timeout = self.last_stable_time + CONFUSION_TTL_MILLIS < now;
+
+        let result = if !self.confused || timeout {
+            frequency
+        } else {
+            let ratio = frequency / self.last_major;
+            if ratio > 0.94 && ratio < 1.06 {
+                self.last_major
+            } else {
+                frequency
+            }
+        };
+
+        self.latest_pitch = result;
+
+        if self.confusion_level >= 0.0 {
+            self.confusion_level = if self.confused {
+                (1.0 - CONFUSION_DECAY) + self.confusion_level * CONFUSION_DECAY
+            } else {
+                self.confusion_level * CONFUSION_DECAY
+            };
+        } else if self.confused {
+            self.confusion_level = 1.0;
+        }
+
+        result
+    }
+
+    fn apply_smoothing(&mut self, frequency: f64) -> f64 {
+        match self.smoothed_frequency {
+            Some(prev) => {
+                let ratio = frequency / prev;
+                let is_same_note = ratio > 0.94 && ratio < 1.06;
+
+                if !is_same_note {
+                    self.smoothed_frequency = Some(frequency);
+                    return frequency;
+                }
+
+                let diff = (frequency - prev).abs();
+                let threshold = frequency * SIMILAR_THRESHOLD;
+
+                let smoothed = if diff < threshold {
+                    frequency * (1.0 - SMOOTHING_RATIO) + prev * SMOOTHING_RATIO
+                } else {
+                    frequency * 0.5 + prev * 0.5
+                };
+
+                self.smoothed_frequency = Some(smoothed);
+                smoothed
+            }
+            None => {
+                self.smoothed_frequency = Some(frequency);
+                frequency
+            }
+        }
+    }
+
+    fn apply_calibration(&self, frequency: f32) -> f32 {
+        if self.config.calibration_offset.abs() < 0.01 {
+            return frequency;
+        }
+        frequency * (2.0f32.powf(self.config.calibration_offset / 1200.0))
+    }
+
+    fn compute_harmonic_score(&self, frequency: f64, buffer: &[f64]) -> f32 {
+        let fundamental_frame = (self.config.sample_rate as f64 / frequency) as i32;
+        if fundamental_frame <= 0 || fundamental_frame as usize >= buffer.len() {
+            return 0.5;
+        }
+
+        let fundamental_ac = self.auto_correlation(buffer, fundamental_frame);
+        if fundamental_ac.abs() < 1e-10 {
+            return 0.5;
+        }
+
+        let ac_at_zero = {
+            let sum: f64 = buffer.iter().map(|&x| x * x).sum();
+            sum / buffer.len() as f64
+        };
+        if ac_at_zero.abs() < 1e-10 {
+            return 0.5;
+        }
+
+        let normalized_fundamental = (fundamental_ac / ac_at_zero).abs();
+
+        let mut score = 0.0f32;
+        let mut count = 0;
+
+        for harmonic in [2.0f64, 3.0, 4.0, 5.0] {
+            let harmonic_freq = frequency * harmonic;
+            if harmonic_freq > MAX_FREQUENCY as f64 {
+                break;
+            }
+
+            let harmonic_frame = (self.config.sample_rate as f64 / harmonic_freq) as i32;
+            if harmonic_frame > 0 && (harmonic_frame as usize) < buffer.len() {
+                let harmonic_ac = self.auto_correlation(buffer, harmonic_frame);
+                let normalized_harmonic = (harmonic_ac / ac_at_zero).abs();
+                let ratio = normalized_harmonic / normalized_fundamental;
+                score += if ratio < 1.0 { ratio as f32 } else { 1.0 };
+                count += 1;
+            }
+        }
+
+        if count > 0 {
+            (score / count as f32).clamp(0.0, 1.0)
+        } else {
+            0.5
+        }
     }
 
     fn compute_temporal_consistency(&mut self, frequency: f32) -> f32 {
@@ -548,38 +729,6 @@ impl PitchDetector {
         }
 
         consistent as f32 / (self.frequency_history.len() - 1) as f32
-    }
-
-    fn apply_temporal_smoothing(&mut self, frequency: f32, _probability: f32) -> f32 {
-        match self.smoothed_frequency {
-            Some(prev) => {
-                let ratio = frequency / prev;
-                let cents_diff = (ratio.log2() * 1200.0).abs();
-
-                let alpha = if cents_diff < 20.0 {
-                    SMOOTHING_FACTOR
-                } else if cents_diff < 100.0 {
-                    0.5
-                } else {
-                    0.1
-                };
-
-                let smoothed = prev * alpha + frequency * (1.0 - alpha);
-                self.smoothed_frequency = Some(smoothed);
-                smoothed
-            }
-            None => {
-                self.smoothed_frequency = Some(frequency);
-                frequency
-            }
-        }
-    }
-
-    fn apply_calibration(&self, frequency: f32) -> f32 {
-        if self.config.calibration_offset.abs() < 0.01 {
-            return frequency;
-        }
-        frequency * (2.0f32.powf(self.config.calibration_offset / 1200.0))
     }
 
     fn compute_rms(buffer: &[f32]) -> f64 {

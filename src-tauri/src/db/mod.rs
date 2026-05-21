@@ -2,6 +2,7 @@ use rusqlite::{Connection, Result as SqliteResult};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
+use std::sync::PoisonError;
 
 pub mod stats;
 
@@ -65,5 +66,5 @@ fn init_db() -> SqliteResult<Connection> {
 }
 
 pub fn get_db() -> std::sync::MutexGuard<'static, Connection> {
-    DB_CONNECTION.lock().unwrap()
+    DB_CONNECTION.lock().unwrap_or_else(PoisonError::into_inner)
 }

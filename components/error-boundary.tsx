@@ -2,6 +2,10 @@
 
 import React from 'react'
 
+interface FmErrorsWindow extends Window {
+  __fmerrors?: string[]
+}
+
 interface ErrorBoundaryProps {
   children: React.ReactNode
   fallback?: React.ReactNode
@@ -33,8 +37,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       this.props.onError(error, errorInfo)
     }
 
-    if (typeof window !== 'undefined' && (window as any).__fmerrors) {
-      (window as any).__fmerrors.push(
+    if (typeof window !== 'undefined' && (window as FmErrorsWindow).__fmerrors) {
+      (window as FmErrorsWindow).__fmerrors!.push(
         `[ErrorBoundary${this.props.componentName ? ' ' + this.props.componentName : ''}] ${error.message}`
       )
     }

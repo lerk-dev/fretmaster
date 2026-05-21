@@ -161,8 +161,8 @@ export const FocusMode = memo(function FocusMode({
 
   useEffect(() => {
     let cancelled = false
-    if (focusMode.wakeLock && 'wakeLock' in navigator) {
-      (navigator as any).wakeLock.request('screen').then((lock: any) => {
+    if (focusMode.enableWakeLock && 'wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').then((lock) => {
         if (!cancelled) {
           wakeLockRef.current = lock
         } else {
@@ -177,7 +177,7 @@ export const FocusMode = memo(function FocusMode({
         wakeLockRef.current = null
       }
     }
-  }, [focusMode.wakeLock])
+  }, [focusMode.enableWakeLock])
 
   const remainingTime = currentPhaseDuration - pomodoroTime
   const correctRate = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0

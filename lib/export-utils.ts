@@ -1,12 +1,12 @@
 import { PracticeStats } from './stats-api'
-import { jsPDF } from 'jspdf'
+import { isTauriEnv } from './utils'
 
 const isTauri = (): boolean => {
-  return typeof window !== 'undefined' && !!(window as any).__TAURI__
+  return isTauriEnv()
 }
 
 export interface ExportOptions {
-  format: 'csv' | 'pdf' | 'json'
+  format: 'csv' | 'pdf' | 'json' | 'html'
   language: 'zh-CN' | 'en'
   dateRange?: {
     start: Date
@@ -172,82 +172,9 @@ export function exportToJSON(stats: PracticeStats[], options: ExportOptions): st
   return JSON.stringify(report, null, 2)
 }
 
-function drawChineseTextAsImage(
-  doc: jsPDF,
-  text: string,
-  x: number,
-  y: number,
-  fontSize: number,
-  color: [number, number, number] = [26, 26, 26],
-  maxWidth: number = 0,
-  align: 'left' | 'center' | 'right' = 'left'
-): void {
-  if (typeof document === 'undefined') {
-    doc.setFontSize(fontSize)
-    doc.setTextColor(color[0], color[1], color[2])
-    doc.text(text, x, y, { align })
-    return
-  }
-
-  const canvas = document.createElement('canvas')
-  const scale = 3
-  const canvasFontSize = fontSize * scale
-
-  canvas.style.display = 'none'
-  document.body.appendChild(canvas)
-
-  try {
-    const ctx = canvas.getContext('2d')
-    if (!ctx) {
-      doc.setFontSize(fontSize)
-      doc.setTextColor(color[0], color[1], color[2])
-      doc.text(text, x, y, { align })
-      return
-    }
-
-    ctx.font = `${canvasFontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "SimHei", sans-serif`
-
-    const metrics = ctx.measureText(text)
-    const textWidth = metrics.width
-    const textHeight = canvasFontSize * 1.3
-
-    canvas.width = Math.ceil(textWidth + 4 * scale)
-    canvas.height = Math.ceil(textHeight + 4 * scale)
-
-    ctx.font = `${canvasFontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "SimHei", sans-serif`
-    ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`
-    ctx.textBaseline = 'top'
-    ctx.fillText(text, 2 * scale, 2 * scale)
-
-    const imageData = canvas.toDataURL('image/png')
-
-    const imgWidth = (canvas.width / scale) * (72 / 96)
-    const imgHeight = (canvas.height / scale) * (72 / 96)
-
-    let imgX = x
-    if (align === 'center') {
-      imgX = x - imgWidth / 2
-    } else if (align === 'right') {
-      imgX = x - imgWidth
-    }
-
-    const imgY = y - imgHeight * 0.75
-
-    doc.addImage(imageData, 'PNG', imgX, imgY, imgWidth, imgHeight)
-  } finally {
-    if (canvas.parentNode) {
-      document.body.removeChild(canvas)
-    }
-    // P1 Fix: Explicitly clear canvas to free memory
-    canvas.width = 0
-    canvas.height = 0
-  }
-}
-
-export function generatePDF(stats: PracticeStats[], options: ExportOptions): jsPDF {
+export function exportToHTML(stats: PracticeStats[], options: ExportOptions): string {
   const { language } = options
   const isZh = language === 'zh-CN'
-  const doc = new jsPDF()
 
   const totalDuration = stats.reduce((sum, s) => sum + (s.duration || 0), 0)
   const avgScore = stats.length > 0
@@ -257,143 +184,174 @@ export function generatePDF(stats: PracticeStats[], options: ExportOptions): jsP
     ? Math.round(stats.reduce((sum, s) => sum + (s.accuracy || 0), 0) / stats.length)
     : 0
 
-  const pageWidth = doc.internal.pageSize.getWidth()
+  const title = isZh ? 'FretMaster 练习报告' : 'FretMaster Practice Report'
+  const generatedAt = isZh ? '生成时间' : 'Generated At'
+  const totalSessions = isZh ? '练习次数' : 'Total Sessions'
+  const totalDurationLabel = isZh ? '总时长(分钟)' : 'Total Duration(min)'
+  const avgScoreLabel = isZh ? '平均得分' : 'Average Score'
+  const avgAccuracyLabel = isZh ? '平均准确率' : 'Average Accuracy'
+  const dateLabel = isZh ? '日期' : 'Date'
+  const typeLabel = isZh ? '练习类型' : 'Type'
+  const scoreLabel = isZh ? '得分' : 'Score'
+  const durationLabel = isZh ? '时长(秒)' : 'Duration(sec)'
+  const accuracyLabel = isZh ? '准确率' : 'Accuracy'
 
-  doc.setFontSize(20)
-  doc.setTextColor(37, 99, 235)
-  doc.text(t('practice_report', language), pageWidth / 2, 20, { align: 'center' })
+  const rows = stats.map(stat => `
+    <tr>
+      <td>${(stat.created_at || stat.date || '-').substring(0, 10)}</td>
+      <td>${getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language)}</td>
+      <td>${stat.score || 0}</td>
+      <td>${stat.duration || 0}</td>
+      <td>${stat.accuracy || 0}%</td>
+    </tr>
+  `).join('')
 
-  if (isZh) {
-    drawChineseTextAsImage(doc, 'FretMaster 练习报告', pageWidth / 2, 28, 12, [37, 99, 235], 0, 'center')
-  }
-
-  doc.setDrawColor(37, 99, 235)
-  doc.setLineWidth(0.5)
-  doc.line(14, isZh ? 34 : 24, pageWidth - 14, isZh ? 34 : 24)
-
-  doc.setFontSize(10)
-  doc.setTextColor(102, 102, 102)
-  const genTime = new Date().toLocaleString(isZh ? 'zh-CN' : 'en-US')
-  doc.text(`${t('generated_at', language)}: ${genTime}`, 14, isZh ? 40 : 32)
-
-  const summaryY = isZh ? 48 : 40
-  const cardWidth = (pageWidth - 14 * 2 - 12) / 4
-  const summaryItems = [
-    { value: String(stats.length), label: t('total_sessions', language) },
-    { value: String(Math.round(totalDuration / 60)), label: t('total_duration', language) },
-    { value: String(avgScore), label: t('average_score', language) },
-    { value: `${avgAccuracy}%`, label: t('average_accuracy', language) },
-  ]
-
-  summaryItems.forEach((item, i) => {
-    const x = 14 + i * (cardWidth + 4)
-    doc.setFillColor(248, 250, 252)
-    doc.roundedRect(x, summaryY, cardWidth, 24, 2, 2, 'F')
-    doc.setFontSize(16)
-    doc.setTextColor(37, 99, 235)
-    doc.text(item.value, x + cardWidth / 2, summaryY + 10, { align: 'center' })
-    doc.setFontSize(8)
-    doc.setTextColor(102, 102, 102)
-    doc.text(item.label, x + cardWidth / 2, summaryY + 18, { align: 'center' })
-  })
-
-  const tableY = summaryY + 34
-  const headers = [
-    t('date', language),
-    t('exercise_type', language),
-    t('score', language),
-    t('duration', language),
-    t('accuracy', language),
-  ]
-  const colWidths = [36, 40, 28, 36, 36]
-  let currentX = 14
-
-  doc.setFillColor(248, 250, 252)
-  doc.rect(14, tableY, pageWidth - 28, 10, 'F')
-  doc.setDrawColor(229, 231, 235)
-  doc.setLineWidth(0.3)
-  doc.rect(14, tableY, pageWidth - 28, 10)
-
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(26, 26, 26)
-  currentX = 14
-  headers.forEach((header, i) => {
-    doc.text(header, currentX + 2, tableY + 7)
-    currentX += colWidths[i]
-  })
-
-  let rowY = tableY + 10
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-
-  stats.forEach((stat, index) => {
-    if (rowY > doc.internal.pageSize.getHeight() - 20) {
-      doc.addPage()
-      rowY = 20
-
-      doc.setFillColor(248, 250, 252)
-      doc.rect(14, rowY - 10, pageWidth - 28, 10, 'F')
-      doc.setDrawColor(229, 231, 235)
-      doc.rect(14, rowY - 10, pageWidth - 28, 10)
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(26, 26, 26)
-      currentX = 14
-      headers.forEach((header, i) => {
-        doc.text(header, currentX + 2, rowY - 3)
-        currentX += colWidths[i]
-      })
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(8)
+  return `<!DOCTYPE html>
+<html lang="${language}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #e2e8f0;
     }
-
-    if (index % 2 === 0) {
-      doc.setFillColor(249, 250, 251)
-      doc.rect(14, rowY, pageWidth - 28, 8, 'F')
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     }
-    doc.setDrawColor(229, 231, 235)
-    doc.rect(14, rowY, pageWidth - 28, 8)
-
-    doc.setTextColor(26, 26, 26)
-    currentX = 14
-    const rowData = [
-      (stat.created_at || stat.date || '-').substring(0, 10),
-      getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language),
-      String(stat.score || 0),
-      `${Math.round((stat.duration || 0) / 60)} ${t('minutes', language)}`,
-      `${stat.accuracy || 0}%`,
-    ]
-    rowData.forEach((cell, i) => {
-      doc.text(cell, currentX + 2, rowY + 6)
-      currentX += colWidths[i]
-    })
-
-    rowY += 8
-  })
-
-  const footerY = doc.internal.pageSize.getHeight() - 10
-  doc.setFontSize(8)
-  doc.setTextColor(102, 102, 102)
-  doc.text(`Generated by FretMaster · ${new Date().getFullYear()}`, pageWidth / 2, footerY, { align: 'center' })
-
-  return doc
+    h1 {
+      text-align: center;
+      color: #60a5fa;
+      margin-bottom: 8px;
+      font-size: 28px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #94a3b8;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .summary-card {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .summary-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #60a5fa;
+    }
+    .summary-label {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    th {
+      background: rgba(59, 130, 246, 0.2);
+      color: #e2e8f0;
+      padding: 12px 8px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    td {
+      padding: 12px 8px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      font-size: 13px;
+    }
+    tr:nth-child(even) {
+      background: rgba(30, 41, 59, 0.5);
+    }
+    tr:hover {
+      background: rgba(59, 130, 246, 0.1);
+    }
+    .footer {
+      text-align: center;
+      margin-top: 32px;
+      color: #64748b;
+      font-size: 12px;
+    }
+    @media print {
+      body { background: #fff; color: #1a1a2e; }
+      .container { box-shadow: none; background: #fff; }
+      .summary-card { background: #f1f5f9; border-color: #cbd5e1; }
+      .summary-value { color: #2563eb; }
+      th { background: #e2e8f0; color: #1a1a2e; }
+      td { border-color: #e2e8f0; }
+      tr:nth-child(even) { background: #f8fafc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${title}</h1>
+    <p class="subtitle">${generatedAt}: ${new Date().toLocaleString(language)}</p>
+    
+    <div class="summary">
+      <div class="summary-card">
+        <div class="summary-value">${stats.length}</div>
+        <div class="summary-label">${totalSessions}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value">${Math.round(totalDuration / 60)}</div>
+        <div class="summary-label">${totalDurationLabel}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value">${avgScore}</div>
+        <div class="summary-label">${avgScoreLabel}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value">${avgAccuracy}%</div>
+        <div class="summary-label">${avgAccuracyLabel}</div>
+      </div>
+    </div>
+    
+    <table>
+      <thead>
+        <tr>
+          <th>${dateLabel}</th>
+          <th>${typeLabel}</th>
+          <th>${scoreLabel}</th>
+          <th>${durationLabel}</th>
+          <th>${accuracyLabel}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+    
+    <p class="footer">Generated by FretMaster · ${new Date().getFullYear()}</p>
+  </div>
+</body>
+</html>`
 }
 
 function downloadFileWeb(content: string, filename: string, mimeType: string): void {
   const blob = new Blob([content], { type: mimeType })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
-function downloadBlobWeb(data: Uint8Array, filename: string, mimeType: string): void {
-  const blob = new Blob([data], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -428,28 +386,6 @@ async function saveFileTauri(content: string, defaultFilename: string, filters: 
   }
 }
 
-async function saveBinaryFileTauri(data: Uint8Array, defaultFilename: string, filters: { name: string; extensions: string[] }[]): Promise<{ success: boolean; path?: string; error?: string }> {
-  try {
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const { writeFile } = await import('@tauri-apps/plugin-fs')
-
-    const filePath = await save({
-      defaultPath: defaultFilename,
-      filters: filters,
-    })
-
-    if (!filePath) {
-      return { success: false, error: 'cancelled' }
-    }
-
-    await writeFile(filePath, data)
-
-    return { success: true, path: filePath }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-}
-
 export async function exportPracticeData(
   stats: PracticeStats[],
   options: ExportOptions
@@ -457,15 +393,18 @@ export async function exportPracticeData(
   const timestamp = new Date().toISOString().split('T')[0]
 
   if (options.format === 'pdf') {
-    const doc = generatePDF(stats, options)
-    const pdfData = new Uint8Array(doc.output('arraybuffer'))
-    const filename = `fretmaster-practice-${timestamp}.pdf`
-    const filters = [{ name: 'PDF', extensions: ['pdf'] }, { name: 'All Files', extensions: ['*'] }]
+    const htmlContent = exportToHTML(stats, options)
+    const filename = `fretmaster-practice-${timestamp}.html`
+    const filters = [{ name: 'HTML', extensions: ['html'] }, { name: 'All Files', extensions: ['*'] }]
 
     if (isTauri()) {
-      return await saveBinaryFileTauri(pdfData, filename, filters)
+      const result = await saveFileTauri(htmlContent, filename, filters)
+      if (result.success && result.path) {
+        return { success: true, path: result.path }
+      }
+      return result
     } else {
-      downloadBlobWeb(pdfData, filename, 'application/pdf')
+      downloadFileWeb(htmlContent, filename, 'text/html;charset=utf-8')
       return { success: true, path: filename }
     }
   }
@@ -488,6 +427,12 @@ export async function exportPracticeData(
       mimeType = 'application/json;charset=utf-8'
       filters = [{ name: 'JSON', extensions: ['json'] }, { name: 'All Files', extensions: ['*'] }]
       break
+    case 'html':
+      content = exportToHTML(stats, options)
+      filename = `fretmaster-practice-${timestamp}.html`
+      mimeType = 'text/html;charset=utf-8'
+      filters = [{ name: 'HTML', extensions: ['html'] }, { name: 'All Files', extensions: ['*'] }]
+      break
     default:
       throw new Error(`Unsupported format: ${options.format}`)
   }
@@ -501,11 +446,13 @@ export async function exportPracticeData(
 }
 
 export function printPDFReport(stats: PracticeStats[], options: ExportOptions): void {
-  const doc = generatePDF(stats, options)
-  const pdfBlob = doc.output('blob')
-  const url = URL.createObjectURL(pdfBlob)
+  const htmlContent = exportToHTML(stats, options)
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
   const printWindow = window.open(url, '_blank')
   if (printWindow) {
-    printWindow.print()
+    printWindow.onload = () => {
+      printWindow.print()
+    }
   }
 }

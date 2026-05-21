@@ -1,4 +1,5 @@
 import { logger } from './logger'
+import { getAudioContextClass as getAudioContextClassUtil } from './utils'
 
 export function isIOS(): boolean {
   if (typeof window === 'undefined') return false
@@ -37,18 +38,14 @@ export function supportsWebAudio(): boolean {
 
   return (
     typeof AudioContext !== 'undefined' ||
-    typeof (window as any).webkitAudioContext !== 'undefined'
+    getAudioContextClassUtil() !== AudioContext
   )
 }
 
 export function getAudioContextClass(): typeof AudioContext | null {
   if (typeof window === 'undefined') return null
 
-  return (
-    window.AudioContext ||
-    (window as any).webkitAudioContext ||
-    null
-  )
+  return getAudioContextClassUtil()
 }
 
 export class IOSAudioUnlocker {

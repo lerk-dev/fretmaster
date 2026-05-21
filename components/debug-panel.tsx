@@ -14,6 +14,7 @@ import {
   Radio,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { isTauriEnv } from '@/lib/utils'
 
 interface DebugData {
   frequency: number
@@ -96,30 +97,36 @@ const DebugPanelInner = memo(function DebugPanelInner() {
       }
       const invoke = invokeRef.current
       
+      interface PitchData {
+        note: string
+        octave: number
+        frequency: number
+        cents: number
+        confidence: { yin: number; harmonic: number; temporal: number; overall: number }
+      }
+      
+      interface AudioStatus {
+        isCapturing: boolean
+        latencyMs: number
+        bufferSize: number
+        sampleRate: number
+      }
+      
+      interface AudioLevel {
+        rms: number
+        db_spl: number
+        peak: number
+        is_voiced: boolean
+        noise_floor: number
+        snr_db: number
+      }
+      
       const [pitch, status, audioLevel] = await Promise.all([
-        invoke<{
-          note: string
-          octave: number
-          frequency: number
-          cents: number
-          confidence: { yin: number; harmonic: number; temporal: number; overall: number }
-        } | null>('detect_pitch').catch(() => null),
-        invoke<{
-          isCapturing: boolean
-          latencyMs: number
-          bufferSize: number
-          sampleRate: number
-        }>('get_audio_status').catch(() => ({
+        invoke('detect_pitch').catch(() => null) as Promise<PitchData | null>,
+        invoke('get_audio_status').catch(() => ({
           isCapturing: false, latencyMs: 0, bufferSize: 0, sampleRate: 48000,
-        })),
-        invoke<{
-          rms: number
-          db_spl: number
-          peak: number
-          is_voiced: boolean
-          noise_floor: number
-          snr_db: number
-        } | null>('get_audio_level').catch(() => null),
+        })) as Promise<AudioStatus>,
+        invoke('get_audio_level').catch(() => null) as Promise<AudioLevel | null>,
       ])
 
       const detectTime = performance.now() - startTime
@@ -421,13 +428,13 @@ const DebugPanelInner = memo(function DebugPanelInner() {
 })
 
 export function DebugPanel() {
-  const [isTauriEnv, setIsTauriEnv] = useState(false)
+  const [isTauri, setIsTauri] = useState(false)
   
   useEffect(() => {
-    setIsTauriEnv(typeof window !== 'undefined' && !!(window as any).__TAURI__)
+    setIsTauri(isTauriEnv())
   }, [])
   
-  if (!isTauriEnv) {
+  if (!isTauri) {
     return null
   }
   return <DebugPanelInner />

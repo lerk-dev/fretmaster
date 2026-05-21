@@ -1,6 +1,8 @@
 // SOLO歌曲数据结构定义
 // 与SOLO原版songs.json完全匹配
 
+import { logger } from './logger'
+
 // SOLO原版和弦结构
 export interface SoloChord {
   beats: number
@@ -201,7 +203,7 @@ export async function loadSoloSongs(): Promise<Song[]> {
     cachedSongs = data.songs.map(convertSoloSong)
     return cachedSongs
   } catch (error) {
-    console.error('Failed to load songs:', error)
+    logger.error('Failed to load songs:', error)
     return []
   }
 }
@@ -213,12 +215,8 @@ export function getSoloSongs(): Song[] {
 
 // 预加载歌曲数据
 export function preloadSoloSongs(): void {
-  loadSoloSongs().catch(console.error)
+  loadSoloSongs().catch((e) => logger.error('Failed to preload songs:', e))
 }
 
 // 默认导出空数组，实际使用时通过loadSoloSongs加载
 export const SOLO_SONGS: Song[] = []
-
-// 类型导出（兼容旧代码）
-export type ChordDetailed = SoloChord
-export type SoloSong = Song
