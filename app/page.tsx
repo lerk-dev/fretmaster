@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -4787,8 +4787,17 @@ function applyVoiceLeading(degrees: string[], chordRoot: string, previousNote: s
 
 // 将半音数转换为音级表示
 function semitonesToDegree(semitones: number, chordContext?: string): string {
-  const isDiminished = chordContext === 'diminished' || chordContext === 'dim7' || chordContext === 'dim'
-  const isMinor = chordContext === 'minor' || chordContext === 'm7' || chordContext === 'm9' || chordContext === 'm11' || chordContext === 'm13' || chordContext === 'mMaj7'
+  const isDiminished = chordContext === 'diminished' || chordContext === 'dim7' || chordContext === 'dim' || chordContext === 'dimMaj7'
+  const hasFlatFive = isDiminished || chordContext === 'm7b5' || chordContext === 'm9b5' || chordContext === 'm7b5nat9' || 
+    chordContext === '7b5' || chordContext === '7b5b9' || chordContext === '7b5#9'
+  const isMinor = chordContext?.startsWith('m') || chordContext?.startsWith('min') || chordContext?.startsWith('-') || 
+    chordContext === 'minor' || chordContext === 'm7' || chordContext === 'm9' || chordContext === 'm11' || chordContext === 'm13' || 
+    chordContext === 'mMaj7' || chordContext === 'm6' || chordContext === 'm7b5' || chordContext === 'm7b6' || 
+    chordContext === 'm9b5' || chordContext === 'm7b5nat9' || chordContext === 'mMaj9' || chordContext === 'mMaj13' || 
+    chordContext === 'madd9' || chordContext === 'm6/9'
+  const hasSharpFive = chordContext === '7#5' || chordContext === '7#5b9' || chordContext === '7#5#9' || chordContext === '7alt' ||
+    chordContext === 'aug' || chordContext === 'Aug' || chordContext === 'aug7' ||
+    chordContext === 'maj7#5' || chordContext === 'maj9#5' || chordContext === 'maj13#5'
   const degreeMap: Record<number, string> = {
     0: "1",
     1: "b2",
@@ -4796,9 +4805,9 @@ function semitonesToDegree(semitones: number, chordContext?: string): string {
     3: "b3",
     4: "3",
     5: "4",
-    6: isDiminished ? "b5" : "#4",
+    6: hasFlatFive ? "b5" : "#4",
     7: "5",
-    8: isMinor ? "b6" : "#5",
+    8: hasSharpFive ? "#5" : isMinor ? "b6" : "#5",
     9: isDiminished ? "bb7" : "6",
     10: "b7",
     11: "7",
@@ -4897,7 +4906,7 @@ function degreeToSemitone(degree: string): number | undefined {
   const degreeMap: Record<string, number> = {
     '1': 0, 'b2': 1, '2': 2, 'b3': 3, '3': 4, '4': 5,
     'b5': 6, '#4': 6, '5': 7, '#5': 8, 'b6': 8,
-    '6': 9, '#6': 10, 'b7': 10, '7': 11,
+    '6': 9, 'bb7': 9, '#6': 10, 'b7': 10, '7': 11,
     'b9': 13, '9': 14, '#9': 15, '11': 17, '#11': 18,
     'b13': 20, '13': 21
   }
@@ -8475,7 +8484,6 @@ export default function FretMasterPage() {
     // 根据和弦类型调整音级
     sequence = sequence.map(degree => {
       switch (chordType) {
-        // 小三和弦系列: 3 -> b3
         case 'Minor':
         case 'm':
         case 'm6':
@@ -8486,52 +8494,121 @@ export default function FretMasterPage() {
         case 'madd9':
         case 'm6add9':
           if (degree === '3') return 'b3'
+          if (degree === '7') return 'b7'
           return degree
         
-        // 减和弦系列：3 -> b3, 5 -> b5
         case 'Dim':
         case 'dim':
         case 'dim7':
           if (degree === '3') return 'b3'
           if (degree === '5') return 'b5'
-          if (degree === '7') return 'bb7'  // 减七是bb7
+          if (degree === '7') return 'bb7'
           return degree
         
-        // 半减七和弦：3 -> b3, 5 -> b5
-        case 'm7b5':
+        case 'dimMaj7':
           if (degree === '3') return 'b3'
           if (degree === '5') return 'b5'
           return degree
         
-        // 增和弦：5 -> #5
+        case 'm7b5':
+        case 'm9b5':
+          if (degree === '3') return 'b3'
+          if (degree === '5') return 'b5'
+          if (degree === '7') return 'b7'
+          return degree
+        
+        case 'm7b5nat9':
+          if (degree === '3') return 'b3'
+          if (degree === '5') return 'b5'
+          if (degree === '7') return 'b7'
+          return degree
+        
+        case 'm7b6':
+          if (degree === '3') return 'b3'
+          if (degree === '7') return 'b7'
+          if (degree === '6') return 'b6'
+          return degree
+        
+        case 'mMaj7':
+        case 'mMaj9':
+        case 'mMaj13':
+          if (degree === '3') return 'b3'
+          return degree
+        
         case 'Aug':
         case 'aug':
           if (degree === '5') return '#5'
           return degree
         
-        // 属七降九: 9 -> b9
+        case 'aug7':
+          if (degree === '5') return '#5'
+          if (degree === '7') return 'b7'
+          return degree
+        
+        case '7':
+        case '7b5':
+        case '7#5':
         case '7b9':
-          if (degree === '9') return 'b9'
-          return degree
-        
-        // 属七升九: 9 -> #9
         case '7#9':
-          if (degree === '9') return '#9'
-          return degree
-        
-        // 属七升十一: 11 -> #11
         case '7#11':
-          if (degree === '11') return '#11'
+        case '7b13':
+        case '7#5b9':
+        case '7#5#9':
+        case '7b5b9':
+        case '7b5#9':
+        case '7b9b13':
+        case '7alt':
+        case '9':
+        case '9b13':
+        case '9#11':
+        case '13':
+        case '13b9':
+        case '13#9':
+        case '13#11':
+        case '7sus4':
+        case '7sus4b9':
+        case '9sus4':
+        case '13sus4':
+        case '13sus4b9':
+        case 'sus4b9':
+          if (degree === '7') return 'b7'
+          if (degree === '5' && ['7b5', '7b5b9', '7b5#9'].includes(chordType)) return 'b5'
+          if (degree === '5' && ['7#5', '7#5b9', '7#5#9', '7alt'].includes(chordType)) return '#5'
+          if (degree === '9' && ['7b9', '7#5b9', '7b5b9', '7b9b13', '7sus4b9', 'sus4b9', '13sus4b9', '13b9'].includes(chordType)) return 'b9'
+          if (degree === '9' && ['7#9', '7#5#9', '7b5#9', '13#9'].includes(chordType)) return '#9'
+          if (degree === '11' && ['7#11', '9#11', '13#11'].includes(chordType)) return '#11'
+          if (degree === '6' && ['7b13', '7b9b13', '9b13'].includes(chordType)) return 'b13'
           return degree
         
-        // 挂二和弦：没有3，有2
+        case 'Maj7':
+        case 'maj7#5':
+        case 'maj7#11':
+        case 'maj7b6':
+        case 'maj7#9':
+        case 'Maj9':
+        case 'maj9#11':
+        case 'maj9#5':
+        case 'maj9b6':
+        case 'maj13':
+        case 'maj13#11':
+        case 'maj13#5':
+          if (degree === '5' && ['maj7#5', 'maj9#5', 'maj13#5'].includes(chordType)) return '#5'
+          if (degree === '6' && ['maj7b6', 'maj9b6'].includes(chordType)) return 'b6'
+          if (degree === '9' && ['maj7#9'].includes(chordType)) return '#9'
+          if (degree === '11' && ['maj7#11', 'maj9#11', 'maj13#11'].includes(chordType)) return '#11'
+          return degree
+        
         case 'sus2':
-          if (degree === '3') return '2'  // sus2用2代替3
+          if (degree === '3') return '2'
+          if (degree === '7') return 'b7'
           return degree
         
-        // 挂四和弦：没有3，有4
         case 'sus4':
-          if (degree === '3') return '4'  // sus4用4代替3
+          if (degree === '3') return '4'
+          return degree
+        
+        case '6':
+        case '6add9':
           return degree
         
         default:
