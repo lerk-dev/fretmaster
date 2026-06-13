@@ -77,12 +77,14 @@ export interface FocusModeSettings {
 
 export type ThemeMode = 'dark' | 'light'
 export type ChordScaleDisplayMode = 'chinese' | 'english' | 'english_short' | 'jazz'
+export type NoteAccidentalDisplay = 'sharp' | 'flat' | 'mixed'
 
 export interface UserSettings {
   instrument: InstrumentType
   language: 'zh-CN' | 'en'
   theme: ThemeMode
   chordScaleDisplay: ChordScaleDisplayMode
+  noteAccidentalDisplay: NoteAccidentalDisplay
   showPracticeSuggestion: boolean
 }
 
@@ -320,6 +322,7 @@ export interface AppActions {
   setLanguage: (language: 'zh-CN' | 'en') => void
   setTheme: (theme: ThemeMode) => void
   setChordScaleDisplay: (display: ChordScaleDisplayMode) => void
+  setNoteAccidentalDisplay: (display: NoteAccidentalDisplay) => void
   setShowPracticeSuggestion: (show: boolean) => void
   setCurrentPracticeSuggestion: (suggestion: string | null) => void
   
@@ -465,6 +468,7 @@ const initialState: AppState = {
     language: 'zh-CN',
     theme: 'dark' as ThemeMode,
     chordScaleDisplay: 'chinese' as ChordScaleDisplayMode,
+    noteAccidentalDisplay: 'sharp' as NoteAccidentalDisplay,
     showPracticeSuggestion: true,
   },
   
@@ -593,6 +597,7 @@ export const useAppStore = create<AppState & AppActions>()(
       setLanguage: (language) => set((state) => ({ user: { ...state.user, language } })),
       setTheme: (theme) => set((state) => ({ user: { ...state.user, theme } })),
       setChordScaleDisplay: (chordScaleDisplay) => set((state) => ({ user: { ...state.user, chordScaleDisplay } })),
+      setNoteAccidentalDisplay: (noteAccidentalDisplay) => set((state) => ({ user: { ...state.user, noteAccidentalDisplay } })),
       setShowPracticeSuggestion: (show) => set((state) => ({ user: { ...state.user, showPracticeSuggestion: show } })),
       setCurrentPracticeSuggestion: (suggestion) => set({ currentPracticeSuggestion: suggestion }),
       
@@ -695,6 +700,9 @@ export const useAppStore = create<AppState & AppActions>()(
             }
             if (persistedState.user.chordScaleDisplay === undefined) {
               persistedState.user.chordScaleDisplay = 'chinese'
+            }
+            if (persistedState.user.noteAccidentalDisplay === undefined) {
+              persistedState.user.noteAccidentalDisplay = 'sharp'
             }
           }
           if (persistedState.fullscreenMode !== undefined) {

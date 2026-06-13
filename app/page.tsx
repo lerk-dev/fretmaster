@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -5704,7 +5704,9 @@ export default function FretMasterPage() {
     return NOTES[(noteIndex + offset) % 12]
   }, [getInstrumentTranspose])
   const chordScaleDisplay = user.chordScaleDisplay
+  const noteAccidentalDisplay = user.noteAccidentalDisplay
   const setChordScaleDisplay = store.setChordScaleDisplay
+  const setNoteAccidentalDisplay = store.setNoteAccidentalDisplay
 
   const t = useCallback((key: string) => {
     const lang = language || 'zh-CN'
@@ -6974,6 +6976,7 @@ export default function FretMasterPage() {
     const settings = {
       language,
       chordScaleDisplay,
+      noteAccidentalDisplay,
       practiceTime,
       fretCount,
       metronomeBpm,
@@ -6992,7 +6995,7 @@ export default function FretMasterPage() {
     a.click()
     URL.revokeObjectURL(url)
     toast.success(t('export_settings'))
-  }, [language, chordScaleDisplay, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, customChords, t])
+  }, [language, chordScaleDisplay, noteAccidentalDisplay, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, customChords, t])
 
   // 导入设置
   const importSettings = useCallback((file: File) => {
@@ -7002,6 +7005,7 @@ export default function FretMasterPage() {
         const settings = JSON.parse(e.target?.result as string)
         setLanguage(settings.language || 'zh-CN')
         setChordScaleDisplay(settings.chordScaleDisplay || (settings.language === 'en' ? 'english' : 'chinese'))
+        setNoteAccidentalDisplay(settings.noteAccidentalDisplay || 'sharp')
         setTheme(settings.theme || 'dark')
         setPracticeTime(settings.practiceTime || 60)
         setFretCount(settings.fretCount || 15)
@@ -8923,6 +8927,20 @@ export default function FretMasterPage() {
     if (['C#', 'D#', 'F#', 'G#', 'A#'].includes(note)) return ENHARMONIC_MAP[note] || note
     return note
   }
+
+  const formatNoteByAccidentalSetting = useCallback((note: string): string => {
+    if (noteAccidentalDisplay === 'flat') return preferFlat(note)
+    if (noteAccidentalDisplay === 'mixed') {
+      // 混用模式：升降号交替显示，同一音符始终显示同一种
+      const noteIndex = NOTES.indexOf(preferSharp(note))
+      if (noteIndex === -1) return note
+      // 使用音符索引决定升降号：C,D,E,F,G,A,B 用升号，其他用降号
+      // 更合理的做法：F大调的降号调用降号，其他用升号
+      const FLAT_KEYS_INDICES = [1, 3, 5, 8, 10] // Db, Eb, Gb, Ab, Bb 的索引
+      return FLAT_KEYS_INDICES.includes(noteIndex) ? preferFlat(note) : preferSharp(note)
+    }
+    return preferSharp(note)
+  }, [noteAccidentalDisplay])
   
   const getNextKeyByMovement = useCallback((currentKey: string, movement: typeof scaleRootMovement): string => {
     const noteIndex = NOTES.indexOf(currentKey)
@@ -10964,6 +10982,40 @@ export default function FretMasterPage() {
                           {t('display_jazz')}
                         </Button>
                       </div>
+
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Music className="h-3.5 w-3.5" />
+                      {language === 'zh-CN' ? '音符升降号显示' : 'Note Accidental Display'}
+                    </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant={noteAccidentalDisplay === 'sharp' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setNoteAccidentalDisplay('sharp')}
+                        >
+                          {language === 'zh-CN' ? '升号 ♯' : 'Sharp ♯'}
+                        </Button>
+                        <Button
+                          variant={noteAccidentalDisplay === 'flat' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setNoteAccidentalDisplay('flat')}
+                        >
+                          {language === 'zh-CN' ? '降号 ♭' : 'Flat ♭'}
+                        </Button>
+                        <Button
+                          variant={noteAccidentalDisplay === 'mixed' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setNoteAccidentalDisplay('mixed')}
+                        >
+                          {language === 'zh-CN' ? '混用' : 'Mixed'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {language === 'zh-CN' 
+                          ? '升号：所有变化音用♯显示（如C♯, F♯）；降号：所有变化音用♭显示（如D♭, G♭）；混用：根据音名自动选择升降号'
+                          : 'Sharp: display all accidentals as ♯ (e.g. C♯, F♯); Flat: display all as ♭ (e.g. D♭, G♭); Mixed: auto-select based on note name'}
+                      </p>
                       </AccordionContent>
                     </AccordionItem>
                     
@@ -11167,7 +11219,7 @@ export default function FretMasterPage() {
                             <Target className="h-4 w-4 text-primary" />
                             <div>
                               <Label className="text-[10px] text-muted-foreground block">{t('target_note')}</Label>
-                              <div className="text-base sm:text-lg font-bold text-primary leading-tight">{targetNote}</div>
+                              <div className="text-base sm:text-lg font-bold text-primary leading-tight">{formatNoteByAccidentalSetting(targetNote)}</div>
                             </div>
                           </div>
                         )}
@@ -12411,7 +12463,7 @@ export default function FretMasterPage() {
                                   : "text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
                               )}
                             >
-                              {getNoteAtPosition(stringIndex, 0)}
+                              {formatNoteByAccidentalSetting(getNoteAtPosition(stringIndex, 0))}
                             </button>
                             
                             {/* 1品及以上 */}
@@ -12489,7 +12541,7 @@ export default function FretMasterPage() {
                               }
                               
                               // 根据模式确定显示内容
-                              let displayText = note
+                              let displayText = formatNoteByAccidentalSetting(note)
                               let showText = showNote || isCurrentExerciseNote
                               
                               // 练习模式下显示音级数字
@@ -13110,7 +13162,7 @@ export default function FretMasterPage() {
                 <div className="space-y-8">
                   {practiceAnswerMode === "fretboard" ? (
                     <>
-                      <div className="text-8xl font-bold text-primary">{targetNote}</div>
+                      <div className="text-8xl font-bold text-primary">{formatNoteByAccidentalSetting(targetNote)}</div>
                       <div className="text-2xl text-muted-foreground">{t('target_note')}</div>
                     </>
                   ) : (
