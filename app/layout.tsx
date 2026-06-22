@@ -1,6 +1,7 @@
 "use client"
 
 import './globals.css'
+import '@fontsource/noto-music'
 import { TitleBar } from '@/components/title-bar'
 import { DebugPanel } from '@/components/debug-panel'
 import { Toaster } from 'sonner'
@@ -37,20 +38,7 @@ export default function RootLayout({
             if (el) { el.textContent = window.__fmerrors.join('\\n'); el.classList.remove('hidden'); }
           });
         `}} />
-        {/* Noto Music - 专业音乐符号字体，覆盖 ♯♭♮Δø° 等音乐记号 */}
-        <link
-          rel="preconnect"
-          href="https://fonts.googleapis.com"
-        />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Music&text=%E2%99%AF%E2%99%AE%E2%99%AD%CE%94%C3%B8%C2%B0%E2%81%80%E2%81%B1%E2%81%B2%E2%81%B3%E2%81%B4%E2%81%B5%E2%81%B6%E2%81%B7%E2%81%B8%E2%81%B9&display=swap"
-          rel="stylesheet"
-        />
+        {/* Noto Music - 专业音乐符号字体，通过 @fontsource/noto-music 本地加载 */}
         <title>FretMaster - 吉他指板练习工具</title>
         <meta name="description" content="专业的吉他指板可视化练习工具，助你掌握指板音符位置" />
         <meta name="generator" content="v0.app" />
