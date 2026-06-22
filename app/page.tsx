@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -7329,9 +7329,14 @@ export default function FretMasterPage() {
     setAudioError(null)
     try {
       if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+        const isHttps = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         const errorMsg = language === 'zh-CN' 
-          ? '浏览器不支持音频输入，请使用 HTTPS 或更换浏览器（Chrome/Firefox/Edge）'
-          : 'Browser does not support audio input. Please use HTTPS or try Chrome/Firefox/Edge'
+          ? isHttps 
+            ? '浏览器不支持音频输入，请更换浏览器（Chrome/Firefox/Edge）'
+            : '音频输入需要 HTTPS 安全连接。请使用 HTTPS 地址访问，或下载桌面版应用'
+          : isHttps 
+            ? 'Browser does not support audio input. Please try Chrome/Firefox/Edge'
+            : 'Audio input requires HTTPS. Please use HTTPS URL or download the desktop app'
         toast.error(errorMsg)
         setAudioError(errorMsg)
         throw new Error(errorMsg)
