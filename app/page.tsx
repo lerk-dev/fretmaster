@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -9644,11 +9644,11 @@ export default function FretMasterPage() {
   return (
     <OnboardingProvider t={t}>
     <TooltipProvider>
-      <div 
-        className="min-h-screen bg-background flex flex-col relative"
-        style={{ 
+      <div
+        className="h-screen bg-background flex flex-col relative overflow-hidden"
+        style={{
           zoom: displayScale !== 1 ? displayScale : undefined,
-          minHeight: '100vh',
+          height: '100dvh',
         }}
       >
         {/* 节拍器闪烁层 */}
@@ -10483,7 +10483,7 @@ export default function FretMasterPage() {
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden h-0">
+        <div className="flex-1 flex overflow-hidden h-0 min-h-0">
           {/* Sidebar */}
           <aside
             data-onboarding="practice-tabs"
@@ -10527,7 +10527,7 @@ export default function FretMasterPage() {
           </aside>
 
           {/* Main Area */}
-          <main className="flex-1 overflow-auto p-2 sm:p-4 pb-20 sm:pb-6">
+          <main className="flex-1 overflow-auto min-h-0 p-2 sm:p-4 pb-20 sm:pb-6">
             <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
               {/* Control Panel - 统计页面不显示*/}
               {activeTab !== "stats" && (
