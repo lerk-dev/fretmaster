@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
-import { Timer, Eye, EyeOff, Target, Zap, Coffee, Play, Pause, RotateCcw, X, CheckCircle2, Circle } from 'lucide-react'
+import { Timer, Eye, EyeOff, Target, Zap, Coffee, Play, Pause, RotateCcw, X, CheckCircle2, Circle, ChevronRight, ChevronLeft } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 
 interface FocusModeProps {
@@ -30,6 +30,7 @@ export const FocusMode = memo(function FocusMode({
   const [pomodoroPhase, setPomodoroPhase] = useState<'work' | 'break'>('work')
   const [pomodoroCount, setPomodoroCount] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const pomodoroRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const phaseDurationRef = useRef(25 * 60)
   const phaseRef = useRef<'work' | 'break'>('work')
@@ -69,6 +70,8 @@ export const FocusMode = memo(function FocusMode({
         'seconds': '秒',
         'practice_score': '练习得分',
         'time_elapsed': '已用时间',
+        'collapse': '收起',
+        'expand': '展开',
       },
       'en': {
         'focus_mode': 'Focus Mode',
@@ -94,6 +97,8 @@ export const FocusMode = memo(function FocusMode({
         'seconds': 'sec',
         'practice_score': 'Practice Score',
         'time_elapsed': 'Time Elapsed',
+        'collapse': 'Collapse',
+        'expand': 'Expand',
       }
     }
     return translations[language]?.[key] || key
@@ -183,81 +188,94 @@ export const FocusMode = memo(function FocusMode({
   const correctRate = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0
   const practiceProgress = practiceTime > 0 ? Math.min(100, Math.round(((practiceTime * 60 - timeLeft) / (practiceTime * 60)) * 100)) : 0
 
+  // 收起状态：只显示一个小条
+  if (collapsed) {
+    return (
+      <div className="fixed top-20 right-2 z-[9999] bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg">
+        <button
+          onClick={() => setCollapsed(false)}
+          className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-lg transition-colors"
+        >
+          <div className={`w-2 h-2 rounded-full ${pomodoroPhase === 'work' ? 'bg-red-500 animate-pulse' : 'bg-green-500 animate-pulse'}`} />
+          <span className="font-mono text-xs">{formatTime(remainingTime)}</span>
+          <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className={`fixed inset-0 z-[9999] flex flex-col transition-all duration-500 ${
-      focusMode.dimBackground ? 'bg-black/90' : 'bg-black/70'
-    }`}>
+    <div className="fixed top-16 right-2 bottom-16 z-[9999] w-64 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg flex flex-col overflow-hidden">
       {/* 顶部栏 */}
-      <div className="flex items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${pomodoroPhase === 'work' ? 'bg-red-500 animate-pulse' : 'bg-green-500 animate-pulse'}`} />
-          <span className="text-white/80 text-sm font-medium">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${pomodoroPhase === 'work' ? 'bg-red-500 animate-pulse' : 'bg-green-500 animate-pulse'}`} />
+          <span className="text-xs font-medium">
             {pomodoroPhase === 'work' ? t('work_phase') : t('break_phase')}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setShowSettings(prev => !prev)}
-            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title={t('settings')}
           >
-            {showSettings ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            {showSettings ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+          <button
+            onClick={() => setCollapsed(true)}
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title={t('collapse')}
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => {
               store.setFocusModeSettings({ enabled: false })
               onClose?.()
             }}
-            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title={t('exit_focus')}
           >
-            <X className="w-5 h-5" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* 设置面板 */}
       {showSettings && (
-        <div className="mx-6 mb-4 p-4 bg-white/5 rounded-xl border border-white/10 space-y-3">
-          <h4 className="text-white/70 text-sm font-medium">{t('settings')}</h4>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer">
+        <div className="px-3 py-2 border-b border-border/30 space-y-2">
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
               <input
                 type="checkbox"
                 checked={focusMode.showTimer ?? true}
                 onChange={(e) => setFocusModeSettings({ showTimer: e.target.checked })}
-                className="rounded border-white/30 bg-transparent text-blue-500"
+                className="rounded"
               />
               {t('show_timer')}
             </label>
-            <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
               <input
                 type="checkbox"
                 checked={focusMode.showProgress ?? true}
                 onChange={(e) => setFocusModeSettings({ showProgress: e.target.checked })}
-                className="rounded border-white/30 bg-transparent text-blue-500"
+                className="rounded"
               />
               {t('show_progress')}
             </label>
-            <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
               <input
                 type="checkbox"
-                checked={focusMode.dimBackground ?? true}
-                onChange={(e) => setFocusModeSettings({ dimBackground: e.target.checked })}
-                className="rounded border-white/30 bg-transparent text-blue-500"
+                checked={focusMode.enableWakeLock ?? true}
+                onChange={(e) => setFocusModeSettings({ enableWakeLock: e.target.checked })}
+                className="rounded"
               />
-              {t('dim_background')}
-            </label>
-            <label className="flex items-center gap-2 text-white/60 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={focusMode.hideDistractions ?? true}
-                onChange={(e) => setFocusModeSettings({ hideDistractions: e.target.checked })}
-                className="rounded border-white/30 bg-transparent text-blue-500"
-              />
-              {t('hide_distractions')}
+              {t('wake_lock')}
             </label>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-white/60 text-sm">{t('work_duration')}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">{t('work_duration')}</span>
             <input
               type="range"
               min={5}
@@ -265,31 +283,31 @@ export const FocusMode = memo(function FocusMode({
               step={5}
               value={workDuration}
               onChange={(e) => setFocusModeSettings({ targetDuration: Number(e.target.value) })}
-              className="flex-1"
+              className="flex-1 h-1"
             />
-            <span className="text-white/80 text-sm font-mono w-8">{workDuration}</span>
+            <span className="text-xs font-mono w-6 text-right">{workDuration}</span>
           </div>
         </div>
       )}
 
       {/* 主内容区 */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-3 overflow-y-auto">
         {/* 番茄钟计时器 */}
         {focusMode.showTimer !== false && (
           <div className="relative flex flex-col items-center">
-            <div className="relative w-64 h-64">
+            <div className="relative w-40 h-40">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 200 200">
                 <circle
                   cx="100" cy="100" r="90"
                   fill="none"
-                  stroke="rgba(255,255,255,0.1)"
-                  strokeWidth="6"
+                  stroke="rgba(128,128,128,0.15)"
+                  strokeWidth="8"
                 />
                 <circle
                   cx="100" cy="100" r="90"
                   fill="none"
                   stroke={pomodoroPhase === 'work' ? '#ef4444' : '#22c55e'}
-                  strokeWidth="6"
+                  strokeWidth="8"
                   strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 90}`}
                   strokeDashoffset={`${2 * Math.PI * 90 * (1 - progressPercent / 100)}`}
@@ -297,67 +315,67 @@ export const FocusMode = memo(function FocusMode({
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-white text-5xl font-mono font-light tracking-wider">
+                <span className="text-2xl font-mono font-light tracking-wider">
                   {formatTime(remainingTime)}
                 </span>
-                <span className="text-white/50 text-sm mt-2">
+                <span className="text-muted-foreground text-[10px] mt-1">
                   {pomodoroPhase === 'work' ? t('work_phase') : t('break_phase')}
                 </span>
               </div>
             </div>
 
             {/* 番茄钟控制 */}
-            <div className="flex items-center gap-4 mt-6">
+            <div className="flex items-center gap-3 mt-3">
               <button
                 onClick={resetPomodoro}
-                className="p-3 rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+                className="p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
               >
-                <RotateCcw className="w-5 h-5" />
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={togglePomodoro}
-                className="p-4 rounded-full bg-white/15 text-white hover:bg-white/25 transition-colors"
+                className="p-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                {pomodoroRunning ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+                {pomodoroRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
               </button>
             </div>
 
             {/* 已完成番茄数 */}
-            <div className="flex items-center gap-1 mt-4">
+            <div className="flex items-center gap-0.5 mt-2">
               {Array.from({ length: Math.min(pomodoroCount, 8) }).map((_, i) => (
-                <CheckCircle2 key={i} className="w-4 h-4 text-red-400" />
+                <CheckCircle2 key={i} className="w-3 h-3 text-red-400" />
               ))}
               {Array.from({ length: Math.max(0, 4 - Math.min(pomodoroCount, 4)) }).map((_, i) => (
-                <Circle key={`empty-${i}`} className="w-4 h-4 text-white/20" />
+                <Circle key={`empty-${i}`} className="w-3 h-3 text-muted-foreground/30" />
               ))}
-              <span className="text-white/40 text-xs ml-2">{pomodoroCount} {t('completed_pomodoros')}</span>
+              <span className="text-muted-foreground text-[10px] ml-1">{pomodoroCount} {t('completed_pomodoros')}</span>
             </div>
           </div>
         )}
 
         {/* 练习进度 */}
         {focusMode.showProgress !== false && isPlaying && (
-          <div className="w-full max-w-md space-y-4">
-            <div className="bg-white/5 rounded-xl p-4 space-y-3">
+          <div className="w-full space-y-2">
+            <div className="bg-muted/50 rounded-lg p-2.5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-white/60 text-sm">{t('practice_score')}</span>
-                <span className="text-white text-lg font-mono">
+                <span className="text-muted-foreground text-xs">{t('practice_score')}</span>
+                <span className="text-sm font-mono">
                   {score.correct}/{score.total}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-white/60 text-sm">{t('correct_rate')}</span>
-                <span className={`text-lg font-mono ${correctRate >= 80 ? 'text-green-400' : correctRate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                <span className="text-muted-foreground text-xs">{t('correct_rate')}</span>
+                <span className={`text-sm font-mono ${correctRate >= 80 ? 'text-green-500' : correctRate >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
                   {correctRate}%
                 </span>
               </div>
-              <div className="w-full bg-white/10 rounded-full h-2">
+              <div className="w-full bg-muted rounded-full h-1.5">
                 <div
-                  className="h-2 rounded-full transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-500"
+                  className="h-1.5 rounded-full transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-500"
                   style={{ width: `${practiceProgress}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between text-xs text-white/40">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                 <span>{t('time_elapsed')}</span>
                 <span>{practiceProgress}%</span>
               </div>
@@ -367,9 +385,9 @@ export const FocusMode = memo(function FocusMode({
       </div>
 
       {/* 底部提示 */}
-      <div className="text-center pb-6">
-        <span className="text-white/30 text-xs">
-          {t('focus_mode')} · {t('work_duration')}: {workDuration}{t('minutes')}
+      <div className="text-center py-2 border-t border-border/30">
+        <span className="text-muted-foreground text-[10px]">
+          {t('focus_mode')} · {workDuration}{t('minutes')}
         </span>
       </div>
     </div>

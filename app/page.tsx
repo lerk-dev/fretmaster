@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -5136,18 +5136,16 @@ export default function FretMasterPage() {
   
   const setFullscreenMode = handleToggleFullscreen
   
-  // 专注模式启用时自动进入全屏（仅在 focusMode.enabled 变化时触发）
+  // 专注模式启用时不再自动进入全屏，改为浮动侧边面板
   const prevFocusModeEnabled = useRef(focusMode?.enabled)
   useEffect(() => {
     if (focusMode?.enabled !== prevFocusModeEnabled.current) {
       prevFocusModeEnabled.current = focusMode?.enabled
-      if (focusMode?.enabled && focusMode?.enableFullscreen) {
-        handleToggleFullscreen(true)
-      } else if (!focusMode?.enabled && isFullscreen) {
+      if (!focusMode?.enabled && isFullscreen) {
         handleToggleFullscreen(false)
       }
     }
-  }, [focusMode?.enabled, focusMode?.enableFullscreen, isFullscreen, handleToggleFullscreen])
+  }, [focusMode?.enabled, isFullscreen, handleToggleFullscreen])
   
   // 全屏时切换 html 元素的 fullscreen-mode 类，防止 scrollbar-gutter 导致白条
   useEffect(() => {
