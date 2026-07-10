@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -124,11 +124,17 @@ import { PianoKeyboard, SimplePianoKeyboard } from "@/components/piano-keyboard"
 import { TRANSLATIONS } from '@/lib/i18n'
 
 // ==================== 音乐理论常量 ====================
-const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-const NOTES_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+const NOTES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
+const NOTES_FLAT = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]
 const STRING_TUNING = [4, 11, 7, 2, 9, 4] // E B G D A E (high to low, as semitones from C)
 const GUITAR_TUNING = ["E", "B", "G", "D", "A", "E"] // 1弦到6弦的开放音 (high to low)
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
+
+// 标准化音符名：将 # 转为 ♯、b 转为 ♭（用于兼容旧数据/和弦解析结果）
+function normalizeNoteName(note: string): string {
+  if (!note) return note
+  return note.replace(/#/g, '♯').replace(/b/g, '♭')
+}
 
 function findNoteIndexInArray(note: string, arr: string[]): number {
   return arr.findIndex(n => n === note)
@@ -4061,29 +4067,31 @@ const intervalToSemitones: Record<string, number> = {
 }
 
 const noteToSemitones: Record<string, number> = {
-  "C": 0, "C#": 1, "Cb": 11, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5,
-  "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
+  "C": 0, "C#": 1, "C♯": 1, "Cb": 11, "C♭": 11, "Db": 1, "D♭": 1, "D": 2, "D#": 3, "D♯": 3, "Eb": 3, "E♭": 3, "E": 4, "F": 5,
+  "F#": 6, "F♯": 6, "Gb": 6, "G♭": 6, "G": 7, "G#": 8, "G♯": 8, "Ab": 8, "A♭": 8, "A": 9, "A#": 10, "A♯": 10, "Bb": 10, "B♭": 10, "B": 11
 }
 
-// 检查两个音符是否为等音（如 C# = Db） 与原文件相同
+// 检查两个音符是否为等音（如 C♯ = D♭） 标准化后比较
 function isEquivalentNote(note1: string, note2: string): boolean {
   if (note1 === note2) return true
 
-  // 分离音符名和八度
+  // 分离音符名和八度，并标准化为 ♯/♭ 形式
   const extractNoteName = (fullNote: string): string => {
     const match = fullNote.match(/^([CDEFGAB][#♯b♭]?\d*)/)
-    return match ? match[1] : fullNote
+    return match ? normalizeNoteName(match[1]) : normalizeNoteName(fullNote)
   }
 
   const note1Name = extractNoteName(note1)
   const note2Name = extractNoteName(note2)
 
-  // 定义等价的音符对
+  if (note1Name === note2Name) return true
+
+  // 定义等价的音符对（使用 ♯/♭ 统一形式）
   const equivalentPairs = [
-    ['C#', 'Db'], ['D#', 'Eb'], ['F#', 'Gb'],
-    ['G#', 'Ab'], ['A#', 'Bb'],
-    ['C#', 'Db'], ['D#', 'Eb'], ['F#', 'Gb'],
-    ['G#', 'Ab'], ['A#', 'Bb']
+    ['C♯', 'D♭'], ['D♯', 'E♭'], ['F♯', 'G♭'],
+    ['G♯', 'A♭'], ['A♯', 'B♭'],
+    ['C♯', 'D♭'], ['D♯', 'E♭'], ['F♯', 'G♭'],
+    ['G♯', 'A♭'], ['A♯', 'B♭']
   ]
 
   for (const pair of equivalentPairs) {
@@ -4103,9 +4111,11 @@ function getNoteAtPosition(stringIndex: number, fret: number): string {
 }
 
 function getNoteIndex(note: string): number {
-  const idx = NOTES.indexOf(note)
+  if (!note) return -1
+  const normalized = normalizeNoteName(note)
+  const idx = NOTES.indexOf(normalized)
   if (idx !== -1) return idx
-  return NOTES_FLAT.indexOf(note)
+  return NOTES_FLAT.indexOf(normalized)
 }
 
 function getNoteColor(semitones: number): string {
@@ -4130,35 +4140,35 @@ function transposeChord(chord: string, fromKey: string, toKey: string): string {
   const fromIndex = getNoteIndex(fromKey)
   const toIndex = getNoteIndex(toKey)
   if (fromIndex === -1 || toIndex === -1) return chord
-  
+
   const diff = (toIndex - fromIndex + 12) % 12
-  
-  // Extract root note
-  const rootMatch = chord.match(/^([A-G][#b]?)/)
+
+  // Extract root note（兼容 #/♯ 和 b/♭）
+  const rootMatch = chord.match(/^([A-G][#♯b♭]?)/)
   if (!rootMatch) return chord
-  
+
   const root = rootMatch[1]
   const rootIndex = getNoteIndex(root)
   if (rootIndex === -1) return chord
-  
+
   const newRootIndex = (rootIndex + diff) % 12
   const newRoot = NOTES[newRootIndex]
-  
-  return chord.replace(/^([A-G][#b]?)/, newRoot)
+
+  return chord.replace(/^([A-G][#♯b♭]?)/, newRoot)
 }
 
 function parseChord(chord: string): { root: string; type: string; bass?: string } {
-  const match = chord.match(/^([A-G][#b]?)(.*)$/)
+  const match = chord.match(/^([A-G][#♯b♭]?)(.*)$/)
   if (!match) return { root: "C", type: "Major" }
-  
+
   const root = match[1]
   const rest = match[2]
-  
+
   // Check for bass note
-  const bassMatch = rest.match(/\/([A-G][#b]?)$/)
+  const bassMatch = rest.match(/\/([A-G][#♯b♭]?)$/)
   const type = bassMatch ? rest.replace(bassMatch[0], "") : rest
   const bass = bassMatch ? bassMatch[1] : undefined
-  
+
   return { root, type: type || "Major", bass }
 }
 
@@ -4202,10 +4212,10 @@ function formatChordName(chord: { root: string; type: string; bass?: string }, t
   const normalizedType = normalizeChordType(chord.type)
   const chordType = CHORD_TYPES.find(ct => ct.symbol === normalizedType || ct.name === normalizedType || ct.symbol === chord.type || ct.name === chord.type)
   const typeSymbol = chordType ? chordType.symbol : chord.type
-  
-  let result = `${chord.root}${typeSymbol}`
+
+  let result = `${normalizeNoteName(chord.root)}${normalizeNoteName(typeSymbol)}`
   if (chord.bass) {
-    result += `/${chord.bass}`
+    result += `/${normalizeNoteName(chord.bass)}`
   }
   return result
 }
@@ -5020,9 +5030,9 @@ export default function FretMasterPage() {
   
   const transposeNoteForInstrument = useCallback((note: string, instrument: string): string => {
     const offset = getInstrumentTranspose(instrument)
-    if (offset === 0) return note
-    const noteIndex = NOTES.indexOf(note)
-    if (noteIndex === -1) return note
+    if (offset === 0) return normalizeNoteName(note)
+    const noteIndex = NOTES.indexOf(normalizeNoteName(note))
+    if (noteIndex === -1) return normalizeNoteName(note)
     return NOTES[(noteIndex + offset) % 12]
   }, [getInstrumentTranspose])
   const chordScaleDisplay = user.chordScaleDisplay
@@ -5204,7 +5214,7 @@ export default function FretMasterPage() {
   const [pitchFindingTime, setPitchFindingTime] = useState(5) // 找音练习时长（分钟）
 
   // 音程状态
-  const [rootNote, setRootNote] = useState(store.intervalPractice.rootNote)
+  const [rootNote, setRootNote] = useState(normalizeNoteName(store.intervalPractice.rootNote))
   const [selectedIntervals, setSelectedIntervals] = useState<number[]>(store.intervalPractice.selectedIntervals)
   const [intervalRootMode, setIntervalRootMode] = useState<"fixed" | "random">(store.intervalPractice.rootMode)
   const [findRootFirst, setFindRootFirst] = useState(store.intervalPractice.findRootFirst)
@@ -5228,21 +5238,22 @@ export default function FretMasterPage() {
   const [practiceLevel, setPracticeLevel] = useState(store.chordProgression.selectedLevelId)
   // 调性状态：存储音名（如 "E"），小调状态单独存储
   const getKeyNote = (key: string): string => {
-    // 提取音名部分（去掉小调标记 'm'）
-    const notePart = key.endsWith('m') ? key.slice(0, -1) : key
-    
-    // 处理降号调性 (如 Db -> C#, Bb -> A#)
-    if (notePart.includes('b') && !notePart.includes('#')) {
+    // 提取音名部分（去掉小调标记 'm'），并标准化为 ♯/♭
+    const rawNotePart = key.endsWith('m') ? key.slice(0, -1) : key
+    const notePart = normalizeNoteName(rawNotePart)
+
+    // 处理降号调性 (如 D♭ -> C♯, B♭ -> A♯)
+    if (notePart.includes('♭')) {
       const flatIndex = findNoteIndexInArray(notePart, NOTES_FLAT)
       if (flatIndex !== -1) {
         return NOTES[flatIndex]
       }
     }
-    
+
     return notePart
   }
   const isKeyMinor = (key: string): boolean => key.endsWith('m')
-  const [progressionKey, setProgressionKey] = useState(store.chordProgression.progressionKey || getKeyNote(SONG_PROGRESSIONS[0]?.key || "C"))
+  const [progressionKey, setProgressionKey] = useState(normalizeNoteName(store.chordProgression.progressionKey || getKeyNote(SONG_PROGRESSIONS[0]?.key || "C")))
   const [isMinor, setIsMinor] = useState(isKeyMinor(SONG_PROGRESSIONS[0]?.key || "C"))
   const [progressionRepeat, setProgressionRepeat] = useState(store.chordProgression.shouldRepeat)
   const [shouldVoiceLead, setShouldVoiceLead] = useState(store.chordProgression.shouldVoiceLead)
@@ -8274,25 +8285,27 @@ export default function FretMasterPage() {
     return intervals
   }, [findFirstIntervalOfType, findNearestIntervalInScale])
 
-  const SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'a', 'e', 'b', 'f#', 'c#', 'g#', 'd#']
-  const FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'd', 'g', 'c', 'f', 'bb', 'eb']
-  
+  const SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'a', 'e', 'b', 'f♯', 'c♯', 'g♯', 'd♯']
+  const FLAT_KEYS = ['F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'd', 'g', 'c', 'f', 'bb', 'eb']
+
   const ENHARMONIC_MAP: Record<string, string> = {
-    'C#': 'Db', 'Db': 'C#',
-    'D#': 'Eb', 'Eb': 'D#',
-    'F#': 'Gb', 'Gb': 'F#',
-    'G#': 'Ab', 'Ab': 'G#',
-    'A#': 'Bb', 'Bb': 'A#',
+    'C#': 'D♭', 'D♭': 'C#', 'C♯': 'D♭',
+    'D#': 'E♭', 'E♭': 'D#', 'D♯': 'E♭',
+    'F#': 'G♭', 'G♭': 'F#', 'F♯': 'G♭',
+    'G#': 'A♭', 'A♭': 'G#', 'G♯': 'A♭',
+    'A#': 'B♭', 'B♭': 'A#', 'A♯': 'B♭',
   }
-  
+
   const preferSharp = (note: string): string => {
-    if (['Db', 'Eb', 'Gb', 'Ab', 'Bb'].includes(note)) return ENHARMONIC_MAP[note] || note
-    return note
+    const normalized = normalizeNoteName(note)
+    if (['D♭', 'E♭', 'G♭', 'A♭', 'B♭', 'Db', 'Eb', 'Gb', 'Ab', 'Bb'].includes(note)) return normalizeNoteName(ENHARMONIC_MAP[note] || note)
+    return normalized
   }
-  
+
   const preferFlat = (note: string): string => {
-    if (['C#', 'D#', 'F#', 'G#', 'A#'].includes(note)) return ENHARMONIC_MAP[note] || note
-    return note
+    const normalized = normalizeNoteName(note)
+    if (['C#', 'D#', 'F#', 'G#', 'A#', 'C♯', 'D♯', 'F♯', 'G♯', 'A♯'].includes(note)) return normalizeNoteName(ENHARMONIC_MAP[note] || note)
+    return normalized
   }
 
   const formatNoteByAccidentalSetting = useCallback((note: string): string => {
@@ -8310,16 +8323,17 @@ export default function FretMasterPage() {
   }, [noteAccidentalDisplay])
   
   const getNextKeyByMovement = useCallback((currentKey: string, movement: typeof scaleRootMovement): string => {
-    const noteIndex = NOTES.indexOf(currentKey)
-    if (noteIndex === -1) return currentKey
-    
-    const isSharpKey = SHARP_KEYS.includes(currentKey)
-    const isFlatKey = FLAT_KEYS.includes(currentKey)
+    const normalizedKey = normalizeNoteName(currentKey)
+    const noteIndex = NOTES.indexOf(normalizedKey)
+    if (noteIndex === -1) return normalizedKey
+
+    const isSharpKey = SHARP_KEYS.includes(normalizedKey)
+    const isFlatKey = FLAT_KEYS.includes(normalizedKey)
     const useSharps = isSharpKey || (!isFlatKey && Math.random() > 0.5)
-    
+
     switch (movement) {
       case 'static':
-        return currentKey
+        return normalizedKey
       case 'random':
         return NOTES[Math.floor(Math.random() * NOTES.length)]
       case 'upSemiTone': {
@@ -8449,7 +8463,7 @@ export default function FretMasterPage() {
           const targetIndex = (rootIdx + intervalObj.semitones) % 12
           const targetNoteName = NOTES[targetIndex]
           
-          if (note === targetNoteName) {
+          if (isEquivalentNote(note, targetNoteName)) {
             matchedInterval = interval
             break
           }
@@ -9092,7 +9106,7 @@ export default function FretMasterPage() {
         recordPractice('chord_progression', selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name)
         // 如果开启随机转调，随机选择新的调
         if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
-          const allKeys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+          const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
           const newKey = allKeys[Math.floor(Math.random() * allKeys.length)]
           setProgressionKey(newKey)
           logger.debug('随机转调到:', newKey)
@@ -9114,7 +9128,7 @@ export default function FretMasterPage() {
           recordPractice('chord_progression', selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name)
           // 如果开启随机转调，随机选择新的调
           if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
-            const allKeys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+            const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
             const newKey = allKeys[Math.floor(Math.random() * allKeys.length)]
             setProgressionKey(newKey)
             logger.debug('随机转调到:', newKey)
@@ -9128,7 +9142,7 @@ export default function FretMasterPage() {
           recordPractice('chord_progression', selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name)
           // 如果开启随机转调，随机选择新的调
           if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
-            const allKeys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+            const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
             const newKey = allKeys[Math.floor(Math.random() * allKeys.length)]
             setProgressionKey(newKey)
             logger.debug('随机转调到:', newKey)
@@ -9605,7 +9619,7 @@ export default function FretMasterPage() {
     const chord = chords[currentChordIndex]
     if (!chord) return ""
     const chordTypeName = getChordDisplayName(chord.type, chordScaleDisplay)
-    const displayName = `${chord.root}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : chordTypeName}${chord.bass ? '/' + chord.bass : ''}`
+    const displayName = `${normalizeNoteName(chord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : normalizeNoteName(chordTypeName)}${chord.bass ? '/' + normalizeNoteName(chord.bass) : ''}`
     return displayName
   }
 
@@ -11117,7 +11131,7 @@ export default function FretMasterPage() {
                           <Select value={progressionKey} onValueChange={(value) => setProgressionKey(value)}>
                             <SelectTrigger size="xs" className="w-full">
                               <SelectValue>
-                                {progressionKey + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))}
+                                {normalizeNoteName(progressionKey) + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
@@ -11623,7 +11637,7 @@ export default function FretMasterPage() {
                   >
                     <div className="flex items-center gap-2">
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <h4 className="text-sm font-semibold">{scaleKey} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</h4>
+                      <h4 className="text-sm font-semibold">{normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</h4>
                     </div>
                     <button 
                       onClick={() => setShowScaleStructure(false)}
@@ -11680,7 +11694,7 @@ export default function FretMasterPage() {
                   >
                     <div className="flex items-center gap-2">
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <h4 className="text-sm font-semibold">{chordExerciseTargetChord.root} {getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay)}</h4>
+                      <h4 className="text-sm font-semibold">{normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay))}</h4>
                     </div>
                     <button
                       onClick={() => setShowChordExerciseStructure(false)}
@@ -12121,7 +12135,7 @@ export default function FretMasterPage() {
                         const nextChord = getNextChordDisplay()
                         if (!nextChord) return null
                         const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay)
-                        const displayName = `${nextChord.root}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : chordTypeName}${nextChord.bass ? '/' + nextChord.bass : ''}`
+                        const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
                         return (
                           <div className="py-1 border-t border-border/30 flex flex-col justify-center">
                             <p className="text-[10px] text-muted-foreground mb-0.5">{t('next_chord')}</p>
@@ -12148,7 +12162,7 @@ export default function FretMasterPage() {
                       <div className="mb-3">
                         {isPlaying && scaleExerciseSequence.length > 0 ? (
                           <>
-                            <h3 className="text-lg font-semibold">{scaleKey} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</h3>
+                            <h3 className="text-lg font-semibold">{normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</h3>
                             <div className="flex flex-wrap justify-center gap-2 mt-3">
                               {scaleExerciseSequence.map((degree, i) => (
                                 <Badge 
@@ -12176,7 +12190,7 @@ export default function FretMasterPage() {
                         <div className="py-1 border-t border-border/30 flex flex-col justify-center">
                           <p className="text-[10px] text-muted-foreground mb-0.5">{t('next_chord')}</p>
                           <div className="text-sm font-medium text-muted-foreground mb-0.5">
-                            {nextScaleExerciseInfo.key} {getScaleDisplayName(nextScaleExerciseInfo.scaleName, chordScaleDisplay)}
+                            {normalizeNoteName(nextScaleExerciseInfo.key)} {getScaleDisplayName(nextScaleExerciseInfo.scaleName, chordScaleDisplay)}
                           </div>
                           <div className="text-xs text-muted-foreground tracking-tight">
                             {nextScaleExerciseInfo.sequence.map(formatDegree).join(' ')}
@@ -12198,7 +12212,7 @@ export default function FretMasterPage() {
                         {isPlaying && chordExerciseTargetChord ? (
                           <>
                             <h3 className="text-lg font-semibold">
-                              {chordExerciseTargetChord.root} {getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay)}
+                              {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay))}
                             </h3>
                             <div className="flex flex-wrap justify-center gap-2 mt-3">
                               {chordExerciseSequence.map((degree, i) => (
@@ -12260,7 +12274,7 @@ export default function FretMasterPage() {
                       
                       {/* 根音显示 */}
                       <div className="text-6xl font-bold">
-                        {currentIntervalExercise.rootNote}
+                        {normalizeNoteName(currentIntervalExercise.rootNote)}
                       </div>
                       {/* 音程题目显示 */}
                       <div className="relative">
@@ -12574,7 +12588,7 @@ export default function FretMasterPage() {
                     const nextChord = getNextChordDisplay()
                     if (!nextChord) return null
                     const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay)
-                    const displayName = `${nextChord.root}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : chordTypeName}${nextChord.bass ? '/' + nextChord.bass : ''}`
+                    const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
                     return (
                       <div className="pt-8 mt-8 border-t border-border/30">
                         <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
@@ -12589,7 +12603,7 @@ export default function FretMasterPage() {
               {activeTab === "chord_exercise" && isPlaying && chordExerciseTargetChord && (
                 <div className="space-y-8">
                   <div className="text-7xl font-bold text-primary">
-                    {chordExerciseTargetChord.root} {getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay)}
+                    {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay))}
                   </div>
                   <div className="flex flex-wrap justify-center gap-4">
                     {chordExerciseSequence.map((degree, i) => (
@@ -12622,7 +12636,7 @@ export default function FretMasterPage() {
               
               {activeTab === "scale" && isPlaying && scaleExerciseSequence.length > 0 && (
                 <div className="space-y-6">
-                  <div className="text-6xl font-bold text-primary">{scaleKey} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</div>
+                  <div className="text-6xl font-bold text-primary">{normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</div>
                   <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
                     {scaleExerciseSequence.map((degree, i) => (
                       <span 
@@ -12642,7 +12656,7 @@ export default function FretMasterPage() {
                     <div className="pt-6 mt-6 border-t border-border/30">
                       <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
                       <div className="text-xl font-medium mb-1">
-                        {nextScaleExerciseInfo.key} {getScaleDisplayName(nextScaleExerciseInfo.scaleName, chordScaleDisplay)}
+                        {normalizeNoteName(nextScaleExerciseInfo.key)} {getScaleDisplayName(nextScaleExerciseInfo.scaleName, chordScaleDisplay)}
                       </div>
                       <div className="text-lg text-muted-foreground/70">
                         {nextScaleExerciseInfo.sequence.map(formatDegree).join(' ')}
@@ -12654,7 +12668,7 @@ export default function FretMasterPage() {
               
               {activeTab === "interval" && isPlaying && currentIntervalExercise && (
                 <div className="space-y-8">
-                  <div className="text-8xl font-bold text-primary">{currentIntervalExercise.rootNote}</div>
+                  <div className="text-8xl font-bold text-primary">{normalizeNoteName(currentIntervalExercise.rootNote)}</div>
                   <div className="text-6xl font-bold">
                     {currentIntervalExercise.currentIntervalDisplay.split(' ').map((interval, idx) => (
                       <span 

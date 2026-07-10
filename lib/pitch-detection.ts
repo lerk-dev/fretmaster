@@ -11,7 +11,7 @@ export function calculateRMS(buffer: Float32Array): number {
   return Math.sqrt(sum / buffer.length)
 }
 
-// 频率转音符名（使用#符号以匹配NOTES数组）
+// 频率转音符名（使用 ♯ 符号以匹配 NOTES 数组）
 export function frequencyToNoteName(frequency: number): string {
   if (!frequency || frequency <= 0 || !isFinite(frequency)) {
     return ''
@@ -25,7 +25,7 @@ export function frequencyToNoteName(frequency: number): string {
     noteIndex = noteIndex + 12
   }
 
-  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+  const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
   return noteNames[noteIndex]
 }
 
@@ -54,7 +54,7 @@ export function frequencyToNote(frequency: number, referenceA4: number = 440): {
   const noteIndex = ((roundedSemitones + 9) % 12 + 12) % 12
   const octave = 4 + Math.floor((roundedSemitones + 9) / 12)
 
-  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+  const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 
   return {
     note: noteNames[noteIndex],
