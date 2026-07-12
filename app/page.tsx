@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -5224,7 +5224,7 @@ export default function FretMasterPage() {
     targetNote: string;
     allIntervals: { name: string; symbol: string; semitones: number }[];
     currentIntervalDisplay: string;
-    completedIntervals: string[];
+    completedIntervals: number[];
     answered: boolean;
   } | null>(null)
   
@@ -6911,14 +6911,16 @@ export default function FretMasterPage() {
       
       // 使用 currentIntervalDisplay（先找根音模式包含 '1'）以与点击/MIDI 路径一致
       const intervals = exercise.currentIntervalDisplay.split(' ')
-      let matchedInterval: string | null = null
+      let matchedIndex: number | null = null
       let minCents = Infinity
-      
-      for (const interval of intervals) {
-        // 跳过已经完成的音级
-        if (exercise.completedIntervals.includes(interval)) continue
+
+      for (let idx = 0; idx < intervals.length; idx++) {
+        const interval = intervals[idx]
+        // 跳过已经完成的音级（按索引）
+        if (exercise.completedIntervals.includes(idx)) continue
         // 先找根音模式：根音未完成时只接受根音
-        if (findRootFirstRef.current && !exercise.completedIntervals.includes('1') && interval !== '1') continue
+        const rootCompleted = intervals.some((intv, i) => intv === '1' && exercise.completedIntervals.includes(i))
+        if (findRootFirstRef.current && !rootCompleted && interval !== '1') continue
         
         const intervalSemitone = intervalToSemitones[interval]
         if (intervalSemitone === undefined) continue
@@ -6934,14 +6936,15 @@ export default function FretMasterPage() {
         
         if (adjustedCents <= matchThreshold && adjustedCents < minCents && probability > currentConfidenceThreshold) {
           minCents = adjustedCents
-          matchedInterval = interval
+          matchedIndex = idx
         }
       }
       
-      if (matchedInterval) {
+      if (matchedIndex !== null) {
+        const matchedInterval = intervals[matchedIndex]
         logger.debug('音程练习匹配成功:', matchedInterval, '音分差:', minCents.toFixed(1))
         triggerCorrectFeedback(detectedNote)
-        const newCompletedIntervals = [...exercise.completedIntervals, matchedInterval]
+        const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
         
         if (newCompletedIntervals.length >= intervals.length) {
           setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals, answered: true })
@@ -7376,14 +7379,16 @@ export default function FretMasterPage() {
         
         // 使用 currentIntervalDisplay（先找根音模式包含 '1'）以与点击/MIDI 路径一致
         const intervals = exercise.currentIntervalDisplay.split(' ')
-        let matchedInterval: string | null = null
+        let matchedIndex: number | null = null
         let minCents = Infinity
-        
-        for (const interval of intervals) {
-          // 跳过已经完成的音级
-          if (exercise.completedIntervals.includes(interval)) continue
+
+        for (let idx = 0; idx < intervals.length; idx++) {
+          const interval = intervals[idx]
+          // 跳过已经完成的音级（按索引）
+          if (exercise.completedIntervals.includes(idx)) continue
           // 先找根音模式：根音未完成时只接受根音
-          if (findRootFirstRef.current && !exercise.completedIntervals.includes('1') && interval !== '1') continue
+          const rootCompleted = intervals.some((intv, i) => intv === '1' && exercise.completedIntervals.includes(i))
+          if (findRootFirstRef.current && !rootCompleted && interval !== '1') continue
           
           const intervalSemitone = intervalToSemitones[interval]
           if (intervalSemitone === undefined) continue
@@ -7399,14 +7404,15 @@ export default function FretMasterPage() {
           
           if (adjustedCents <= matchThreshold && adjustedCents < minCents && yinResult.probability > currentConfidenceThreshold) {
             minCents = adjustedCents
-            matchedInterval = interval
+            matchedIndex = idx
           }
         }
-        
-        if (matchedInterval) {
+
+        if (matchedIndex !== null) {
+          const matchedInterval = intervals[matchedIndex]
           logger.debug('音程练习匹配成功:', matchedInterval, '音分差:', minCents.toFixed(1))
-          const newCompletedIntervals = [...exercise.completedIntervals, matchedInterval]
-          
+          const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
+
           if (newCompletedIntervals.length >= intervals.length) {
             setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals, answered: true })
             setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
@@ -7762,7 +7768,7 @@ export default function FretMasterPage() {
       targetNote: targetNoteName,
       allIntervals: selectedIntervalObjects,
       currentIntervalDisplay: currentIntervalDisplay + rootBackDisplay,
-      completedIntervals: [] as string[],
+      completedIntervals: [] as number[],
       answered: false
     })
     
@@ -8440,37 +8446,40 @@ export default function FretMasterPage() {
         const exercise = currentIntervalExercise
         const intervals = exercise.currentIntervalDisplay.split(' ')
         const rootNote = exercise.rootNote
-        
+
         // 检查弹对的音符是哪个音级
-        let matchedInterval: string | null = null
-        
-        for (const interval of intervals) {
-          // 跳过已经完成的音级
-          if (exercise.completedIntervals.includes(interval)) continue
+        let matchedIndex: number | null = null
+
+        for (let idx = 0; idx < intervals.length; idx++) {
+          const interval = intervals[idx]
+          // 跳过已经完成的音级（按索引）
+          if (exercise.completedIntervals.includes(idx)) continue
           // 先找根音模式：根音未完成时只接受根音
-          if (findRootFirst && !exercise.completedIntervals.includes('1') && interval !== '1') continue
-          
+          const rootCompleted = intervals.some((intv, i) => intv === '1' && exercise.completedIntervals.includes(i))
+          if (findRootFirst && !rootCompleted && interval !== '1') continue
+
           // 计算该音程对应的目标音符
-          const intervalObj = interval === '1' 
+          const intervalObj = interval === '1'
             ? { semitones: 0, symbol: '1' }
             : exercise.allIntervals.find(i => i.symbol === interval)
-          
+
           if (!intervalObj) continue
-          
+
           const rootIdx = getNoteIndex(rootNote)
           const targetIndex = (rootIdx + intervalObj.semitones) % 12
           const targetNoteName = NOTES[targetIndex]
-          
+
           if (isEquivalentNote(note, targetNoteName)) {
-            matchedInterval = interval
+            matchedIndex = idx
             break
           }
         }
-        
-        if (matchedInterval) {
+
+        if (matchedIndex !== null) {
+          const matchedInterval = intervals[matchedIndex]
           // 添加到已完成列表
-          const newCompletedIntervals = [...exercise.completedIntervals, matchedInterval]
-          
+          const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
+
           // 检查是否所有音程都弹对了
           if (newCompletedIntervals.length >= intervals.length) {
             // 完成题目
@@ -8480,7 +8489,7 @@ export default function FretMasterPage() {
               answered: true
             })
             setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-            
+
             // 立即生成新题目（MIDI输入无需延迟）- 使用 ref 避免循环依赖
             setTimeout(() => {
               generateIntervalExerciseRef.current?.()
@@ -8776,7 +8785,9 @@ export default function FretMasterPage() {
             const rootIdx = getNoteIndex(currentIntervalExercise.rootNote)
             const clickedInterval = (noteIdx - rootIdx + 12) % 12
             // 先找根音模式：根音未完成时根音为正确答案
-            if (findRootFirst && !currentIntervalExercise.completedIntervals.includes('1')) {
+            const intervalsArr = currentIntervalExercise.currentIntervalDisplay.split(' ')
+            const rootCompleted = intervalsArr.some((intv, i) => intv === '1' && currentIntervalExercise.completedIntervals.includes(i))
+            if (findRootFirst && !rootCompleted) {
               isCorrect = clickedInterval === 0
             } else {
               const targetInterval = currentIntervalExercise.interval?.semitones % 12
@@ -12287,7 +12298,7 @@ export default function FretMasterPage() {
                               key={idx}
                               className={cn(
                                 "mx-2",
-                                currentIntervalExercise.completedIntervals.includes(interval) && "text-muted-foreground line-through"
+                                currentIntervalExercise.completedIntervals.includes(idx) && "text-muted-foreground line-through"
                               )}
                             >
                               {formatDegree(interval)}
@@ -12673,7 +12684,7 @@ export default function FretMasterPage() {
                         key={idx}
                         className={cn(
                           "mx-4",
-                          currentIntervalExercise.completedIntervals.includes(interval) && "text-muted-foreground line-through"
+                          currentIntervalExercise.completedIntervals.includes(idx) && "text-muted-foreground line-through"
                         )}
                       >
                         {interval}
