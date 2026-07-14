@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -7653,14 +7653,8 @@ export default function FretMasterPage() {
 
   // 生成新的目标音符
   const previousTargetRef = useRef<string | null>(null)
-  
-  // 防止 generateNewTarget 递归/竞态的锁
-  const generatingTargetRef = useRef(false)
 
   const generateNewTarget = useCallback(() => {
-    if (generatingTargetRef.current) return
-    generatingTargetRef.current = true
-
     // 总是生成指板位置（在 fretboard 模式下不会被使用，但确保 buttons 模式下始终有值）
     const availableStrings = selectedStrings.length > 0 ? selectedStrings : [1, 2, 3, 4, 5, 6]
     const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
@@ -7678,11 +7672,6 @@ export default function FretMasterPage() {
     }
 
     recordPractice('pitch_finding', '练习')
-
-    // 释放锁放在下一帧，给 React 足够的时间提交状态
-    requestAnimationFrame(() => {
-      generatingTargetRef.current = false
-    })
   }, [intervalRootMode, recordPractice, selectedStrings, fretCount])
 
   // 生成音程练习队列
