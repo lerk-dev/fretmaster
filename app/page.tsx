@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -5173,6 +5173,7 @@ export default function FretMasterPage() {
   
   // 找音练习新模式：指板点亮 + 音名按钮答题
   const [practiceAnswerMode, setPracticeAnswerMode] = useState<"fretboard" | "buttons">("fretboard") // 答题模式：指板点击或按钮选择
+  const practiceAnswerModeRef = useRef<"fretboard" | "buttons">("fretboard") // 答题模式 ref，供音频检测回调使用
   const [highlightedTargetPosition, setHighlightedTargetPosition] = useState<{stringIndex: number, fret: number} | null>(null) // 高亮的目标位置
   
   // 找音练习建议
@@ -6876,7 +6877,8 @@ export default function FretMasterPage() {
     const currentConfidenceThreshold = confidenceThresholdRef.current || 0.8
     
     if (currentActiveTab === 'practice') {
-      // 找音练习
+      // 找音练习 - 辨音模式下通过按钮答题，不自动匹配
+      if (practiceAnswerModeRef.current === 'buttons') return
       if (isCoolingDownRef.current) return
       const currentTargetNote = targetNoteRef.current
       if (!currentTargetNote) return
@@ -8432,6 +8434,8 @@ export default function FretMasterPage() {
     
     switch (activeTab) {
       case "practice":
+        // 辨音模式下通过按钮答题，不自动匹配
+        if (practiceAnswerMode === "buttons") break
         if (note === targetNote) {
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
           generateNewTarget()
@@ -8637,7 +8641,7 @@ export default function FretMasterPage() {
         }
         break
     }
-  }, [isPlaying, activeTab, targetNote, generateNewTarget, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise])
+  }, [isPlaying, activeTab, targetNote, generateNewTarget, practiceAnswerMode, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise])
 
   // 更新 ref 以便在 startPitchDetection 中使用（不含 nextChord，它在后面定义）
   useEffect(() => {
@@ -8647,7 +8651,16 @@ export default function FretMasterPage() {
     generateNewTargetRef.current = generateNewTarget
     generateIntervalExerciseRef.current = generateIntervalExercise
     chordExerciseIsAnsweredRef.current = chordExerciseIsAnswered
-  }, [handleMIDINoteInput, nextChordExercise, nextScaleExercise, generateNewTarget, chordExerciseIsAnswered])
+    practiceAnswerModeRef.current = practiceAnswerMode
+  }, [handleMIDINoteInput, nextChordExercise, nextScaleExercise, generateNewTarget, chordExerciseIsAnswered, practiceAnswerMode])
+
+  // 安全网：辨音模式下如果 highlightedTargetPosition 为 null，重新生成目标位置
+  useEffect(() => {
+    if (isPlaying && activeTab === 'practice' && practiceAnswerMode === 'buttons' && !highlightedTargetPosition) {
+      logger.debug('辨音模式安全网：highlightedTargetPosition 为 null，重新生成目标')
+      generateNewTarget()
+    }
+  }, [isPlaying, activeTab, practiceAnswerMode, highlightedTargetPosition, generateNewTarget])
 
   // 练习开始时自动聚焦到练习卡片
   useEffect(() => {
