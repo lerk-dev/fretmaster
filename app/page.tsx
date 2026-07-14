@@ -7654,8 +7654,16 @@ export default function FretMasterPage() {
   // 生成新的目标音符
   const previousTargetRef = useRef<string | null>(null)
   
+  // 防止 generateNewTarget 递归/竞态的锁
+  const generatingTargetRef = useRef(false)
+
   const generateNewTarget = useCallback(() => {
-    if (practiceAnswerMode === "buttons") {
+    if (generatingTargetRef.current) return
+    generatingTargetRef.current = true
+
+    // 使用 ref 读取当前答题模式，避免 React 状态批处理/闭包延迟
+    const currentMode = practiceAnswerModeRef.current
+    if (currentMode === "buttons") {
       const availableStrings = selectedStrings.length > 0 ? selectedStrings : [1, 2, 3, 4, 5, 6]
       const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
       const stringIndex = 6 - randomStringNum
@@ -7672,13 +7680,18 @@ export default function FretMasterPage() {
       setHighlightedTargetPosition(null)
       previousTargetRef.current = newNote
     }
-    
+
     if (intervalRootMode === "random") {
       setRootNote(NOTES[Math.floor(Math.random() * NOTES.length)])
     }
-    
+
     recordPractice('pitch_finding', '练习')
-  }, [intervalRootMode, recordPractice, practiceAnswerMode, selectedStrings, fretCount])
+
+    // 释放锁放在下一帧，给 React 足够的时间提交状态
+    requestAnimationFrame(() => {
+      generatingTargetRef.current = false
+    })
+  }, [intervalRootMode, recordPractice, selectedStrings, fretCount])
 
   // 生成音程练习队列
   const generateIntervalExerciseQueue = useCallback(() => {
@@ -8656,11 +8669,12 @@ export default function FretMasterPage() {
 
   // 安全网：辨音模式下如果 highlightedTargetPosition 为 null，重新生成目标位置
   useEffect(() => {
-    if (isPlaying && activeTab === 'practice' && practiceAnswerMode === 'buttons' && !highlightedTargetPosition) {
+    if (activeTab !== 'practice' || practiceAnswerMode !== 'buttons') return
+    if (!highlightedTargetPosition) {
       logger.debug('辨音模式安全网：highlightedTargetPosition 为 null，重新生成目标')
       generateNewTarget()
     }
-  }, [isPlaying, activeTab, practiceAnswerMode, highlightedTargetPosition, generateNewTarget])
+  }, [activeTab, practiceAnswerMode, highlightedTargetPosition, generateNewTarget])
 
   // 练习开始时自动聚焦到练习卡片
   useEffect(() => {
