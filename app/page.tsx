@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -7661,25 +7661,17 @@ export default function FretMasterPage() {
     if (generatingTargetRef.current) return
     generatingTargetRef.current = true
 
-    // 使用 ref 读取当前答题模式，避免 React 状态批处理/闭包延迟
-    const currentMode = practiceAnswerModeRef.current
-    if (currentMode === "buttons") {
-      const availableStrings = selectedStrings.length > 0 ? selectedStrings : [1, 2, 3, 4, 5, 6]
-      const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
-      const stringIndex = 6 - randomStringNum
-      const randomFret = Math.floor(Math.random() * (fretCount + 1))
-      setHighlightedTargetPosition({ stringIndex, fret: randomFret })
-      const noteAtPosition = getNoteAtPosition(stringIndex, randomFret)
-      setTargetNote(noteAtPosition)
-      previousTargetRef.current = noteAtPosition
-    } else {
-      let availableNotes = NOTES.filter(n => n !== previousTargetRef.current)
-      if (availableNotes.length === 0) availableNotes = [...NOTES]
-      const newNote = availableNotes[Math.floor(Math.random() * availableNotes.length)]
-      setTargetNote(newNote)
-      setHighlightedTargetPosition(null)
-      previousTargetRef.current = newNote
-    }
+    // 总是生成指板位置（在 fretboard 模式下不会被使用，但确保 buttons 模式下始终有值）
+    const availableStrings = selectedStrings.length > 0 ? selectedStrings : [1, 2, 3, 4, 5, 6]
+    const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
+    const stringIndex = 6 - randomStringNum
+    const randomFret = Math.floor(Math.random() * (fretCount + 1))
+    const noteAtPosition = getNoteAtPosition(stringIndex, randomFret)
+    
+    // 设置高亮位置（buttons 模式使用，fretboard 模式忽略）
+    setHighlightedTargetPosition({ stringIndex, fret: randomFret })
+    setTargetNote(noteAtPosition)
+    previousTargetRef.current = noteAtPosition
 
     if (intervalRootMode === "random") {
       setRootNote(NOTES[Math.floor(Math.random() * NOTES.length)])
