@@ -8447,8 +8447,8 @@ export default function FretMasterPage() {
     
     switch (activeTab) {
       case "practice":
-        // 辨音模式下通过按钮答题，不自动匹配
-        if (practiceAnswerMode === "buttons") break
+        // 辨音模式下通过按钮答题，不自动匹配（使用 ref 避免闭包延迟）
+        if (practiceAnswerModeRef.current === "buttons") break
         if (note === targetNote) {
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
           generateNewTarget()
@@ -8654,7 +8654,7 @@ export default function FretMasterPage() {
         }
         break
     }
-  }, [isPlaying, activeTab, targetNote, generateNewTarget, practiceAnswerMode, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise])
+  }, [isPlaying, activeTab, targetNote, generateNewTarget, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise])
 
   // 更新 ref 以便在 startPitchDetection 中使用（不含 nextChord，它在后面定义）
   useEffect(() => {
