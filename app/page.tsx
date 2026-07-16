@@ -5461,6 +5461,9 @@ export default function FretMasterPage() {
   const tunerAudioContextRef = useRef<AudioContext | null>(null)
   const tunerAnalyserRef = useRef<AnalyserNode | null>(null)
   const tunerStreamRef = useRef<MediaStream | null>(null)
+  // 反馈音共享 AudioContext，避免每次播放都创建新实例导致内存泄漏和配额耗尽
+  // （浏览器/WebView 通常限制约 6 个 AudioContext 实例）
+  const feedbackAudioCtxRef = useRef<AudioContext | null>(null)
   const tunerGainNodeRef = useRef<GainNode | null>(null)
   const tunerAnimationRef = useRef<number | null>(null)
   const tunerHistoryRef = useRef<{ frequency: number; note: string; cents: number }[]>([])
@@ -6184,6 +6187,10 @@ export default function FretMasterPage() {
           latencyHint: 'interactive'
         })
         tunerAudioContextRef.current = audioContext
+        // Tauri WebView2 / autoplay policy 下 AudioContext 可能挂起，需显式 resume
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().catch(() => {})
+        }
 
         const source = audioContext.createMediaStreamSource(stream)
         
@@ -6439,7 +6446,17 @@ export default function FretMasterPage() {
     if (!isCorrect && !feedbackSoundSettings.wrongSound) return
     
     try {
-      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      // 复用共享 AudioContext，避免每次调用都创建新实例导致配额耗尽
+      // （Chromium 限制约 6 个 AudioContext，超过后新创建会抛异常导致反馈音静默失效）
+      const AudioCtx = getAudioContextClass()
+      if (!feedbackAudioCtxRef.current || feedbackAudioCtxRef.current.state === 'closed') {
+        feedbackAudioCtxRef.current = new AudioCtx()
+      }
+      const ctx = feedbackAudioCtxRef.current
+      // Tauri WebView2 / autoplay policy 下 AudioContext 可能处于挂起状态，需显式 resume
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {})
+      }
       const oscillator = ctx.createOscillator()
       const gainNode = ctx.createGain()
       oscillator.connect(gainNode)
@@ -6509,12 +6526,12 @@ export default function FretMasterPage() {
         if (metronomeSound) {
           try {
             if (!metronomeAudioCtxRef.current || metronomeAudioCtxRef.current.state === 'closed') {
-              const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+              const AudioCtx = getAudioContextClass()
               metronomeAudioCtxRef.current = new AudioCtx()
             }
             const ctx = metronomeAudioCtxRef.current
             if (ctx.state === 'suspended') {
-              ctx.resume()
+              ctx.resume().catch(() => {})
             }
             const oscillator = ctx.createOscillator()
             const gainNode = ctx.createGain()
@@ -6541,8 +6558,9 @@ export default function FretMasterPage() {
         }
       }, interval)
     } else {
+      // 仅在节拍器关闭或停止练习时关闭 AudioContext，BPM 变化时不会触发此分支
       if (metronomeAudioCtxRef.current) {
-        metronomeAudioCtxRef.current.close()
+        metronomeAudioCtxRef.current.close().catch(() => {})
         metronomeAudioCtxRef.current = null
       }
     }
@@ -6805,7 +6823,7 @@ export default function FretMasterPage() {
       mediaStreamRef.current = stream
       
       // 创建 AudioContext - 与原HTML文件一致，固定48000采样率
-      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)({
+      const ctx = new (getAudioContextClass())({
         sampleRate: 48000,
         latencyHint: 'interactive'
       })
