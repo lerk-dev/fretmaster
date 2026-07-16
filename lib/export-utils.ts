@@ -161,11 +161,11 @@ const getDetailName = (stat: PracticeStats): string => {
  */
 function normalizeAndDeduplicate(
   stats: PracticeStats[],
-  options: ExportOptions
+  options?: ExportOptions
 ): PracticeStats[] {
   // 应用类型过滤
   let filtered = stats
-  if (options.exerciseTypes && options.exerciseTypes.length > 0) {
+  if (options?.exerciseTypes && options.exerciseTypes.length > 0) {
     filtered = stats.filter(s => {
       const key = getExerciseTypeKey(s.exercise_type || s.exerciseType || '')
       return options.exerciseTypes!.includes(key)
@@ -173,7 +173,7 @@ function normalizeAndDeduplicate(
   }
 
   // 应用日期范围过滤
-  if (options.dateRange) {
+  if (options?.dateRange) {
     const startMs = options.dateRange.start.getTime()
     const endMs = options.dateRange.end.getTime()
     filtered = filtered.filter(s => {
@@ -183,33 +183,73 @@ function normalizeAndDeduplicate(
     })
   }
 
-  // 去重：按 id 或 (时间戳+类型+详情)
+  // 去重：
+  // 1. 同一秒内同类型同详情的记录视为重复（无论是否有 id），只保留第一条。
+  //    业务上一次练习至少耗时数十秒，同一秒不可能完成多次练习；
+  //    这类数据通常是旧版本 bug（生成新题即记录）导致的脏数据。
+  // 2. 有 id 的记录额外按 id 去重（防止同一记录被重复读取）。
+  // 3. 相邻同类型记录若时间差小于其声称的 duration，也视为重复
+  //    （例如两条相隔 27 秒但 duration=60 的记录不可能是两次独立练习）。
   const seen = new Set<string>()
   const deduped: PracticeStats[] = []
   for (const stat of filtered) {
     const ts = parseDbTimestamp(stat.created_at || stat.date).getTime()
     const type = stat.exercise_type || stat.exerciseType || ''
     const detail = getDetailName(stat)
-    const key = stat.id != null
-      ? `id:${stat.id}`
-      : `t:${ts}|type:${type}|detail:${detail}`
-    if (seen.has(key)) continue
-    // 防止同一秒内同类型同详情的重复记录（无 id 情况）
+    // 按时间戳+类型+详情模糊去重（对所有记录生效，不区分有无 id）
     const fuzzyKey = `t:${ts}|type:${type}|detail:${detail}`
-    if (!stat.id && seen.has(fuzzyKey)) continue
-    seen.add(key)
+    if (seen.has(fuzzyKey)) continue
+    // 有 id 时额外按 id 去重
+    if (stat.id != null) {
+      const idKey = `id:${stat.id}`
+      if (seen.has(idKey)) continue
+      seen.add(idKey)
+    }
     seen.add(fuzzyKey)
     deduped.push(stat)
   }
 
-  // 按时间倒序排序（最新的在前）
+  // 按时间倒序排序（最新的在前），便于后续相邻去重
   deduped.sort((a, b) => {
     const ta = parseDbTimestamp(a.created_at || a.date).getTime()
     const tb = parseDbTimestamp(b.created_at || b.date).getTime()
     return tb - ta
   })
 
-  return deduped
+  // 相邻同类型去重：若两条记录时间差 < 声称的 duration，则后者视为重复
+  // （一次 60 秒的练习不可能在 27 秒后再次完成）
+  const finalDeduped: PracticeStats[] = []
+  let prevKept: PracticeStats | null = null
+  for (const stat of deduped) {
+    if (prevKept) {
+      const prevTs = parseDbTimestamp(prevKept.created_at || prevKept.date).getTime()
+      const curTs = parseDbTimestamp(stat.created_at || stat.date).getTime()
+      const prevType = prevKept.exercise_type || prevKept.exerciseType || ''
+      const curType = stat.exercise_type || stat.exerciseType || ''
+      const prevDetail = getDetailName(prevKept)
+      const curDetail = getDetailName(stat)
+      const gap = prevTs - curTs // 倒序，prev 比 cur 更新
+      // 取两条记录中较大的 duration 作为判断基准
+      const maxDuration = Math.max(prevKept.duration || 0, stat.duration || 0)
+      if (prevType === curType && prevDetail === curDetail && maxDuration > 0 && gap < maxDuration * 1000) {
+        // 时间差小于 duration，视为重复，跳过当前记录
+        continue
+      }
+    }
+    finalDeduped.push(stat)
+    prevKept = stat
+  }
+
+  return finalDeduped
+}
+
+/**
+ * 对统计数据去重（不过滤），供应用内统计面板和导出共用。
+ * 同一秒内的同类型同详情记录只保留一条；相邻同类型记录若时间差小于
+ * 声称的 duration 也视为重复。
+ */
+export function deduplicateStats(stats: PracticeStats[]): PracticeStats[] {
+  return normalizeAndDeduplicate(stats)
 }
 
 /**

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } fro
 import { VariableSizeList as List } from 'react-window'
 import { Button } from "@/components/ui/button"
 import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
+import { deduplicateStats } from "@/lib/export-utils"
 import { getLocalDateString, parseDbTimestamp, dbTimestampToLocalDate, getLocalDayStart, getLocalDaysAgoStart, getLocalMonthsAgoStart, normalizeAccuracy } from "@/lib/utils"
 import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser } from "@/lib/store"
 import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
@@ -5645,7 +5646,12 @@ export default function FretMasterPage() {
           '和弦进行': 'chord_progression'
         }
         
-        serverStats.forEach((record: ServerPracticeStats) => {
+        // 先对服务器返回的数据去重，避免旧版本 bug 产生的脏数据
+        // （同一秒内多条同类型记录、或时间差小于 duration 的重复记录）
+        // 导致统计虚高（例如"今天没练习却显示练习了"）
+        const dedupedServerStats = deduplicateStats(serverStats as ServerPracticeStats[])
+        
+        dedupedServerStats.forEach((record: ServerPracticeStats) => {
           // 使用 dbTimestampToLocalDate 正确解析 SQLite/ISO 时间戳为本地日期
           // 避免 SQLite 的 "YYYY-MM-DD HH:MM:SS" (UTC) 被错误解析为本地时间
           const date = record.created_at
