@@ -1,5 +1,5 @@
 import { PracticeStats } from './stats-api'
-import { isTauriEnv } from './utils'
+import { isTauriEnv, parseDbTimestamp, dbTimestampToLocalDate, normalizeAccuracy } from './utils'
 
 const isTauri = (): boolean => {
   return isTauriEnv()
@@ -17,35 +17,40 @@ export interface ExportOptions {
 
 const translations: Record<string, Record<string, string>> = {
   'zh-CN': {
-    'practice_report': 'FretMaster Practice Report',
-    'practice_report_zh': 'FretMaster 练习报告',
-    'generated_at': 'Generated',
-    'total_sessions': 'Sessions',
-    'total_duration': 'Duration(min)',
-    'average_score': 'Avg Score',
-    'average_accuracy': 'Avg Accuracy',
-    'exercise_type': 'Type',
-    'score': 'Score',
-    'duration': 'Duration',
-    'accuracy': 'Accuracy',
-    'date': 'Date',
-    'notes': 'Notes',
-    'minutes': 'min',
-    'seconds': 'sec',
-    'find_note': 'Find Note',
-    'chord_progression': 'Chord Prog.',
-    'scale': 'Scale',
-    'interval': 'Interval',
-    'chord_exercise': 'Chord Exer.',
-    'rhythm': 'Rhythm',
+    'practice_report': 'FretMaster 练习报告',
+    'generated_at': '生成时间',
+    'total_sessions': '练习次数',
+    'total_duration': '总时长(分钟)',
+    'average_score': '平均得分',
+    'average_accuracy': '平均准确率',
+    'exercise_type': '练习类型',
+    'score': '得分',
+    'duration': '时长',
+    'duration_sec': '时长(秒)',
+    'duration_min': '时长(分钟)',
+    'accuracy': '准确率',
+    'date': '日期',
+    'time': '时间',
+    'notes': '备注',
+    'minutes': '分钟',
+    'seconds': '秒',
+    'detail': '练习项目',
+    'daily_summary': '每日汇总',
+    'records': '详细记录',
+    'no_data': '暂无练习记录',
     'export_success': '导出成功',
     'export_cancelled': '导出已取消',
     'export_failed': '导出失败',
     'file_saved_to': '文件已保存到',
+    // 练习类型中文名 → 显示名（中文环境下原样显示）
+    'type_pitch_finding': '找音练习',
+    'type_scale': '音阶练习',
+    'type_chord_exercise': '和弦练习',
+    'type_interval': '音程练习',
+    'type_chord_progression': '和弦进行',
   },
   'en': {
     'practice_report': 'FretMaster Practice Report',
-    'practice_report_zh': '',
     'generated_at': 'Generated',
     'total_sessions': 'Sessions',
     'total_duration': 'Duration(min)',
@@ -54,21 +59,27 @@ const translations: Record<string, Record<string, string>> = {
     'exercise_type': 'Type',
     'score': 'Score',
     'duration': 'Duration',
+    'duration_sec': 'Duration(sec)',
+    'duration_min': 'Duration(min)',
     'accuracy': 'Accuracy',
     'date': 'Date',
+    'time': 'Time',
     'notes': 'Notes',
     'minutes': 'min',
     'seconds': 'sec',
-    'find_note': 'Find Note',
-    'chord_progression': 'Chord Prog.',
-    'scale': 'Scale',
-    'interval': 'Interval',
-    'chord_exercise': 'Chord Exer.',
-    'rhythm': 'Rhythm',
+    'detail': 'Detail',
+    'daily_summary': 'Daily Summary',
+    'records': 'Records',
+    'no_data': 'No practice records',
     'export_success': 'Export Successful',
     'export_cancelled': 'Export Cancelled',
     'export_failed': 'Export Failed',
     'file_saved_to': 'File saved to',
+    'type_pitch_finding': 'Note Practice',
+    'type_scale': 'Scale Practice',
+    'type_chord_exercise': 'Chord Practice',
+    'type_interval': 'Interval Practice',
+    'type_chord_progression': 'Chord Progression',
   },
 }
 
@@ -76,39 +87,168 @@ const t = (key: string, language: 'zh-CN' | 'en'): string => {
   return translations[language]?.[key] || key
 }
 
+// 练习类型映射：统一识别存储的各种格式
+// 数据库中可能存储的值：
+//  - 中文: '音高识别', '音阶练习', '和弦练习', '音程练习', '和弦进行'
+//  - 英文 key: 'pitch_finding', 'find_note', 'scale', 'chord_exercise', 'interval', 'chord_progression'
+const EXERCISE_TYPE_MAP: Record<string, string> = {
+  // 中文 → 内部 key
+  '音高识别': 'pitch_finding',
+  '找音练习': 'pitch_finding',
+  '音阶练习': 'scale',
+  '和弦练习': 'chord_exercise',
+  '音程练习': 'interval',
+  '和弦进行': 'chord_progression',
+  '和弦转换': 'chord_progression',
+  // 英文 key → 内部 key
+  'pitch_finding': 'pitch_finding',
+  'find_note': 'pitch_finding',
+  'scale': 'scale',
+  'chord_exercise': 'chord_exercise',
+  'interval': 'interval',
+  'chord_progression': 'chord_progression',
+  'rhythm': 'rhythm',
+}
+
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  'pitch_finding': 'type_pitch_finding',
+  'scale': 'type_scale',
+  'chord_exercise': 'type_chord_exercise',
+  'interval': 'type_interval',
+  'chord_progression': 'type_chord_progression',
+  'rhythm': 'type_pitch_finding', // fallback
+}
+
+/**
+ * 获取练习类型的本地化显示名
+ */
 const getExerciseTypeName = (type: string, language: 'zh-CN' | 'en'): string => {
-  const typeMap: Record<string, string> = {
-    'find_note': t('find_note', language),
-    'chord_progression': t('chord_progression', language),
-    'scale': t('scale', language),
-    'interval': t('interval', language),
-    'chord_exercise': t('chord_exercise', language),
-    'rhythm': t('rhythm', language),
+  const normalized = (type || '').trim()
+  if (!normalized) return t('exercise_type', language)
+  const internalKey = EXERCISE_TYPE_MAP[normalized]
+  if (internalKey && TYPE_LABEL_KEYS[internalKey]) {
+    return t(TYPE_LABEL_KEYS[internalKey], language)
   }
-  return typeMap[type] || type
+  // 未知类型原样返回
+  return normalized
+}
+
+/**
+ * 获取练习类型的内部 key（用于过滤）
+ */
+const getExerciseTypeKey = (type: string): string => {
+  const normalized = (type || '').trim()
+  return EXERCISE_TYPE_MAP[normalized] || normalized || 'unknown'
+}
+
+/**
+ * 从 notes 字段提取练习项目名称
+ */
+const getDetailName = (stat: PracticeStats): string => {
+  const notes = stat.notes || ''
+  // 兼容旧格式 "练习项目: xxx"
+  const match = notes.match(/练习项目[:：]\s*(.+)/)
+  if (match) return match[1].trim()
+  return notes.trim() || '-'
+}
+
+/**
+ * 规范化并去重统计数据。
+ * 1. 按 id 去重（如果有 id）
+ * 2. 按 (时间戳+类型+详情) 去重（防止重复保存）
+ * 3. 按时间倒序排序
+ * 4. 应用日期范围和类型过滤
+ */
+function normalizeAndDeduplicate(
+  stats: PracticeStats[],
+  options: ExportOptions
+): PracticeStats[] {
+  // 应用类型过滤
+  let filtered = stats
+  if (options.exerciseTypes && options.exerciseTypes.length > 0) {
+    filtered = stats.filter(s => {
+      const key = getExerciseTypeKey(s.exercise_type || s.exerciseType || '')
+      return options.exerciseTypes!.includes(key)
+    })
+  }
+
+  // 应用日期范围过滤
+  if (options.dateRange) {
+    const startMs = options.dateRange.start.getTime()
+    const endMs = options.dateRange.end.getTime()
+    filtered = filtered.filter(s => {
+      const d = parseDbTimestamp(s.created_at || s.date)
+      const t = d.getTime()
+      return t >= startMs && t <= endMs
+    })
+  }
+
+  // 去重：按 id 或 (时间戳+类型+详情)
+  const seen = new Set<string>()
+  const deduped: PracticeStats[] = []
+  for (const stat of filtered) {
+    const ts = parseDbTimestamp(stat.created_at || stat.date).getTime()
+    const type = stat.exercise_type || stat.exerciseType || ''
+    const detail = getDetailName(stat)
+    const key = stat.id != null
+      ? `id:${stat.id}`
+      : `t:${ts}|type:${type}|detail:${detail}`
+    if (seen.has(key)) continue
+    // 防止同一秒内同类型同详情的重复记录（无 id 情况）
+    const fuzzyKey = `t:${ts}|type:${type}|detail:${detail}`
+    if (!stat.id && seen.has(fuzzyKey)) continue
+    seen.add(key)
+    seen.add(fuzzyKey)
+    deduped.push(stat)
+  }
+
+  // 按时间倒序排序（最新的在前）
+  deduped.sort((a, b) => {
+    const ta = parseDbTimestamp(a.created_at || a.date).getTime()
+    const tb = parseDbTimestamp(b.created_at || b.date).getTime()
+    return tb - ta
+  })
+
+  return deduped
+}
+
+/**
+ * 按日汇总统计
+ */
+interface DailyAgg {
+  date: string
+  count: number
+  totalDuration: number
+  totalScore: number
+  byType: Record<string, number>
+}
+
+function aggregateByDay(stats: PracticeStats[]): DailyAgg[] {
+  const map: Record<string, DailyAgg> = {}
+  for (const s of stats) {
+    const date = dbTimestampToLocalDate(s.created_at || s.date)
+    if (!map[date]) {
+      map[date] = { date, count: 0, totalDuration: 0, totalScore: 0, byType: {} }
+    }
+    const agg = map[date]
+    agg.count += 1
+    agg.totalDuration += s.duration || 0
+    agg.totalScore += s.score || 0
+    const typeKey = getExerciseTypeKey(s.exercise_type || s.exerciseType || '')
+    agg.byType[typeKey] = (agg.byType[typeKey] || 0) + 1
+  }
+  return Object.values(map).sort((a, b) => b.date.localeCompare(a.date))
 }
 
 export function exportToCSV(stats: PracticeStats[], options: ExportOptions): string {
   const { language } = options
+  const isZh = language === 'zh-CN'
 
-  const zhTranslations: Record<string, string> = {
-    'Date': '日期',
-    'Type': '练习类型',
-    'Score': '得分',
-    'Duration(min)': '时长(分钟)',
-    'Accuracy': '准确率',
-    'Notes': '备注',
-    'Find Note': '找音练习',
-    'Chord Prog.': '和弦进行',
-    'Scale': '音阶练习',
-    'Interval': '音程练习',
-    'Chord Exer.': '和弦练习',
-    'Rhythm': '节奏练习',
-  }
+  const clean = normalizeAndDeduplicate(stats, options)
 
-  const headers = language === 'zh-CN'
-    ? ['日期', '练习类型', '得分', '时长(分钟)', '准确率', '备注']
-    : ['Date', 'Type', 'Score', 'Duration(min)', 'Accuracy', 'Notes']
+  const headers = isZh
+    ? ['日期', '时间', '练习类型', '练习项目', '得分', '时长(秒)', '准确率(%)', '备注']
+    : ['Date', 'Time', 'Type', 'Detail', 'Score', 'Duration(sec)', 'Accuracy(%)', 'Notes']
 
   const sanitizeCsvCell = (value: string): string => {
     let sanitized = value.replace(/"/g, '""').replace(/\r?\n/g, ' ')
@@ -118,16 +258,21 @@ export function exportToCSV(stats: PracticeStats[], options: ExportOptions): str
     return sanitized
   }
 
-  const rows = stats.map(stat => [
-    stat.created_at || stat.date || '',
-    language === 'zh-CN'
-      ? (zhTranslations[getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', 'en')] || getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', 'en'))
-      : getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language),
-    String(stat.score || 0),
-    String(Math.round((stat.duration || 0) / 60)),
-    `${stat.accuracy || 0}%`,
-    sanitizeCsvCell(stat.notes || ''),
-  ])
+  const rows = clean.map(stat => {
+    const dt = parseDbTimestamp(stat.created_at || stat.date)
+    const dateStr = isNaN(dt.getTime()) ? '-' : dbTimestampToLocalDate(stat.created_at || stat.date)
+    const timeStr = isNaN(dt.getTime()) ? '-' : dt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return [
+      dateStr,
+      timeStr,
+      getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language),
+      getDetailName(stat),
+      String(stat.score || 0),
+      String(stat.duration || 0),
+      String(Math.round(normalizeAccuracy(stat.accuracy))),
+      sanitizeCsvCell(stat.notes || ''),
+    ]
+  })
 
   const BOM = '\uFEFF'
   const csvContent = BOM + [
@@ -140,6 +285,17 @@ export function exportToCSV(stats: PracticeStats[], options: ExportOptions): str
 
 export function exportToJSON(stats: PracticeStats[], options: ExportOptions): string {
   const { language, dateRange } = options
+  const clean = normalizeAndDeduplicate(stats, options)
+
+  const totalDuration = clean.reduce((sum, s) => sum + (s.duration || 0), 0)
+  const avgScore = clean.length > 0
+    ? Math.round(clean.reduce((sum, s) => sum + (s.score || 0), 0) / clean.length)
+    : 0
+  const avgAccuracy = clean.length > 0
+    ? Math.round(clean.reduce((sum, s) => sum + normalizeAccuracy(s.accuracy), 0) / clean.length)
+    : 0
+
+  const dailyAgg = aggregateByDay(clean)
 
   const report = {
     title: language === 'zh-CN' ? 'FretMaster 练习报告' : 'FretMaster Practice Report',
@@ -149,22 +305,27 @@ export function exportToJSON(stats: PracticeStats[], options: ExportOptions): st
       end: dateRange.end.toISOString(),
     } : null,
     summary: {
-      totalSessions: stats.length,
-      totalDuration: stats.reduce((sum, s) => sum + (s.duration || 0), 0),
-      averageScore: stats.length > 0
-        ? Math.round(stats.reduce((sum, s) => sum + (s.score || 0), 0) / stats.length)
-        : 0,
-      averageAccuracy: stats.length > 0
-        ? Math.round(stats.reduce((sum, s) => sum + (s.accuracy || 0), 0) / stats.length)
-        : 0,
+      totalSessions: clean.length,
+      totalDuration,
+      averageScore: avgScore,
+      averageAccuracy: avgAccuracy,
     },
-    records: stats.map(stat => ({
-      date: stat.created_at || stat.date,
-      exerciseType: stat.exercise_type || stat.exerciseType,
+    dailySummary: dailyAgg.map(d => ({
+      date: d.date,
+      count: d.count,
+      totalDuration: d.totalDuration,
+      averageScore: d.count > 0 ? Math.round(d.totalScore / d.count) : 0,
+      byType: d.byType,
+    })),
+    records: clean.map(stat => ({
+      date: dbTimestampToLocalDate(stat.created_at || stat.date),
+      timestamp: parseDbTimestamp(stat.created_at || stat.date).toISOString(),
+      exerciseType: getExerciseTypeKey(stat.exercise_type || stat.exerciseType || ''),
       exerciseTypeName: getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language),
+      detail: getDetailName(stat),
       score: stat.score,
       duration: stat.duration,
-      accuracy: stat.accuracy,
+      accuracy: Math.round(normalizeAccuracy(stat.accuracy)),
       notes: stat.notes,
     })),
   }
@@ -176,35 +337,77 @@ export function exportToHTML(stats: PracticeStats[], options: ExportOptions): st
   const { language } = options
   const isZh = language === 'zh-CN'
 
-  const totalDuration = stats.reduce((sum, s) => sum + (s.duration || 0), 0)
-  const avgScore = stats.length > 0
-    ? Math.round(stats.reduce((sum, s) => sum + (s.score || 0), 0) / stats.length)
+  const clean = normalizeAndDeduplicate(stats, options)
+
+  const totalDuration = clean.reduce((sum, s) => sum + (s.duration || 0), 0)
+  const avgScore = clean.length > 0
+    ? Math.round(clean.reduce((sum, s) => sum + (s.score || 0), 0) / clean.length)
     : 0
-  const avgAccuracy = stats.length > 0
-    ? Math.round(stats.reduce((sum, s) => sum + (s.accuracy || 0), 0) / stats.length)
+  const avgAccuracy = clean.length > 0
+    ? Math.round(clean.reduce((sum, s) => sum + normalizeAccuracy(s.accuracy), 0) / clean.length)
     : 0
 
-  const title = isZh ? 'FretMaster 练习报告' : 'FretMaster Practice Report'
-  const generatedAt = isZh ? '生成时间' : 'Generated At'
-  const totalSessions = isZh ? '练习次数' : 'Total Sessions'
-  const totalDurationLabel = isZh ? '总时长(分钟)' : 'Total Duration(min)'
-  const avgScoreLabel = isZh ? '平均得分' : 'Average Score'
-  const avgAccuracyLabel = isZh ? '平均准确率' : 'Average Accuracy'
-  const dateLabel = isZh ? '日期' : 'Date'
-  const typeLabel = isZh ? '练习类型' : 'Type'
-  const scoreLabel = isZh ? '得分' : 'Score'
-  const durationLabel = isZh ? '时长(秒)' : 'Duration(sec)'
-  const accuracyLabel = isZh ? '准确率' : 'Accuracy'
+  const title = t('practice_report', language)
+  const generatedAtLabel = t('generated_at', language)
+  const totalSessionsLabel = t('total_sessions', language)
+  const totalDurationLabel = t('total_duration', language)
+  const avgScoreLabel = t('average_score', language)
+  const avgAccuracyLabel = t('average_accuracy', language)
+  const dateLabel = t('date', language)
+  const timeLabel = t('time', language)
+  const typeLabel = t('exercise_type', language)
+  const detailLabel = t('detail', language)
+  const scoreLabel = t('score', language)
+  const durationLabel = t('duration_sec', language)
+  const accuracyLabel = t('accuracy', language)
+  const notesLabel = t('notes', language)
+  const dailySummaryLabel = t('daily_summary', language)
+  const recordsLabel = t('records', language)
 
-  const rows = stats.map(stat => `
+  // 每日汇总行
+  const dailyAgg = aggregateByDay(clean)
+  const dailyRows = dailyAgg.map(d => {
+    const typeBreakdown = Object.entries(d.byType)
+      .map(([k, v]) => `${getExerciseTypeName(k, language)}: ${v}`)
+      .join('、')
+    return `
+      <tr>
+        <td>${d.date}</td>
+        <td>${d.count}</td>
+        <td>${Math.round(d.totalDuration / 60)} ${t('minutes', language)} (${d.totalDuration} ${t('seconds', language)})</td>
+        <td>${d.count > 0 ? Math.round(d.totalScore / d.count) : 0}</td>
+        <td>${typeBreakdown || '-'}</td>
+      </tr>
+    `
+  }).join('')
+
+  // 详细记录行
+  const rows = clean.map(stat => {
+    const dt = parseDbTimestamp(stat.created_at || stat.date)
+    const dateStr = isNaN(dt.getTime()) ? '-' : dbTimestampToLocalDate(stat.created_at || stat.date)
+    const timeStr = isNaN(dt.getTime()) ? '-' : dt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const accuracy = Math.round(normalizeAccuracy(stat.accuracy))
+    const detail = getDetailName(stat)
+    const escapedNotes = (stat.notes || '').replace(/[<>&"']/g, c => ({
+      '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'
+    }[c] || c))
+    return `
     <tr>
-      <td>${(stat.created_at || stat.date || '-').substring(0, 10)}</td>
+      <td>${dateStr}</td>
+      <td>${timeStr}</td>
       <td>${getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language)}</td>
+      <td>${detail}</td>
       <td>${stat.score || 0}</td>
       <td>${stat.duration || 0}</td>
-      <td>${stat.accuracy || 0}%</td>
+      <td>${accuracy}%</td>
+      <td>${escapedNotes || '-'}</td>
     </tr>
-  `).join('')
+  `
+  }).join('')
+
+  const noDataHtml = clean.length === 0
+    ? `<div class="no-data">${t('no_data', language)}</div>`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="${language}">
@@ -222,7 +425,7 @@ export function exportToHTML(stats: PracticeStats[], options: ExportOptions): st
       color: #e2e8f0;
     }
     .container {
-      max-width: 900px;
+      max-width: 1100px;
       margin: 0 auto;
       background: rgba(30, 41, 59, 0.8);
       border-radius: 16px;
@@ -264,23 +467,33 @@ export function exportToHTML(stats: PracticeStats[], options: ExportOptions): st
       color: #94a3b8;
       margin-top: 4px;
     }
+    .section-title {
+      color: #60a5fa;
+      font-size: 18px;
+      margin: 24px 0 12px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 16px;
+      margin-top: 8px;
+      margin-bottom: 16px;
     }
     th {
       background: rgba(59, 130, 246, 0.2);
       color: #e2e8f0;
-      padding: 12px 8px;
+      padding: 10px 8px;
       text-align: left;
       font-weight: 600;
       font-size: 13px;
+      white-space: nowrap;
     }
     td {
-      padding: 12px 8px;
+      padding: 10px 8px;
       border-bottom: 1px solid rgba(148, 163, 184, 0.2);
       font-size: 13px;
+      vertical-align: top;
     }
     tr:nth-child(even) {
       background: rgba(30, 41, 59, 0.5);
@@ -288,32 +501,53 @@ export function exportToHTML(stats: PracticeStats[], options: ExportOptions): st
     tr:hover {
       background: rgba(59, 130, 246, 0.1);
     }
+    .no-data {
+      text-align: center;
+      padding: 48px;
+      color: #94a3b8;
+      font-size: 16px;
+    }
+    .notes-cell {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #94a3b8;
+      font-size: 12px;
+    }
     .footer {
       text-align: center;
       margin-top: 32px;
       color: #64748b;
       font-size: 12px;
     }
+    .record-count {
+      color: #94a3b8;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
     @media print {
       body { background: #fff; color: #1a1a2e; }
       .container { box-shadow: none; background: #fff; }
       .summary-card { background: #f1f5f9; border-color: #cbd5e1; }
       .summary-value { color: #2563eb; }
+      .section-title { color: #1e40af; border-color: #cbd5e1; }
       th { background: #e2e8f0; color: #1a1a2e; }
       td { border-color: #e2e8f0; }
       tr:nth-child(even) { background: #f8fafc; }
+      .notes-cell { color: #475569; }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>${title}</h1>
-    <p class="subtitle">${generatedAt}: ${new Date().toLocaleString(language)}</p>
-    
+    <p class="subtitle">${generatedAtLabel}: ${new Date().toLocaleString(language)}</p>
+
     <div class="summary">
       <div class="summary-card">
-        <div class="summary-value">${stats.length}</div>
-        <div class="summary-label">${totalSessions}</div>
+        <div class="summary-value">${clean.length}</div>
+        <div class="summary-label">${totalSessionsLabel}</div>
       </div>
       <div class="summary-card">
         <div class="summary-value">${Math.round(totalDuration / 60)}</div>
@@ -328,22 +562,50 @@ export function exportToHTML(stats: PracticeStats[], options: ExportOptions): st
         <div class="summary-label">${avgAccuracyLabel}</div>
       </div>
     </div>
-    
+
+    ${noDataHtml}
+
+    ${dailyAgg.length > 0 ? `
+    <h2 class="section-title">${dailySummaryLabel}</h2>
+    <p class="record-count">${dailyAgg.length} ${isZh ? '天' : 'days'}</p>
     <table>
       <thead>
         <tr>
           <th>${dateLabel}</th>
+          <th>${totalSessionsLabel}</th>
+          <th>${totalDurationLabel}</th>
+          <th>${avgScoreLabel}</th>
           <th>${typeLabel}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${dailyRows}
+      </tbody>
+    </table>
+    ` : ''}
+
+    ${clean.length > 0 ? `
+    <h2 class="section-title">${recordsLabel}</h2>
+    <p class="record-count">${clean.length} ${isZh ? '条记录（已去重）' : 'records (deduplicated)'}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>${dateLabel}</th>
+          <th>${timeLabel}</th>
+          <th>${typeLabel}</th>
+          <th>${detailLabel}</th>
           <th>${scoreLabel}</th>
           <th>${durationLabel}</th>
           <th>${accuracyLabel}</th>
+          <th>${notesLabel}</th>
         </tr>
       </thead>
       <tbody>
         ${rows}
       </tbody>
     </table>
-    
+    ` : ''}
+
     <p class="footer">Generated by FretMaster · ${new Date().getFullYear()}</p>
   </div>
 </body>

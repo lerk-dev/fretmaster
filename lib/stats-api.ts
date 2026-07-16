@@ -2,7 +2,7 @@
 // Web 版本使用 CGI API，Windows 版本使用 SQLite
 
 import { logger } from './logger'
-import { isTauriEnv } from './utils'
+import { isTauriEnv, parseDbTimestamp, normalizeAccuracy } from './utils'
 
 const API_BASE_URL = '/cgi-bin';
 
@@ -205,7 +205,7 @@ export async function getStatsSummary() {
   const totalSessions = stats.length;
   const totalDuration = stats.reduce((sum, s) => sum + (s.duration || 0), 0);
   const averageScore = stats.reduce((sum, s) => sum + (s.score || 0), 0) / totalSessions;
-  const averageAccuracy = stats.reduce((sum, s) => sum + (s.accuracy || 0), 0) / totalSessions;
+  const averageAccuracy = stats.reduce((sum, s) => sum + normalizeAccuracy(s.accuracy), 0) / totalSessions;
   const lastPractice = stats[0]?.created_at || stats[0]?.date || null;
 
   return {
@@ -224,13 +224,15 @@ export async function getRecentStats(days: number = 7): Promise<PracticeStats[]>
     const { getRecentStats: nativeGetRecent } = await import('./native-stats');
     return nativeGetRecent(days);
   }
-  
+
   const stats = await getAllPracticeStats();
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
-  
+
   return stats.filter(s => {
-    const recordDate = new Date(s.created_at || s.date || '');
+    // 使用 parseDbTimestamp 正确解析 SQLite/ISO 时间戳为 UTC
+    // 避免将 UTC 时间错误地解析为本地时间导致过滤偏差
+    const recordDate = parseDbTimestamp(s.created_at || s.date);
     return recordDate >= cutoffDate;
   });
 }

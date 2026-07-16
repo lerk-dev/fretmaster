@@ -1,9 +1,10 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
 import { Button } from "@/components/ui/button"
 import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
+import { getLocalDateString, parseDbTimestamp, dbTimestampToLocalDate, getLocalDayStart, getLocalDaysAgoStart, getLocalMonthsAgoStart, normalizeAccuracy } from "@/lib/utils"
 import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser } from "@/lib/store"
 import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
 import { logger } from "@/lib/logger"
@@ -5645,7 +5646,11 @@ export default function FretMasterPage() {
         }
         
         serverStats.forEach((record: ServerPracticeStats) => {
-          const date = record.created_at ? record.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+          // 使用 dbTimestampToLocalDate 正确解析 SQLite/ISO 时间戳为本地日期
+          // 避免 SQLite 的 "YYYY-MM-DD HH:MM:SS" (UTC) 被错误解析为本地时间
+          const date = record.created_at
+            ? dbTimestampToLocalDate(record.created_at)
+            : getLocalDateString(new Date())
           const type = typeMapping[record.exercise_type] || 'pitch_finding'
           const detailName = record.notes?.replace('练习项目: ', '') || record.exercise_type
           
@@ -5700,9 +5705,11 @@ export default function FretMasterPage() {
         // 只保留最近90天的数据
         newStats.daily = newStats.daily
           .filter(d => {
-            const date = new Date(d.date)
-            const ninetyDaysAgo = new Date()
-            ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+            // 使用本地时区解析日期，避免 UTC 偏移导致数据被误删
+            const parts = d.date.split('-')
+            if (parts.length !== 3) return false
+            const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+            const ninetyDaysAgo = getLocalDaysAgoStart(90)
             return date >= ninetyDaysAgo
           })
           .sort((a, b) => b.date.localeCompare(a.date))
@@ -5772,7 +5779,8 @@ export default function FretMasterPage() {
 
   // 记录练习统计
   const recordPractice = useCallback((type: PracticeType, detailName: string) => {
-    const today = new Date().toISOString().split('T')[0]
+    // 使用本地时区日期，避免 UTC+8 凌晨 0-8 点时今天被记为昨天
+    const today = getLocalDateString(new Date())
     
     setPracticeStats(prevStats => {
       const newStats = { ...prevStats }
@@ -5830,9 +5838,11 @@ export default function FretMasterPage() {
       // 只保留最近90天的数据
       newStats.daily = newStats.daily
         .filter(d => {
-          const date = new Date(d.date)
-          const ninetyDaysAgo = new Date()
-          ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+          // 使用本地时区解析日期
+          const parts = d.date.split('-')
+          if (parts.length !== 3) return false
+          const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+          const ninetyDaysAgo = getLocalDaysAgoStart(90)
           return date >= ninetyDaysAgo
         })
         .sort((a, b) => b.date.localeCompare(a.date))
@@ -5851,11 +5861,12 @@ export default function FretMasterPage() {
       }
       
       // 异步保存到服务器，不阻塞UI
+      // accuracy 使用 0-100 范围（与导出和验证逻辑一致）
       saveToServer({
         exercise_type: typeNames[type] || detailName,
         score: 100, // 练习完成得满分
         duration: 60, // 默认练习时长1分钟
-        accuracy: 1.0, // 练习完成准确率100%
+        accuracy: 100, // 练习完成准确率100%（0-100 范围）
         notes: `练习项目: ${detailName}`
       }).catch(err => console.error('保存到服务器失败:', err))
       
@@ -5865,28 +5876,37 @@ export default function FretMasterPage() {
 
   // 获取指定时间范围的统计数据
   const getStatsByTimeRange = useCallback((range: StatsTimeRange): { count: number; byType: Record<PracticeType, number>; byDetail: Record<PracticeType, PracticeDetail[]> } => {
-    const today = new Date().toISOString().split('T')[0]
-    const now = new Date()
-    
+    // 使用本地时区的日期范围边界，避免 UTC 偏移导致"今天/本周/本月"判断错误
+    // 旧代码使用 new Date().toISOString().split('T')[0] 得到的是 UTC 日期，
+    // 在 UTC+8 时区凌晨 0-8 点会返回前一天，导致"今天"显示错误。
+    const todayLocal = getLocalDateString(new Date())
+
     let startDate: Date
     switch (range) {
       case 'today':
-        startDate = new Date(today)
+        // 今天的本地 0 点
+        startDate = getLocalDayStart(todayLocal)
         break
       case 'week':
-        startDate = new Date()
-        startDate.setDate(now.getDate() - 7)
+        // 7 天前的本地 0 点（滑动窗口）
+        startDate = getLocalDaysAgoStart(7)
         break
       case 'month':
-        startDate = new Date()
-        startDate.setMonth(now.getMonth() - 1)
+        // 1 个月前的本地 0 点
+        startDate = getLocalMonthsAgoStart(1)
         break
       case 'total':
       default:
         return practiceStats.total
     }
-    
-    const filtered = practiceStats.daily.filter(d => new Date(d.date) >= startDate)
+
+    // daily 中的 date 是 YYYY-MM-DD 格式（本地日期），需要按本地时区解析
+    const filtered = practiceStats.daily.filter(d => {
+      const parts = d.date.split('-')
+      if (parts.length !== 3) return false
+      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+      return date >= startDate
+    })
     
     interface StatsResult {
       count: number
@@ -7671,7 +7691,7 @@ export default function FretMasterPage() {
       setRootNote(NOTES[Math.floor(Math.random() * NOTES.length)])
     }
 
-    recordPractice('pitch_finding', '练习')
+    // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
   }, [intervalRootMode, recordPractice, selectedStrings, fretCount])
 
   // 生成音程练习队列
@@ -7773,9 +7793,8 @@ export default function FretMasterPage() {
     
     // 更新队列索引
     setIntervalCurrentQueueIndex(nextIndex + 1)
-    
-    // 记录音程练习统计（只统计次数，不区分类型）
-    recordPractice('interval', '练习')
+
+    // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
   }, [rootNote, intervalRootMode, selectedIntervals, findRootFirst, addRootBack, recordPractice, intervalExerciseQueue, intervalCurrentQueueIndex])
 
   // 辅助函数：生成和弦练习序列
@@ -8068,9 +8087,8 @@ export default function FretMasterPage() {
       type: nextType,
       sequence: nextSequence
     })
-    
-    // 记录和弦练习统计
-    recordPractice('chord_exercise', chordType)
+
+    // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
   }, [chordExerciseRoot, chordExerciseTypes, chordExerciseLevel, chordExerciseOrder, chordExerciseBass, generateChordSequence, recordPractice])
 
   // 下一和弦练习
@@ -8387,8 +8405,8 @@ export default function FretMasterPage() {
       scaleName: nextScale.name,
       sequence: nextSequence
     })
-    
-    recordPractice('scale', randomScale.name)
+
+    // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
   }, [selectedScales, scalePracticeSequence, scaleDirection, isScaleKeyRandom, scaleKey, generateScaleSequence, recordPractice, scaleRootMovement, getNextKeyByMovement])
 
   // 下一音阶练习
@@ -8432,6 +8450,8 @@ export default function FretMasterPage() {
         if (practiceAnswerModeRef.current === "buttons") break
         if (note === targetNote) {
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          // 用户答对后才记录一次练习统计
+          recordPractice('pitch_finding', '找音练习')
           generateNewTarget()
         } else {
           setScore(prev => ({ ...prev, total: prev.total + 1 }))
@@ -8487,6 +8507,8 @@ export default function FretMasterPage() {
               answered: true
             })
             setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+            // 完成整个音程练习后记录一次统计
+            recordPractice('interval', '音程练习')
 
             // 立即生成新题目（MIDI输入无需延迟）- 使用 ref 避免循环依赖
             setTimeout(() => {
@@ -8581,6 +8603,8 @@ export default function FretMasterPage() {
             if (nextStep >= scaleExerciseSequence.length) {
               // 完成当前序列，使用预览的下一题
               setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+              // 完成整个音阶序列后记录一次统计
+              recordPractice('scale', selectedScale?.name || '音阶练习')
               nextScaleExercise()
             } else {
               // 继续下一个音
@@ -8622,6 +8646,8 @@ export default function FretMasterPage() {
             if (nextStep >= chordExerciseSequence.length) {
               // 完成当前和弦，使用预览的下一题
               setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+              // 完成整个和弦序列后记录一次统计
+              recordPractice('chord_exercise', chordExerciseTargetChord?.type || '和弦练习')
               nextChordExercise()
             } else {
               // 继续下一个音
@@ -8635,7 +8661,7 @@ export default function FretMasterPage() {
         }
         break
     }
-  }, [isPlaying, activeTab, targetNote, generateNewTarget, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise])
+  }, [isPlaying, activeTab, targetNote, generateNewTarget, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise, recordPractice])
 
   // 更新 ref 以便在 startPitchDetection 中使用（不含 nextChord，它在后面定义）
   useEffect(() => {
@@ -10748,16 +10774,21 @@ export default function FretMasterPage() {
                                     const { stringIndex, fret } = highlightedTargetPosition
                                     const correctNote = getNoteAtPosition(stringIndex, fret)
                                     const isCorrect = note === correctNote
-                                    
+
                                     // 显示反馈
                                     setHighlightedFrets(new Map([[`${stringIndex}-${fret}`, isCorrect]]))
-                                    
+
                                     // 更新分数
                                     setScore(prev => ({
                                       correct: prev.correct + (isCorrect ? 1 : 0),
                                       total: prev.total + 1
                                     }))
-                                    
+
+                                    // 答对后记录一次练习统计
+                                    if (isCorrect) {
+                                      recordPractice('pitch_finding', '找音练习')
+                                    }
+
                                     // 延迟后生成新题目
                                     setTimeout(() => {
                                       setHighlightedFrets(new Map())
