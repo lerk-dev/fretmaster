@@ -218,20 +218,25 @@ function normalizeAndDeduplicate(
 
   // 相邻同类型去重：若两条记录时间差 < 声称的 duration，则后者视为重复
   // （一次 60 秒的练习不可能在 27 秒后再次完成）
+  // 注意：找音练习(pitch_finding)是每答对一题就记一次，duration 是会话累计时间
+  // 而非单题耗时，因此不能用 duration 时间窗判断，否则会误杀合法的连续答题记录
   const finalDeduped: PracticeStats[] = []
   let prevKept: PracticeStats | null = null
   for (const stat of deduped) {
     if (prevKept) {
       const prevTs = parseDbTimestamp(prevKept.created_at || prevKept.date).getTime()
       const curTs = parseDbTimestamp(stat.created_at || stat.date).getTime()
-      const prevType = prevKept.exercise_type || prevKept.exerciseType || ''
-      const curType = stat.exercise_type || stat.exerciseType || ''
+      const prevTypeKey = getExerciseTypeKey(prevKept.exercise_type || prevKept.exerciseType || '')
+      const curTypeKey = getExerciseTypeKey(stat.exercise_type || stat.exerciseType || '')
       const prevDetail = getDetailName(prevKept)
       const curDetail = getDetailName(stat)
       const gap = prevTs - curTs // 倒序，prev 比 cur 更新
       // 取两条记录中较大的 duration 作为判断基准
       const maxDuration = Math.max(prevKept.duration || 0, stat.duration || 0)
-      if (prevType === curType && prevDetail === curDetail && maxDuration > 0 && gap < maxDuration * 1000) {
+      // 仅对非 pitch_finding 类型应用 duration 时间窗去重
+      // pitch_finding 每答对一题就记一次，duration 是会话累计值，时间窗判断无意义
+      const isPitchFinding = prevTypeKey === 'pitch_finding' || curTypeKey === 'pitch_finding'
+      if (!isPitchFinding && prevTypeKey === curTypeKey && prevDetail === curDetail && maxDuration > 0 && gap < maxDuration * 1000) {
         // 时间差小于 duration，视为重复，跳过当前记录
         continue
       }

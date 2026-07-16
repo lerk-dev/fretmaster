@@ -5331,6 +5331,9 @@ export default function FretMasterPage() {
   const [showPracticeSummary, setShowPracticeSummary] = useState(false)
   const [practiceSummaryData, setPracticeSummaryData] = useState<{correct: number, total: number, duration: number}>({correct: 0, total: 0, duration: 0})
 
+  // 近期练习记录（从服务器加载，用于统计页展示）
+  const [recentRecords, setRecentRecords] = useState<ServerPracticeStats[]>([])
+
   // 音程练习状态
   const [showIntervalFretboard, setShowIntervalFretboard] = useState(store.intervalPractice.showFretboard)
   const [showIntervalKeyboard, setShowIntervalKeyboard] = useState(false)
@@ -5722,6 +5725,9 @@ export default function FretMasterPage() {
         
         setPracticeStats(newStats)
         
+        // 保存去重后的近期记录（最多 50 条，按时间倒序），供统计页展示
+        setRecentRecords(dedupedServerStats.slice(0, 50))
+        
         localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
       } catch (e) {
         console.error('Failed to load stats:', e)
@@ -5784,9 +5790,25 @@ export default function FretMasterPage() {
   }, [])
 
   // 记录练习统计
-  const recordPractice = useCallback((type: PracticeType, detailName: string) => {
+  // score/duration/accuracy 为可选参数，未传则使用当前会话的实时数据
+  // - score: 本次答题得分（0-100），默认用 scoreRef 实时计算
+  // - duration: 本次练习耗时（秒），默认用会话开始至今的时间
+  // - accuracy: 准确率（0-100），默认用 scoreRef 实时计算
+  const recordPractice = useCallback((type: PracticeType, detailName: string, opts?: { score?: number; duration?: number; accuracy?: number }) => {
     // 使用本地时区日期，避免 UTC+8 凌晨 0-8 点时今天被记为昨天
     const today = getLocalDateString(new Date())
+    
+    // 计算真实数据（若未显式传入）
+    const currentScore = scoreRef.current
+    const realAccuracy = currentScore.total > 0
+      ? Math.round((currentScore.correct / currentScore.total) * 100)
+      : 100
+    const realDuration = practiceSessionStartTime
+      ? Math.max(1, Math.round((Date.now() - practiceSessionStartTime + practiceElapsedTime * 1000) / 1000))
+      : 60
+    const finalScore = opts?.score ?? 100
+    const finalDuration = opts?.duration ?? realDuration
+    const finalAccuracy = opts?.accuracy ?? realAccuracy
     
     setPracticeStats(prevStats => {
       const newStats = { ...prevStats }
@@ -5867,18 +5889,19 @@ export default function FretMasterPage() {
       }
       
       // 异步保存到服务器，不阻塞UI
+      // 使用真实的 score/duration/accuracy，而非硬编码的 100/60/100
       // accuracy 使用 0-100 范围（与导出和验证逻辑一致）
       saveToServer({
         exercise_type: typeNames[type] || detailName,
-        score: 100, // 练习完成得满分
-        duration: 60, // 默认练习时长1分钟
-        accuracy: 100, // 练习完成准确率100%（0-100 范围）
+        score: finalScore,
+        duration: finalDuration,
+        accuracy: finalAccuracy,
         notes: `练习项目: ${detailName}`
       }).catch(err => console.error('保存到服务器失败:', err))
       
       return newStats
     })
-  }, [])
+  }, [practiceSessionStartTime, practiceElapsedTime])
 
   // 获取指定时间范围的统计数据
   const getStatsByTimeRange = useCallback((range: StatsTimeRange): { count: number; byType: Record<PracticeType, number>; byDetail: Record<PracticeType, PracticeDetail[]> } => {
@@ -12544,6 +12567,59 @@ export default function FretMasterPage() {
                                   </div>
                                 )
                               })}
+                          </div>
+                          
+                          {/* 近期练习记录列表 */}
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-muted-foreground">{t('stats_recent_records')}</h4>
+                            {recentRecords.length === 0 ? (
+                              <div className="text-center py-4 text-xs text-muted-foreground">
+                                {t('stats_recent_empty')}
+                              </div>
+                            ) : (
+                              <div className="space-y-1 max-h-80 overflow-y-auto">
+                                {recentRecords.map((rec, idx) => {
+                                  const dt = parseDbTimestamp(rec.created_at || rec.date)
+                                  const dateStr = isNaN(dt.getTime()) ? '-' : dbTimestampToLocalDate(rec.created_at || rec.date)
+                                  const timeStr = isNaN(dt.getTime()) ? '-' : dt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
+                                  // 提取练习项目名（兼容 "练习项目: xxx" 格式）
+                                  const notesStr = rec.notes || ''
+                                  const m = notesStr.match(/练习项目[:：]\s*(.+)/)
+                                  const detailName = m ? m[1].trim() : (notesStr.trim() || '-')
+                                  // 类型中文名映射
+                                  const typeDisplayMap: Record<string, string> = {
+                                    'pitch_finding': t('nav_practice'),
+                                    'find_note': t('nav_practice'),
+                                    '音高识别': t('nav_practice'),
+                                    '找音练习': t('nav_practice'),
+                                    'scale': t('nav_scale'),
+                                    '音阶练习': t('nav_scale'),
+                                    'chord_exercise': t('nav_chord_exercise'),
+                                    '和弦练习': t('nav_chord_exercise'),
+                                    'interval': t('nav_interval'),
+                                    '音程练习': t('nav_interval'),
+                                    'chord_progression': t('nav_chord'),
+                                    '和弦进行': t('nav_chord'),
+                                    '练习': t('nav_practice'),
+                                  }
+                                  const typeDisplay = typeDisplayMap[rec.exercise_type || rec.exerciseType || ''] || rec.exercise_type || rec.exerciseType || '-'
+                                  const acc = rec.accuracy != null ? Math.round(rec.accuracy <= 1 ? rec.accuracy * 100 : rec.accuracy) : null
+                                  return (
+                                    <div key={rec.id ?? idx} className="flex items-center justify-between gap-2 px-2 py-1.5 bg-card/30 rounded border border-border/20 text-xs">
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span className="text-muted-foreground tabular-nums shrink-0">{dateStr} {timeStr}</span>
+                                        <span className="text-primary shrink-0">{typeDisplay}</span>
+                                        <span className="truncate text-muted-foreground">{detailName}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 shrink-0 text-muted-foreground tabular-nums">
+                                        {acc != null && <span>{acc}%</span>}
+                                        {rec.duration ? <span>{rec.duration}{t('stats_duration_sec')}</span> : null}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
                           </div>
                           
                           {stats.count === 0 && (
