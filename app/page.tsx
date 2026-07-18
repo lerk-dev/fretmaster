@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -5334,6 +5334,19 @@ export default function FretMasterPage() {
   // 近期练习记录（从服务器加载，用于统计页展示）
   const [recentRecords, setRecentRecords] = useState<ServerPracticeStats[]>([])
 
+  // 统计数据缓存版本：升级此版本号会自动清除旧的 localStorage 统计缓存
+  // 用于修复历史脏数据（如重复记录、错误时区数据等）
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const CACHE_VERSION = 'v3-20260716'  // v3: 清除路由器清理后残留的本地缓存
+    const stored = localStorage.getItem('fretmaster-stats-version')
+    if (stored !== CACHE_VERSION) {
+      localStorage.removeItem('fretmaster-stats')
+      localStorage.setItem('fretmaster-stats-version', CACHE_VERSION)
+      logger.info('已清除旧的统计数据缓存', { from: stored, to: CACHE_VERSION })
+    }
+  }, [])
+
   // 音程练习状态
   const [showIntervalFretboard, setShowIntervalFretboard] = useState(store.intervalPractice.showFretboard)
   const [showIntervalKeyboard, setShowIntervalKeyboard] = useState(false)
@@ -5905,6 +5918,39 @@ export default function FretMasterPage() {
       return newStats
     })
   }, [practiceSessionStartTime, practiceElapsedTime])
+
+  // ==================== 音高识别练习会话统计 ====================
+  // 音高识别练习按"会话"统计：从开始练习到结束练习（停止/时间到/切Tab）记为一次。
+  // 不再每答对一个音就 +1，避免单次会话被记成几十次。
+  const pitchFindingSessionStartRef = useRef<number | null>(null)
+  const pitchFindingSessionScoreRef = useRef<{ correct: number; total: number }>({ correct: 0, total: 0 })
+
+  useEffect(() => {
+    // 会话开始：进入播放状态且在 practice tab
+    if (isPlaying && activeTab === 'practice' && pitchFindingSessionStartRef.current === null) {
+      pitchFindingSessionStartRef.current = Date.now()
+      pitchFindingSessionScoreRef.current = { correct: 0, total: 0 }
+    }
+
+    // 会话进行中：持续记录最新分数（仅当仍在播放且在 practice tab 时更新，
+    // 这样在会话结束的同一渲染周期里即使 score 被重置为 0，ref 仍保留最后一题的分数）
+    if (isPlaying && activeTab === 'practice' && pitchFindingSessionStartRef.current !== null) {
+      pitchFindingSessionScoreRef.current = score
+    }
+
+    // 会话结束：播放停止，且之前确实有一个进行中的 pitch_finding 会话
+    if (!isPlaying && pitchFindingSessionStartRef.current !== null) {
+      const startTime = pitchFindingSessionStartRef.current
+      const sessionScore = pitchFindingSessionScoreRef.current
+      pitchFindingSessionStartRef.current = null
+      // 仅在用户实际有答题时才记录，避免"开始后立即停止"也被计入
+      if (sessionScore.total > 0) {
+        const accuracy = Math.round((sessionScore.correct / sessionScore.total) * 100)
+        const duration = Math.max(1, Math.round((Date.now() - startTime) / 1000))
+        recordPractice('pitch_finding', '找音练习', { duration, accuracy })
+      }
+    }
+  }, [isPlaying, activeTab, score, recordPractice])
 
   // 获取指定时间范围的统计数据
   const getStatsByTimeRange = useCallback((range: StatsTimeRange): { count: number; byType: Record<PracticeType, number>; byDetail: Record<PracticeType, PracticeDetail[]> } => {
@@ -8497,8 +8543,7 @@ export default function FretMasterPage() {
         if (practiceAnswerModeRef.current === "buttons") break
         if (note === targetNote) {
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          // 用户答对后才记录一次练习统计
-          recordPractice('pitch_finding', '找音练习')
+          // 音高识别统计改为按会话记录，不在此处累加 —— 见 pitchFindingSession 统计 effect
           generateNewTarget()
         } else {
           setScore(prev => ({ ...prev, total: prev.total + 1 }))
@@ -10831,10 +10876,7 @@ export default function FretMasterPage() {
                                       total: prev.total + 1
                                     }))
 
-                                    // 答对后记录一次练习统计
-                                    if (isCorrect) {
-                                      recordPractice('pitch_finding', '找音练习')
-                                    }
+                                    // 音高识别统计改为按会话记录，不在此处累加 —— 见 pitchFindingSession 统计 effect
 
                                     // 延迟后生成新题目
                                     setTimeout(() => {

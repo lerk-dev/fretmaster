@@ -37,7 +37,9 @@
     "dist/types/**/*.ts",
     "dist/dev/types/**/*.ts",
     "dist-tauri/types/**/*.ts",
-    "dist-tauri/dev/types/**/*.ts"
+    "dist-tauri/dev/types/**/*.ts",
+    "out/types/**/*.ts",
+    "out/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

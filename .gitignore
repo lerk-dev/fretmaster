@@ -146,6 +146,7 @@ run-pitch-tests.js
 ssh-deploy.ps1
 ssh-test.ps1
 windres.bat
+askpass.bat
 代码对比分析报告.md
 平台对比分析报告.md
 音高识别改进效果报告.md
