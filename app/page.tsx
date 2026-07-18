@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -7303,6 +7303,274 @@ export default function FretMasterPage() {
     }
   }, [micEnabled, audioContext, startAudioInput, language])
 
+  // 练习模式音高匹配逻辑（从 runPitchDetection 抽取，供 Web 和 Tauri 两条路径共用）
+  const processPracticeMatch = useCallback((detectedFreq: number, probability: number, detectedNote: string) => {
+    const currentIsPlaying = isPlayingRef.current
+    const currentActiveTab = activeTabRef.current
+    const currentSensitivity = sensitivityRef.current
+    const currentConfidenceThreshold = confidenceThresholdRef.current
+
+    if (!currentIsPlaying || !detectedNote) return
+    if (isCoolingDownRef.current) return
+
+    // 根据练习模式处理 - 完全按照原HTML的processAudio逻辑
+    if (currentActiveTab === 'practice') {
+      // 找音练习 - 使用音分差匹配
+      const currentTargetNote = targetNoteRef.current
+      if (!currentTargetNote) return
+
+      const targetSemitone = noteToSemitones[currentTargetNote] || 0
+      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
+
+      const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+
+      const baseThreshold = detectedFreq < 110 ? 35 : 25
+      const matchThreshold = baseThreshold * (2 - currentSensitivity)
+
+      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
+        logger.debug('找音练习匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1))
+        setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+        if (generateNewTargetRef.current) {
+          generateNewTargetRef.current()
+        }
+      }
+    } else if (currentActiveTab === 'interval') {
+      // 音程练习 - 使用音分差匹配
+      const exercise = currentIntervalExerciseRef.current
+      if (!exercise || exercise.answered) return
+
+      const rootNoteValue = exercise.rootNote
+
+      // 使用 currentIntervalDisplay（先找根音模式包含 '1'）以与点击/MIDI 路径一致
+      const intervals = exercise.currentIntervalDisplay.split(' ')
+      let matchedIndex: number | null = null
+      let minCents = Infinity
+
+      for (let idx = 0; idx < intervals.length; idx++) {
+        const interval = intervals[idx]
+        // 跳过已经完成的音级（按索引）
+        if (exercise.completedIntervals.includes(idx)) continue
+        // 先找根音模式：根音未完成时只接受根音
+        const rootCompleted = intervals.some((intv, i) => intv === '1' && exercise.completedIntervals.includes(i))
+        if (findRootFirstRef.current && !rootCompleted && interval !== '1') continue
+
+        const intervalSemitone = intervalToSemitones[interval]
+        if (intervalSemitone === undefined) continue
+
+        const rootValue = noteToSemitones[rootNoteValue] || 0
+        const targetSemitone = (rootValue + intervalSemitone) % 12
+        const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
+
+        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+
+        const baseThreshold = detectedFreq < 110 ? 35 : interval === '1' ? 25 : 15
+        const matchThreshold = baseThreshold * (2 - currentSensitivity)
+
+        if (adjustedCents <= matchThreshold && adjustedCents < minCents && probability > currentConfidenceThreshold) {
+          minCents = adjustedCents
+          matchedIndex = idx
+        }
+      }
+
+      if (matchedIndex !== null) {
+        const matchedInterval = intervals[matchedIndex]
+        logger.debug('音程练习匹配成功:', matchedInterval, '音分差:', minCents.toFixed(1))
+        const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
+
+        if (newCompletedIntervals.length >= intervals.length) {
+          setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals, answered: true })
+          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          if (addRootBackRef.current && matchedInterval !== '1') {
+            setIntervalPracticeStep('root')
+          } else if (generateIntervalExerciseRef.current) {
+            generateIntervalExerciseRef.current()
+          }
+        } else {
+          setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals })
+          if (findRootFirstRef.current && matchedInterval === '1') {
+            setIntervalPracticeStep('interval')
+          } else if (addRootBackRef.current && matchedInterval !== '1') {
+            setIntervalPracticeStep('root')
+          }
+        }
+      }
+    } else if (currentActiveTab === 'scale') {
+      // 音阶练习 - 使用音分差匹配
+      const sequence = scaleExerciseSequenceRef.current
+      const step = scaleExerciseCurrentStepRef.current
+      const key = scaleKeyRef.current
+
+      if (sequence.length === 0 || step >= sequence.length) return
+
+      const currentDegree = sequence[step]
+      const semitone = intervalToSemitones[currentDegree]
+      if (semitone === undefined) return
+
+      const keyValue = noteToSemitones[key] || 0
+      const targetSemitone = (keyValue + semitone) % 12
+      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
+
+      const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+
+      const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
+      const matchThreshold = baseThreshold * (2 - currentSensitivity)
+
+      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
+        logger.debug('音阶练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
+        const nextStep = step + 1
+        if (nextStep >= sequence.length) {
+          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          if (nextScaleExerciseRef.current) {
+            nextScaleExerciseRef.current()
+          }
+        } else {
+          setScaleExerciseCurrentStep(nextStep)
+          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+        }
+      }
+    } else if (currentActiveTab === 'chord_exercise') {
+      // 和弦练习 - 使用音分差匹配
+      const targetChord = chordExerciseTargetChordRef.current
+      const sequence = chordExerciseSequenceRef.current
+      const step = chordExerciseCurrentStepRef.current
+
+      if (!targetChord || sequence.length === 0 || step >= sequence.length) return
+      if (chordExerciseIsAnsweredRef.current) return
+
+      const currentDegree = sequence[step]
+      const semitone = intervalToSemitones[currentDegree]
+      if (semitone === undefined) return
+
+      const rootValue = noteToSemitones[targetChord.root] || 0
+      const targetSemitone = (rootValue + semitone) % 12
+      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
+
+      const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+
+      const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
+      const matchThreshold = baseThreshold * (2 - currentSensitivity)
+
+      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
+        logger.debug('和弦练习音高匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1), '阈值:', matchThreshold.toFixed(1))
+
+        const nextStep = step + 1
+        if (nextStep >= sequence.length) {
+          // 完成整个和弦，设置 answered 状态
+          setChordExerciseIsAnswered(true)
+          chordExerciseIsAnsweredRef.current = true
+          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          if (nextChordExerciseRef.current) {
+            nextChordExerciseRef.current()
+          }
+        } else {
+          // 继续下一个音，不设置 answered 状态
+          setChordExerciseCurrentStep(nextStep)
+          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+        }
+      }
+    } else if (currentActiveTab === 'chord') {
+      // 和弦转换练习 - 使用音分差匹配
+      const chords = getTransposedChordsRef.current ? getTransposedChordsRef.current() : []
+      const currentChord = chords[currentChordIndexRef.current]
+      if (!currentChord) return
+
+      const degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
+      const currentStep = chordDegreeCurrentStepRef.current
+      if (currentStep >= degrees.length) return
+
+      const currentDegree = degrees[currentStep]
+      if (!currentDegree) return
+
+      const semitone = intervalToSemitones[currentDegree]
+      if (semitone === undefined) return
+
+      const rootValue = noteToSemitones[currentChord.root] || 0
+      const targetSemitone = (rootValue + semitone) % 12
+      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
+
+      const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+
+      const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
+      const matchThreshold = baseThreshold * (2 - currentSensitivity)
+
+      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
+        logger.debug('和弦转换练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
+        const nextStep = currentStep + 1
+        if (nextStep >= degrees.length) {
+          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          if (nextChordInfoRef.current && nextChordRef.current) {
+            nextChordRef.current()
+          }
+        } else {
+          setChordDegreeCurrentStep(nextStep)
+          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+        }
+      }
+    } else if (currentActiveTab === 'tuner') {
+      // 调音表模式 - 只显示音高，不需要答题逻辑
+    }
+  }, [getTransposedChordsRef, practiceLevelRef, findRootFirstRef, targetNoteRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, currentIntervalExerciseRef, currentChordIndexRef, chordDegreeCurrentStepRef, nextChordRef, nextChordInfoRef, nextScaleExerciseRef, nextChordExerciseRef, generateNewTargetRef, generateIntervalExerciseRef, isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef])
+
+  const processPracticeMatchRef = useRef(processPracticeMatch)
+  useEffect(() => { processPracticeMatchRef.current = processPracticeMatch }, [processPracticeMatch])
+
+  // Tauri 环境：练习模式音高检测轮询
+  // WindowsAudioSettings 启用音频后，Rust 后端会持续采集；这里在练习进行时轮询 detectPitch 并复用同一套匹配逻辑
+  useEffect(() => {
+    if (!isTauri) return
+    if (!micEnabled || !isPlaying || tunerActive) return
+
+    let isActive = true
+    let intervalId: ReturnType<typeof setInterval> | null = null
+    let lastDisplayedNote: string | null = null
+    let lastDisplayUpdateTime = 0
+    const DISPLAY_THROTTLE_MS = 50
+
+    const startPolling = async () => {
+      const { detectPitch } = await import('@/lib/native-audio')
+
+      intervalId = setInterval(async () => {
+        if (!isActive) return
+
+        try {
+          const result = await detectPitch()
+          if (!result || result.frequency <= 0) return
+
+          const prob = result.confidence?.overall ?? 0
+          const currentConfidenceThreshold = confidenceThresholdRef.current
+          if (prob <= currentConfidenceThreshold) return
+
+          const detectedFreq = result.frequency
+          const detectedNote = frequencyToNoteName(detectedFreq)
+          if (!detectedNote) return
+
+          // 节流更新音高显示
+          const now = Date.now()
+          if (now - lastDisplayUpdateTime >= DISPLAY_THROTTLE_MS && detectedNote !== lastDisplayedNote) {
+            setDetectedPitch(detectedNote)
+            lastDisplayUpdateTime = now
+            lastDisplayedNote = detectedNote
+          }
+
+          // 复用 Web 版的练习匹配逻辑
+          processPracticeMatchRef.current(detectedFreq, prob, detectedNote)
+        } catch (e) {
+          console.error('Tauri 练习模式音高检测错误:', e)
+        }
+      }, 50)
+    }
+
+    startPolling()
+
+    return () => {
+      isActive = false
+      if (intervalId) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+  }, [isTauri, micEnabled, isPlaying, tunerActive])
+
   // 实际的音高检测逻辑 - 完全按照原HTML文件的processAudio实现
   const runPitchDetection = useCallback((analyser: AnalyserNode, ctx: AudioContext, scriptProcessor: ScriptProcessorNode) => {
     logger.debug('音高检测已启动，使用 ScriptProcessorNode，sampleRate:', ctx.sampleRate)
@@ -7462,206 +7730,10 @@ export default function FretMasterPage() {
         lastDetectedPitch = detectedNote
       }
       
-      if (!currentIsPlaying || !detectedNote) return
-      
-      // 根据练习模式处理 - 完全按照原HTML的processAudio逻辑
-      if (currentActiveTab === 'practice') {
-        // 找音练习 - 使用音分差匹配
-        const currentTargetNote = targetNoteRef.current
-        if (!currentTargetNote) return
-        
-        const targetSemitone = noteToSemitones[currentTargetNote] || 0
-        const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-        
-        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
-        
-        const baseThreshold = detectedFreq < 110 ? 35 : 25
-        const matchThreshold = baseThreshold * (2 - currentSensitivity)
-        
-        if (adjustedCents <= matchThreshold && yinResult.probability > currentConfidenceThreshold) {
-          logger.debug('找音练习匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1))
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          if (generateNewTargetRef.current) {
-            generateNewTargetRef.current()
-          }
-        }
-      } else if (currentActiveTab === 'interval') {
-        // 音程练习 - 使用音分差匹配
-        const exercise = currentIntervalExerciseRef.current
-        if (!exercise || exercise.answered) return
-        
-        const rootNoteValue = exercise.rootNote
-        
-        // 使用 currentIntervalDisplay（先找根音模式包含 '1'）以与点击/MIDI 路径一致
-        const intervals = exercise.currentIntervalDisplay.split(' ')
-        let matchedIndex: number | null = null
-        let minCents = Infinity
-
-        for (let idx = 0; idx < intervals.length; idx++) {
-          const interval = intervals[idx]
-          // 跳过已经完成的音级（按索引）
-          if (exercise.completedIntervals.includes(idx)) continue
-          // 先找根音模式：根音未完成时只接受根音
-          const rootCompleted = intervals.some((intv, i) => intv === '1' && exercise.completedIntervals.includes(i))
-          if (findRootFirstRef.current && !rootCompleted && interval !== '1') continue
-          
-          const intervalSemitone = intervalToSemitones[interval]
-          if (intervalSemitone === undefined) continue
-          
-          const rootValue = noteToSemitones[rootNoteValue] || 0
-          const targetSemitone = (rootValue + intervalSemitone) % 12
-          const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-          
-          const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
-          
-          const baseThreshold = detectedFreq < 110 ? 35 : interval === '1' ? 25 : 15
-          const matchThreshold = baseThreshold * (2 - currentSensitivity)
-          
-          if (adjustedCents <= matchThreshold && adjustedCents < minCents && yinResult.probability > currentConfidenceThreshold) {
-            minCents = adjustedCents
-            matchedIndex = idx
-          }
-        }
-
-        if (matchedIndex !== null) {
-          const matchedInterval = intervals[matchedIndex]
-          logger.debug('音程练习匹配成功:', matchedInterval, '音分差:', minCents.toFixed(1))
-          const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
-
-          if (newCompletedIntervals.length >= intervals.length) {
-            setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals, answered: true })
-            setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-            if (addRootBackRef.current && matchedInterval !== '1') {
-              setIntervalPracticeStep('root')
-            } else if (generateIntervalExerciseRef.current) {
-              generateIntervalExerciseRef.current()
-            }
-          } else {
-            setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals })
-            if (findRootFirstRef.current && matchedInterval === '1') {
-              setIntervalPracticeStep('interval')
-            } else if (addRootBackRef.current && matchedInterval !== '1') {
-              setIntervalPracticeStep('root')
-            }
-          }
-        }
-      } else if (currentActiveTab === 'scale') {
-        // 音阶练习 - 使用音分差匹配
-        const sequence = scaleExerciseSequenceRef.current
-        const step = scaleExerciseCurrentStepRef.current
-        const key = scaleKeyRef.current
-        
-        if (sequence.length === 0 || step >= sequence.length) return
-        
-        const currentDegree = sequence[step]
-        const semitone = intervalToSemitones[currentDegree]
-        if (semitone === undefined) return
-        
-        const keyValue = noteToSemitones[key] || 0
-        const targetSemitone = (keyValue + semitone) % 12
-        const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-        
-        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
-        
-        const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
-        const matchThreshold = baseThreshold * (2 - currentSensitivity)
-        
-        if (adjustedCents <= matchThreshold && yinResult.probability > currentConfidenceThreshold) {
-          logger.debug('音阶练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
-          const nextStep = step + 1
-          if (nextStep >= sequence.length) {
-            setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-            if (nextScaleExerciseRef.current) {
-              nextScaleExerciseRef.current()
-            }
-          } else {
-            setScaleExerciseCurrentStep(nextStep)
-            setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          }
-        }
-      } else if (currentActiveTab === 'chord_exercise') {
-        // 和弦练习 - 使用音分差匹配
-        const targetChord = chordExerciseTargetChordRef.current
-        const sequence = chordExerciseSequenceRef.current
-        const step = chordExerciseCurrentStepRef.current
-        
-        if (!targetChord || sequence.length === 0 || step >= sequence.length) return
-        if (chordExerciseIsAnsweredRef.current) return
-        
-        const currentDegree = sequence[step]
-        const semitone = intervalToSemitones[currentDegree]
-        if (semitone === undefined) return
-        
-        const rootValue = noteToSemitones[targetChord.root] || 0
-        const targetSemitone = (rootValue + semitone) % 12
-        const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-        
-        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
-        
-        const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
-        const matchThreshold = baseThreshold * (2 - currentSensitivity)
-        
-        if (adjustedCents <= matchThreshold && yinResult.probability > currentConfidenceThreshold) {
-          logger.debug('和弦练习音高匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1), '阈值:', matchThreshold.toFixed(1))
-          
-          const nextStep = step + 1
-          if (nextStep >= sequence.length) {
-            // 完成整个和弦，设置 answered 状态
-            setChordExerciseIsAnswered(true)
-            chordExerciseIsAnsweredRef.current = true
-            setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-            if (nextChordExerciseRef.current) {
-              nextChordExerciseRef.current()
-            }
-          } else {
-            // 继续下一个音，不设置 answered 状态
-            setChordExerciseCurrentStep(nextStep)
-            setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          }
-        }
-      } else if (currentActiveTab === 'chord') {
-        // 和弦转换练习 - 使用音分差匹配
-        const chords = getTransposedChordsRef.current ? getTransposedChordsRef.current() : []
-        const currentChord = chords[currentChordIndexRef.current]
-        if (!currentChord) return
-        
-        const degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
-        const currentStep = chordDegreeCurrentStepRef.current
-        if (currentStep >= degrees.length) return
-        
-        const currentDegree = degrees[currentStep]
-        if (!currentDegree) return
-        
-        const semitone = intervalToSemitones[currentDegree]
-        if (semitone === undefined) return
-        
-        const rootValue = noteToSemitones[currentChord.root] || 0
-        const targetSemitone = (rootValue + semitone) % 12
-        const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-        
-        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
-        
-        const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
-        const matchThreshold = baseThreshold * (2 - currentSensitivity)
-        
-        if (adjustedCents <= matchThreshold && yinResult.probability > currentConfidenceThreshold) {
-          logger.debug('和弦转换练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
-          const nextStep = currentStep + 1
-          if (nextStep >= degrees.length) {
-            setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-            if (nextChordInfoRef.current && nextChordRef.current) {
-              nextChordRef.current()
-            }
-          } else {
-            setChordDegreeCurrentStep(nextStep)
-            setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          }
-        }
-      } else if (currentActiveTab === 'tuner') {
-        // 调音表模式 - 只显示音高，不需要答题逻辑
-      }
+      // 调用共用的练习匹配逻辑（Web 和 Tauri 两条路径共用）
+      processPracticeMatchRef.current(detectedFreq, yinResult.probability, detectedNote)
     }
-  }, [getTransposedChordsRef, practiceLevelRef, findRootFirstRef, targetNoteRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, currentIntervalExerciseRef, currentChordIndexRef, chordDegreeCurrentStepRef, nextChordRef, nextChordInfoRef, nextScaleExerciseRef, nextChordExerciseRef, generateNewTargetRef, generateIntervalExerciseRef, isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef, scriptProcessorRef])
+  }, [getTransposedChordsRef, practiceLevelRef, findRootFirstRef, targetNoteRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, currentIntervalExerciseRef, currentChordIndexRef, chordDegreeCurrentStepRef, nextChordRef, nextChordInfoRef, nextScaleExerciseRef, nextChordExerciseRef, generateNewTargetRef, generateIntervalExerciseRef, isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef, scriptProcessorRef, processPracticeMatchRef])
 
   // 旧的 requestAnimationFrame 方式（保留但不使用）
   const runPitchDetectionOld = useCallback((analyser: AnalyserNode, ctx: AudioContext) => {

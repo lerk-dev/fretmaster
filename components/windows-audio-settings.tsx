@@ -20,7 +20,6 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   const audioSettings = store?.audio || {}
   
   const [devices, setDevices] = useState<AudioDeviceInfo[]>([])
-  const [isCapturing, setIsCapturing] = useState(false)
   const [lastPitch, setLastPitch] = useState<PitchResult | null>(null)
   const [latency, setLatency] = useState(0)
   const [isInitializing, setIsInitializing] = useState(false)
@@ -28,6 +27,10 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   const [initError, setInitError] = useState<string | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const devicePollRef = useRef<NodeJS.Timeout | null>(null)
+  // 跳过设备重新枚举后的首个事件，避免误弹"检测到新设备"提示
+  const skipNextDeviceToastRef = useRef(true)
+  // 使用 store 中的 micEnabled 作为音频启用状态，避免组件卸载后状态丢失
+  const isCapturing = audioSettings.micEnabled
   
   const t = useCallback((key: string) => {
     const translations: Record<string, Record<string, string>> = {
@@ -97,7 +100,17 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   useEffect(() => {
     try {
       console.log('[WindowsAudioSettings] Mounting, loading devices...')
+      // 重新挂载时重置跳过标志，跳过 Rust device_monitor 重启带来的初始事件
+      skipNextDeviceToastRef.current = true
       loadDevices()
+      // 与后端实际捕获状态同步：设置面板关闭后 Rust 可能仍在采集，需要把 store 的 micEnabled 校正为真实状态
+      nativeAudio.getAudioStatus().then((status) => {
+        if (status.isCapturing !== audioSettings.micEnabled) {
+          store.setMicEnabled(status.isCapturing)
+        }
+      }).catch((e) => {
+        console.warn('[WindowsAudioSettings] Failed to sync audio status:', e)
+      })
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err))
       console.error('[WindowsAudioSettings] Init error:', error.message)
@@ -131,7 +144,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         audioSettings.selectedAudioDevice,
         audioSettings.sampleRate || 48000
       )
-      setIsCapturing(true)
+      store.setMicEnabled(true)
       toast.success(t('audio_active'))
       
       // 开始检测音高
@@ -164,7 +177,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         intervalRef.current = null
       }
       await nativeAudio.stopAudioCapture()
-      setIsCapturing(false)
+      store.setMicEnabled(false)
       setLastPitch(null)
       toast.success(t('audio_inactive'))
     } catch (error) {
@@ -191,9 +204,15 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   const handleDeviceChange = useCallback((event: DeviceChangeEvent) => {
     setDeviceChangeDetected(true)
     setDevices(event.devices)
-    
+
+    // 跳过重新挂载后的首个事件（来自 Rust 重新启动 device_monitor 的初始枚举），避免误弹"检测到新设备"
+    const skipToast = skipNextDeviceToastRef.current
+    if (skipToast) {
+      skipNextDeviceToastRef.current = false
+    }
+
     // 显示通知
-    if (event.added.length > 0) {
+    if (!skipToast && event.added.length > 0) {
       const names = event.added.map(d => d.name).join(', ')
       toast.success(language === 'zh-CN' ? `检测到新设备: ${names}` : `New device detected: ${names}`)
     }
