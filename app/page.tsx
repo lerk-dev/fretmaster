@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -9505,9 +9505,21 @@ export default function FretMasterPage() {
         return
       }
 
-      // 上箭头 - 显示指板
+      // 上箭头 - 显示指板（与快捷键说明一致）
       if (event.key === 'ArrowUp' && isPlaying) {
         event.preventDefault()
+        // 根据当前练习 tab 显示对应的指板
+        if (activeTab === 'practice') {
+          setShowFretboard(true)
+        } else if (activeTab === 'interval') {
+          setShowIntervalFretboard(true)
+        } else if (activeTab === 'chord') {
+          setShowChordFretboard(true)
+        } else if (activeTab === 'chord_exercise') {
+          setShowChordExerciseFretboard(true)
+        } else if (activeTab === 'scale') {
+          setShowScaleFretboard(true)
+        }
         setShowAllNotes(true)
         return
       }
@@ -9515,6 +9527,18 @@ export default function FretMasterPage() {
       // 下箭头 - 隐藏指板
       if (event.key === 'ArrowDown' && isPlaying) {
         event.preventDefault()
+        // 根据当前练习 tab 隐藏对应的指板
+        if (activeTab === 'practice') {
+          setShowFretboard(false)
+        } else if (activeTab === 'interval') {
+          setShowIntervalFretboard(false)
+        } else if (activeTab === 'chord') {
+          setShowChordFretboard(false)
+        } else if (activeTab === 'chord_exercise') {
+          setShowChordExerciseFretboard(false)
+        } else if (activeTab === 'scale') {
+          setShowScaleFretboard(false)
+        }
         setShowAllNotes(false)
         return
       }
