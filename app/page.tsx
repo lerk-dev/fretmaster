@@ -9335,21 +9335,22 @@ export default function FretMasterPage() {
     if (e.key === 'ArrowUp' || e.key === 'PageUp') {
       if (!isPlayingRef.current) return
       e.preventDefault()
+      // 上箭头 - 显示指板（与快捷键说明一致）
       switch (activeTabRef.current) {
         case 'practice':
-          generateNewTargetRef.current?.()
+          setShowFretboard(true)
           break
         case 'interval':
-          generateIntervalExerciseRef.current?.()
+          setShowIntervalFretboard(true)
           break
         case 'chord':
-          nextChordRef.current?.()
+          setShowChordFretboard(true)
           break
         case 'chord_exercise':
-          nextChordExerciseRef.current?.()
+          setShowChordExerciseFretboard(true)
           break
         case 'scale':
-          nextScaleExerciseRef.current?.()
+          setShowScaleFretboard(true)
           break
       }
     }
