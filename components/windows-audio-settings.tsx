@@ -27,8 +27,6 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   const [initError, setInitError] = useState<string | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const devicePollRef = useRef<NodeJS.Timeout | null>(null)
-  // 跳过设备重新枚举后的首个事件，避免误弹"检测到新设备"提示
-  const skipNextDeviceToastRef = useRef(true)
   // 使用 store 中的 micEnabled 作为音频启用状态，避免组件卸载后状态丢失
   const isCapturing = audioSettings.micEnabled
   
@@ -83,34 +81,26 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   }, [language])
   
   // 加载设备列表
+  // 注意：不依赖 store（Zustand store 引用是稳定的），避免 store 变化导致 useEffect 重复执行引发竞态
   const loadDevices = useCallback(async () => {
     try {
       const deviceList = await nativeAudio.getAudioDevices()
       setDevices(deviceList)
-      if (!audioSettings.selectedAudioDevice && deviceList.length > 0) {
+      const currentSelected = useAppStore.getState().audio?.selectedAudioDevice
+      if (!currentSelected && deviceList.length > 0) {
         const defaultDevice = deviceList.find(d => d.isDefault) || deviceList[0]
-        store.setSelectedAudioDevice(defaultDevice.name)
+        useAppStore.getState().setSelectedAudioDevice(defaultDevice.name)
       }
     } catch (error) {
       console.error('Failed to load audio devices:', error)
       toast.error(language === 'zh-CN' ? '加载音频设备失败' : 'Failed to load audio devices')
     }
-  }, [language, store])
-  
+  }, [language])
+
   useEffect(() => {
     try {
       console.log('[WindowsAudioSettings] Mounting, loading devices...')
-      // 重新挂载时重置跳过标志，跳过 Rust device_monitor 重启带来的初始事件
-      skipNextDeviceToastRef.current = true
       loadDevices()
-      // 与后端实际捕获状态同步：设置面板关闭后 Rust 可能仍在采集，需要把 store 的 micEnabled 校正为真实状态
-      nativeAudio.getAudioStatus().then((status) => {
-        if (status.isCapturing !== audioSettings.micEnabled) {
-          store.setMicEnabled(status.isCapturing)
-        }
-      }).catch((e) => {
-        console.warn('[WindowsAudioSettings] Failed to sync audio status:', e)
-      })
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err))
       console.error('[WindowsAudioSettings] Init error:', error.message)
@@ -205,37 +195,27 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
     setDeviceChangeDetected(true)
     setDevices(event.devices)
 
-    // 跳过重新挂载后的首个事件（来自 Rust 重新启动 device_monitor 的初始枚举），避免误弹"检测到新设备"
-    const skipToast = skipNextDeviceToastRef.current
-    if (skipToast) {
-      skipNextDeviceToastRef.current = false
-    }
+    // 静默更新设备列表，不弹出"检测到新设备"提示（Rust device_monitor 启动时会 emit 所有设备作为 added 事件，易误报）
 
-    // 显示通知
-    if (!skipToast && event.added.length > 0) {
-      const names = event.added.map(d => d.name).join(', ')
-      toast.success(language === 'zh-CN' ? `检测到新设备: ${names}` : `New device detected: ${names}`)
-    }
     if (event.removed.length > 0) {
-      const names = event.removed.join(', ')
-      toast.warning(language === 'zh-CN' ? `设备已移除: ${names}` : `Device removed: ${names}`)
-      
       // 如果当前使用的设备被移除，停止音频捕获
-      if (event.removed.includes(audioSettings.selectedAudioDevice)) {
+      const currentSelected = useAppStore.getState().audio?.selectedAudioDevice
+      if (currentSelected && event.removed.includes(currentSelected)) {
         // 使用 ref 调用 stopAudio 避免依赖循环
         stopAudioRef.current()
         toast.error(language === 'zh-CN' ? '当前音频设备已断开，音频输入已停止' : 'Current audio device disconnected, audio input stopped')
         // 清除设备选择
-        store.setSelectedAudioDevice('')
+        useAppStore.getState().setSelectedAudioDevice('')
       }
     }
-    
+
     // 如果有默认设备且当前没有选择设备，自动选择
-    if (!audioSettings.selectedAudioDevice && event.devices.length > 0) {
+    const currentSelected = useAppStore.getState().audio?.selectedAudioDevice
+    if (!currentSelected && event.devices.length > 0) {
       const defaultDevice = event.devices.find(d => d.isDefault) || event.devices[0]
-      store.setSelectedAudioDevice(defaultDevice.name)
+      useAppStore.getState().setSelectedAudioDevice(defaultDevice.name)
     }
-  }, [language, audioSettings.selectedAudioDevice, store])
+  }, [language])
   
   // 启动设备热插拔检测（使用 Rust 后端事件驱动）
   useEffect(() => {

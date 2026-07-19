@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -7513,6 +7513,45 @@ export default function FretMasterPage() {
 
   const processPracticeMatchRef = useRef(processPracticeMatch)
   useEffect(() => { processPracticeMatchRef.current = processPracticeMatch }, [processPracticeMatch])
+
+  // Tauri 环境：应用启动时自动启用默认音频设备
+  // 避免用户手动启用时遇到的竞态问题，开箱即用
+  useEffect(() => {
+    if (!isTauri) return
+    if (micEnabled) return // 已启用则跳过
+
+    let cancelled = false
+    const autoStartAudio = async () => {
+      try {
+        const { getAudioDevices, startAudioCaptureWithSampleRate } = await import('@/lib/native-audio')
+        const deviceList = await getAudioDevices()
+        if (cancelled || deviceList.length === 0) return
+
+        // 优先使用已保存的设备，其次用默认设备
+        const savedDevice = audioSettings.selectedAudioDevice
+        const device = savedDevice
+          ? deviceList.find(d => d.name === savedDevice)
+          : null
+        const targetDevice = device || deviceList.find(d => d.isDefault) || deviceList[0]
+
+        if (cancelled) return
+        await startAudioCaptureWithSampleRate(targetDevice.name, audioSettings.sampleRate || 48000)
+        if (cancelled) {
+          // 如果已被取消（用户手动停止），立即停止捕获
+          const { stopAudioCapture } = await import('@/lib/native-audio')
+          await stopAudioCapture()
+          return
+        }
+        store.setSelectedAudioDevice(targetDevice.name)
+        store.setMicEnabled(true)
+        logger.info('[Tauri] 自动启用音频设备:', targetDevice.name)
+      } catch (err) {
+        console.error('[Tauri] 自动启用音频失败:', err)
+      }
+    }
+    autoStartAudio()
+    return () => { cancelled = true }
+  }, [isTauri]) // 仅在 isTauri 变化时执行一次
 
   // Tauri 环境：练习模式音高检测轮询
   // WindowsAudioSettings 启用音频后，Rust 后端会持续采集；这里在练习进行时轮询 detectPitch 并复用同一套匹配逻辑
