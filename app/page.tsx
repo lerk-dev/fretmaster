@@ -12880,13 +12880,13 @@ export default function FretMasterPage() {
 
         {/* 全屏模式覆盖层 */}
         {isFullscreen && (
-          <div 
-            className="fixed inset-0 z-[9999] bg-background flex items-center justify-center"
+          <div
+            className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center overflow-auto"
             style={{ margin: 0, padding: 0, width: '100vw', height: '100vh', top: 0, left: 0, right: 0, bottom: 0 }}
             onClick={() => setFullscreenMode(false)}
           >
-            <div 
-              className="text-center p-8 min-w-[400px] min-h-[300px] flex flex-col items-center justify-center" 
+            <div
+              className="text-center p-8 min-w-[400px] min-h-[300px] flex flex-col items-center justify-center"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 根据当前练习模式显示不同内容 */}
@@ -13029,6 +13029,100 @@ export default function FretMasterPage() {
                 </div>
               )}
               
+              {/* 全屏模式指板 - 按 ↑ 显示，按 ↓ 隐藏 */}
+              {isPlaying && (() => {
+                const showFb = activeTab === 'practice' ? showFretboard :
+                  activeTab === 'interval' ? showIntervalFretboard :
+                  activeTab === 'chord' ? showChordFretboard :
+                  activeTab === 'chord_exercise' ? showChordExerciseFretboard :
+                  activeTab === 'scale' ? showScaleFretboard : false
+                if (!showFb) return null
+                return (
+                  <div className="w-full max-w-5xl mt-8 px-4">
+                    {/* 指板外层容器 */}
+                    <div className="relative rounded-lg overflow-hidden border border-border bg-muted/30 dark:bg-zinc-900/30">
+                      {/* 弦分隔线 */}
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div
+                          key={`fs-sep-${i}`}
+                          className="absolute left-0 right-0 pointer-events-none block z-10 dark:border-t dark:border-dashed dark:border-[oklch(0.35_0.02_260_/_0.8)]"
+                          style={{
+                            top: `${((i + 1) / 6) * 100}%`,
+                            borderTop: '1px dashed oklch(0.7 0.02 260 / 0.5)',
+                            transform: 'translateY(-1px)',
+                          }}
+                        />
+                      ))}
+                      {/* 弦 × 品 */}
+                      {STRING_TUNING.map((_, stringIndex) => {
+                        const stringNum = stringIndex + 1
+                        const isStringEnabled = activeTab !== "practice" || selectedStrings.includes(stringNum)
+                        return (
+                          <div key={stringIndex} className={cn("flex items-center", !isStringEnabled && "opacity-60")}>
+                            <div className="flex-1 flex">
+                              {/* 0品（空弦） */}
+                              <button
+                                onClick={() => isStringEnabled && handleFretClick(stringIndex, 0)}
+                                disabled={!isStringEnabled}
+                                className={cn(
+                                  "flex-[0.8] h-8 sm:h-10 text-xs sm:text-sm font-mono font-semibold transition-all duration-150 flex items-center justify-center",
+                                  isStringEnabled
+                                    ? cn("text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(getNoteAtPosition(stringIndex, 0), stringIndex, 0))
+                                    : "text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
+                                )}
+                              >
+                                {formatNoteByAccidentalSetting(getNoteAtPosition(stringIndex, 0))}
+                              </button>
+                              {/* 1品及以上 */}
+                              {Array.from({ length: fretCount }, (_, fret) => {
+                                const actualFret = fret + 1
+                                const note = getNoteAtPosition(stringIndex, actualFret)
+                                const isHighlighted = highlightedFrets.has(`${stringIndex}-${actualFret}`)
+                                const showNote = showAllNotes || isHighlighted
+                                return (
+                                  <button
+                                    key={actualFret}
+                                    onClick={() => isStringEnabled && handleFretClick(stringIndex, actualFret)}
+                                    disabled={!isStringEnabled}
+                                    className={cn(
+                                      "flex-1 h-8 sm:h-10 text-[10px] sm:text-xs font-medium transition-all duration-150 min-w-[24px] sm:min-w-[32px] flex items-center justify-center relative z-10 border-r",
+                                      isStringEnabled
+                                        ? cn("border-border/50 dark:border-zinc-600/50", getNoteButtonColor(note, stringIndex, actualFret))
+                                        : "border-border/30 dark:border-zinc-800/50 text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
+                                    )}
+                                  >
+                                    <span className={cn("transition-opacity duration-150", showNote ? "opacity-100" : "opacity-0")}>
+                                      {formatNoteByAccidentalSetting(note)}
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* 品数显示 */}
+                    <div className="flex items-center py-1">
+                      <div className="flex-1 flex">
+                        <div className="flex-[0.8]" />
+                        {Array.from({ length: fretCount }, (_, fret) => {
+                          const actualFret = fret + 1
+                          const isMarker = FRET_MARKERS.includes(actualFret)
+                          return (
+                            <div key={actualFret} className="flex-1 flex justify-center min-w-[24px] sm:min-w-[32px]">
+                              <span className={cn("text-xs", isMarker ? "text-primary font-semibold" : "text-muted-foreground")}>
+                                {actualFret}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* 提示文字 */}
               <div className="mt-12 text-sm text-muted-foreground">
                 {t('click_to_exit_fullscreen')}
