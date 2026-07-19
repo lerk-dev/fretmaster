@@ -69,6 +69,12 @@ impl AudioPipeline {
         let sample_rate = self.capture.get_sample_rate();
         let calibration_offset = self.capture.get_calibration_offset();
 
+        // 同步实际 capture buffer_size 到 detector，避免 detect 入口
+        // `buffer.len() < self.config.buffer_size` 永远为真（capture 1024 vs detector 默认 8192）
+        // 导致 detect_pitch 始终返回 None（DebugPanel 中 Pitch Detection 无反应的根因）
+        let capture_buffer_size = self.capture.get_buffer_frame_size();
+        self.detector.set_buffer_size(capture_buffer_size);
+
         let processed = if self.agc_enabled {
             let agc_buffer = self.apply_agc(&buffer);
             self.preprocessor.set_sample_rate(sample_rate);
