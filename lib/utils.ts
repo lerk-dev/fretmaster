@@ -15,7 +15,17 @@ interface WebkitWindow extends Window {
 
 export function isTauriEnv(): boolean {
   if (typeof window === 'undefined') return false
-  return !!(window as TauriWindow).__TAURI__
+  // 优先检查 Tauri 注入标志
+  if ((window as TauriWindow).__TAURI__) return true
+  // 兜底：在 Tauri 启动初期 __TAURI__ 可能尚未注入，用协议/主机名检测避免误调
+  // getUserMedia 触发系统麦克风权限弹窗
+  // Tauri 2 Windows: 协议为 http(s)://tauri.localhost 或 tauri://
+  // Tauri 2 macOS/Linux: 卐议为 tauri://localhost
+  if (typeof window.location === 'object') {
+    const { protocol, hostname } = window.location
+    if (protocol === 'tauri:' || hostname === 'tauri.localhost') return true
+  }
+  return false
 }
 
 export function getAudioContextClass(): typeof AudioContext {

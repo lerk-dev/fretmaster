@@ -326,6 +326,20 @@ export async function syncLocalBackupToServer(): Promise<number> {
   return syncedCount;
 }
 
+// 清空所有练习记录（Tauri 环境调用 SQLite，Web 环境清空 localStorage 备份）
+export async function clearAllPracticeStats(): Promise<void> {
+  if (isTauri) {
+    const { clearAllPracticeStats: nativeClear } = await import('./native-stats');
+    return nativeClear();
+  }
+  try {
+    localStorage.setItem(LOCAL_BACKUP_KEY, '[]');
+    localStorage.removeItem('fretmaster-stats');
+  } catch (e) {
+    logger.error('清空本地备份失败:', e);
+  }
+}
+
 // 获取用户 ID（用于调试）
 export function getCurrentUserId(): string {
   if (isTauri) {

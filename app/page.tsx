@@ -5632,6 +5632,18 @@ export default function FretMasterPage() {
   // 从服务器/SQLite加载统计数据
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    // Tauri 环境首次运行：清理历史 localStorage 备份，避免从 Web 版迁移或早期版本遗留的脏数据
+    // 被错误加载（导致"未使用却显示练习记录"）
+    if (isTauri) {
+      try {
+        localStorage.removeItem('fretmaster-stats')
+        localStorage.removeItem('fretmaster_stats_backup')
+      } catch (e) {
+        console.warn('Failed to clean legacy localStorage stats:', e)
+      }
+    }
+
     const loadStatsFromServer = async () => {
       try {
         const serverStats = await getAllPracticeStats()
@@ -5743,18 +5755,24 @@ export default function FretMasterPage() {
         
         // 保存去重后的近期记录（最多 50 条，按时间倒序），供统计页展示
         setRecentRecords(dedupedServerStats.slice(0, 50))
-        
-        localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
+
+        // Tauri 环境以 SQLite 为唯一真相源，不写入 localStorage，避免历史脏数据污染
+        if (!isTauri) {
+          localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
+        }
       } catch (e) {
         console.error('Failed to load stats:', e)
-        const savedStats = localStorage.getItem('fretmaster-stats')
-        if (savedStats) {
-          try {
-            const stats = JSON.parse(savedStats)
-            setPracticeStats(stats)
+        // Tauri 环境失败时返回空统计，不读 localStorage 备份（避免历史脏数据导致"未练习却有记录"）
+        if (!isTauri) {
+          const savedStats = localStorage.getItem('fretmaster-stats')
+          if (savedStats) {
+            try {
+              const stats = JSON.parse(savedStats)
+              setPracticeStats(stats)
             } catch (e) {
               console.error('Failed to load stats from localStorage:', e)
             }
+          }
         }
       }
     }

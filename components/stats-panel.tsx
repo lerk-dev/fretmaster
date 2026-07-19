@@ -5,26 +5,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  BarChart3, 
-  Clock, 
-  Target, 
-  TrendingUp, 
+import {
+  BarChart3,
+  Clock,
+  Target,
+  TrendingUp,
   Calendar,
   Trophy,
   Activity,
   Flame,
   BarChart,
   PieChart as PieChartIcon,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
-import { 
-  getStatsSummary, 
-  getRecentStats, 
+import {
+  getStatsSummary,
+  getRecentStats,
   getStatsByExerciseType,
   syncLocalBackupToServer,
-  PracticeStats 
+  clearAllPracticeStats,
+  PracticeStats
 } from '@/lib/stats-api';
+import { isTauriEnv } from '@/lib/utils';
 import {
   BarChart as RechartsBarChart,
   Bar,
@@ -80,6 +83,8 @@ export const StatsPanel = memo(function StatsPanel() {
   const [exerciseTypes, setExerciseTypes] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const isTauri = isTauriEnv();
 
   useEffect(() => {
     loadStats();
@@ -117,6 +122,23 @@ export const StatsPanel = memo(function StatsPanel() {
       alert('同步失败: ' + error);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!confirm('确定要清空所有练习记录吗？此操作不可恢复。')) return;
+    setClearing(true);
+    try {
+      await clearAllPracticeStats();
+      // 清空内存中的状态
+      setSummary({ totalSessions: 0, totalDuration: 0, averageScore: 0, averageAccuracy: 0, lastPractice: null });
+      setRecentStats([]);
+      setExerciseTypes({});
+      alert('已清空所有练习记录');
+    } catch (error) {
+      alert('清空失败: ' + error);
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -555,8 +577,8 @@ export const StatsPanel = memo(function StatsPanel() {
 
       {/* 操作按钮 */}
       <div className="flex gap-2">
-        <Button 
-          onClick={loadStats} 
+        <Button
+          onClick={loadStats}
           disabled={loading}
           variant="outline"
           className="flex-1"
@@ -565,8 +587,8 @@ export const StatsPanel = memo(function StatsPanel() {
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
           {loading ? '刷新中...' : '刷新'}
         </Button>
-        <Button 
-          onClick={handleSync} 
+        <Button
+          onClick={handleSync}
           disabled={syncing}
           variant="outline"
           className="flex-1"
@@ -574,6 +596,18 @@ export const StatsPanel = memo(function StatsPanel() {
         >
           {syncing ? '同步中...' : '同步备份'}
         </Button>
+        {isTauri && (
+          <Button
+            onClick={handleClearAll}
+            disabled={clearing || loading}
+            variant="outline"
+            size="sm"
+            className="text-red-500 hover:text-red-600 hover:bg-red-500/10 border-red-500/30"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            {clearing ? '清空中...' : '清空记录'}
+          </Button>
+        )}
       </div>
     </div>
   );
