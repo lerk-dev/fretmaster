@@ -13065,7 +13065,7 @@ export default function FretMasterPage() {
                                 onClick={() => isStringEnabled && handleFretClick(stringIndex, 0)}
                                 disabled={!isStringEnabled}
                                 className={cn(
-                                  "flex-[0.8] h-8 sm:h-10 text-xs sm:text-sm font-mono font-semibold transition-all duration-150 flex items-center justify-center",
+                                  "flex-1 h-8 sm:h-10 text-xs sm:text-sm font-mono font-semibold transition-all duration-150 flex items-center justify-center min-w-[24px] sm:min-w-[32px]",
                                   isStringEnabled
                                     ? cn("text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(getNoteAtPosition(stringIndex, 0), stringIndex, 0))
                                     : "text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
@@ -13105,7 +13105,7 @@ export default function FretMasterPage() {
                     {/* 品数显示 */}
                     <div className="flex items-center py-1">
                       <div className="flex-1 flex">
-                        <div className="flex-[0.8]" />
+                        <div className="flex-1 min-w-[24px] sm:min-w-[32px]" />
                         {Array.from({ length: fretCount }, (_, fret) => {
                           const actualFret = fret + 1
                           const isMarker = FRET_MARKERS.includes(actualFret)
