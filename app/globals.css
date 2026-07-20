@@ -3,29 +3,31 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: dark;
   --background: 220 13% 5%;
-  --foreground: 0 0% 95%;
-  --card: 220 13% 8%;
-  --card-foreground: 0 0% 95%;
-  --popover: 220 13% 8%;
-  --popover-foreground: 0 0% 95%;
+  --foreground: 0 0% 96%;
+  --card: 220 13% 12%;
+  --card-foreground: 0 0% 96%;
+  --popover: 220 13% 12%;
+  --popover-foreground: 0 0% 96%;
   --primary: 142 71% 45%;
   --primary-foreground: 220 13% 5%;
-  --secondary: 220 13% 12%;
-  --secondary-foreground: 0 0% 95%;
-  --muted: 220 13% 12%;
-  --muted-foreground: 0 0% 60%;
+  --secondary: 220 13% 16%;
+  --secondary-foreground: 0 0% 96%;
+  --muted: 220 13% 16%;
+  --muted-foreground: 0 0% 68%;
   --accent: 25 95% 53%;
   --accent-foreground: 220 13% 5%;
   --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 95%;
-  --border: 220 13% 18%;
-  --input: 220 13% 12%;
+  --destructive-foreground: 0 0% 96%;
+  --border: 220 13% 22%;
+  --input: 220 13% 16%;
   --ring: 142 71% 45%;
   --radius: 0.75rem;
 }
 
 .light {
+  color-scheme: light;
   --background: 220 13% 88%;
   --foreground: 220 13% 15%;
   --card: 0 0% 100%;
@@ -37,7 +39,7 @@
   --secondary: 220 13% 94%;
   --secondary-foreground: 220 13% 15%;
   --muted: 220 13% 85%;
-  --muted-foreground: 220 13% 45%;
+  --muted-foreground: 220 13% 35%;
   --accent: 25 95% 53%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 84% 60%;
@@ -48,24 +50,25 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: 220 13% 5%;
-  --foreground: 0 0% 95%;
-  --card: 220 13% 8%;
-  --card-foreground: 0 0% 95%;
-  --popover: 220 13% 8%;
-  --popover-foreground: 0 0% 95%;
+  --foreground: 0 0% 96%;
+  --card: 220 13% 12%;
+  --card-foreground: 0 0% 96%;
+  --popover: 220 13% 12%;
+  --popover-foreground: 0 0% 96%;
   --primary: 142 71% 45%;
   --primary-foreground: 220 13% 5%;
-  --secondary: 220 13% 12%;
-  --secondary-foreground: 0 0% 95%;
-  --muted: 220 13% 12%;
-  --muted-foreground: 0 0% 60%;
+  --secondary: 220 13% 16%;
+  --secondary-foreground: 0 0% 96%;
+  --muted: 220 13% 16%;
+  --muted-foreground: 0 0% 68%;
   --accent: 25 95% 53%;
   --accent-foreground: 220 13% 5%;
   --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 95%;
-  --border: 220 13% 18%;
-  --input: 220 13% 12%;
+  --destructive-foreground: 0 0% 96%;
+  --border: 220 13% 22%;
+  --input: 220 13% 16%;
   --ring: 142 71% 45%;
 }
 
@@ -115,12 +118,24 @@
     @apply bg-background text-foreground;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
-  *, *::before, *::after {
+  /* 主题切换平滑过渡：仅作用于特定容器，避免指板等大列表卡顿 */
+  .theme-transition,
+  .theme-transition::before,
+  .theme-transition::after {
     transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.15s ease;
   }
   @media (prefers-reduced-motion: reduce) {
-    body, *, *::before, *::after {
-      transition: none !important;
+    body,
+    .theme-transition,
+    .theme-transition::before,
+    .theme-transition::after,
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }

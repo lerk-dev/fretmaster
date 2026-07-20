@@ -42,6 +42,8 @@ export default function RootLayout({
         <title>FretMaster - 吉他指板练习工具</title>
         <meta name="description" content="专业的吉他指板可视化练习工具，助你掌握指板音符位置" />
         <meta name="generator" content="v0.app" />
+        <meta name="theme-color" content="#0b0f14" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#e8eaef" media="(prefers-color-scheme: light)" />
         <link rel="icon" href="/icon-light-32x32.png" media="(prefers-color-scheme: light)" />
         <link rel="icon" href="/icon-dark-32x32.png" media="(prefers-color-scheme: dark)" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
