@@ -175,7 +175,7 @@ const PRACTICE_SUGGESTIONS = [
 const DEGREE_TO_SEMITONE: Record<string, number> = {
   "1": 0, "b2": 1, "2": 2, "#2": 3, "b3": 3, "3": 4, "4": 5,
   "#4": 6, "b5": 6, "5": 7, "#5": 8, "b6": 8, "6": 9,
-  "#6": 9, "b7": 10, "7": 10, "maj7": 11, "bb7": 9,
+  "#6": 10, "b7": 10, "7": 11, "maj7": 11, "bb7": 9,
   "b9": 1, "9": 2, "#9": 3, "b13": 8, "13": 9, "11": 5, "#11": 6
 }
 
@@ -2804,6 +2804,7 @@ interface PracticeLevel {
     six?: number[]
     augmented?: number[]
     diminishedMajorSeven?: number[]
+    altered?: number[]
   }
   startingIntervalOption: "any" | "first" | "chordTone"
   takeStartingIntervalBeforeOrder: boolean
@@ -4294,8 +4295,143 @@ function getBebopScaleForChordType(type: string): { name: string; intervals: str
   }
 }
 
-function getChordDegrees(type: string, level?: string, options?: { 
-  forceNaturalFive?: boolean, 
+// Scale intervals 定义（与 Solo ScaleLibrary/scales_v2.json 一致，不含 bebop passing tones）
+// sequence 数字作为 1-indexed 索引访问对应 scale 的 intervals
+const SCALE_INTERVALS: Record<string, string[]> = {
+  major:           ['1', '2', '3', '4', '5', '6', '7'],
+  dorian:          ['1', '2', 'b3', '4', '5', '6', 'b7'],
+  phrygian:        ['1', 'b2', 'b3', '4', '5', 'b6', 'b7'],
+  lydian:          ['1', '2', '3', '#4', '5', '6', '7'],
+  mixolydian:      ['1', '2', '3', '4', '5', '6', 'b7'],
+  aeolian:         ['1', '2', 'b3', '4', '5', 'b6', 'b7'],
+  locrian:         ['1', 'b2', 'b3', '4', 'b5', 'b6', 'b7'],
+  locrianNat2:     ['1', '2', 'b3', '4', 'b5', 'b6', 'b7'],
+  locrianNat6:     ['1', 'b2', 'b3', '4', 'b5', '6', 'b7'],
+  melodicMinor:    ['1', '2', 'b3', '4', '5', '6', '7'],
+  dorianFlat2:     ['1', 'b2', 'b3', '4', '5', '6', 'b7'],
+  lydianAugmented: ['1', '2', '3', '#4', '#5', '6', '7'],
+  lydianDominant:  ['1', '2', '3', '#4', '5', '6', 'b7'],
+  mixolydianFlat6: ['1', '2', '3', '4', '5', 'b6', 'b7'],
+  altered:         ['1', 'b9', '#9', '3', 'b5', 'b13', 'b7'],
+  harmonicMinor:   ['1', '2', 'b3', '4', '5', 'b6', '7'],
+  phrygianDominant:['1', 'b9', '3', '4', '5', 'b13', 'b7'],
+  lydianSharp9:    ['1', '#9', '3', '#4', '5', '6', '7'],
+  harmonicMajor:   ['1', '2', '3', '4', '5', 'b6', '7'],
+  ionianAugmented: ['1', '2', '3', '4', '#5', '6', '7'],
+  diminishedHalfWhole: ['1', 'b9', '#9', '3', 'b5', '5', '13', 'b7'],
+  diminishedWholeHalf: ['1', '2', 'b3', '4', 'b5', '#5', '6', '7'],
+  wholeTone:       ['1', '2', '3', '#4', '#5', 'b7'],
+}
+
+// 根据 chord type 返回对应的 scale（与 Solo ScaleLibraryData.scaleNameForChordFunction 一致）
+// forceNaturalFive: 关卡是否强制自然 5 音。变化属和弦在 false 时用 altered，true 时用 phrygianDominant
+// 注意：TS 不区分 function，这里取最常用的 function（如 m7→dorian，Maj7→major）
+function getScaleForChord(type: string, forceNaturalFive?: boolean): string {
+  // 7b9b13 固定用 phrygianDominant（Solo 所有 function 一致）
+  if (type === '7b9b13') return 'phrygianDominant'
+  // 7b9 根据用户偏好（TS 默认：forceNaturalFive=false→altered，true→phrygianDominant）
+  if (type === '7b9') return forceNaturalFive === false ? 'altered' : 'phrygianDominant'
+  // 其他 altered dominants：forceNaturalFive=false→altered，true→phrygianDominant
+  const alteredDominants = ['7alt', '7b5', '7#5', '7#9', '7#5b9', '7#5#9', '7b5b9', '7b5#9', 'aug7']
+  if (alteredDominants.includes(type)) {
+    return forceNaturalFive === false ? 'altered' : 'phrygianDominant'
+  }
+  // 普通属和弦（V function → mixolydian）
+  if (['7', '9', '13'].includes(type)) return 'mixolydian'
+  if (['7#11', '9#11', '13#11'].includes(type)) return 'lydianDominant'
+  if (['9b13'].includes(type)) return 'mixolydianFlat6'
+  if (['7b13'].includes(type)) return 'phrygianDominant'
+  // 13b9/13#9 用 diminishedHalfWhole（Solo 所有 function 一致）
+  if (['13b9', '13#9'].includes(type)) return 'diminishedHalfWhole'
+  // 大和弦（I function → major）
+  if (['Maj7', 'Maj9', 'maj13'].includes(type)) return 'major'
+  if (['maj7#11', 'maj9#11', 'maj13#11'].includes(type)) return 'lydian'
+  if (['maj7#5', 'maj9#5', 'maj13#5'].includes(type)) return 'lydianAugmented'
+  if (['maj7b6', 'maj9b6'].includes(type)) return 'harmonicMajor'
+  if (['maj7#9'].includes(type)) return 'lydian' // Solo: line 295-297 (不是 lydianSharp9)
+  if (['add9', '6', '6add9'].includes(type)) return 'major'
+  // 小和弦（I/II function → dorian）
+  if (['m7', 'm9', 'm11', 'm13'].includes(type)) return 'dorian'
+  if (['m7b5', 'm9b5'].includes(type)) return 'locrian'
+  if (['m7b5nat9'].includes(type)) return 'locrianNat2'
+  if (['m7b6'].includes(type)) return 'dorian' // Solo: line 298-300 (不是 aeolian)
+  if (['m6', 'm6add9'].includes(type)) return 'melodicMinor' // Solo: line 274 否定检查 → line 328 (不是 dorian)
+  if (['mMaj7', 'mMaj9', 'mMaj13'].includes(type)) return 'melodicMinor'
+  if (['madd9'].includes(type)) return 'dorian'
+  // 减和弦
+  if (['Dim', 'dim', 'dim7'].includes(type)) return 'diminishedWholeHalf'
+  if (['dimMaj7'].includes(type)) return 'harmonicMinor' // Solo 算法选择
+  // 增和弦
+  if (['Aug', 'aug'].includes(type)) return 'wholeTone'
+  // 挂留和弦
+  if (['sus4', 'sus2'].includes(type)) return 'major'
+  if (['7sus4', '9sus4', '13sus4'].includes(type)) return 'mixolydian'
+  if (['7sus4b9', '13sus4b9'].includes(type)) return 'dorianFlat2' // Solo: line 317-320 (V function)
+  if (['sus4b9'].includes(type)) return 'phrygian' // Solo: line 314-316
+  // 三和弦
+  if (['Major', ''].includes(type)) return 'major'
+  if (['Minor', 'm', 'min', '-'].includes(type)) return 'dorian' // Solo 算法选择
+  return 'major'
+}
+
+// 根据和弦类型返回对应的 sequence 类型（与 Solo 原版 Level.sequence() 一致）
+// forceNaturalFive: 关卡是否强制自然 5 音。变化属和弦在 true 时用 dominant，false 时用 altered
+// 此函数是 getChordDegrees 和 generateChordSequence 共用的唯一权威实现
+function getSequenceTypeForChord(type: string, forceNaturalFive?: boolean): string {
+  // 变化属和弦系列（forceNaturalFive=true → dominant，false → altered）
+  // 注意：aug7 与 7#5 等音等音程，Solo 中视为同一个 ChordType
+  // 注意：7b9b13 不在此列 - Solo case 12 始终用 dominantSequence（不是 altered/dominant 二选一）
+  const alteredDominants = ['7alt', '7b5', '7#5', '7b9', '7#9', '7#5b9', '7#5#9', '7b5b9', '7b5#9', 'aug7']
+  if (alteredDominants.includes(type)) {
+    return forceNaturalFive === false ? 'altered' : 'dominant'
+  }
+  // 普通属和弦系列（包含 7b9b13，Solo case 12 → dominantSequence）
+  if (['7', '7#11', '7b13', '9', '9b13', '9#11', '13', '13#11', '7b9b13'].includes(type)) return 'dominant'
+  // 13b9、13#9 在 Solo 中使用 diminishedDominantSequence（case 52, 53）
+  if (['13b9', '13#9'].includes(type)) return 'diminishedDominant'
+  // 大和弦系列（包含大七、大九、大十三、add9）
+  if (['Maj7', 'maj7#5', 'maj7#11', 'maj7b6', 'maj7#9', 'Maj9', 'maj9#11', 'maj9#5', 'maj9b6', 'maj13', 'maj13#11', 'maj13#5', 'add9'].includes(type)) return 'major'
+  // 小和弦系列（包含小七、小九、小十一、小十三、m7b5、m7b6、mMaj7、madd9）
+  if (['m7', 'm7b5', 'm7b5nat9', 'm7b6', 'mMaj7', 'mMaj9', 'mMaj13', 'm9', 'm9b5', 'm11', 'm13', 'madd9'].includes(type)) return 'minor'
+  // 减和弦系列
+  if (['Dim', 'dim', 'dim7'].includes(type)) return 'diminished'
+  // 减大七和弦
+  if (['dimMaj7'].includes(type)) return 'diminishedMajorSeven'
+  // 增和弦系列（aug7 已在 altered dominants 中处理）
+  if (['Aug', 'aug'].includes(type)) return 'augmented'
+  // 挂留和弦系列（Solo case 40-46：susFourTriad, susFourFlatNine, nineSusFour, sevenSusFour, sevenSusFourFlatNine, thirteenSusFour, thirteenSusFourFlatNine）
+  if (['sus4', '7sus4', '7sus4b9', 'sus4b9', '9sus4', '13sus4', '13sus4b9'].includes(type)) return 'sus'
+  // 挂二和弦
+  if (['sus2'].includes(type)) return 'sus2'
+  // 六和弦系列（6add9 和 m6add9 在 Solo 中都属于 sixSequence，case 49 和 51）
+  if (['6', '6add9', 'm6', 'm6add9'].includes(type)) return 'six'
+  // 大三/小三三和弦（注意 normalizeChordType 会把 'm'、'min'、'-' 转为 'Minor'）
+  if (type === 'Minor' || type === 'm' || type === 'min' || type === '-') return 'minor'
+  if (type === 'Major' || type === '') return 'major'
+  // 默认大调
+  return 'major'
+}
+
+// 根据 sequence 类型获取实际序列，应用与 Solo 一致的回退逻辑：
+// diminishedMajorSeven → diminished；sus2/augmented/altered → sus；最终回退到 major
+function getSequenceWithFallback(sequences: PracticeLevel['sequences'], seqType: string): number[] {
+  const direct = sequences[seqType as keyof typeof sequences]
+  if (direct) return direct
+  const fallbackMap: Record<string, string> = {
+    diminishedMajorSeven: 'diminished',
+    sus2: 'sus',
+    augmented: 'sus',
+    altered: 'sus',
+  }
+  const fallbackKey = fallbackMap[seqType]
+  if (fallbackKey && sequences[fallbackKey as keyof typeof sequences]) {
+    return sequences[fallbackKey as keyof typeof sequences]!
+  }
+  return sequences.major || [1, 3, 5, 7]
+}
+
+function getChordDegrees(type: string, level?: string, options?: {
+  forceNaturalFive?: boolean,
   endOnStartingInterval?: boolean,
   usePassingNoteBebopScale?: boolean
 }): string[] {
@@ -4307,58 +4443,19 @@ function getChordDegrees(type: string, level?: string, options?: {
     const practiceLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level)
     
     if (practiceLevel) {
-      const getSequenceType = (chordTypeStr: string): string => {
-        if (['7', '7b5', '7#5', '7b9', '7#9', '7#11', '7b13', '7#5b9', '7#5#9', '7b5b9', '7b5#9', '7b9b13', '7alt'].includes(chordTypeStr)) return 'dominant'
-        if (['9', '9b13', '9#11', '9sus4'].includes(chordTypeStr)) return 'dominant'
-        if (['13', '13b9', '13#9', '13#11'].includes(chordTypeStr)) return 'dominant'
-        if (['Maj7', 'maj7#5', 'maj7#11', 'maj7b6', 'maj7#9'].includes(chordTypeStr)) return 'major'
-        if (['Maj9', 'maj9#11', 'maj9#5', 'maj9b6'].includes(chordTypeStr)) return 'major'
-        if (['maj13', 'maj13#11', 'maj13#5'].includes(chordTypeStr)) return 'major'
-        if (['m7', 'm7b5', 'm7b5nat9', 'm7b6', 'mMaj7', 'mMaj9', 'mMaj13'].includes(chordTypeStr)) return 'minor'
-        if (['m9', 'm9b5'].includes(chordTypeStr)) return 'minor'
-        if (['m11', 'm13'].includes(chordTypeStr)) return 'minor'
-        if (['Dim', 'dim', 'dim7'].includes(chordTypeStr)) return 'diminished'
-        if (['dimMaj7'].includes(chordTypeStr)) return 'diminishedMajorSeven'
-        if (['Aug', 'aug', 'aug7'].includes(chordTypeStr)) return 'augmented'
-        if (['sus4', '7sus4', '7sus4b9', 'sus4b9', '13sus4', '13sus4b9'].includes(chordTypeStr)) return 'sus'
-        if (['sus2'].includes(chordTypeStr)) return 'sus2'
-        if (['6', 'm6'].includes(chordTypeStr)) return 'six'
-        if (chordTypeStr === 'Major' || chordTypeStr === 'minor') {
-          return chordTypeStr === 'minor' ? 'minor' : 'major'
-        }
-        return 'major'
-      }
-      
-      const seqType = getSequenceType(type) as keyof typeof practiceLevel.sequences
-      const degreeNumbers = practiceLevel.sequences[seqType] || practiceLevel.sequences.major || [1, 3, 5, 7]
-      
-      const degreeToPosition = (deg: number): number => {
-        if (deg === 1) return 0
-        if (deg <= 4) return 1
-        if (deg <= 6) return 2
-        if (deg <= 8) return 3
-        if (deg <= 11) return 4
-        if (deg <= 13) return 5
-        return 6
-      }
-      
+      const seqType = getSequenceTypeForChord(type, options?.forceNaturalFive) as keyof typeof practiceLevel.sequences
+      const degreeNumbers = getSequenceWithFallback(practiceLevel.sequences, seqType)
+
+      // Solo 架构：sequence 数字作为 1-indexed 索引访问 chord type 对应 scale 的 intervals
+      // 越界时跳过（与 Solo ChangesWorkoutStepBuilder 一致）
+      const scaleName = getScaleForChord(type, options?.forceNaturalFive)
+      const scaleIntervals = SCALE_INTERVALS[scaleName] || SCALE_INTERVALS.major
       const chordIntervals = chordType.intervals
       let intervals: string[] = degreeNumbers
-        .filter(deg => degreeToPosition(deg) < chordIntervals.length)
-        .map(deg => {
-          const pos = degreeToPosition(deg)
-          const semitone = chordIntervals[pos]
-          return semitonesToDegree(semitone, type)
-        })
-      
-      if (options?.forceNaturalFive && isAlteredChord(type)) {
-        intervals = intervals.map(degree => {
-          if (degree === '#5' || degree === 'b5' || degree === 'b13' || degree === '#11') {
-            return '5'
-          }
-          return degree
-        })
-      }
+        .filter(deg => deg >= 1 && deg <= scaleIntervals.length)
+        .map(deg => scaleIntervals[deg - 1])
+
+      // forceNaturalFive 已通过 scale 选择实现（phrygianDominant 包含自然 5），无需额外替换
       
       if (options?.usePassingNoteBebopScale) {
         const bebopScale = getBebopScaleForChordType(type)
@@ -8028,219 +8125,19 @@ export default function FretMasterPage() {
     const level = ALL_PRACTICE_LEVELS.find(l => l.id === levelId)
     if (!level) return []
 
-    // 根据和弦类型确定序列类型
-    const getSequenceType = (type: string): keyof typeof level.sequences => {
-      // 属七和弦系列
-      if (['7', '7b5', '7#5', '7b9', '7#9', '7#11', '7b13', '7#5b9', '7#5#9', '7b5b9', '7b5#9', '7b9b13', '7alt'].includes(type)) {
-        return 'dominant'
-      }
-      // 属九和弦系列
-      if (['9', '9b13', '9#11', '9sus4'].includes(type)) {
-        return 'dominant'
-      }
-      // 属十三和弦系列
-      if (['13', '13b9', '13#9', '13#11'].includes(type)) {
-        return 'dominant'
-      }
-      // 大七和弦系列
-      if (['Maj7', 'maj7#5', 'maj7#11', 'maj7b6', 'maj7#9'].includes(type)) {
-        return 'major'
-      }
-      // 大九和弦系列
-      if (['Maj9', 'maj9#11', 'maj9#5', 'maj9b6'].includes(type)) {
-        return 'major'
-      }
-      // 大十三和弦系列
-      if (['maj13', 'maj13#11', 'maj13#5'].includes(type)) {
-        return 'major'
-      }
-      // 小七和弦系列
-      if (['m7', 'm7b5', 'm7b5nat9', 'm7b6', 'mMaj7', 'mMaj9', 'mMaj13'].includes(type)) {
-        return 'minor'
-      }
-      // 小九和弦系列
-      if (['m9', 'm9b5'].includes(type)) {
-        return 'minor'
-      }
-      // 小十一/十三和弦系列
-      if (['m11', 'm13'].includes(type)) {
-        return 'minor'
-      }
-      // 减和弦系列
-      if (['Dim', 'dim', 'dim7'].includes(type)) {
-        return 'diminished'
-      }
-      // 减大七和弦
-      if (['dimMaj7'].includes(type)) {
-        return 'diminishedMajorSeven'
-      }
-      // 增和弦系列
-      if (['Aug', 'aug', 'aug7'].includes(type)) {
-        return 'augmented'
-      }
-      // 挂留和弦系列
-      if (['sus4', '7sus4', '7sus4b9', 'sus4b9', '13sus4', '13sus4b9'].includes(type)) {
-        return 'sus'
-      }
-      // 挂二和弦
-      if (['sus2'].includes(type)) {
-        return 'sus2'
-      }
-      // 六和弦系列
-      if (['6', 'm6'].includes(type)) {
-        return 'six'
-      }
-      // 加音和弦系列 - 按大小调分类
-      if (['add9', '6add9'].includes(type)) {
-        return 'major'
-      }
-      if (['madd9', 'm6add9'].includes(type)) {
-        return 'minor'
-      }
-      // 默认大调
-      return 'major'
-    }
+    // 使用共用的 getSequenceTypeForChord 函数，与 getChordDegrees 保持一致
+    // generateChordSequence 用于 chord_exercise tab，使用 level.forceNaturalFive
+    const sequenceType = getSequenceTypeForChord(chordType, level.forceNaturalFive) as keyof typeof level.sequences
+    let sequenceNumbers = getSequenceWithFallback(level.sequences, sequenceType)
+    if (!sequenceNumbers.length) sequenceNumbers = [1]
 
-    const sequenceType = getSequenceType(chordType)
-    let sequenceNumbers = level.sequences[sequenceType] || level.sequences.major || [1]
-    
-    // 将数字转换为音级字符串
-    let sequence = sequenceNumbers.map(n => String(n))
-
-    // 根据和弦类型调整音级
-    sequence = sequence.map(degree => {
-      switch (chordType) {
-        case 'Minor':
-        case 'm':
-        case 'm6':
-        case 'm7':
-        case 'm9':
-        case 'm11':
-        case 'm13':
-        case 'madd9':
-        case 'm6add9':
-          if (degree === '3') return 'b3'
-          if (degree === '7') return 'b7'
-          return degree
-        
-        case 'Dim':
-        case 'dim':
-        case 'dim7':
-          if (degree === '3') return 'b3'
-          if (degree === '5') return 'b5'
-          if (degree === '7') return 'bb7'
-          return degree
-        
-        case 'dimMaj7':
-          if (degree === '3') return 'b3'
-          if (degree === '5') return 'b5'
-          return degree
-        
-        case 'm7b5':
-        case 'm9b5':
-          if (degree === '3') return 'b3'
-          if (degree === '5') return 'b5'
-          if (degree === '7') return 'b7'
-          return degree
-        
-        case 'm7b5nat9':
-          if (degree === '3') return 'b3'
-          if (degree === '5') return 'b5'
-          if (degree === '7') return 'b7'
-          return degree
-        
-        case 'm7b6':
-          if (degree === '3') return 'b3'
-          if (degree === '7') return 'b7'
-          if (degree === '6') return 'b6'
-          return degree
-        
-        case 'mMaj7':
-        case 'mMaj9':
-        case 'mMaj13':
-          if (degree === '3') return 'b3'
-          return degree
-        
-        case 'Aug':
-        case 'aug':
-          if (degree === '5') return '#5'
-          return degree
-        
-        case 'aug7':
-          if (degree === '5') return '#5'
-          if (degree === '7') return 'b7'
-          return degree
-        
-        case '7':
-        case '7b5':
-        case '7#5':
-        case '7b9':
-        case '7#9':
-        case '7#11':
-        case '7b13':
-        case '7#5b9':
-        case '7#5#9':
-        case '7b5b9':
-        case '7b5#9':
-        case '7b9b13':
-        case '7alt':
-        case '9':
-        case '9b13':
-        case '9#11':
-        case '13':
-        case '13b9':
-        case '13#9':
-        case '13#11':
-        case '7sus4':
-        case '7sus4b9':
-        case '9sus4':
-        case '13sus4':
-        case '13sus4b9':
-        case 'sus4b9':
-          if (degree === '7') return 'b7'
-          if (degree === '5' && ['7b5', '7b5b9', '7b5#9'].includes(chordType)) return 'b5'
-          if (degree === '5' && ['7#5', '7#5b9', '7#5#9', '7alt'].includes(chordType)) return '#5'
-          if (degree === '9' && ['7b9', '7#5b9', '7b5b9', '7b9b13', '7sus4b9', 'sus4b9', '13sus4b9', '13b9'].includes(chordType)) return 'b9'
-          if (degree === '9' && ['7#9', '7#5#9', '7b5#9', '13#9'].includes(chordType)) return '#9'
-          if (degree === '11' && ['7#11', '9#11', '13#11'].includes(chordType)) return '#11'
-          if (degree === '6' && ['7b13', '7b9b13', '9b13'].includes(chordType)) return 'b13'
-          return degree
-        
-        case 'Maj7':
-        case 'maj7#5':
-        case 'maj7#11':
-        case 'maj7b6':
-        case 'maj7#9':
-        case 'Maj9':
-        case 'maj9#11':
-        case 'maj9#5':
-        case 'maj9b6':
-        case 'maj13':
-        case 'maj13#11':
-        case 'maj13#5':
-          if (degree === '5' && ['maj7#5', 'maj9#5', 'maj13#5'].includes(chordType)) return '#5'
-          if (degree === '6' && ['maj7b6', 'maj9b6'].includes(chordType)) return 'b6'
-          if (degree === '9' && ['maj7#9'].includes(chordType)) return '#9'
-          if (degree === '11' && ['maj7#11', 'maj9#11', 'maj13#11'].includes(chordType)) return '#11'
-          return degree
-        
-        case 'sus2':
-          if (degree === '3') return '2'
-          if (degree === '7') return 'b7'
-          return degree
-        
-        case 'sus4':
-          if (degree === '3') return '4'
-          return degree
-        
-        case '6':
-        case '6add9':
-          return degree
-        
-        default:
-          return degree
-      }
-    })
+    // Solo 架构：sequence 数字作为 1-indexed 索引访问 chord type 对应 scale 的 intervals
+    // 越界时跳过（与 Solo ChangesWorkoutStepBuilder 一致）
+    const scaleName = getScaleForChord(chordType, level.forceNaturalFive)
+    const scaleIntervals = SCALE_INTERVALS[scaleName] || SCALE_INTERVALS.major
+    let sequence = sequenceNumbers
+      .filter(n => n >= 1 && n <= scaleIntervals.length)
+      .map(n => scaleIntervals[n - 1])
 
     // 应用低音音符（旋转序列使指定音级排在最前）
     if (bass && bass !== "root") {
@@ -8756,43 +8653,33 @@ export default function FretMasterPage() {
         }
         break
       case "chord":
-        // Handle chord practice
+        // Handle chord practice (和弦转换练习)
         {
           const chords = transposedChords
           const currentChord = chords[currentChordIndex]
           if (!currentChord) break
-          
+
           const normalizedType = normalizeChordType(currentChord.type)
           const chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === currentChord.type || ct.symbol === currentChord.type)
           if (!chordType) break
-          
+
           // 从所有练习模式中查找
           const level = ALL_PRACTICE_LEVELS.find(l => l.id === practiceLevel)
           if (!level) break
-          
+
           const rootIdx = getNoteIndex(currentChord.root)
           const noteIdx = getNoteIndex(note)
           const interval = (noteIdx - rootIdx + 12) % 12
-          
-          // 获取当前和弦质量 (使用 group 属性)
-          const chordQuality = chordType.group || 'major'
-          
-          // 判断音符是否正确
-          let isCorrect = false
-          
-          if ('chordTypes' in level && level.chordTypes) {
-            // 旋律结构和Voice Led结构 - 根据和弦类型使用不同的音级
-            const chordIntervals = level.chordTypes[chordQuality as keyof typeof level.chordTypes] as number[] | undefined
-            isCorrect = Array.isArray(chordIntervals) && chordIntervals.includes(interval)
-          } else {
-            // 基础练习模式 - 使用 sequences 中的对应和弦类型
-            const sequenceKey = chordQuality === 'triad' ? 'major' : 
-                               chordQuality === 'dominant' ? 'dominant' :
-                               chordQuality === 'minor' ? 'minor' : 'major'
-            const intervals = level.sequences[sequenceKey as keyof typeof level.sequences] as number[] | undefined
-            isCorrect = Array.isArray(intervals) && intervals.includes(interval)
-          }
-          
+
+          // 用 getChordDegrees 获取当前和弦在该 level 下的音级字符串数组
+          // 然后把音级字符串转成半音数，判断当前音符是否匹配
+          // 注意：level.sequences 存的是序列数字（1,2,3,5），不是半音数，不能直接用
+          const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
+          const validSemitones = degrees
+            .map(d => intervalToSemitones[d])
+            .filter((s): s is number => s !== undefined)
+          const isCorrect = validSemitones.includes(interval)
+
           if (isCorrect) {
             setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
           } else {
@@ -8853,9 +8740,10 @@ export default function FretMasterPage() {
 
           const rootIdx = getNoteIndex(chordExerciseTargetChord.root)
           const degreeToSemitone: Record<string, number> = {
-            "1": 0, "b9": 1, "9": 2, "#9": 3,
+            "1": 0, "b2": 1, "2": 2, "#2": 3,
+            "b9": 1, "9": 2, "#9": 3,
             "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8,
-            "b6": 8, "6": 9, "7": 11, "b7": 10, "maj7": 11, "bb7": 9,
+            "b6": 8, "6": 9, "#6": 10, "7": 11, "b7": 10, "maj7": 11, "bb7": 9,
             "b13": 8, "13": 9, "11": 5, "#11": 6
           }
           const semitone = degreeToSemitone[currentDegree]
@@ -9009,8 +8897,9 @@ export default function FretMasterPage() {
             const chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === chordExerciseTargetChord.type)
             if (chordType && currentDegree) {
               const degreeToSemitone: Record<string, number> = {
-                "1": 0, "b9": 1, "9": 2, "#9": 3, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8,
-                "b6": 8, "6": 9, "7": 11, "b7": 10, "maj7": 11, "bb7": 9,
+                "1": 0, "b2": 1, "2": 2, "#2": 3,
+                "b9": 1, "9": 2, "#9": 3, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8,
+                "b6": 8, "6": 9, "#6": 10, "7": 11, "b7": 10, "maj7": 11, "bb7": 9,
                 "b13": 8, "13": 9, "11": 5, "#11": 6
               }
               const targetInterval = degreeToSemitone[currentDegree]
@@ -13422,9 +13311,9 @@ export default function FretMasterPage() {
                           {group}
                         </h4>
                       </div>
-                      {songs.map((song) => (
+                      {songs.map((song, songIndex) => (
                         <div
-                          key={song.name}
+                          key={`${song.name}-${songIndex}`}
                           className={cn(
                             "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors",
                             selectedSong.name === song.name
