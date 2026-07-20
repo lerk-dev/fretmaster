@@ -11240,7 +11240,7 @@ export default function FretMasterPage() {
                             onClick={() => toggleInterval(index)}
                             className="text-xs h-7 px-2 min-w-[36px]"
                           >
-                            {interval.symbol}
+                            {formatDegree(interval.symbol)}
                           </Button>
                         ))}
                       </div>
@@ -11992,17 +11992,17 @@ export default function FretMasterPage() {
                   <div className="space-y-1.5 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{t('scale_formula')}:</span>
-                      <span className="font-mono">{selectedScale.formula}</span>
+                      <span className="font-mono">{formatDegree(selectedScale.formula)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{t('scale_intervals')}:</span>
-                      <span className="font-mono">{selectedScale.intervals?.join(', ') || selectedScale.notes.map(n => {
+                      <span className="font-mono">{formatDegree(selectedScale.intervals?.join(', ') || selectedScale.notes.map(n => {
                         const semitoneToDegree: Record<number, string> = {
                           0: "1", 1: "b9", 2: "2", 3: "b3", 4: "3", 5: "4",
                           6: "#4", 7: "5", 8: "b6", 9: "6", 10: "b7", 11: "7"
                         }
                         return semitoneToDegree[n] || String(n)
-                      }).join(', ')}</span>
+                      }).join(', '))}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{t('scale_notes')}:</span>
@@ -12328,7 +12328,7 @@ export default function FretMasterPage() {
                                     "transition-opacity duration-150",
                                     showText ? "opacity-100" : "opacity-0"
                                   )}>
-                                    {displayText}
+                                    {formatDegree(displayText)}
                                   </span>
                                 </button>
                               )
@@ -13113,13 +13113,13 @@ export default function FretMasterPage() {
                           currentIntervalExercise.completedIntervals.includes(idx) && "text-muted-foreground line-through"
                         )}
                       >
-                        {interval}
+                        {formatDegree(interval)}
                       </span>
                     ))}
                   </div>
                 </div>
               )}
-              
+
               {/* 全屏模式指板 - 按 ↑ 显示，按 ↓ 隐藏 */}
               {isPlaying && (() => {
                 const showFb = activeTab === 'practice' ? showFretboard :
@@ -13994,7 +13994,7 @@ export default function FretMasterPage() {
                           <Label className="text-xs text-muted-foreground">{t('intervals')}</Label>
                           <div className="p-3 bg-muted/30 rounded-lg">
                             <p className="text-sm font-mono">
-                              {level.intervals.map(i => degreeMap[i] || i).join(' - ')}
+                              {formatDegree(level.intervals.map(i => degreeMap[i] || i).join(' - '))}
                             </p>
                           </div>
                         </div>
@@ -14019,7 +14019,7 @@ export default function FretMasterPage() {
                               <div key={type} className="p-2 bg-muted/30 rounded">
                                 <span className="font-medium capitalize">{type}:</span>{' '}
                                 <span className="font-mono text-xs">
-                                  {intervals.map(i => degreeMap[i] || i).join('-')}
+                                  {formatDegree(intervals.map(i => degreeMap[i] || i).join('-'))}
                                 </span>
                               </div>
                             ))}
