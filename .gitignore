@@ -106,6 +106,14 @@ test-*.sh
 mobile-optimized.html
 sqlite-api.sh
 
+# Local release helpers (contain tokens - DO NOT COMMIT)
+scripts/check_release.ps1
+scripts/create_release.ps1
+scripts/release_notes*.md
+_commit_msg.txt
+_temp_levels.json
+installers/
+
 # Rust installer
 rustup-init.exe
 
