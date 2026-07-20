@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -6169,7 +6169,7 @@ export default function FretMasterPage() {
           try {
             const result = await nativeDetectPitch()
             
-            if (result && result.frequency > 0 && (result.confidence?.overall ?? 0) > confidenceThresholdRef.current) {
+            if (result && result.frequency > 0 && (result.confidence?.yin ?? 0) > confidenceThresholdRef.current) {
               const noteName = frequencyToNoteName(result.frequency)
               const noteResult = frequencyToNote(result.frequency, referenceFrequency)
               
@@ -7593,7 +7593,10 @@ export default function FretMasterPage() {
           const result = await detectPitch()
           if (!result || result.frequency <= 0) return
 
-          const prob = result.confidence?.overall ?? 0
+          // 与 Web 路径对齐：使用 YIN probability（confidence.yin）而非 overall
+          // overall = 0.5*yin + 0.25*harmonic + 0.25*temporal，前 ~400ms temporal 未累积会偏低
+          // yin probability 单次好检测即可达 0.85-0.99，与 Web ScriptProcessorNode 路径行为一致
+          const prob = result.confidence?.yin ?? 0
           const currentConfidenceThreshold = confidenceThresholdRef.current
           if (prob <= currentConfidenceThreshold) return
 

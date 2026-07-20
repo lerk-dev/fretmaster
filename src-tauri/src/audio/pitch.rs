@@ -34,8 +34,11 @@ pub struct PitchResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PitchConfidence {
+    #[serde(rename = "yin")]
     pub yin_probability: f32,
+    #[serde(rename = "harmonic")]
     pub harmonic_score: f32,
+    #[serde(rename = "temporal")]
     pub temporal_consistency: f32,
     pub overall: f32,
 }
