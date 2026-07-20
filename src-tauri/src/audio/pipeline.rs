@@ -59,21 +59,24 @@ impl AudioPipeline {
             return None;
         }
 
-        let buffer_size = self.capture.get_buffer_frame_size();
-        let buffer = self.capture.get_latest_samples(buffer_size);
+        // 音高检测需要足够大的样本数：
+        // - 最低音 E2 ≈ 82Hz，周期 ≈ 586 samples @ 48kHz
+        // - YIN/autocorrelation 至少需要 2-3 个周期，约 1200-1800 samples
+        // - capture.get_buffer_frame_size() 仅 1024（用于 latency），不足以检测低音
+        //   （auto_correlation 检查 frame >= buffer.len() 会返回 0，detect 必然 None）
+        // - ring buffer 容量 16384，取 4096 samples（85ms @ 48kHz）覆盖到 ~60Hz 低音
+        const PITCH_BUFFER_SIZE: usize = 4096;
+        let buffer = self.capture.get_latest_samples(PITCH_BUFFER_SIZE);
 
-        if buffer.len() < buffer_size {
+        if buffer.len() < PITCH_BUFFER_SIZE {
             return None;
         }
 
         let sample_rate = self.capture.get_sample_rate();
         let calibration_offset = self.capture.get_calibration_offset();
 
-        // 同步实际 capture buffer_size 到 detector，避免 detect 入口
-        // `buffer.len() < self.config.buffer_size` 永远为真（capture 1024 vs detector 默认 8192）
-        // 导致 detect_pitch 始终返回 None（DebugPanel 中 Pitch Detection 无反应的根因）
-        let capture_buffer_size = self.capture.get_buffer_frame_size();
-        self.detector.set_buffer_size(capture_buffer_size);
+        // 同步 detector 配置（与传入 buffer 大小一致，使 detect 入口检查通过）
+        self.detector.set_buffer_size(PITCH_BUFFER_SIZE);
 
         let processed = if self.agc_enabled {
             let agc_buffer = self.apply_agc(&buffer);

@@ -360,7 +360,11 @@ const DebugPanelInner = memo(function DebugPanelInner() {
                         style={{ width: `${Math.min(100, data.rms * 500)}%` }}
                       />
                     </div>
-                    <span className="w-16 text-right font-mono">{data.rms.toFixed(4)}</span>
+                    <span className="w-16 text-right font-mono">
+                      {data.rms < 0.001 && data.rms > 0
+                        ? data.rms.toExponential(2)
+                        : data.rms.toFixed(4)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-10 text-muted-foreground">dB</span>
