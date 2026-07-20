@@ -10918,27 +10918,27 @@ export default function FretMasterPage() {
                 <CardContent className="px-6 pt-0 pb-3">
                   {/* Practice Mode Controls */}
                   {activeTab === "practice" && (
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-end gap-2">
                         {/* 目标音符 - 仅在指板点击模式下显示*/}
                         {practiceAnswerMode === "fretboard" && (
-                          <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-lg border border-primary/10 min-w-[100px] sm:min-w-[120px]">
-                            <Target className="h-4 w-4 text-primary" />
-                            <div>
-                              <Label className="text-[10px] text-muted-foreground block">{t('target_note')}</Label>
-                              <div className="text-base sm:text-lg font-bold text-primary leading-tight">{formatNoteByAccidentalSetting(targetNote)}</div>
+                          <div className="flex items-center gap-2 px-2.5 h-10 bg-primary/5 rounded-md border border-primary/20 min-w-[110px] sm:min-w-[130px]">
+                            <Target className="h-4 w-4 text-primary shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-[10px] text-muted-foreground leading-3">{t('target_note')}</div>
+                              <div className="text-base sm:text-lg font-bold text-primary leading-tight truncate">{formatNoteByAccidentalSetting(targetNote)}</div>
                             </div>
                           </div>
                         )}
 
-                        {/* 琴弦选择 */}
-                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-card/30 rounded border border-border/30">
-                          <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('select_strings')}</Label>
-                          <div className="flex gap-0.5">
+                        {/* 琴弦选择 - segmented */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('select_strings')}</div>
+                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
                             {[1, 2, 3, 4, 5, 6].map((stringNum) => (
                               <Button
                                 key={stringNum}
-                                variant={selectedStrings.includes(stringNum) ? "default" : "outline"}
+                                variant={selectedStrings.includes(stringNum) ? "default" : "ghost"}
                                 size="sm"
                                 onClick={() => {
                                   if (selectedStrings.includes(stringNum)) {
@@ -10950,7 +10950,7 @@ export default function FretMasterPage() {
                                     setSelectedStrings(prev => [...prev, stringNum].sort())
                                   }
                                 }}
-                                className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-[10px] sm:text-xs"
+                                className="h-7 w-7 p-0 text-xs"
                               >
                                 {stringNum}
                               </Button>
@@ -10959,10 +10959,10 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 练习时长选择 */}
-                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-card/30 rounded border border-border/30">
-                          <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('pitch_finding_practice_time')}</Label>
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('pitch_finding_practice_time')}</div>
                           <Select value={String(pitchFindingTime)} onValueChange={(v) => setPitchFindingTime(Number(v))}>
-                            <SelectTrigger className="w-16 sm:w-20 h-7 text-xs">
+                            <SelectTrigger className="w-[68px] sm:w-[80px] h-8 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -10978,26 +10978,33 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 练习建议开关 */}
-                        <div className="flex items-center gap-2 px-2 py-1.5 bg-card/30 rounded border border-border/30">
-                          <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('pitch_finding_show_suggestions')}</Label>
-                          <Switch
-                            checked={showPracticeSuggestions}
-                            onCheckedChange={setShowPracticeSuggestions}
-                            className="scale-75"
-                          />
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
+                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30">
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('pitch_finding_show_suggestions')}</Label>
+                            <Switch
+                              checked={showPracticeSuggestions}
+                              onCheckedChange={setShowPracticeSuggestions}
+                              className="scale-90"
+                            />
+                          </div>
                         </div>
 
-                        <Button variant="outline" size="sm" onClick={() => setShowAllNotes(prev => !prev)} className="h-8">
-                          {showAllNotes ? <EyeOff className="h-3 w-3 mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
-                          <span className="text-xs">{showAllNotes ? t('hide_notes') : t('show_all_notes')}</span>
-                        </Button>
-                        
-                        {/* 答题模式切换 */}
-                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-card/30 rounded border border-border/30">
-                          <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('answer_mode')}</Label>
-                          <div className="flex gap-1">
+                        {/* 显示/隐藏所有音符 */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
+                          <Button variant="outline" size="sm" onClick={() => setShowAllNotes(prev => !prev)} className="h-8 px-2 text-xs">
+                            {showAllNotes ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+                            <span>{showAllNotes ? t('hide_notes') : t('show_all_notes')}</span>
+                          </Button>
+                        </div>
+
+                        {/* 答题模式切换 - segmented */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('answer_mode')}</div>
+                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
                             <Button
-                              variant={practiceAnswerMode === "fretboard" ? "default" : "outline"}
+                              variant={practiceAnswerMode === "fretboard" ? "default" : "ghost"}
                               size="sm"
                               onClick={() => {
                                 // 如果正在练习中，先停止练习
@@ -11009,12 +11016,12 @@ export default function FretMasterPage() {
                                 }
                                 setPracticeAnswerMode("fretboard")
                               }}
-                              className="h-8 px-2 text-xs"
+                              className="h-7 px-2.5 text-xs"
                             >
                               {t('practice_mode_find')}
                             </Button>
                             <Button
-                              variant={practiceAnswerMode === "buttons" ? "default" : "outline"}
+                              variant={practiceAnswerMode === "buttons" ? "default" : "ghost"}
                               size="sm"
                               onClick={() => {
                                 // 如果正在练习中，先停止练习
@@ -11026,7 +11033,7 @@ export default function FretMasterPage() {
                                 }
                                 setPracticeAnswerMode("buttons")
                               }}
-                              className="h-8 px-2 text-xs"
+                              className="h-7 px-2.5 text-xs"
                             >
                               {t('practice_mode_identify')}
                             </Button>
@@ -11099,64 +11106,82 @@ export default function FretMasterPage() {
                   
                   {/* Interval Controls */}
                   {activeTab === "interval" && (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {/* 第一行：基础设置 */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Select value={rootNote} onValueChange={setRootNote} disabled={intervalRootMode === "random"}>
-                          <SelectTrigger className="w-auto min-w-[60px] h-8 text-xs px-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {NOTES.map(note => (
-                              <SelectItem key={note} value={note} className="text-xs">{note}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={intervalRootMode} onValueChange={(v: "fixed" | "random") => setIntervalRootMode(v)}>
-                          <SelectTrigger className="w-auto min-w-[70px] h-8 text-xs px-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="fixed" className="text-xs">{t('fixed_root')}</SelectItem>
-                            <SelectItem value="random" className="text-xs">{t('random_root')}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="flex items-center gap-2 px-2">
-                          <Checkbox 
-                            id="findRootFirst" 
-                            checked={findRootFirst} 
-                            onCheckedChange={(c) => setFindRootFirst(c as boolean)}
-                            className="h-4 w-4"
-                          />
-                          <Label htmlFor="findRootFirst" className="text-xs cursor-pointer">{t('find_root_first')}</Label>
+                      <div className="flex flex-wrap items-end gap-2">
+                        {/* 根音 */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('interval_root_note_label')}</div>
+                          <Select value={rootNote} onValueChange={setRootNote} disabled={intervalRootMode === "random"}>
+                            <SelectTrigger className="w-[68px] h-8 text-xs px-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {NOTES.map(note => (
+                                <SelectItem key={note} value={note} className="text-xs">{note}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                        <div className="flex items-center gap-2 px-2">
-                          <Checkbox 
-                            id="addRootBack" 
-                            checked={addRootBack} 
-                            onCheckedChange={(c) => setAddRootBack(c as boolean)}
-                            className="h-4 w-4"
-                          />
-                          <Label htmlFor="addRootBack" className="text-xs cursor-pointer">{t('add_root_back')}</Label>
+
+                        {/* 根音模式 */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('interval_root_mode_label')}</div>
+                          <Select value={intervalRootMode} onValueChange={(v: "fixed" | "random") => setIntervalRootMode(v)}>
+                            <SelectTrigger className="w-[80px] sm:w-[92px] h-8 text-xs px-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="fixed" className="text-xs">{t('fixed_root')}</SelectItem>
+                              <SelectItem value="random" className="text-xs">{t('random_root')}</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                        <div className="flex items-center gap-2 px-2">
-                          <Switch 
-                            id="showIntervalFretboard" 
-                            checked={showIntervalFretboard} 
-                            onCheckedChange={setShowIntervalFretboard}
-                            className="h-4 w-7"
-                          />
-                          <Label htmlFor="showIntervalFretboard" className="text-xs cursor-pointer">{t('show_fretboard')}</Label>
+
+                        {/* 选项开关组 */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
+                          <div className="flex items-center gap-2 h-8 px-2 bg-card/30 rounded-md border border-border/30">
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id="findRootFirst"
+                                checked={findRootFirst}
+                                onCheckedChange={(c) => setFindRootFirst(c as boolean)}
+                                className="h-3.5 w-3.5"
+                              />
+                              <Label htmlFor="findRootFirst" className="text-xs cursor-pointer whitespace-nowrap">{t('find_root_first')}</Label>
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id="addRootBack"
+                                checked={addRootBack}
+                                onCheckedChange={(c) => setAddRootBack(c as boolean)}
+                                className="h-3.5 w-3.5"
+                              />
+                              <Label htmlFor="addRootBack" className="text-xs cursor-pointer whitespace-nowrap">{t('add_root_back')}</Label>
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Switch
+                                id="showIntervalFretboard"
+                                checked={showIntervalFretboard}
+                                onCheckedChange={setShowIntervalFretboard}
+                                className="scale-90"
+                              />
+                              <Label htmlFor="showIntervalFretboard" className="text-xs cursor-pointer whitespace-nowrap">{t('show_fretboard')}</Label>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
                       {/* 第二行：高级设置 */}
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-end gap-2">
                         {/* 练习时长 */}
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-muted-foreground">{t('practice_duration')}</Label>
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('practice_duration')}</div>
                           <Select value={String(intervalPracticeDuration)} onValueChange={(v) => setIntervalPracticeDuration(Number(v))}>
-                            <SelectTrigger className="w-[70px] h-7 text-xs px-2">
+                            <SelectTrigger className="w-[68px] h-8 text-xs px-2">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -11166,22 +11191,11 @@ export default function FretMasterPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        
-                        {/* 随机顺序 */}
-                        <div className="flex items-center gap-2 px-2">
-                          <Switch 
-                            id="intervalRandomizeOrder" 
-                            checked={intervalRandomizeOrder} 
-                            onCheckedChange={setIntervalRandomizeOrder}
-                            className="h-4 w-7"
-                          />
-                          <Label htmlFor="intervalRandomizeOrder" className="text-xs cursor-pointer">{t('randomize_order')}</Label>
-                        </div>
-                        
-                        {/* 音程方向 */}
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-muted-foreground">{t('interval_direction')}</Label>
-                          <div className="flex gap-0.5">
+
+                        {/* 音程方向 - segmented */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('interval_direction')}</div>
+                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
                             {[
                               { id: "up", label: t('direction_up') },
                               { id: "down", label: t('direction_down') },
@@ -11189,62 +11203,82 @@ export default function FretMasterPage() {
                             ].map((dir) => (
                               <Button
                                 key={dir.id}
-                                variant={intervalDirection === dir.id ? "default" : "outline"}
+                                variant={intervalDirection === dir.id ? "default" : "ghost"}
                                 size="sm"
                                 onClick={() => setIntervalDirection(dir.id as "up" | "down" | "random")}
-                                className="h-7 text-xs px-2"
+                                className="h-7 text-xs px-2.5"
                               >
                                 {dir.label}
                               </Button>
                             ))}
                           </div>
                         </div>
-                        
-                        {/* 指板自动推进 */}
-                        <div className="flex items-center gap-2 px-2">
-                          <Switch 
-                            id="intervalAutoAdvance" 
-                            checked={intervalAutoAdvance} 
-                            onCheckedChange={setIntervalAutoAdvance}
-                            className="h-4 w-7"
-                            disabled={!showIntervalFretboard}
-                          />
-                          <Label htmlFor="intervalAutoAdvance" className="text-xs cursor-pointer">{t('auto_advance')}</Label>
-                        </div>
-                        
-                        {/* 指板显示时长 */}
-                        {intervalAutoAdvance && showIntervalFretboard && (
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-muted-foreground">{t('fretboard_duration')}</Label>
-                            <Select value={String(intervalFretboardDuration)} onValueChange={(v) => setIntervalFretboardDuration(Number(v))}>
-                              <SelectTrigger className="w-[60px] h-7 text-xs px-2">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[1, 2, 3, 5, 7, 10].map(sec => (
-                                  <SelectItem key={sec} value={String(sec)} className="text-xs">{sec}s</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+
+                        {/* 自动推进 + 指板时长 */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
+                          <div className="flex items-center gap-2 h-8 px-2 bg-card/30 rounded-md border border-border/30">
+                            <div className="flex items-center gap-1.5">
+                              <Switch
+                                id="intervalAutoAdvance"
+                                checked={intervalAutoAdvance}
+                                onCheckedChange={setIntervalAutoAdvance}
+                                className="scale-90"
+                                disabled={!showIntervalFretboard}
+                              />
+                              <Label htmlFor="intervalAutoAdvance" className="text-xs cursor-pointer whitespace-nowrap">{t('auto_advance')}</Label>
+                            </div>
+                            {intervalAutoAdvance && showIntervalFretboard && (
+                              <>
+                                <Separator orientation="vertical" className="h-4" />
+                                <Select value={String(intervalFretboardDuration)} onValueChange={(v) => setIntervalFretboardDuration(Number(v))}>
+                                  <SelectTrigger className="w-[52px] h-7 text-xs px-1.5">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {[1, 2, 3, 5, 7, 10].map(sec => (
+                                      <SelectItem key={sec} value={String(sec)} className="text-xs">{sec}s</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            )}
                           </div>
-                        )}
+                        </div>
+
+                        {/* 随机顺序 */}
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
+                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30">
+                            <Switch
+                              id="intervalRandomizeOrder"
+                              checked={intervalRandomizeOrder}
+                              onCheckedChange={setIntervalRandomizeOrder}
+                              className="scale-90"
+                            />
+                            <Label htmlFor="intervalRandomizeOrder" className="text-xs cursor-pointer whitespace-nowrap">{t('randomize_order')}</Label>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* 音程选择 */}
-                      <div className="flex flex-wrap gap-1">
-                        {INTERVALS.map((interval, index) => (
-                          <Button
-                            key={interval.name}
-                            variant={selectedIntervals.includes(index) ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => toggleInterval(index)}
-                            className="text-xs h-7 px-2 min-w-[36px]"
-                          >
-                            {formatDegree(interval.symbol)}
-                          </Button>
-                        ))}
+                      {/* 音程选择 - segmented 多选 */}
+                      <div className="space-y-0.5">
+                        <div className="text-[10px] text-muted-foreground leading-3">{t('select_intervals_label')}</div>
+                        <div className="flex flex-wrap items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5 w-fit">
+                          {INTERVALS.map((interval, index) => (
+                            <Button
+                              key={interval.name}
+                              variant={selectedIntervals.includes(index) ? "default" : "ghost"}
+                              size="sm"
+                              onClick={() => toggleInterval(index)}
+                              className="text-xs h-7 px-2 min-w-[36px]"
+                            >
+                              {formatDegree(interval.symbol)}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
-                      
+
                       {/* 开始练习提示*/}
                       {!isPlaying && (
                         <div className="text-muted-foreground text-sm py-4">
@@ -11263,10 +11297,10 @@ export default function FretMasterPage() {
                       {/* 第一行：基础设置 */}
                       <div className="flex flex-wrap items-end gap-2">
                         {/* 根音选择 */}
-                        <div className="w-[70px]">
-                          <Label className="text-[10px] font-medium text-muted-foreground block mb-0.5 leading-4">{t('chord_root_note')}</Label>
+                        <div className="w-[72px] sm:w-[80px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_root_note')}</div>
                           <Select value={chordExerciseRoot} onValueChange={setChordExerciseRoot}>
-                            <SelectTrigger className="h-7 text-xs px-2">
+                            <SelectTrigger className="h-8 text-xs px-2 w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -11279,11 +11313,11 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 练习模式 */}
-                        <div className="w-[140px]">
-                          <Label className="text-[10px] font-medium text-muted-foreground block mb-0.5 leading-4">{t('practice_level')}</Label>
+                        <div className="w-[130px] sm:w-[150px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('practice_level')}</div>
                           <Button
                             variant="outline"
-                            className="h-7 text-xs w-full justify-between"
+                            className="h-8 text-xs w-full justify-between px-2"
                             onClick={() => setShowChordExerciseLevelSelector(true)}
                           >
                             <span className="truncate">
@@ -11294,10 +11328,10 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 低音音符选择 */}
-                        <div className="w-[80px]">
-                          <Label className="text-[10px] font-medium text-muted-foreground block mb-0.5 leading-4">{t('chord_bass_note')}</Label>
+                        <div className="w-[80px] sm:w-[88px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_bass_note')}</div>
                           <Select value={chordExerciseBass} onValueChange={setChordExerciseBass}>
-                            <SelectTrigger className="h-7 text-xs px-2">
+                            <SelectTrigger className="h-8 text-xs px-2 w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -11310,10 +11344,10 @@ export default function FretMasterPage() {
                           </Select>
                         </div>
 
-                        {/* 演奏顺序 */}
-                        <div className="w-[150px]">
-                          <Label className="text-[10px] font-medium text-muted-foreground block mb-0.5 leading-4">{t('chord_order')}</Label>
-                          <div className="flex gap-0.5">
+                        {/* 演奏顺序 - segmented */}
+                        <div className="w-[150px] sm:w-[168px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_order')}</div>
+                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
                             {[
                               { id: "asc", label: t('order_ascending') },
                               { id: "desc", label: t('order_descending') },
@@ -11321,7 +11355,7 @@ export default function FretMasterPage() {
                             ].map((order) => (
                               <Button
                                 key={order.id}
-                                variant={chordExerciseOrder === order.id ? "default" : "outline"}
+                                variant={chordExerciseOrder === order.id ? "default" : "ghost"}
                                 size="sm"
                                 onClick={() => setChordExerciseOrder(order.id as "asc" | "desc" | "random")}
                                 className="h-7 text-xs flex-1 px-1"
@@ -11333,50 +11367,53 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 显示选项开关组 */}
-                        <div className="flex items-center gap-1 h-8 px-2 bg-card/30 rounded border border-border/30">
-                          <div className="flex items-center gap-1.5">
-                            <Label htmlFor="showChordExerciseFretboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('fretboard')}</Label>
-                            <Switch
-                              id="showChordExerciseFretboard"
-                              checked={showChordExerciseFretboard}
-                              onCheckedChange={setShowChordExerciseFretboard}
-                              className="scale-75"
-                            />
-                          </div>
-                          <Separator orientation="vertical" className="h-4 mx-1" />
-                          <div className="flex items-center gap-1.5">
-                            <Label htmlFor="showChordExerciseKeyboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('keyboard')}</Label>
-                            <Switch
-                              id="showChordExerciseKeyboard"
-                              checked={showChordExerciseKeyboard}
-                              onCheckedChange={setShowChordExerciseKeyboard}
-                              className="scale-75"
-                            />
-                          </div>
-                          <Separator orientation="vertical" className="h-4 mx-1" />
-                          <div className="flex items-center gap-1.5">
-                            <Label htmlFor="showChordExerciseStructure" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('structure')}</Label>
-                            <Switch
-                              id="showChordExerciseStructure"
-                              checked={showChordExerciseStructure}
-                              onCheckedChange={setShowChordExerciseStructure}
-                              className="scale-75"
-                            />
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('display_options')}</div>
+                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30">
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showChordExerciseFretboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('fretboard')}</Label>
+                              <Switch
+                                id="showChordExerciseFretboard"
+                                checked={showChordExerciseFretboard}
+                                onCheckedChange={setShowChordExerciseFretboard}
+                                className="scale-90"
+                              />
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showChordExerciseKeyboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('keyboard')}</Label>
+                              <Switch
+                                id="showChordExerciseKeyboard"
+                                checked={showChordExerciseKeyboard}
+                                onCheckedChange={setShowChordExerciseKeyboard}
+                                className="scale-90"
+                              />
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showChordExerciseStructure" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('structure')}</Label>
+                              <Switch
+                                id="showChordExerciseStructure"
+                                checked={showChordExerciseStructure}
+                                onCheckedChange={setShowChordExerciseStructure}
+                                className="scale-90"
+                              />
+                            </div>
                           </div>
                         </div>
 
                       </div>
 
                       {/* 第二行：和弦类型选择 - 按分组显示 */}
-                      <div className="bg-card/30 rounded-lg p-2 border border-border/30">
+                      <div className="bg-card/30 rounded-md p-2 border border-border/30">
                         <div className="flex items-center justify-between mb-1.5">
-                          <Label className="text-[10px] font-medium text-muted-foreground">{t('chord_type')}</Label>
-                          <div className="flex gap-1">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_type')}</div>
+                          <div className="flex items-center bg-background/40 rounded-md border border-border/30 p-0.5 gap-0.5">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setChordExerciseTypes(CHORD_TYPES.map(t => t.name))}
-                              className="h-5 text-[10px] px-1.5 py-0"
+                              className="h-6 text-[11px] px-2"
                             >
                               {t('select_all')}
                             </Button>
@@ -11384,13 +11421,13 @@ export default function FretMasterPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => setChordExerciseTypes([])}
-                              className="h-5 text-[10px] px-1.5 py-0"
+                              className="h-6 text-[11px] px-2"
                             >
                               {t('clear_all')}
                             </Button>
                           </div>
                         </div>
-                        <div className="max-h-[160px] overflow-y-auto">
+                        <div className="max-h-[160px] overflow-y-auto pr-1">
                         {(() => {
                           const groups = CHORD_TYPES.reduce((acc, type) => {
                             const groupKey = type.group || 'other'
@@ -11402,7 +11439,7 @@ export default function FretMasterPage() {
                           }, {} as Record<string, { name: string; nameZh: string; types: typeof CHORD_TYPES }>)
                           
                           return Object.entries(groups).map(([key, group]) => (
-                            <div key={key} className="mb-2">
+                            <div key={key} className="mb-2 last:mb-0">
                               <div className="text-[10px] font-medium text-muted-foreground/70 mb-1 px-1">{language === 'zh-CN' ? group.nameZh : group.name}</div>
                               <div className="flex flex-wrap gap-1">
                                 {group.types.map(type => (
@@ -11417,7 +11454,7 @@ export default function FretMasterPage() {
                                         setChordExerciseTypes([...chordExerciseTypes, type.name])
                                       }
                                     }}
-                                    className="h-6 text-xs px-2 py-0.5"
+                                    className="h-7 text-xs px-2"
                                   >
                                     {type.symbol || type.name}
                                   </Button>
@@ -11435,22 +11472,22 @@ export default function FretMasterPage() {
                   {activeTab === "chord" && (
                     <div className="space-y-2">
                       {/* 第一行：歌曲选择、调性、练习模式、和弦顺序 */}
-                      <div className="grid grid-cols-4 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] font-medium text-muted-foreground">{t('select_song')}</Label>
+                      <div className="flex flex-wrap items-end gap-2">
+                        <div className="w-[140px] sm:w-[180px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('select_song')}</div>
                           <Button
                             variant="outline"
-                            className="h-7 text-xs w-full justify-between"
+                            className="h-8 text-xs w-full justify-between px-2"
                             onClick={() => setShowSongSelector(true)}
                           >
                             <span className="truncate">{selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name}</span>
                             <ChevronRight className="h-3 w-3 ml-1 shrink-0" />
                           </Button>
                         </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] font-medium text-muted-foreground">{t('select_key')}</Label>
+                        <div className="w-[110px] sm:w-[130px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('select_key')}</div>
                           <Select value={progressionKey} onValueChange={(value) => setProgressionKey(value)}>
-                            <SelectTrigger size="xs" className="w-full">
+                            <SelectTrigger className="h-8 text-xs w-full px-2">
                               <SelectValue>
                                 {normalizeNoteName(progressionKey) + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))}
                               </SelectValue>
@@ -11458,7 +11495,7 @@ export default function FretMasterPage() {
                             <SelectContent>
                               {NOTES.map((note, index) => {
                                 const flatNote = NOTES_FLAT[index]
-                                const displayName = note === flatNote 
+                                const displayName = note === flatNote
                                   ? note + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))
                                   : `${note} / ${flatNote}` + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))
                                 return (
@@ -11468,11 +11505,11 @@ export default function FretMasterPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] font-medium text-muted-foreground">{t('practice_level')}</Label>
+                        <div className="w-[130px] sm:w-[150px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('practice_level')}</div>
                           <Button
                             variant="outline"
-                            className="h-7 text-xs w-full justify-between"
+                            className="h-8 text-xs w-full justify-between px-2"
                             onClick={() => setShowLevelSelector(true)}
                           >
                             <span className="truncate">
@@ -11481,10 +11518,10 @@ export default function FretMasterPage() {
                             <ChevronRight className="h-3 w-3 ml-1 shrink-0" />
                           </Button>
                         </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] font-medium text-muted-foreground">{t('chord_order')}</Label>
+                        <div className="w-[110px] sm:w-[130px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_order')}</div>
                           <Select value={chordPlayOrder} onValueChange={(v: "asc" | "desc" | "random") => setChordPlayOrder(v)}>
-                            <SelectTrigger size="xs" className="w-full">
+                            <SelectTrigger className="h-8 text-xs w-full px-2">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -11495,87 +11532,102 @@ export default function FretMasterPage() {
                           </Select>
                         </div>
                       </div>
-                      
+
                       {/* 第二行：开关选项 + 操作按钮 */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded border border-border/30">
-                          <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('progression_repeat')}</Label>
-                          <Switch
-                            checked={progressionRepeat}
-                            onCheckedChange={setProgressionRepeat}
-                            className="scale-75"
-                          />
-                        </div>
-                        <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded border border-border/30">
-                          <Label className={`text-xs whitespace-nowrap ${chordPlayOrder !== 'random' ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}>{t('progression_voice_leading')}</Label>
-                          <Switch
-                            checked={shouldVoiceLead}
-                            onCheckedChange={setShouldVoiceLead}
-                            disabled={chordPlayOrder === 'random'}
-                            className="scale-75"
-                          />
-                        </div>
-                        {progressionRepeat && (
-                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded border border-border/30">
-                            <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('progression_randomize_key')}</Label>
-                            <Switch
-                              checked={shouldRandomizeKeyOnRepeat}
-                              onCheckedChange={setShouldRandomizeKeyOnRepeat}
-                              className="scale-75"
-                            />
+                      <div className="flex items-end gap-2 flex-wrap">
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('display_options')}</div>
+                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('progression_repeat')}</Label>
+                              <Switch
+                                checked={progressionRepeat}
+                                onCheckedChange={setProgressionRepeat}
+                                className="scale-90"
+                              />
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Label className={`text-xs whitespace-nowrap ${chordPlayOrder !== 'random' ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}>{t('progression_voice_leading')}</Label>
+                              <Switch
+                                checked={shouldVoiceLead}
+                                onCheckedChange={setShouldVoiceLead}
+                                disabled={chordPlayOrder === 'random'}
+                                className="scale-90"
+                              />
+                            </div>
+                            {progressionRepeat && (
+                              <>
+                                <Separator orientation="vertical" className="h-4" />
+                                <div className="flex items-center gap-1.5">
+                                  <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('progression_randomize_key')}</Label>
+                                  <Switch
+                                    checked={shouldRandomizeKeyOnRepeat}
+                                    onCheckedChange={setShouldRandomizeKeyOnRepeat}
+                                    className="scale-90"
+                                  />
+                                </div>
+                              </>
+                            )}
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showChordFretboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('show_fretboard')}</Label>
+                              <Switch
+                                id="showChordFretboard"
+                                checked={showChordFretboard}
+                                onCheckedChange={setShowChordFretboard}
+                                className="scale-90"
+                              />
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showChordStructure" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('chord_progression_structure')}</Label>
+                              <Switch
+                                id="showChordStructure"
+                                checked={showChordStructure}
+                                onCheckedChange={setShowChordStructure}
+                                className="scale-90"
+                              />
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showChordKeyboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('show_keyboard')}</Label>
+                              <Switch
+                                id="showChordKeyboard"
+                                checked={showChordKeyboard}
+                                onCheckedChange={setShowChordKeyboard}
+                                className="scale-90"
+                              />
+                            </div>
                           </div>
-                        )}
-                        <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded border border-border/30">
-                          <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('show_fretboard')}</Label>
-                          <Switch
-                            id="showChordFretboard"
-                            checked={showChordFretboard}
-                            onCheckedChange={setShowChordFretboard}
-                            className="scale-75"
-                          />
                         </div>
-                        <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded border border-border/30">
-                          <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('chord_progression_structure')}</Label>
-                          <Switch
-                            id="showChordStructure"
-                            checked={showChordStructure}
-                            onCheckedChange={setShowChordStructure}
-                            className="scale-75"
-                          />
+                        <div className="space-y-0.5 ml-auto">
+                          <div className="text-[10px] text-transparent leading-3">&nbsp;</div>
+                          <Button
+                            onClick={nextChord}
+                            variant="outline"
+                            className="h-8 px-3 text-xs"
+                            disabled={!isPlaying}
+                          >
+                            <SkipForward className="h-3.5 w-3.5 mr-1" />
+                            {t('btn_next')}
+                          </Button>
                         </div>
-                        <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded border border-border/30">
-                          <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('show_keyboard')}</Label>
-                          <Switch
-                            id="showChordKeyboard"
-                            checked={showChordKeyboard}
-                            onCheckedChange={setShowChordKeyboard}
-                            className="scale-75"
-                          />
-                        </div>
-                        <Button
-                          onClick={nextChord}
-                          variant="outline"
-                          className="h-7 px-3 text-xs ml-auto"
-                          disabled={!isPlaying}
-                        >
-                          <SkipForward className="h-3 w-3 mr-1" />
-                          {t('btn_next')}
-                        </Button>
                       </div>
 
                       {/* 第三行：自定义和弦（折叠） */}
                       <Accordion type="multiple" defaultValue={[]} className="w-full">
                         <AccordionItem value="custom" className="border-0">
-                          <AccordionTrigger className="text-xs py-1.5 px-2 bg-card/30 rounded border border-border/30 hover:no-underline">
+                          <AccordionTrigger className="text-xs py-1.5 px-2 bg-card/30 rounded-md border border-border/30 hover:no-underline">
                             {t('chord_custom')}
                           </AccordionTrigger>
                           <AccordionContent>
-                            <div className="space-y-3 pt-2 p-2 bg-card/20 rounded-b border-x border-b border-border/30">
+                            <div className="space-y-3 pt-2 p-2 bg-card/20 rounded-b-md border-x border-b border-border/30">
                               {/* 手动添加和弦 */}
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 grid grid-cols-12 gap-1">
                                   <Select value={newChordRoot} onValueChange={setNewChordRoot}>
-                                    <SelectTrigger className="col-span-3 h-7 text-xs">
+                                    <SelectTrigger className="col-span-3 h-8 text-xs px-2">
                                       <SelectValue placeholder={t('chord_root_note')} />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -11585,7 +11637,7 @@ export default function FretMasterPage() {
                                     </SelectContent>
                                   </Select>
                                   <Select value={newChordType} onValueChange={setNewChordType}>
-                                    <SelectTrigger className="col-span-6 h-7 text-xs">
+                                    <SelectTrigger className="col-span-6 h-8 text-xs px-2">
                                       <SelectValue placeholder={t('chord_type')} />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -11594,8 +11646,8 @@ export default function FretMasterPage() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  <Button onClick={addCustomChord} size="sm" className="col-span-3 h-7 text-xs px-2">
-                                    <Plus className="h-3 w-3 mr-1" />
+                                  <Button onClick={addCustomChord} size="sm" className="col-span-3 h-8 text-xs px-2">
+                                    <Plus className="h-3.5 w-3.5 mr-1" />
                                     {t('custom_chord_add')}
                                   </Button>
                                 </div>
@@ -11610,8 +11662,8 @@ export default function FretMasterPage() {
                                   onChange={(e) => setIrealInput(e.target.value)}
                                   className="min-h-[50px] text-xs"
                                 />
-                                <Button onClick={importIrealPro} size="sm" className="w-full h-7 text-xs">
-                                  <Upload className="h-3 w-3 mr-1" />
+                                <Button onClick={importIrealPro} size="sm" className="w-full h-8 text-xs">
+                                  <Upload className="h-3.5 w-3.5 mr-1" />
                                   {t('ireal_import_btn')}
                                 </Button>
                               </div>
@@ -11631,28 +11683,28 @@ export default function FretMasterPage() {
                               )}
 
                               {/* 操作按钮 */}
-                              <div className="flex items-center gap-1 pt-2 border-t border-border/30">
+                              <div className="flex items-center gap-1 pt-2 border-t border-border/30 flex-wrap">
                                 <Input
                                   placeholder={t('custom_chord_sequence_name')}
                                   value={customChordName}
                                   onChange={(e) => setCustomChordName(e.target.value)}
-                                  className="h-7 text-xs flex-1"
+                                  className="h-8 text-xs flex-1 min-w-[120px]"
                                 />
-                                <Button variant="outline" size="sm" onClick={saveCustomChords} className="h-7 px-2 text-xs" disabled={customChords.length === 0}>
-                                  <Save className="h-3 w-3 mr-1" />
+                                <Button variant="outline" size="sm" onClick={saveCustomChords} className="h-8 px-2 text-xs" disabled={customChords.length === 0}>
+                                  <Save className="h-3.5 w-3.5 mr-1" />
                                   {t('custom_chord_save')}
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={loadCustomChords} className="h-7 px-2 text-xs">
-                                  <Upload className="h-3 w-3 mr-1" />
+                                <Button variant="outline" size="sm" onClick={loadCustomChords} className="h-8 px-2 text-xs">
+                                  <Upload className="h-3.5 w-3.5 mr-1" />
                                   {t('custom_chord_load')}
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={exportCustomChords} className="h-7 px-2 text-xs" disabled={customChords.length === 0}>
-                                  <Download className="h-3 w-3 mr-1" />
+                                <Button variant="outline" size="sm" onClick={exportCustomChords} className="h-8 px-2 text-xs" disabled={customChords.length === 0}>
+                                  <Download className="h-3.5 w-3.5 mr-1" />
                                   {t('custom_chord_export')}
                                 </Button>
                                 {customChords.length > 0 && (
-                                  <Button variant="outline" size="sm" onClick={clearCustomChords} className="h-7 px-2 text-xs">
-                                    <Trash2 className="h-3 w-3 mr-1" />
+                                  <Button variant="outline" size="sm" onClick={clearCustomChords} className="h-8 px-2 text-xs">
+                                    <Trash2 className="h-3.5 w-3.5 mr-1" />
                                     {t('custom_chord_clear')}
                                   </Button>
                                 )}
@@ -11742,8 +11794,8 @@ export default function FretMasterPage() {
                       {/* 第一行：基础设置 */}
                       <div className="flex flex-wrap items-end gap-2">
                         {/* 调性选择 */}
-                        <div className="w-[80px]">
-                          <Label className="text-[10px] font-medium text-muted-foreground block mb-0.5 leading-4">{t('scale_key')}</Label>
+                        <div className="w-[80px] sm:w-[88px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('scale_key')}</div>
                           <Select value={isScaleKeyRandom ? 'random' : scaleKey} onValueChange={(value) => {
                             if (value === 'random') {
                               setIsScaleKeyRandom(true)
@@ -11754,7 +11806,7 @@ export default function FretMasterPage() {
                               setScaleKey(value)
                             }
                           }}>
-                            <SelectTrigger className="h-7 text-xs px-2">
+                            <SelectTrigger className="h-8 text-xs px-2 w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -11769,13 +11821,13 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 调式分类 */}
-                        <div className="w-[120px]">
-                          <Label className="text-[10px] font-medium text-muted-foreground block mb-0.5 leading-4">{t('scale_mode')}</Label>
+                        <div className="w-[120px] sm:w-[140px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('scale_mode')}</div>
                           <Select value={selectedScaleCategory} onValueChange={(v: keyof typeof SCALE_MODES) => {
                             setSelectedScaleCategory(v)
                             setSelectedScale(SCALE_MODES[v][0])
                           }}>
-                            <SelectTrigger className="h-7 text-xs px-2">
+                            <SelectTrigger className="h-8 text-xs px-2 w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -11798,10 +11850,10 @@ export default function FretMasterPage() {
                           </Select>
                         </div>
 
-                        {/* 方向 */}
-                        <div className="w-[150px]">
-                          <Label className="text-[10px] font-medium text-muted-foreground block mb-0.5 leading-4">{t('scale_direction')}</Label>
-                          <div className="flex gap-0.5">
+                        {/* 方向 - segmented */}
+                        <div className="w-[180px] sm:w-[200px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('scale_direction')}</div>
+                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
                             {[
                               { id: "up", label: t('order_ascending') },
                               { id: "down", label: t('order_descending') },
@@ -11810,7 +11862,7 @@ export default function FretMasterPage() {
                             ].map((order) => (
                               <Button
                                 key={order.id}
-                                variant={scaleDirection === order.id ? "default" : "outline"}
+                                variant={scaleDirection === order.id ? "default" : "ghost"}
                                 size="sm"
                                 onClick={() => setScaleDirection(order.id as "up" | "down" | "up_down" | "random")}
                                 className="h-7 text-xs flex-1 px-1"
@@ -11822,10 +11874,10 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 根音移动 */}
-                        <div className="w-[140px]">
-                          <Label className="text-[10px] font-medium text-muted-foreground block mb-0.5 leading-4">{t('root_movement')}</Label>
+                        <div className="w-[130px] sm:w-[150px] space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('root_movement')}</div>
                           <Select value={scaleRootMovement} onValueChange={(v) => setScaleRootMovement(v as typeof scaleRootMovement)}>
-                            <SelectTrigger className="h-7 text-xs px-2">
+                            <SelectTrigger className="h-8 text-xs px-2 w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -11840,35 +11892,38 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 显示选项开关组 */}
-                        <div className="flex items-center gap-1 h-8 px-2 bg-card/30 rounded border border-border/30">
-                          <div className="flex items-center gap-1.5">
-                            <Label htmlFor="showScaleFretboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('fretboard')}</Label>
-                            <Switch
-                              id="showScaleFretboard"
-                              checked={showScaleFretboard}
-                              onCheckedChange={setShowScaleFretboard}
-                              className="scale-75"
-                            />
-                          </div>
-                          <Separator orientation="vertical" className="h-4 mx-1" />
-                          <div className="flex items-center gap-1.5">
-                            <Label htmlFor="showScaleKeyboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('keyboard')}</Label>
-                            <Switch
-                              id="showScaleKeyboard"
-                              checked={showScaleKeyboard}
-                              onCheckedChange={setShowScaleKeyboard}
-                              className="scale-75"
-                            />
-                          </div>
-                          <Separator orientation="vertical" className="h-4 mx-1" />
-                          <div className="flex items-center gap-1.5">
-                            <Label htmlFor="showScaleStructure" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('structure')}</Label>
-                            <Switch
-                              id="showScaleStructure"
-                              checked={showScaleStructure}
-                              onCheckedChange={setShowScaleStructure}
-                              className="scale-75"
-                            />
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-muted-foreground leading-3">{t('display_options')}</div>
+                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30">
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showScaleFretboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('fretboard')}</Label>
+                              <Switch
+                                id="showScaleFretboard"
+                                checked={showScaleFretboard}
+                                onCheckedChange={setShowScaleFretboard}
+                                className="scale-90"
+                              />
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showScaleKeyboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('keyboard')}</Label>
+                              <Switch
+                                id="showScaleKeyboard"
+                                checked={showScaleKeyboard}
+                                onCheckedChange={setShowScaleKeyboard}
+                                className="scale-90"
+                              />
+                            </div>
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="showScaleStructure" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('structure')}</Label>
+                              <Switch
+                                id="showScaleStructure"
+                                checked={showScaleStructure}
+                                onCheckedChange={setShowScaleStructure}
+                                className="scale-90"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -11876,9 +11931,9 @@ export default function FretMasterPage() {
                       {/* 第二行：练习序列和音阶选择 */}
                       <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                         {/* 练习序列选择 */}
-                        <div className="bg-card/30 rounded-lg p-2 border border-border/30 sm:w-auto w-full">
+                        <div className="bg-card/30 rounded-md p-2 border border-border/30 sm:w-auto w-full">
                           <div className="flex items-center justify-between mb-1.5">
-                            <Label className="text-[10px] font-medium text-muted-foreground">{t('scale_practice_sequence')}</Label>
+                            <div className="text-[10px] text-muted-foreground leading-3">{t('scale_practice_sequence')}</div>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {SCALE_PRACTICE_SEQUENCES.map((seq) => (
@@ -11887,7 +11942,7 @@ export default function FretMasterPage() {
                                 variant={scalePracticeSequence === seq.id ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => setScalePracticeSequence(seq.id)}
-                                className="h-6 text-xs px-1.5 py-0.5"
+                                className="h-7 text-xs px-2"
                               >
                                 {seq.id === 'random' ? t('random') : seq.name}
                               </Button>
@@ -11896,26 +11951,26 @@ export default function FretMasterPage() {
                         </div>
 
                         {/* 音阶类型选择 */}
-                        <div className="bg-card/30 rounded-lg p-2 border border-border/30 flex-1 min-w-0">
+                        <div className="bg-card/30 rounded-md p-2 border border-border/30 flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1.5">
-                            <Label className="text-[10px] font-medium text-muted-foreground">
-                              {selectedScaleCategory === 'pentatonic' ? (language === 'zh-CN' ? '五声音阶' : 'Pentatonic Scales') : 
-                               selectedScaleCategory === 'majorScaleModes' ? (language === 'zh-CN' ? '大调音阶模式' : 'Major Scale Modes') : 
-                               selectedScaleCategory === 'melodicMinorScaleModes' ? (language === 'zh-CN' ? '旋律小调模式' : 'Melodic Minor Scale Modes') : 
-                               selectedScaleCategory === 'harmonicMinorScaleModes' ? (language === 'zh-CN' ? '和声小调模式' : 'Harmonic Minor Scale Modes') : 
-                               selectedScaleCategory === 'harmonicMajorScaleModes' ? (language === 'zh-CN' ? '和声大调模式' : 'Harmonic Major Scale Modes') : 
-                               selectedScaleCategory === 'otherScales' ? (language === 'zh-CN' ? '其他音阶' : 'Other Scales') : 
-                               selectedScaleCategory === 'bebopScales' ? (language === 'zh-CN' ? 'Bebop音阶' : 'Bebop Scales') : 
-                               selectedScaleCategory === 'basic' ? (language === 'zh-CN' ? '基础音阶' : 'Basic Scales') : 
-                               selectedScaleCategory === 'church' ? (language === 'zh-CN' ? '教会调式' : 'Church Modes') : 
-                               selectedScaleCategory === 'minor' ? (language === 'zh-CN' ? '小调变体' : 'Minor Variants') : 
-                               selectedScaleCategory === 'bebop' ? (language === 'zh-CN' ? 'Bebop音阶(旧)' : 'Bebop Scales(Old)') : 
-                               selectedScaleCategory === 'jazz' ? (language === 'zh-CN' ? '爵士音阶' : 'Jazz Scales') : 
-                               selectedScaleCategory === 'exotic' ? (language === 'zh-CN' ? '异域音阶' : 'Exotic Scales') : 
-                               selectedScaleCategory === 'symmetrical' ? (language === 'zh-CN' ? '对称音阶' : 'Symmetrical Scales') : 
+                            <div className="text-[10px] text-muted-foreground leading-3">
+                              {selectedScaleCategory === 'pentatonic' ? (language === 'zh-CN' ? '五声音阶' : 'Pentatonic Scales') :
+                               selectedScaleCategory === 'majorScaleModes' ? (language === 'zh-CN' ? '大调音阶模式' : 'Major Scale Modes') :
+                               selectedScaleCategory === 'melodicMinorScaleModes' ? (language === 'zh-CN' ? '旋律小调模式' : 'Melodic Minor Scale Modes') :
+                               selectedScaleCategory === 'harmonicMinorScaleModes' ? (language === 'zh-CN' ? '和声小调模式' : 'Harmonic Minor Scale Modes') :
+                               selectedScaleCategory === 'harmonicMajorScaleModes' ? (language === 'zh-CN' ? '和声大调模式' : 'Harmonic Major Scale Modes') :
+                               selectedScaleCategory === 'otherScales' ? (language === 'zh-CN' ? '其他音阶' : 'Other Scales') :
+                               selectedScaleCategory === 'bebopScales' ? (language === 'zh-CN' ? 'Bebop音阶' : 'Bebop Scales') :
+                               selectedScaleCategory === 'basic' ? (language === 'zh-CN' ? '基础音阶' : 'Basic Scales') :
+                               selectedScaleCategory === 'church' ? (language === 'zh-CN' ? '教会调式' : 'Church Modes') :
+                               selectedScaleCategory === 'minor' ? (language === 'zh-CN' ? '小调变体' : 'Minor Variants') :
+                               selectedScaleCategory === 'bebop' ? (language === 'zh-CN' ? 'Bebop音阶(旧)' : 'Bebop Scales(Old)') :
+                               selectedScaleCategory === 'jazz' ? (language === 'zh-CN' ? '爵士音阶' : 'Jazz Scales') :
+                               selectedScaleCategory === 'exotic' ? (language === 'zh-CN' ? '异域音阶' : 'Exotic Scales') :
+                               selectedScaleCategory === 'symmetrical' ? (language === 'zh-CN' ? '对称音阶' : 'Symmetrical Scales') :
                                (language === 'zh-CN' ? '其他音阶(旧)' : 'Other Scales(Old)')}
                               <span className="ml-1 text-[9px] text-muted-foreground/70">({t('multi_select_hint')})</span>
-                            </Label>
+                            </div>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {SCALE_MODES[selectedScaleCategory].map((scale) => (
@@ -11939,7 +11994,7 @@ export default function FretMasterPage() {
                                     setSelectedScale(scale)
                                   }
                                 }}
-                                className="h-6 text-xs px-1.5 py-0.5"
+                                className="h-7 text-xs px-2"
                               >
                                 {scale.name}
                               </Button>

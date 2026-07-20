@@ -687,6 +687,11 @@ export const TRANSLATIONS = {
 
                     // P1 修复：i18n 补全
                     'request_mic_permission': '请求麦克风权限',
+                    // 控制区字段 Label（统一仪表盘风格）
+                    'interval_root_note_label': '根音',
+                    'interval_root_mode_label': '根音模式',
+                    'select_intervals_label': '选择音程',
+                    'display_options': '显示选项',
                     'mic_granted_with_label': '已获取麦克风权限',
                     'mic_granted_no_label': '已获取权限，但设备名称不可用',
                     'mic_no_input_device': '未检测到音频输入设备',
@@ -1975,6 +1980,11 @@ export const TRANSLATIONS = {
 
                     // P1 修复：i18n 补全
                     'request_mic_permission': 'Request Microphone Permission',
+                    // 控制区字段 Label（统一仪表盘风格）
+                    'interval_root_note_label': 'Root Note',
+                    'interval_root_mode_label': 'Root Mode',
+                    'select_intervals_label': 'Select Intervals',
+                    'display_options': 'Display',
                     'mic_granted_with_label': 'Microphone permission granted',
                     'mic_granted_no_label': 'Permission granted, but device name unavailable',
                     'mic_no_input_device': 'No audio input device detected',
