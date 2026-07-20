@@ -365,7 +365,7 @@ export const FocusMode = memo(function FocusMode({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground text-xs">{t('correct_rate')}</span>
-                <span className={`text-sm font-mono ${correctRate >= 80 ? 'text-green-500' : correctRate >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
+                <span className={`text-sm font-mono ${correctRate >= 80 ? 'text-green-600 dark:text-green-500' : correctRate >= 50 ? 'text-yellow-600 dark:text-yellow-500' : 'text-red-600 dark:text-red-500'}`}>
                   {correctRate}%
                 </span>
               </div>

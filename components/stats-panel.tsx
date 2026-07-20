@@ -6,6 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import {
   BarChart3,
   Clock,
   Target,
@@ -65,6 +74,18 @@ const COLORS = [
   'hsl(340, 75%, 55%)',  // 粉色
 ];
 
+// P1.8: 图表 tooltip/grid 用 CSS 变量适配双主题
+const chartTooltipStyle = {
+  backgroundColor: 'hsl(var(--popover))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: '8px',
+  fontSize: '12px',
+  color: 'hsl(var(--popover-foreground))',
+} as const;
+
+const chartGridStroke = 'hsl(var(--border))';
+const chartAxisStroke = 'hsl(var(--muted-foreground))';
+
 const EXERCISE_TYPE_LABELS: Record<string, string> = {
   'pitch_finding': '找音练习',
   'interval': '音程练习',
@@ -84,6 +105,7 @@ export const StatsPanel = memo(function StatsPanel() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const isTauri = isTauriEnv();
 
   useEffect(() => {
@@ -113,20 +135,19 @@ export const StatsPanel = memo(function StatsPanel() {
     try {
       const count = await syncLocalBackupToServer();
       if (count > 0) {
-        alert(`成功同步 ${count} 条本地备份数据`);
+        toast.success(`成功同步 ${count} 条本地备份数据`);
         loadStats();
       } else {
-        alert('没有需要同步的本地数据');
+        toast.info('没有需要同步的本地数据');
       }
     } catch (error) {
-      alert('同步失败: ' + error);
+      toast.error('同步失败: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setSyncing(false);
     }
   };
 
   const handleClearAll = async () => {
-    if (!confirm('确定要清空所有练习记录吗？此操作不可恢复。')) return;
     setClearing(true);
     try {
       await clearAllPracticeStats();
@@ -134,9 +155,10 @@ export const StatsPanel = memo(function StatsPanel() {
       setSummary({ totalSessions: 0, totalDuration: 0, averageScore: 0, averageAccuracy: 0, lastPractice: null });
       setRecentStats([]);
       setExerciseTypes({});
-      alert('已清空所有练习记录');
+      toast.success('已清空所有练习记录');
+      setClearConfirmOpen(false);
     } catch (error) {
-      alert('清空失败: ' + error);
+      toast.error('清空失败: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setClearing(false);
     }
@@ -329,17 +351,10 @@ export const StatsPanel = memo(function StatsPanel() {
                           <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(220, 13%, 40%)" />
-                      <YAxis tick={{ fontSize: 10 }} stroke="hsl(220, 13%, 40%)" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(220, 13%, 8%)',
-                          border: '1px solid hsl(220, 13%, 18%)',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                        }}
-                      />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke={chartAxisStroke} />
+                      <YAxis tick={{ fontSize: 10 }} stroke={chartAxisStroke} />
+                      <Tooltip contentStyle={chartTooltipStyle} />
                       <Area
                         type="monotone"
                         dataKey="count"
@@ -370,8 +385,8 @@ export const StatsPanel = memo(function StatsPanel() {
               </CardHeader>
               <CardContent>
                 {exerciseTypePieData.length > 0 ? (
-                  <div className="flex items-center gap-4">
-                    <ResponsiveContainer width="60%" height={200}>
+                  <div className="flex flex-col md:flex-row items-center gap-4">
+                    <ResponsiveContainer width="100%" height={200} className="md:w-3/5">
                       <PieChart>
                         <Pie
                           data={exerciseTypePieData}
@@ -382,36 +397,32 @@ export const StatsPanel = memo(function StatsPanel() {
                           paddingAngle={3}
                           dataKey="value"
                           nameKey="name"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          labelLine={false}
+                          minAngle={2}
+                          labelLine={true}
+                          label={({ name, percent }) =>
+                            percent && percent >= 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''
+                          }
                         >
                           {exerciseTypePieData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(220, 13%, 8%)',
-                            border: '1px solid hsl(220, 13%, 18%)',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                          }}
-                        />
+                        <Tooltip contentStyle={chartTooltipStyle} />
                       </PieChart>
                     </ResponsiveContainer>
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
                       {exerciseTypePieData.map((entry, i) => (
                         <div key={i} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <div
-                              className="w-2.5 h-2.5 rounded-sm"
+                              className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
                               style={{ backgroundColor: entry.color }}
                             />
-                            <span>{entry.name}</span>
+                            <span className="truncate">{entry.name}</span>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex items-center gap-1 flex-shrink-0">
                             <span className="font-mono">{entry.value}次</span>
-                            <span className="text-muted-foreground ml-1">
+                            <span className="text-muted-foreground">
                               {formatDuration(entry.duration)}
                             </span>
                           </div>
@@ -441,17 +452,10 @@ export const StatsPanel = memo(function StatsPanel() {
                 {exerciseTypeBarData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={220}>
                     <RechartsBarChart data={exerciseTypeBarData} barSize={40}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(220, 13%, 40%)" />
-                      <YAxis tick={{ fontSize: 10 }} stroke="hsl(220, 13%, 40%)" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(220, 13%, 8%)',
-                          border: '1px solid hsl(220, 13%, 18%)',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                        }}
-                      />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke={chartAxisStroke} />
+                      <YAxis tick={{ fontSize: 10 }} stroke={chartAxisStroke} />
+                      <Tooltip contentStyle={chartTooltipStyle} />
                       <Bar dataKey="avgScore" name="平均分" radius={[4, 4, 0, 0]}>
                         {exerciseTypeBarData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -481,16 +485,11 @@ export const StatsPanel = memo(function StatsPanel() {
                 {scoreTrendData.length > 1 ? (
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={scoreTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 18%)" />
-                      <XAxis dataKey="index" tick={{ fontSize: 10 }} stroke="hsl(220, 13%, 40%)" />
-                      <YAxis tick={{ fontSize: 10 }} stroke="hsl(220, 13%, 40%)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                      <XAxis dataKey="index" tick={{ fontSize: 10 }} stroke={chartAxisStroke} />
+                      <YAxis tick={{ fontSize: 10 }} stroke={chartAxisStroke} />
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(220, 13%, 8%)',
-                          border: '1px solid hsl(220, 13%, 18%)',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                        }}
+                        contentStyle={chartTooltipStyle}
                         formatter={(value: number, name: string) => [
                           name === '得分' ? value : `${value}%`,
                           name,
@@ -563,7 +562,7 @@ export const StatsPanel = memo(function StatsPanel() {
                       {stat.score || 0}分
                     </Badge>
                     {stat.accuracy && (
-                      <span className="text-xs text-green-500">
+                      <span className="text-xs text-green-600 dark:text-green-500">
                         {(stat.accuracy * 100).toFixed(0)}%
                       </span>
                     )}
@@ -598,17 +597,45 @@ export const StatsPanel = memo(function StatsPanel() {
         </Button>
         {isTauri && (
           <Button
-            onClick={handleClearAll}
+            onClick={() => setClearConfirmOpen(true)}
             disabled={clearing || loading}
             variant="outline"
             size="sm"
-            className="text-red-500 hover:text-red-600 hover:bg-red-500/10 border-red-500/30"
+            className="text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-500/10 border-red-500/30"
           >
             <Trash2 className="h-3.5 w-3.5 mr-1.5" />
             {clearing ? '清空中...' : '清空记录'}
           </Button>
         )}
       </div>
+
+      {/* P1.4: 清空记录确认对话框（替代原生 confirm） */}
+      <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>清空确认</DialogTitle>
+            <DialogDescription>
+              确定要清空所有练习记录吗？此操作不可恢复。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setClearConfirmOpen(false)}
+              disabled={clearing}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleClearAll}
+              disabled={clearing}
+            >
+              {clearing ? '清空中...' : '清空'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 })

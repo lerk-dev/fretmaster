@@ -100,7 +100,7 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
   return (
     <div
       className={cn(
-        'h-10 bg-background border-b flex items-center justify-between select-none',
+        'h-11 bg-background border-b flex items-center justify-between select-none',
         className
       )}
     >
@@ -118,16 +118,18 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
         <button
           onClick={handleMinimize}
           onMouseDown={(e) => e.stopPropagation()}
-          className="h-10 w-12 flex items-center justify-center hover:bg-accent/50 transition-colors"
+          className="h-11 w-12 flex items-center justify-center hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:bg-accent/50"
           title="Minimize"
+          aria-label="Minimize"
         >
           <Minus className="w-4 h-4 text-foreground/70" />
         </button>
         <button
           onClick={handleMaximize}
           onMouseDown={(e) => e.stopPropagation()}
-          className="h-10 w-12 flex items-center justify-center hover:bg-accent/50 transition-colors"
+          className="h-11 w-12 flex items-center justify-center hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:bg-accent/50"
           title={isMaximized ? 'Restore' : 'Maximize'}
+          aria-label={isMaximized ? 'Restore' : 'Maximize'}
         >
           {isMaximized ? (
             <Square className="w-3.5 h-3.5 text-foreground/70" />
@@ -138,8 +140,9 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
         <button
           onClick={handleClose}
           onMouseDown={(e) => e.stopPropagation()}
-          className="h-10 w-12 flex items-center justify-center hover:bg-red-500/90 hover:text-white transition-colors"
+          className="h-11 w-12 flex items-center justify-center hover:bg-red-500/90 hover:text-white transition-colors focus-visible:outline-none focus-visible:bg-red-500/90"
           title="Close"
+          aria-label="Close"
         >
           <X className="w-4 h-4 text-foreground/70 hover:text-white" />
         </button>

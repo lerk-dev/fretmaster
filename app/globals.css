@@ -75,6 +75,7 @@
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     overflow-y: scroll;
@@ -124,6 +125,43 @@
   .theme-transition::after {
     transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.15s ease;
   }
+  /* P1.6: iOS safe-area 工具类，配合 viewport-fit=cover 使用 */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  /* P1.3: 指板对错反馈角标（仅靠颜色之外的视觉编码） */
+  .fret-feedback-correct::after {
+    content: '✓';
+    position: absolute;
+    top: 1px;
+    right: 2px;
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.95);
+  }
+  .fret-feedback-wrong::after {
+    content: '✗';
+    position: absolute;
+    top: 1px;
+    right: 2px;
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.95);
+  }
+  /* P1.10: 仅在键盘聚焦时显示焦点环 */
+  .focus-ring-none:focus { outline: none; }
+  .focus-ring-none:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) {
     body,
     .theme-transition,

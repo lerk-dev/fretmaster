@@ -235,8 +235,9 @@ const DebugPanelInner = memo(function DebugPanelInner() {
       {!visible && (
         <button
           onClick={() => setVisible(true)}
-          className="fixed bottom-4 right-4 z-50 w-10 h-10 rounded-full bg-card border border-border shadow-lg flex items-center justify-center hover:bg-accent/20 transition-colors"
+          className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-card border border-border shadow-lg flex items-center justify-center hover:bg-accent/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title="Debug Panel"
+          aria-label="Open debug panel"
         >
           <Bug className="w-4 h-4 text-muted-foreground" />
         </button>
@@ -245,8 +246,18 @@ const DebugPanelInner = memo(function DebugPanelInner() {
       {visible && (
         <div className="fixed bottom-4 right-4 z-50 w-96 max-h-[80vh] overflow-hidden rounded-lg border border-border bg-card/95 backdrop-blur-sm shadow-2xl">
           <div
-            className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border cursor-pointer select-none"
+            className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            role="button"
+            tabIndex={0}
+            aria-expanded={!minimized}
+            aria-label="Toggle debug panel"
             onClick={() => setMinimized(!minimized)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setMinimized(!minimized)
+              }
+            }}
           >
             <div className="flex items-center gap-2">
               <Bug className="w-3.5 h-3.5 text-amber-500" />
@@ -269,9 +280,10 @@ const DebugPanelInner = memo(function DebugPanelInner() {
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); setVisible(false) }}
-                className="ml-1 hover:bg-destructive/20 rounded p-0.5"
+                className="ml-1 hover:bg-destructive/20 rounded p-1 min-h-[28px] min-w-[28px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Close debug panel"
               >
-                <X className="w-3 h-3 text-muted-foreground" />
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
               </button>
             </div>
           </div>

@@ -9558,21 +9558,21 @@ export default function FretMasterPage() {
   const getNoteButtonColor = useCallback((note: string, stringIndex: number, fret: number) => {
     const key = `${stringIndex}-${fret}`
     
-    // 优先显示点击反馈（正确绿色，错误红色）
+    // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标作为非颜色编码）
     if (highlightedFrets.has(key)) {
       const isCorrect = highlightedFrets.get(key)
       return isCorrect
-        ? "bg-green-500 text-white" 
-        : "bg-red-500 text-white"
+        ? "bg-green-500 text-white fret-feedback-correct" 
+        : "bg-red-500 text-white fret-feedback-wrong"
     }
     
     if (activeTab === "practice") {
-      // 优先显示点击反馈（正确绿色，错误红色）
+      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
       if (highlightedFrets.has(key)) {
         const isCorrect = highlightedFrets.get(key)
         return isCorrect
-          ? "bg-green-500 text-white" 
-          : "bg-red-500 text-white"
+          ? "bg-green-500 text-white fret-feedback-correct" 
+          : "bg-red-500 text-white fret-feedback-wrong"
       }
       
       // 按钮答题模式下，高亮显示目标位置
@@ -9595,12 +9595,12 @@ export default function FretMasterPage() {
       // 和弦练习模式 - 色块按和弦转换练习样式
       const key = `${stringIndex}-${fret}`
       
-      // 优先显示点击反馈（正确绿色，错误红色）
+      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
       if (highlightedFrets.has(key)) {
         const isCorrect = highlightedFrets.get(key)
         return isCorrect
-          ? "bg-green-500 text-white" 
-          : "bg-red-500 text-white"
+          ? "bg-green-500 text-white fret-feedback-correct" 
+          : "bg-red-500 text-white fret-feedback-wrong"
       }
       
       // 开始练习后显示当前和弦的所有音 - 按和弦转换练习色块样式
@@ -9634,12 +9634,12 @@ export default function FretMasterPage() {
       // 音程练习 - 色块按和弦转换练习样式
       const key = `${stringIndex}-${fret}`
       
-      // 优先显示点击反馈（正确绿色，错误红色）
+      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
       if (highlightedFrets.has(key)) {
         const isCorrect = highlightedFrets.get(key)
         return isCorrect
-          ? "bg-green-500 text-white" 
-          : "bg-red-500 text-white"
+          ? "bg-green-500 text-white fret-feedback-correct" 
+          : "bg-red-500 text-white fret-feedback-wrong"
       }
       
       // 练习未开始时只显示 hover 效果
@@ -9670,12 +9670,12 @@ export default function FretMasterPage() {
       // 音阶练习模式 - 色块按和弦转换练习样式
       const key = `${stringIndex}-${fret}`
       
-      // 优先显示点击反馈（正确绿色，错误红色）
+      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
       if (highlightedFrets.has(key)) {
         const isCorrect = highlightedFrets.get(key)
         return isCorrect
-          ? "bg-green-500 text-white" 
-          : "bg-red-500 text-white"
+          ? "bg-green-500 text-white fret-feedback-correct" 
+          : "bg-red-500 text-white fret-feedback-wrong"
       }
       
       // 开始练习后显示当前音阶的所有音 - 按和弦转换练习色块样式
@@ -9705,12 +9705,12 @@ export default function FretMasterPage() {
       // 和弦转换练习 - 指板样式参考找音练习
       const key = `${stringIndex}-${fret}`
       
-      // 优先显示点击反馈（正确绿色，错误红色） 找音练习样式
+      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
       if (highlightedFrets.has(key)) {
         const isCorrect = highlightedFrets.get(key)
         return isCorrect
-          ? "bg-green-500 text-white" 
-          : "bg-red-500 text-white"
+          ? "bg-green-500 text-white fret-feedback-correct" 
+          : "bg-red-500 text-white fret-feedback-wrong"
       }
       
       const chords = transposedChords
@@ -10011,9 +10011,10 @@ export default function FretMasterPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-9 w-9"
                 onClick={() => setShowShortcutsHelp(true)}
                 title={t('keyboard_shortcuts')}
+                aria-label={t('keyboard_shortcuts')}
               >
                 <Keyboard className="h-4 w-4" />
               </Button>
@@ -10025,7 +10026,7 @@ export default function FretMasterPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-9 w-9"
                       title={t('nav_tuner')}
                       aria-label={t('nav_tuner')}
                     >
@@ -10370,26 +10371,26 @@ export default function FretMasterPage() {
                                   const devices = await navigator.mediaDevices.enumerateDevices()
                                   const audioInputs = devices.filter(d => d.kind === 'audioinput')
                                   if (audioInputs.length > 0 && audioInputs.some(d => d.label)) {
-                                    toast.success('已获取麦克风权限')
+                                    toast.success(t('mic_granted_with_label'))
                                   } else if (audioInputs.length > 0) {
-                                    toast.warning('已获取权限，但设备名称不可用')
+                                    toast.warning(t('mic_granted_no_label'))
                                   } else {
-                                    toast.warning('未检测到音频输入设备')
+                                    toast.warning(t('mic_no_input_device'))
                                   }
                                 } catch (err: unknown) {
                                   console.error('麦克风权限错误', err)
                                   const error = err instanceof Error ? err : new Error(String(err))
                                   if (error.name === 'NotAllowedError') {
-                                    toast.error('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风')
+                                    toast.error(t('mic_permission_denied'))
                                   } else if (error.name === 'NotFoundError') {
-                                    toast.error('未找到麦克风设备')
+                                    toast.error(t('mic_not_found'))
                                   } else {
-                                    toast.error('无法获取麦克风权限 ' + (error.message || '未知错误'))
+                                    toast.error(`${t('mic_generic_error')} ${error.message || ''}`)
                                   }
                                 }
                               }}
                             >
-                              请求麦克风权限
+                              {t('request_mic_permission')}
                             </Button>
                           </div>
                         )}
@@ -10410,7 +10411,7 @@ export default function FretMasterPage() {
                           <div className="flex flex-col">
                             <span className="text-sm text-muted-foreground">{t('device_audio_input')}</span>
                             {micEnabled && (
-                              <span className="text-xs text-green-500">
+                              <span className="text-xs text-green-600 dark:text-green-500">
                                 {useAudioWorklet ? 'AudioWorklet' : 'ScriptProcessor'}
                               </span>
                             )}
@@ -10850,25 +10851,26 @@ export default function FretMasterPage() {
                 ref={practiceCardRef}
                 tabIndex={0} 
                 onKeyDown={handleKeyDown}
-                className="outline-none focus:ring-2 focus:ring-primary/50"
+                className="outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 role="region"
                 aria-label={t('fretboard_title')}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">
+                    <h2 className="text-lg font-semibold leading-none">
                       {activeTab === "practice" && t('nav_practice')}
                       {activeTab === "interval" && t('nav_interval')}
                       {activeTab === "chord_exercise" && t('nav_chord_exercise')}
                       {activeTab === "chord" && t('nav_chord')}
                       {activeTab === "scale" && t('nav_scale')}
-                    </CardTitle>
+                    </h2>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setFullscreenMode(true)}
                         title={t('fullscreen_mode')}
+                        aria-label={t('fullscreen_mode')}
                       >
                         <Maximize2 className="h-4 w-4" />
                       </Button>
@@ -10877,6 +10879,7 @@ export default function FretMasterPage() {
                         size="sm"
                         onClick={() => store.setFocusModeSettings({ enabled: !focusMode?.enabled })}
                         title={t('focus_mode')}
+                        aria-label={t('focus_mode')}
                       >
                         <Target className="h-4 w-4" />
                       </Button>
@@ -10886,6 +10889,7 @@ export default function FretMasterPage() {
                           size="sm"
                           onClick={togglePausePractice}
                           title={isPracticePaused ? t('resume') : t('pause')}
+                          aria-label={isPracticePaused ? t('resume') : t('pause')}
                         >
                           {isPracticePaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                         </Button>
@@ -10946,7 +10950,7 @@ export default function FretMasterPage() {
                                     setSelectedStrings(prev => [...prev, stringNum].sort())
                                   }
                                 }}
-                                className="h-5 w-5 sm:h-6 sm:w-6 p-0 text-[10px] sm:text-xs"
+                                className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-[10px] sm:text-xs"
                               >
                                 {stringNum}
                               </Button>
@@ -11005,7 +11009,7 @@ export default function FretMasterPage() {
                                 }
                                 setPracticeAnswerMode("fretboard")
                               }}
-                              className="h-6 px-2 text-xs"
+                              className="h-8 px-2 text-xs"
                             >
                               {t('practice_mode_find')}
                             </Button>
@@ -11022,7 +11026,7 @@ export default function FretMasterPage() {
                                 }
                                 setPracticeAnswerMode("buttons")
                               }}
-                              className="h-6 px-2 text-xs"
+                              className="h-8 px-2 text-xs"
                             >
                               {t('practice_mode_identify')}
                             </Button>
@@ -11671,9 +11675,19 @@ export default function FretMasterPage() {
                     >
                       <div className="bg-card/95 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg p-3">
                         <div 
-                          className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing"
+                          className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t('chord_structure_drag_hint') || '拖动或用方向键移动面板'}
                           onMouseDown={(e) => handleDragStart(e, 'chord')}
                           onTouchStart={(e) => handleDragStart(e, 'chord')}
+                          onKeyDown={(e) => {
+                            const step = e.shiftKey ? 20 : 5
+                            if (e.key === 'ArrowLeft') { e.preventDefault(); setChordStructurePosition(p => ({ ...p, x: p.x - step })) }
+                            else if (e.key === 'ArrowRight') { e.preventDefault(); setChordStructurePosition(p => ({ ...p, x: p.x + step })) }
+                            else if (e.key === 'ArrowUp') { e.preventDefault(); setChordStructurePosition(p => ({ ...p, y: p.y - step })) }
+                            else if (e.key === 'ArrowDown') { e.preventDefault(); setChordStructurePosition(p => ({ ...p, y: p.y + step })) }
+                          }}
                         >
                           <div className="flex items-center gap-2">
                             <GripVertical className="h-3 w-3 text-muted-foreground" />
@@ -11681,7 +11695,8 @@ export default function FretMasterPage() {
                           </div>
                           <button
                             onClick={() => setShowChordStructure(false)}
-                            className="text-muted-foreground hover:text-foreground p-1"
+                            className="text-muted-foreground hover:text-foreground p-1 min-h-[28px] min-w-[28px] flex items-center justify-center"
+                            aria-label="关闭和弦进行信息"
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -11948,9 +11963,19 @@ export default function FretMasterPage() {
                   }}
                 >
                   <div 
-                    className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing"
+                    className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t('chord_structure_drag_hint') || '拖动或用方向键移动面板'}
                     onMouseDown={(e) => handleDragStart(e, 'scale')}
                     onTouchStart={(e) => handleDragStart(e, 'scale')}
+                    onKeyDown={(e) => {
+                      const step = e.shiftKey ? 20 : 5
+                      if (e.key === 'ArrowLeft') { e.preventDefault(); setScaleStructurePosition(p => ({ ...p, x: p.x - step })) }
+                      else if (e.key === 'ArrowRight') { e.preventDefault(); setScaleStructurePosition(p => ({ ...p, x: p.x + step })) }
+                      else if (e.key === 'ArrowUp') { e.preventDefault(); setScaleStructurePosition(p => ({ ...p, y: p.y - step })) }
+                      else if (e.key === 'ArrowDown') { e.preventDefault(); setScaleStructurePosition(p => ({ ...p, y: p.y + step })) }
+                    }}
                   >
                     <div className="flex items-center gap-2">
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -11958,7 +11983,8 @@ export default function FretMasterPage() {
                     </div>
                     <button 
                       onClick={() => setShowScaleStructure(false)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-muted-foreground hover:text-foreground p-1 min-h-[28px] min-w-[28px] flex items-center justify-center"
+                      aria-label="关闭音阶结构"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -12005,9 +12031,19 @@ export default function FretMasterPage() {
                   }}
                 >
                   <div 
-                    className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing"
+                    className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t('chord_structure_drag_hint') || '拖动或用方向键移动面板'}
                     onMouseDown={(e) => handleDragStart(e, 'chordExercise')}
                     onTouchStart={(e) => handleDragStart(e, 'chordExercise')}
+                    onKeyDown={(e) => {
+                      const step = e.shiftKey ? 20 : 5
+                      if (e.key === 'ArrowLeft') { e.preventDefault(); setChordExerciseStructurePosition(p => ({ ...p, x: p.x - step })) }
+                      else if (e.key === 'ArrowRight') { e.preventDefault(); setChordExerciseStructurePosition(p => ({ ...p, x: p.x + step })) }
+                      else if (e.key === 'ArrowUp') { e.preventDefault(); setChordExerciseStructurePosition(p => ({ ...p, y: p.y - step })) }
+                      else if (e.key === 'ArrowDown') { e.preventDefault(); setChordExerciseStructurePosition(p => ({ ...p, y: p.y + step })) }
+                    }}
                   >
                     <div className="flex items-center gap-2">
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -12015,7 +12051,8 @@ export default function FretMasterPage() {
                     </div>
                     <button
                       onClick={() => setShowChordExerciseStructure(false)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-muted-foreground hover:text-foreground p-1 min-h-[28px] min-w-[28px] flex items-center justify-center"
+                      aria-label="关闭和弦练习结构"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -12072,26 +12109,33 @@ export default function FretMasterPage() {
               )}
 
               {showPracticeSummary && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                  <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 max-w-sm w-full mx-4 shadow-2xl">
-                    <div className="text-center mb-6">
-                      <div className="text-4xl mb-2">
+                <Dialog open={showPracticeSummary} onOpenChange={(open) => !open && setShowPracticeSummary(false)}>
+                  <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle className="text-center text-xl font-bold">
+                        {t('practice_summary_title')}
+                      </DialogTitle>
+                      <DialogDescription className="text-center text-sm text-muted-foreground sr-only">
+                        {t('practice_summary_title')}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="text-center mb-2">
+                      <div className="text-4xl mb-2" aria-hidden="true">
                         {practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.8 ? '🎉' : 
                          practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.5 ? '👍' : '💪'}
                       </div>
-                      <h3 className="text-xl font-bold">{t('practice_summary_title')}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-sm text-muted-foreground">
                         {practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.8 ? t('practice_summary_excellent') :
                          practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.5 ? t('practice_summary_good') : t('practice_summary_keep')}
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className="grid grid-cols-2 gap-3 mb-2">
                       <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-center">
-                        <div className="text-2xl font-bold text-green-500">{practiceSummaryData.correct}</div>
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-500">{practiceSummaryData.correct}</div>
                         <div className="text-xs text-muted-foreground">{t('practice_summary_correct')}</div>
                       </div>
                       <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center">
-                        <div className="text-2xl font-bold text-red-500">{practiceSummaryData.total - practiceSummaryData.correct}</div>
+                        <div className="text-2xl font-bold text-red-600 dark:text-red-500">{practiceSummaryData.total - practiceSummaryData.correct}</div>
                         <div className="text-xs text-muted-foreground">{t('practice_summary_wrong')}</div>
                       </div>
                       <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-center">
@@ -12123,8 +12167,8 @@ export default function FretMasterPage() {
                         {t('practice_summary_again')}
                       </Button>
                     </div>
-                  </div>
-                </div>
+                  </DialogContent>
+                </Dialog>
               )}
 
               {/* Fretboard - 根据模式显示/隐藏，统计页面不显示 */}
@@ -12170,8 +12214,9 @@ export default function FretMasterPage() {
                             <button
                               onClick={() => isStringEnabled && handleFretClick(stringIndex, 0)}
                               disabled={!isStringEnabled}
+                              aria-label={isStringEnabled ? `${formatNoteByAccidentalSetting(getNoteAtPosition(stringIndex, 0))} ${stringIndex + 1}弦 0品` : undefined}
                               className={cn(
-                                "flex-[0.8] h-6 sm:h-8 text-[10px] sm:text-xs font-mono font-semibold transition-all duration-150",
+                                "flex-[0.8] h-8 sm:h-10 text-[10px] sm:text-xs font-mono font-semibold transition-all duration-150 relative",
                                 "flex items-center justify-center",
                                 isStringEnabled 
                                   ? cn("text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(getNoteAtPosition(stringIndex, 0), stringIndex, 0))
@@ -12269,11 +12314,12 @@ export default function FretMasterPage() {
                                   key={actualFret}
                                   onClick={() => isStringEnabled && handleFretClick(stringIndex, actualFret)}
                                   disabled={!isStringEnabled}
+                                  aria-label={isStringEnabled ? `${formatNoteByAccidentalSetting(note)} ${stringIndex + 1}弦 ${actualFret}品` : undefined}
                                   className={cn(
-                                    "flex-1 h-6 sm:h-8 text-[8px] sm:text-[10px] font-medium transition-all duration-150 min-w-[20px] sm:min-w-[28px]",
+                                    "flex-1 h-8 sm:h-10 text-[8px] sm:text-[10px] font-medium transition-all duration-150 min-w-[20px] sm:min-w-[28px]",
                                     "flex items-center justify-center relative z-10",
                                     "border-r",
-                                    isStringEnabled 
+                                    isStringEnabled
                                       ? cn("border-border/50 dark:border-zinc-600/50", getNoteButtonColor(note, stringIndex, actualFret))
                                       : "border-border/30 dark:border-zinc-800/50 text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
                                   )}
@@ -12919,8 +12965,8 @@ export default function FretMasterPage() {
           <div
             role="button"
             tabIndex={0}
-            aria-label="点击空白处或按 ESC 退出全屏"
-            className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center overflow-auto cursor-pointer"
+            aria-label={t('fullscreen_exit_hint')}
+            className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center overflow-auto cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ margin: 0, padding: 0, width: '100vw', height: '100vh', top: 0, left: 0, right: 0, bottom: 0 }}
             onClick={() => setFullscreenMode(false)}
             onKeyDown={(e) => {
