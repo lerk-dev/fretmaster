@@ -1161,6 +1161,15 @@ export const TRANSLATIONS = {
                     'level_desc_passing_note_scales_passing_note_scale_5th_to_5th': '经过音音阶\n\n从五音到五音\n\n带经过音的和弦音阶',
                     'level_desc_passing_note_scales_passing_note_scale_6th7th_to_6th7th': '经过音音阶\n\n从六音到六音或七音到七音\n\n根据和声选择',
                     'level_desc_passing_note_scales_passing_note_scale_random_starting_chord_tone': '经过音音阶\n\n从随机和弦音开始\n\n带经过音的和弦音阶',
+                    // 变化属和弦结构 & 减音阶
+                    'level_altered_flat9': '变化属和弦（♭9）',
+                    'level_altered_sharp9': '变化属和弦（♯9）',
+                    'level_altered_flat5': '变化属和弦（♭5）',
+                    'level_altered_sharp5': '变化属和弦（♯5）',
+                    'level_altered_full': '变化属和弦（完整）',
+                    'level_altered_scale': '变化音阶',
+                    'level_dim_wh': '减音阶（全半）',
+                    'level_dim_hw': '减音阶（半全）',
                 },
                 'en': {
                     'fullscreen_mode': 'Fullscreen Mode',
@@ -2321,5 +2330,14 @@ export const TRANSLATIONS = {
                     'level_desc_passing_note_scales_passing_note_scale_5th_to_5th': 'All notes of the relevant chord scale with appropriate passing notes, from the 5th. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.',
                     'level_desc_passing_note_scales_passing_note_scale_6th7th_to_6th7th': 'All notes of the relevant chord scale with appropriate passing notes, from the 6th or 7th. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.',
                     'level_desc_passing_note_scales_passing_note_scale_random_starting_chord_tone': 'All notes of the relevant chord scale with appropriate passing notes, from a randomised starting chord tone. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.',
+                    // Altered Dominant Structures & Diminished Scales
+                    'level_altered_flat9': 'Altered Dominant (♭9)',
+                    'level_altered_sharp9': 'Altered Dominant (♯9)',
+                    'level_altered_flat5': 'Altered Dominant (♭5)',
+                    'level_altered_sharp5': 'Altered Dominant (♯5)',
+                    'level_altered_full': 'Altered Dominant (Full)',
+                    'level_altered_scale': 'Altered Scale',
+                    'level_dim_wh': 'Diminished (Whole-Half)',
+                    'level_dim_hw': 'Diminished (Half-Whole)',
                 }
             }
