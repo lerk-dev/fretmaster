@@ -1,6 +1,6 @@
 {
   "name": "fretmaster",
-  "version": "0.2.146",
+  "version": "0.2.149",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -60,6 +60,7 @@
     "cmdk": "1.1.1",
     "embla-carousel-react": "8.6.0",
     "framer-motion": "^12.38.0",
+    "html2canvas": "^1.4.1",
     "input-otp": "1.4.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.487.0",

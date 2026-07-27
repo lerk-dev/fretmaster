@@ -1,6 +1,25 @@
 import { PracticeStats } from './stats-api'
 import { isTauriEnv, parseDbTimestamp, dbTimestampToLocalDate, normalizeAccuracy } from './utils'
 
+// html2canvas 和 jsPDF 仅在浏览器环境动态导入，避免 SSR 时报错
+// jsPDF 已是项目依赖（package.json），html2canvas 也已安装
+let html2canvasPromise: Promise<typeof import('html2canvas')['default']> | null = null
+let jspdfPromise: Promise<typeof import('jspdf')['jsPDF']> | null = null
+
+async function loadHtml2Canvas() {
+  if (!html2canvasPromise) {
+    html2canvasPromise = import('html2canvas').then(m => m.default)
+  }
+  return html2canvasPromise
+}
+
+async function loadJsPDF() {
+  if (!jspdfPromise) {
+    jspdfPromise = import('jspdf').then(m => m.jsPDF)
+  }
+  return jspdfPromise
+}
+
 const isTauri = (): boolean => {
   return isTauriEnv()
 }
@@ -700,20 +719,9 @@ export async function exportPracticeData(
   const timestamp = new Date().toISOString().split('T')[0]
 
   if (options.format === 'pdf') {
-    const htmlContent = exportToHTML(stats, options)
-    const filename = `fretmaster-practice-${timestamp}.html`
-    const filters = [{ name: 'HTML', extensions: ['html'] }, { name: 'All Files', extensions: ['*'] }]
-
-    if (isTauri()) {
-      const result = await saveFileTauri(htmlContent, filename, filters)
-      if (result.success && result.path) {
-        return { success: true, path: result.path }
-      }
-      return result
-    } else {
-      downloadFileWeb(htmlContent, filename, 'text/html;charset=utf-8')
-      return { success: true, path: filename }
-    }
+    // PDF 导出：使用 html2canvas + jsPDF 生成真正的 PDF（图片形式，中文完美）
+    // 与 HTML 导出独立，HTML 导出仍保留原有逻辑
+    return await exportToPDF(stats, options)
   }
 
   let content: string
@@ -749,6 +757,168 @@ export async function exportPracticeData(
   } else {
     downloadFileWeb(content, filename, mimeType)
     return { success: true, path: filename }
+  }
+}
+
+/**
+ * 生成 PDF 报告（html2canvas + jsPDF 方案）
+ *
+ * 流程：
+ * 1. 复用 exportToHTML 生成完整 HTML（与 HTML 导出样式一致，保证视觉统一）
+ * 2. 创建一个离屏容器渲染该 HTML
+ * 3. 用 html2canvas 截图（2x 清晰度，完美支持中文）
+ * 4. 用 jsPDF 将图片按 A4 分页拼接成 PDF
+ * 5. 在 Tauri 环境保存到用户选择路径，Web 环境触发下载
+ *
+ * 与 HTML 导出的区别：PDF 是图片形式（不可选文字），但中文显示完美、排版固定。
+ */
+async function exportToPDF(
+  stats: PracticeStats[],
+  options: ExportOptions
+): Promise<{ success: boolean; path?: string; error?: string }> {
+  const timestamp = new Date().toISOString().split('T')[0]
+  const filename = `fretmaster-practice-${timestamp}.pdf`
+
+  // 1. 生成 HTML 内容（复用 HTML 导出的模板，包含完整 <style>）
+  const htmlContent = exportToHTML(stats, options)
+
+  // 2. 用 iframe 渲染完整 HTML，确保 <style> 标签生效
+  //    直接用 div 容器只能注入 body 内容，会丢失 head 里的样式
+  //    iframe 有独立的 document，可以完整渲染整个 HTML
+  const iframe = document.createElement('iframe')
+  iframe.style.cssText = `
+    position: fixed;
+    left: -9999px;
+    top: 0;
+    width: 794px;
+    height: 0;
+    border: 0;
+    background: #ffffff;
+  `
+  document.body.appendChild(iframe)
+
+  try {
+    // 3. 写入完整 HTML 到 iframe，并注入打印样式覆盖（白底，适合 PDF）
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!iframeDoc) {
+      throw new Error('无法获取 iframe document')
+    }
+    // 在 HTML 中注入额外样式：强制白底 + 黑字，覆盖原模板的深色背景
+    const printStyle = `
+<style>
+  /* PDF 导出专用：强制白底黑字，覆盖深色主题 */
+  body { background: #ffffff !important; color: #1a1a2e !important; padding: 20px !important; }
+  .container { background: #ffffff !important; box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+  h1 { color: #1e40af !important; }
+  .subtitle { color: #64748b !important; }
+  .summary-card { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+  .summary-value { color: #1e40af !important; }
+  .summary-label { color: #64748b !important; }
+  .section-title { color: #1e40af !important; border-color: #60a5fa !important; }
+  th { background: #1e40af !important; color: #ffffff !important; }
+  td { border-color: #e2e8f0 !important; color: #1a1a2e !important; }
+  tr:nth-child(even) { background: #f8fafc !important; }
+  tr:nth-child(even) td { background: #f8fafc !important; }
+  .notes-cell { color: #475569 !important; }
+  .footer { color: #64748b !important; }
+  .record-count { color: #64748b !important; }
+  .no-data { color: #64748b !important; }
+</style>`
+    // 将打印样式插入到 </head> 之前，确保覆盖原样式
+    const htmlWithPrintStyle = htmlContent.replace('</head>', `${printStyle}</head>`)
+    iframeDoc.open()
+    iframeDoc.write(htmlWithPrintStyle)
+    iframeDoc.close()
+
+    // 4. 等待 iframe 内图片和字体加载完成
+    await new Promise<void>((resolve) => {
+      // 等待字体加载
+      if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+        iframeDoc.fonts.ready.then(() => resolve())
+      } else {
+        setTimeout(resolve, 200)
+      }
+    })
+    // 额外等待 100ms 确保 DOM 渲染完成
+    await new Promise<void>(r => setTimeout(r, 100))
+
+    // 5. 动态加载 html2canvas 和 jsPDF
+    const [html2canvas, JsPDF] = await Promise.all([loadHtml2Canvas(), loadJsPDF()])
+
+    // 6. 截图 iframe 内的 document.body
+    const reportElement = iframeDoc.body
+    // 设置 iframe 高度匹配内容，避免截断
+    const contentHeight = reportElement.scrollHeight
+    iframe.style.height = `${contentHeight}px`
+
+    const canvas = await html2canvas(reportElement, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowWidth: 794,
+      width: 794,
+      height: contentHeight,
+      logging: false,
+    })
+
+    // 5. 生成 PDF
+    const imgData = canvas.toDataURL('image/jpeg', 0.92)
+
+    // A4 尺寸 (mm)
+    const pdfWidth = 210
+    const pdfHeight = 297
+    const margin = 10
+    const contentWidth = pdfWidth - margin * 2
+
+    // 图片按 A4 内容宽度等比缩放
+    const imgWidth = contentWidth
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+    const pdf = new JsPDF({ unit: 'mm', format: 'a4' })
+
+    // 分页处理：图片高度超过一页时，逐页添加
+    let heightLeft = imgHeight
+    let position = margin
+
+    pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight)
+    heightLeft -= (pdfHeight - margin * 2)
+
+    while (heightLeft > 0) {
+      position = margin - (imgHeight - heightLeft)
+      pdf.addPage()
+      pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight)
+      heightLeft -= (pdfHeight - margin * 2)
+    }
+
+    // 6. 输出文件
+    if (isTauri()) {
+      // Tauri 环境：通过插件保存到用户选择路径
+      const filters = [
+        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'All Files', extensions: ['*'] },
+      ]
+      // pdf.output('arraybuffer') 返回 Uint8Array，Tauri 的 writeFile 接受 Uint8Array
+      const pdfBytes = pdf.output('arraybuffer') as ArrayBuffer
+      const { save } = await import('@tauri-apps/plugin-dialog')
+      const { writeFile } = await import('@tauri-apps/plugin-fs')
+      const filePath = await save({ defaultPath: filename, filters })
+      if (!filePath) {
+        return { success: false, error: 'cancelled' }
+      }
+      await writeFile(filePath, new Uint8Array(pdfBytes))
+      return { success: true, path: filePath }
+    } else {
+      // Web 环境：触发浏览器下载
+      pdf.save(filename)
+      return { success: true, path: filename }
+    }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  } finally {
+    // 清理 iframe
+    if (iframe.parentNode) {
+      iframe.parentNode.removeChild(iframe)
+    }
   }
 }
 
