@@ -5,7 +5,7 @@ import { DebugPanel } from '@/components/debug-panel'
 import { Toaster } from 'sonner'
 import { ClientOnly } from '@/components/client-only'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, isLightTheme } from '@/lib/store'
 import { useEffect, useState } from 'react'
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {
@@ -14,7 +14,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   // 客户端 mounted 标记，避免 hydration mismatch
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
-  const sonnerTheme = mounted && theme === 'light' ? 'light' : 'dark'
+  const sonnerTheme = mounted && isLightTheme(theme) ? 'light' : 'dark'
 
   // 同步 isFullscreen 到 html/body 标签（html/body 在 server component 中渲染，需在此副作用操作 DOM）
   useEffect(() => {

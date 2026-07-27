@@ -75,7 +75,61 @@ export interface FocusModeSettings {
   targetDuration: number
 }
 
-export type ThemeMode = 'dark' | 'light'
+export type ThemeMode =
+  | 'dark'
+  | 'light'
+  | 'forest-dark'
+  | 'forest-light'
+  | 'ocean-dark'
+  | 'ocean-light'
+  | 'sunset-dark'
+  | 'sunset-light'
+  | 'monochrome-dark'
+  | 'monochrome-light'
+  | 'rose-dark'
+  | 'rose-light'
+  | 'midnight-dark'
+  | 'midnight-light'
+  | 'sand-dark'
+  | 'sand-light'
+  | 'celadon-dark'
+  | 'celadon-light'
+  | 'lavender-dark'
+  | 'lavender-light'
+  | 'carbon-dark'
+  | 'carbon-light'
+
+// 主题风格（不含明暗）
+export type ThemeStyle = 'classic' | 'forest' | 'ocean' | 'sunset' | 'monochrome' | 'rose' | 'midnight' | 'sand' | 'celadon' | 'lavender' | 'carbon'
+// 明暗模式
+export type ThemeBrightness = 'dark' | 'light'
+
+// 从 ThemeMode 拆解出风格与明暗
+export const parseTheme = (theme: ThemeMode): { style: ThemeStyle; brightness: ThemeBrightness } => {
+  const brightness: ThemeBrightness = theme === 'light' || theme.endsWith('-light') ? 'light' : 'dark'
+  if (theme.startsWith('forest')) return { style: 'forest', brightness }
+  if (theme.startsWith('ocean')) return { style: 'ocean', brightness }
+  if (theme.startsWith('sunset')) return { style: 'sunset', brightness }
+  if (theme.startsWith('monochrome')) return { style: 'monochrome', brightness }
+  if (theme.startsWith('rose')) return { style: 'rose', brightness }
+  if (theme.startsWith('midnight')) return { style: 'midnight', brightness }
+  if (theme.startsWith('sand')) return { style: 'sand', brightness }
+  if (theme.startsWith('celadon')) return { style: 'celadon', brightness }
+  if (theme.startsWith('lavender')) return { style: 'lavender', brightness }
+  if (theme.startsWith('carbon')) return { style: 'carbon', brightness }
+  return { style: 'classic', brightness }
+}
+
+// 由风格 + 明暗组合成 ThemeMode
+export const composeTheme = (style: ThemeStyle, brightness: ThemeBrightness): ThemeMode => {
+  if (style === 'classic') return brightness
+  return `${style}-${brightness}` as ThemeMode
+}
+
+// 判断 ThemeMode 是否为浅色（用于 sonner 等组件主题适配）
+export const isLightTheme = (theme: ThemeMode): boolean => {
+  return theme === 'light' || theme.endsWith('-light')
+}
 export type ChordScaleDisplayMode = 'chinese' | 'english' | 'english_short' | 'jazz'
 export type NoteAccidentalDisplay = 'sharp' | 'flat' | 'mixed'
 

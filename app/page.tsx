@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
 import { deduplicateStats } from "@/lib/export-utils"
 import { getLocalDateString, parseDbTimestamp, dbTimestampToLocalDate, getLocalDayStart, getLocalDaysAgoStart, getLocalMonthsAgoStart, normalizeAccuracy } from "@/lib/utils"
-import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser } from "@/lib/store"
+import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser, parseTheme, composeTheme, isLightTheme, type ThemeStyle, type ThemeBrightness } from "@/lib/store"
 import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
 import { logger } from "@/lib/logger"
 import { SOLO_SONGS } from "@/lib/solo-songs"
@@ -5175,13 +5175,11 @@ export default function FretMasterPage() {
   useEffect(() => {
     setMounted(true)
     setIsTauri(isTauriEnv())
-    if (theme === 'light') {
-      document.documentElement.classList.add('light')
-      document.documentElement.classList.remove('dark')
-    } else {
-      document.documentElement.classList.add('dark')
-      document.documentElement.classList.remove('light')
-    }
+    // 清除所有主题类，仅保留当前主题
+    const allThemeClasses = ['light', 'dark', 'forest-light', 'forest-dark', 'ocean-light', 'ocean-dark', 'sunset-light', 'sunset-dark', 'monochrome-light', 'monochrome-dark', 'rose-light', 'rose-dark', 'midnight-light', 'midnight-dark', 'sand-light', 'sand-dark', 'celadon-light', 'celadon-dark', 'lavender-light', 'lavender-dark', 'carbon-light', 'carbon-dark']
+    const html = document.documentElement
+    allThemeClasses.forEach(cls => html.classList.remove(cls))
+    html.classList.add(theme)
   }, [theme])
 
   useEffect(() => {
@@ -10530,26 +10528,81 @@ export default function FretMasterPage() {
                       <Palette className="h-3.5 w-3.5" />
                       {t('general_theme')}
                     </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={theme === 'dark' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setTheme('dark')}
-                          className="flex-1"
-                        >
-                          <Moon className="h-4 w-4 mr-2" />
-                          {t('theme_dark')}
-                        </Button>
-                        <Button
-                          variant={theme === 'light' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setTheme('light')}
-                          className="flex-1"
-                        >
-                          <Sun className="h-4 w-4 mr-2" />
-                          {t('theme_light')}
-                        </Button>
-                      </div>
+                      {(() => {
+                        const { style: currentStyle, brightness: currentBrightness } = parseTheme(theme)
+                        const themeStyleOptions: { id: ThemeStyle; name: string; desc: string; shortName: string; lightBg: string; darkBg: string; lightPrimary: string; darkPrimary: string }[] = [
+                          { id: 'classic', name: t('theme_style_classic'), desc: t('theme_style_classic_desc'), shortName: t('theme_style_classic').slice(0, 1), lightBg: 'hsl(40 12% 89%)', darkBg: 'hsl(220 14% 7%)', lightPrimary: 'hsl(142 68% 30%)', darkPrimary: 'hsl(142 65% 48%)' },
+                          { id: 'forest', name: t('theme_style_forest'), desc: t('theme_style_forest_desc'), shortName: t('theme_style_forest').slice(0, 1), lightBg: 'hsl(75 16% 86%)', darkBg: 'hsl(150 18% 7%)', lightPrimary: 'hsl(145 55% 24%)', darkPrimary: 'hsl(140 55% 46%)' },
+                          { id: 'ocean', name: t('theme_style_ocean'), desc: t('theme_style_ocean_desc'), shortName: t('theme_style_ocean').slice(0, 1), lightBg: 'hsl(200 26% 88%)', darkBg: 'hsl(215 32% 7%)', lightPrimary: 'hsl(205 72% 34%)', darkPrimary: 'hsl(195 75% 50%)' },
+                          { id: 'sunset', name: t('theme_style_sunset'), desc: t('theme_style_sunset_desc'), shortName: t('theme_style_sunset').slice(0, 1), lightBg: 'hsl(35 32% 89%)', darkBg: 'hsl(350 24% 7%)', lightPrimary: 'hsl(18 78% 40%)', darkPrimary: 'hsl(25 85% 56%)' },
+                          { id: 'monochrome', name: t('theme_style_monochrome'), desc: t('theme_style_monochrome_desc'), shortName: t('theme_style_monochrome').slice(0, 1), lightBg: 'hsl(220 10% 88%)', darkBg: 'hsl(220 8% 7%)', lightPrimary: 'hsl(220 10% 24%)', darkPrimary: 'hsl(220 6% 92%)' },
+                          { id: 'rose', name: t('theme_style_rose'), desc: t('theme_style_rose_desc'), shortName: t('theme_style_rose').slice(0, 1), lightBg: 'hsl(340 18% 89%)', darkBg: 'hsl(345 22% 7%)', lightPrimary: 'hsl(340 72% 36%)', darkPrimary: 'hsl(340 70% 54%)' },
+                          { id: 'midnight', name: t('theme_style_midnight'), desc: t('theme_style_midnight_desc'), shortName: t('theme_style_midnight').slice(0, 1), lightBg: 'hsl(230 28% 88%)', darkBg: 'hsl(235 32% 6%)', lightPrimary: 'hsl(235 65% 38%)', darkPrimary: 'hsl(230 60% 60%)' },
+                          { id: 'sand', name: t('theme_style_sand'), desc: t('theme_style_sand_desc'), shortName: t('theme_style_sand').slice(0, 1), lightBg: 'hsl(30 16% 87%)', darkBg: 'hsl(25 14% 7%)', lightPrimary: 'hsl(22 58% 36%)', darkPrimary: 'hsl(22 60% 52%)' },
+                          { id: 'celadon', name: t('theme_style_celadon'), desc: t('theme_style_celadon_desc'), shortName: t('theme_style_celadon').slice(0, 1), lightBg: 'hsl(165 18% 87%)', darkBg: 'hsl(170 20% 6%)', lightPrimary: 'hsl(172 58% 28%)', darkPrimary: 'hsl(172 55% 44%)' },
+                          { id: 'lavender', name: t('theme_style_lavender'), desc: t('theme_style_lavender_desc'), shortName: t('theme_style_lavender').slice(0, 1), lightBg: 'hsl(265 18% 89%)', darkBg: 'hsl(260 26% 7%)', lightPrimary: 'hsl(262 60% 38%)', darkPrimary: 'hsl(262 60% 58%)' },
+                          { id: 'carbon', name: t('theme_style_carbon'), desc: t('theme_style_carbon_desc'), shortName: t('theme_style_carbon').slice(0, 1), lightBg: 'hsl(215 10% 88%)', darkBg: 'hsl(215 14% 6%)', lightPrimary: 'hsl(212 45% 32%)', darkPrimary: 'hsl(212 55% 52%)' },
+                        ]
+                        return (
+                          <div className="space-y-2">
+                            {/* 主题风格色卡 - 8列两行 */}
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {themeStyleOptions.map(opt => {
+                                const isActive = currentStyle === opt.id
+                                return (
+                                  <button
+                                    key={opt.id}
+                                    onClick={() => setTheme(composeTheme(opt.id, currentBrightness))}
+                                    title={`${opt.name} — ${opt.desc}`}
+                                    aria-label={opt.name}
+                                    aria-pressed={isActive}
+                                    className={cn(
+                                      "relative h-9 rounded-md overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                      isActive
+                                        ? "border-primary shadow-sm ring-1 ring-primary/30"
+                                        : "border-transparent hover:border-border/60"
+                                    )}
+                                  >
+                                    {/* 浅色半 */}
+                                    <div className="absolute inset-y-0 left-0 w-1/2" style={{ background: opt.lightBg }} />
+                                    {/* 深色半 */}
+                                    <div className="absolute inset-y-0 right-0 w-1/2" style={{ background: opt.darkBg }} />
+                                    {/* 主色圆点居中 */}
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <span className="h-2.5 w-2.5 rounded-full shadow ring-1 ring-black/10" style={{ background: currentBrightness === 'light' ? opt.lightPrimary : opt.darkPrimary }} />
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {/* 当前主题名称 */}
+                            <div className="text-[10px] text-muted-foreground text-center">
+                              {themeStyleOptions.find(o => o.id === currentStyle)?.name} · {themeStyleOptions.find(o => o.id === currentStyle)?.desc}
+                            </div>
+                            {/* 明暗模式 */}
+                            <div className="flex gap-2">
+                              <Button
+                                variant={currentBrightness === 'dark' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setTheme(composeTheme(currentStyle, 'dark'))}
+                                className="flex-1"
+                              >
+                                <Moon className="h-4 w-4 mr-2" />
+                                {t('theme_dark')}
+                              </Button>
+                              <Button
+                                variant={currentBrightness === 'light' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setTheme(composeTheme(currentStyle, 'light'))}
+                                className="flex-1"
+                              >
+                                <Sun className="h-4 w-4 mr-2" />
+                                {t('theme_light')}
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })()}
 
                     <Separator className="my-1" />
                     <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
@@ -10848,11 +10901,11 @@ export default function FretMasterPage() {
                       <div className="flex flex-wrap items-end gap-2">
                         {/* 目标音符 - 仅在指板点击模式下显示*/}
                         {practiceAnswerMode === "fretboard" && (
-                          <div className="flex items-center gap-2 px-2.5 h-10 bg-primary/5 rounded-md border border-primary/20 min-w-[110px] sm:min-w-[130px]">
-                            <Target className="h-4 w-4 text-primary shrink-0" />
+                          <div className="flex items-center gap-2 px-3 h-16 bg-primary/5 rounded-md border border-primary/20 min-w-[110px] sm:min-w-[130px]">
+                            <Target className="h-5 w-5 text-primary shrink-0" />
                             <div className="min-w-0">
                               <div className="text-[10px] text-muted-foreground leading-3">{t('target_note')}</div>
-                              <div className="text-base sm:text-lg font-bold text-primary leading-tight truncate">{formatNoteByAccidentalSetting(targetNote)}</div>
+                              <div className="text-2xl sm:text-3xl font-bold text-primary leading-tight truncate">{formatNoteByAccidentalSetting(targetNote)}</div>
                             </div>
                           </div>
                         )}

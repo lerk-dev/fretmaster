@@ -2,6 +2,9 @@
 node_modules/
 .pnpm-store/
 
+# TRAE local skills (UI/UX Pro Max etc.)
+.trae/
+
 # Build outputs
 .next/
 dist/

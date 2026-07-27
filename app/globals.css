@@ -26,50 +26,555 @@
   --radius: 0.75rem;
 }
 
+/* ============================================
+   经典主题（重设计：暖象牙白替代纯白）
+   中性偏暖的浅灰背景，翠绿强调色克制有力
+   ============================================ */
 .light {
   color-scheme: light;
-  --background: 220 13% 88%;
-  --foreground: 220 13% 15%;
-  --card: 0 0% 100%;
-  --card-foreground: 220 13% 15%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 220 13% 15%;
-  --primary: 142 71% 45%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 220 13% 94%;
-  --secondary-foreground: 220 13% 15%;
-  --muted: 220 13% 85%;
-  --muted-foreground: 220 13% 35%;
-  --accent: 25 95% 53%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 220 13% 75%;
-  --input: 220 13% 85%;
-  --ring: 142 71% 45%;
+  --background: 40 12% 89%;
+  --foreground: 220 18% 14%;
+  --card: 40 18% 95%;
+  --card-foreground: 220 18% 14%;
+  --popover: 40 18% 95%;
+  --popover-foreground: 220 18% 14%;
+  --primary: 142 68% 30%;
+  --primary-foreground: 40 18% 95%;
+  --secondary: 40 10% 86%;
+  --secondary-foreground: 220 18% 14%;
+  --muted: 40 10% 85%;
+  --muted-foreground: 220 10% 32%;
+  --accent: 25 85% 48%;
+  --accent-foreground: 40 18% 95%;
+  --destructive: 0 72% 52%;
+  --destructive-foreground: 40 18% 95%;
+  --border: 40 10% 78%;
+  --input: 40 10% 82%;
+  --ring: 142 68% 30%;
 }
 
 .dark {
   color-scheme: dark;
-  --background: 220 13% 5%;
+  --background: 220 14% 7%;
   --foreground: 0 0% 96%;
-  --card: 220 13% 12%;
+  --card: 220 14% 11%;
   --card-foreground: 0 0% 96%;
-  --popover: 220 13% 12%;
+  --popover: 220 14% 13%;
   --popover-foreground: 0 0% 96%;
-  --primary: 142 71% 45%;
-  --primary-foreground: 220 13% 5%;
-  --secondary: 220 13% 16%;
+  --primary: 142 65% 48%;
+  --primary-foreground: 220 14% 7%;
+  --secondary: 220 12% 16%;
   --secondary-foreground: 0 0% 96%;
-  --muted: 220 13% 16%;
-  --muted-foreground: 0 0% 68%;
-  --accent: 25 95% 53%;
-  --accent-foreground: 220 13% 5%;
-  --destructive: 0 84% 60%;
+  --muted: 220 12% 15%;
+  --muted-foreground: 220 8% 64%;
+  --accent: 25 90% 58%;
+  --accent-foreground: 220 14% 7%;
+  --destructive: 0 78% 62%;
   --destructive-foreground: 0 0% 96%;
-  --border: 220 13% 22%;
-  --input: 220 13% 16%;
-  --ring: 142 71% 45%;
+  --border: 220 12% 20%;
+  --input: 220 12% 16%;
+  --ring: 142 65% 48%;
+}
+
+/* ============================================
+   森林主题：暖沙米色 + 深森林绿
+   低饱和大地色，长时间使用不疲劳
+   ============================================ */
+.forest-light {
+  color-scheme: light;
+  --background: 75 16% 86%;
+  --foreground: 150 22% 12%;
+  --card: 60 20% 93%;
+  --card-foreground: 150 22% 12%;
+  --popover: 60 20% 93%;
+  --popover-foreground: 150 22% 12%;
+  --primary: 145 55% 24%;
+  --primary-foreground: 60 20% 93%;
+  --secondary: 75 14% 83%;
+  --secondary-foreground: 150 22% 12%;
+  --muted: 75 14% 82%;
+  --muted-foreground: 150 14% 30%;
+  --accent: 35 72% 44%;
+  --accent-foreground: 60 20% 93%;
+  --destructive: 0 68% 50%;
+  --destructive-foreground: 60 20% 93%;
+  --border: 75 12% 74%;
+  --input: 75 12% 78%;
+  --ring: 145 55% 24%;
+}
+
+.forest-dark {
+  color-scheme: dark;
+  --background: 150 18% 7%;
+  --foreground: 90 12% 92%;
+  --card: 150 18% 11%;
+  --card-foreground: 90 12% 92%;
+  --popover: 150 18% 13%;
+  --popover-foreground: 90 12% 92%;
+  --primary: 140 55% 46%;
+  --primary-foreground: 150 18% 7%;
+  --secondary: 150 14% 16%;
+  --secondary-foreground: 90 12% 92%;
+  --muted: 150 14% 15%;
+  --muted-foreground: 90 8% 62%;
+  --accent: 35 85% 56%;
+  --accent-foreground: 150 18% 7%;
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 90 12% 92%;
+  --border: 150 14% 20%;
+  --input: 150 14% 16%;
+  --ring: 140 55% 46%;
+}
+
+/* ============================================
+   海洋主题：淡青雾色 + 深海蓝
+   清冷雾感背景，专注冷静
+   ============================================ */
+.ocean-light {
+  color-scheme: light;
+  --background: 200 26% 88%;
+  --foreground: 215 32% 14%;
+  --card: 200 32% 94%;
+  --card-foreground: 215 32% 14%;
+  --popover: 200 32% 94%;
+  --popover-foreground: 215 32% 14%;
+  --primary: 205 72% 34%;
+  --primary-foreground: 200 32% 94%;
+  --secondary: 200 20% 85%;
+  --secondary-foreground: 215 32% 14%;
+  --muted: 200 20% 83%;
+  --muted-foreground: 215 18% 32%;
+  --accent: 280 55% 46%;
+  --accent-foreground: 200 32% 94%;
+  --destructive: 0 70% 52%;
+  --destructive-foreground: 200 32% 94%;
+  --border: 200 18% 74%;
+  --input: 200 18% 78%;
+  --ring: 205 72% 34%;
+}
+
+.ocean-dark {
+  color-scheme: dark;
+  --background: 215 32% 7%;
+  --foreground: 195 15% 92%;
+  --card: 215 28% 11%;
+  --card-foreground: 195 15% 92%;
+  --popover: 215 28% 13%;
+  --popover-foreground: 195 15% 92%;
+  --primary: 195 75% 50%;
+  --primary-foreground: 215 32% 7%;
+  --secondary: 215 24% 16%;
+  --secondary-foreground: 195 15% 92%;
+  --muted: 215 24% 15%;
+  --muted-foreground: 195 10% 62%;
+  --accent: 280 60% 62%;
+  --accent-foreground: 215 32% 7%;
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 195 15% 92%;
+  --border: 215 22% 20%;
+  --input: 215 24% 16%;
+  --ring: 195 75% 50%;
+}
+
+/* ============================================
+   日落主题：暖米黄 + 琥珀橙
+   低饱和暖色，舒适宜人
+   ============================================ */
+.sunset-light {
+  color-scheme: light;
+  --background: 35 32% 89%;
+  --foreground: 20 32% 14%;
+  --card: 35 40% 95%;
+  --card-foreground: 20 32% 14%;
+  --popover: 35 40% 95%;
+  --popover-foreground: 20 32% 14%;
+  --primary: 18 78% 40%;
+  --primary-foreground: 35 40% 95%;
+  --secondary: 35 26% 85%;
+  --secondary-foreground: 20 32% 14%;
+  --muted: 35 26% 83%;
+  --muted-foreground: 20 18% 32%;
+  --accent: 280 45% 44%;
+  --accent-foreground: 35 40% 95%;
+  --destructive: 0 70% 52%;
+  --destructive-foreground: 35 40% 95%;
+  --border: 35 20% 76%;
+  --input: 35 20% 80%;
+  --ring: 18 78% 40%;
+}
+
+.sunset-dark {
+  color-scheme: dark;
+  --background: 350 24% 7%;
+  --foreground: 35 15% 92%;
+  --card: 350 22% 11%;
+  --card-foreground: 35 15% 92%;
+  --popover: 350 22% 13%;
+  --popover-foreground: 35 15% 92%;
+  --primary: 25 85% 56%;
+  --primary-foreground: 350 24% 7%;
+  --secondary: 350 18% 17%;
+  --secondary-foreground: 35 15% 92%;
+  --muted: 350 18% 15%;
+  --muted-foreground: 35 10% 62%;
+  --accent: 320 65% 60%;
+  --accent-foreground: 350 24% 7%;
+  --destructive: 0 75% 60%;
+  --destructive-foreground: 35 15% 92%;
+  --border: 350 18% 20%;
+  --input: 350 18% 16%;
+  --ring: 25 85% 56%;
+}
+
+/* ============================================
+   墨黑主题：纯灰阶极简
+   无色相干扰，专注内容本身
+   ============================================ */
+.monochrome-light {
+  color-scheme: light;
+  --background: 220 10% 88%;
+  --foreground: 220 10% 14%;
+  --card: 220 14% 94%;
+  --card-foreground: 220 10% 14%;
+  --popover: 220 14% 94%;
+  --popover-foreground: 220 10% 14%;
+  --primary: 220 10% 24%;
+  --primary-foreground: 220 14% 94%;
+  --secondary: 220 8% 85%;
+  --secondary-foreground: 220 10% 14%;
+  --muted: 220 8% 84%;
+  --muted-foreground: 220 8% 34%;
+  --accent: 220 10% 40%;
+  --accent-foreground: 220 14% 94%;
+  --destructive: 0 60% 50%;
+  --destructive-foreground: 220 14% 94%;
+  --border: 220 8% 76%;
+  --input: 220 8% 80%;
+  --ring: 220 10% 24%;
+}
+
+.monochrome-dark {
+  color-scheme: dark;
+  --background: 220 8% 7%;
+  --foreground: 220 6% 94%;
+  --card: 220 8% 11%;
+  --card-foreground: 220 6% 94%;
+  --popover: 220 8% 13%;
+  --popover-foreground: 220 6% 94%;
+  --primary: 220 6% 92%;
+  --primary-foreground: 220 8% 7%;
+  --secondary: 220 6% 16%;
+  --secondary-foreground: 220 6% 94%;
+  --muted: 220 6% 15%;
+  --muted-foreground: 220 4% 62%;
+  --accent: 220 6% 70%;
+  --accent-foreground: 220 8% 7%;
+  --destructive: 0 60% 60%;
+  --destructive-foreground: 220 6% 94%;
+  --border: 220 6% 20%;
+  --input: 220 6% 16%;
+  --ring: 220 6% 92%;
+}
+
+/* ============================================
+   玫瑰主题：暖粉灰 + 玫红
+   柔和温暖，富有情感
+   ============================================ */
+.rose-light {
+  color-scheme: light;
+  --background: 340 18% 89%;
+  --foreground: 345 24% 14%;
+  --card: 340 24% 95%;
+  --card-foreground: 345 24% 14%;
+  --popover: 340 24% 95%;
+  --popover-foreground: 345 24% 14%;
+  --primary: 340 72% 36%;
+  --primary-foreground: 340 24% 95%;
+  --secondary: 340 16% 85%;
+  --secondary-foreground: 345 24% 14%;
+  --muted: 340 16% 83%;
+  --muted-foreground: 345 16% 32%;
+  --accent: 200 65% 42%;
+  --accent-foreground: 340 24% 95%;
+  --destructive: 0 72% 52%;
+  --destructive-foreground: 340 24% 95%;
+  --border: 340 14% 78%;
+  --input: 340 14% 82%;
+  --ring: 340 72% 36%;
+}
+
+.rose-dark {
+  color-scheme: dark;
+  --background: 345 22% 7%;
+  --foreground: 340 12% 93%;
+  --card: 345 20% 11%;
+  --card-foreground: 340 12% 93%;
+  --popover: 345 20% 13%;
+  --popover-foreground: 340 12% 93%;
+  --primary: 340 70% 54%;
+  --primary-foreground: 345 22% 7%;
+  --secondary: 345 16% 17%;
+  --secondary-foreground: 340 12% 93%;
+  --muted: 345 16% 15%;
+  --muted-foreground: 340 8% 62%;
+  --accent: 200 60% 56%;
+  --accent-foreground: 345 22% 7%;
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 340 12% 93%;
+  --border: 345 16% 20%;
+  --input: 345 16% 16%;
+  --ring: 340 70% 54%;
+}
+
+/* ============================================
+   午夜主题：深靛蓝夜空
+   深邃专注，适合夜间长时间使用
+   ============================================ */
+.midnight-light {
+  color-scheme: light;
+  --background: 230 28% 88%;
+  --foreground: 235 32% 14%;
+  --card: 230 34% 94%;
+  --card-foreground: 235 32% 14%;
+  --popover: 230 34% 94%;
+  --popover-foreground: 235 32% 14%;
+  --primary: 235 65% 38%;
+  --primary-foreground: 230 34% 94%;
+  --secondary: 230 24% 84%;
+  --secondary-foreground: 235 32% 14%;
+  --muted: 230 24% 82%;
+  --muted-foreground: 235 20% 32%;
+  --accent: 45 70% 44%;
+  --accent-foreground: 230 34% 94%;
+  --destructive: 0 70% 52%;
+  --destructive-foreground: 230 34% 94%;
+  --border: 230 22% 74%;
+  --input: 230 22% 78%;
+  --ring: 235 65% 38%;
+}
+
+.midnight-dark {
+  color-scheme: dark;
+  --background: 235 32% 6%;
+  --foreground: 230 18% 92%;
+  --card: 235 30% 10%;
+  --card-foreground: 230 18% 92%;
+  --popover: 235 30% 12%;
+  --popover-foreground: 230 18% 92%;
+  --primary: 230 60% 60%;
+  --primary-foreground: 235 32% 6%;
+  --secondary: 235 26% 16%;
+  --secondary-foreground: 230 18% 92%;
+  --muted: 235 26% 15%;
+  --muted-foreground: 230 12% 62%;
+  --accent: 45 80% 58%;
+  --accent-foreground: 235 32% 6%;
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 230 18% 92%;
+  --border: 235 24% 20%;
+  --input: 235 26% 16%;
+  --ring: 230 60% 60%;
+}
+
+/* ============================================
+   沙岩主题：暖灰褐 + 赭石
+   自然质朴，沉稳大气
+   ============================================ */
+.sand-light {
+  color-scheme: light;
+  --background: 30 16% 87%;
+  --foreground: 25 20% 14%;
+  --card: 30 20% 93%;
+  --card-foreground: 25 20% 14%;
+  --popover: 30 20% 93%;
+  --popover-foreground: 25 20% 14%;
+  --primary: 22 58% 36%;
+  --primary-foreground: 30 20% 93%;
+  --secondary: 30 14% 83%;
+  --secondary-foreground: 25 20% 14%;
+  --muted: 30 14% 81%;
+  --muted-foreground: 25 14% 32%;
+  --accent: 160 45% 30%;
+  --accent-foreground: 30 20% 93%;
+  --destructive: 0 68% 50%;
+  --destructive-foreground: 30 20% 93%;
+  --border: 30 12% 72%;
+  --input: 30 12% 76%;
+  --ring: 22 58% 36%;
+}
+
+.sand-dark {
+  color-scheme: dark;
+  --background: 25 14% 7%;
+  --foreground: 30 10% 92%;
+  --card: 25 14% 11%;
+  --card-foreground: 30 10% 92%;
+  --popover: 25 14% 13%;
+  --popover-foreground: 30 10% 92%;
+  --primary: 22 60% 52%;
+  --primary-foreground: 25 14% 7%;
+  --secondary: 25 12% 16%;
+  --secondary-foreground: 30 10% 92%;
+  --muted: 25 12% 15%;
+  --muted-foreground: 30 8% 62%;
+  --accent: 160 40% 46%;
+  --accent-foreground: 25 14% 7%;
+  --destructive: 0 70% 56%;
+  --destructive-foreground: 30 10% 92%;
+  --border: 25 12% 20%;
+  --input: 25 12% 16%;
+  --ring: 22 60% 52%;
+}
+
+/* ============================================
+   青瓷主题：淡青瓷色 + 深青绿
+   灵感来自 UI/UX Pro Max 生产力工具配色
+   专注冷静，长时间使用不疲劳
+   ============================================ */
+.celadon-light {
+  color-scheme: light;
+  --background: 165 18% 87%;
+  --foreground: 170 24% 12%;
+  --card: 160 22% 93%;
+  --card-foreground: 170 24% 12%;
+  --popover: 160 22% 93%;
+  --popover-foreground: 170 24% 12%;
+  --primary: 172 58% 28%;
+  --primary-foreground: 160 22% 93%;
+  --secondary: 165 16% 83%;
+  --secondary-foreground: 170 24% 12%;
+  --muted: 165 16% 81%;
+  --muted-foreground: 170 16% 30%;
+  --accent: 25 80% 48%;
+  --accent-foreground: 160 22% 93%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 160 22% 93%;
+  --border: 165 14% 72%;
+  --input: 165 14% 76%;
+  --ring: 172 58% 28%;
+}
+
+.celadon-dark {
+  color-scheme: dark;
+  --background: 170 20% 6%;
+  --foreground: 160 12% 92%;
+  --card: 170 18% 10%;
+  --card-foreground: 160 12% 92%;
+  --popover: 170 18% 12%;
+  --popover-foreground: 160 12% 92%;
+  --primary: 172 55% 44%;
+  --primary-foreground: 170 20% 6%;
+  --secondary: 170 14% 16%;
+  --secondary-foreground: 160 12% 92%;
+  --muted: 170 14% 15%;
+  --muted-foreground: 160 8% 62%;
+  --accent: 25 85% 56%;
+  --accent-foreground: 170 20% 6%;
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 160 12% 92%;
+  --border: 170 14% 20%;
+  --input: 170 14% 16%;
+  --ring: 172 55% 44%;
+}
+
+/* ============================================
+   薰衣草主题：淡紫雾色 + 紫罗兰
+   优雅创意，富有想象力
+   ============================================ */
+.lavender-light {
+  color-scheme: light;
+  --background: 265 18% 89%;
+  --foreground: 260 28% 14%;
+  --card: 260 24% 95%;
+  --card-foreground: 260 28% 14%;
+  --popover: 260 24% 95%;
+  --popover-foreground: 260 28% 14%;
+  --primary: 262 60% 38%;
+  --primary-foreground: 260 24% 95%;
+  --secondary: 265 16% 85%;
+  --secondary-foreground: 260 28% 14%;
+  --muted: 265 16% 83%;
+  --muted-foreground: 260 18% 32%;
+  --accent: 35 75% 48%;
+  --accent-foreground: 260 24% 95%;
+  --destructive: 0 72% 52%;
+  --destructive-foreground: 260 24% 95%;
+  --border: 265 14% 78%;
+  --input: 265 14% 82%;
+  --ring: 262 60% 38%;
+}
+
+.lavender-dark {
+  color-scheme: dark;
+  --background: 260 26% 7%;
+  --foreground: 265 14% 92%;
+  --card: 260 24% 11%;
+  --card-foreground: 265 14% 92%;
+  --popover: 260 24% 13%;
+  --popover-foreground: 265 14% 92%;
+  --primary: 262 60% 58%;
+  --primary-foreground: 260 26% 7%;
+  --secondary: 260 20% 17%;
+  --secondary-foreground: 265 14% 92%;
+  --muted: 260 20% 15%;
+  --muted-foreground: 265 10% 62%;
+  --accent: 35 85% 58%;
+  --accent-foreground: 260 26% 7%;
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 265 14% 92%;
+  --border: 260 20% 20%;
+  --input: 260 20% 16%;
+  --ring: 262 60% 58%;
+}
+
+/* ============================================
+   碳黑主题：工业风深灰 + 钢蓝
+   冷峻专业，技术感强
+   ============================================ */
+.carbon-light {
+  color-scheme: light;
+  --background: 215 10% 88%;
+  --foreground: 215 18% 14%;
+  --card: 215 14% 94%;
+  --card-foreground: 215 18% 14%;
+  --popover: 215 14% 94%;
+  --popover-foreground: 215 18% 14%;
+  --primary: 212 45% 32%;
+  --primary-foreground: 215 14% 94%;
+  --secondary: 215 10% 84%;
+  --secondary-foreground: 215 18% 14%;
+  --muted: 215 10% 82%;
+  --muted-foreground: 215 14% 32%;
+  --accent: 25 70% 46%;
+  --accent-foreground: 215 14% 94%;
+  --destructive: 0 68% 50%;
+  --destructive-foreground: 215 14% 94%;
+  --border: 215 10% 74%;
+  --input: 215 10% 78%;
+  --ring: 212 45% 32%;
+}
+
+.carbon-dark {
+  color-scheme: dark;
+  --background: 215 14% 6%;
+  --foreground: 210 8% 92%;
+  --card: 215 14% 10%;
+  --card-foreground: 210 8% 92%;
+  --popover: 215 14% 12%;
+  --popover-foreground: 210 8% 92%;
+  --primary: 212 55% 52%;
+  --primary-foreground: 215 14% 6%;
+  --secondary: 215 12% 16%;
+  --secondary-foreground: 210 8% 92%;
+  --muted: 215 12% 15%;
+  --muted-foreground: 210 6% 62%;
+  --accent: 25 80% 56%;
+  --accent-foreground: 215 14% 6%;
+  --destructive: 0 70% 56%;
+  --destructive-foreground: 210 8% 92%;
+  --border: 215 12% 20%;
+  --input: 215 12% 16%;
+  --ring: 212 55% 52%;
 }
 
 @layer base {
