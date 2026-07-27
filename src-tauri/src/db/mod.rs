@@ -33,10 +33,15 @@ fn init_db() -> SqliteResult<Connection> {
             duration INTEGER NOT NULL,
             accuracy REAL,
             notes TEXT,
+            client_ip TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )",
         [],
     )?;
+
+    // 已存在的表添加 client_ip 列（幂等操作，列已存在时忽略错误）
+    let _ = conn.execute("ALTER TABLE practice_stats ADD COLUMN client_ip TEXT", []);
+    let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_stats_ip ON practice_stats(client_ip)", []);
     
     // 创建练习会话表
     conn.execute(

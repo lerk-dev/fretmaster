@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>FretMaster 统计验证实例</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; }
+  h1 { color: #15803d; border-bottom: 2px solid #15803d; padding-bottom: 8px; }
+  h2 { color: #1e40af; margin-top: 32px; }
+  .case { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 12px 0; }
+  .case h3 { margin: 0 0 8px 0; color: #0f172a; }
+  .case .input { color: #64748b; font-size: 13px; margin: 4px 0; }
+  .case .expected { color: #15803d; font-weight: 600; margin-top: 8px; }
+  .case .note { color: #be185d; font-size: 12px; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+  th { background: #f1f5f9; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>FretMaster 统计得分方案验证实例</h1>
+<p>本文档说明优化后的得分方案、IP 记录字段，以及验证步骤。</p>
+
+<h2>1. 得分方案对比</h2>
+<table>
+  <tr><th>维度</th><th>优化前</th><th>优化后</th></tr>
+  <tr><td>记录频率</td><td>除 pitch_finding 外，每答对一题就 record 一次</td><td>所有 tab 统一"会话级"记录，会话结束才记一次</td></tr>
+  <tr><td>score</td><td>未传时硬编码 <code>100</code></td><td><code>round(correct/total * 100)</code>，未答题记 0</td></tr>
+  <tr><td>accuracy</td><td>同上（0-100）</td><td>同 score（0-100）</td></tr>
+  <tr><td>duration</td><td>全局共享 sessionStartTime，切 tab 会乱</td><td>会话开始到结束的实际秒数</td></tr>
+  <tr><td>切 tab 处理</td><td>无</td><td>切到非练习 tab 自动结束当前会话并记录</td></tr>
+</table>
+
+<h2>2. 验证用例</h2>
+
+<div class="case">
+  <h3>用例 1：找音练习 - 答对 8 题，答错 2 题</h3>
+  <div class="input">输入：isPlaying true→false，score = {correct: 8, total: 10}，会话时长 120 秒</div>
+  <div class="expected">预期记录：exercise_type="找音练习", score=80, accuracy=80, duration=120, client_ip="&lt;访问设备 IP&gt;"</div>
+  <div class="note">注：不再硬编码 100 分</div>
+</div>
+
+<div class="case">
+  <h3>用例 2：音程练习 - 答对 5 题，答错 1 题</h3>
+  <div class="input">输入：完成 6 个音程后停止练习，score = {correct: 5, total: 6}，时长 90 秒</div>
+  <div class="expected">预期记录：exercise_type="音程练习", score=83, accuracy=83, duration=90</div>
+  <div class="note">注：之前每答对一题就记一次，现在整轮会话只记一次</div>
+</div>
+
+<div class="case">
+  <h3>用例 3：音阶练习 - 答对 3 题，答错 0 题</h3>
+  <div class="input">输入：完成 3 个音阶后停止，score = {correct: 3, total: 3}，时长 45 秒</div>
+  <div class="expected">预期记录：exercise_type="音阶练习", score=100, accuracy=100, duration=45</div>
+</div>
+
+<div class="case">
+  <h3>用例 4：和弦练习 - 答对 4 题，答错 2 题</h3>
+  <div class="input">输入：完成 6 个和弦后停止，score = {correct: 4, total: 6}，时长 60 秒</div>
+  <div class="expected">预期记录：exercise_type="和弦练习", score=67, accuracy=67, duration=60</div>
+</div>
+
+<div class="case">
+  <h3>用例 5：和弦进行 - 完成整轮后继续，最终答对 2 轮、答错 1 个和弦</h3>
+  <div class="input">输入：停止时 score = {correct: 9, total: 10}（每轮 5 个和弦），时长 180 秒</div>
+  <div class="expected">预期记录：exercise_type="和弦进行", score=90, accuracy=90, duration=180</div>
+  <div class="note">注：之前每完成一轮就记一次，现在整次会话只记一次</div>
+</div>
+
+<div class="case">
+  <h3>用例 6：开始后立即停止（未答题）</h3>
+  <div class="input">输入：isPlaying true→false，score = {correct: 0, total: 0}</div>
+  <div class="expected">预期：不记录（sessionScore.total > 0 判断）</div>
+</div>
+
+<div class="case">
+  <h3>用例 7：切 tab 练习中切走</h3>
+  <div class="input">输入：找音练习答对 3 题后切到音程 tab</div>
+  <div class="expected">预期：找音会话自动结束并记录 score=100（3/3），然后音程会话开始</div>
+</div>
+
+<h2>3. IP 记录字段</h2>
+<table>
+  <tr><th>环境</th><th>client_ip 来源</th><th>示例值</th></tr>
+  <tr><td>Web（路由器访问）</td><td>CGI 环境变量 <code>$REMOTE_ADDR</code>，支持 <code>X-Forwarded-For</code></td><td>192.168.123.45</td></tr>
+  <tr><td>Tauri（Windows 桌面）</td><td>固定字符串</td><td>local</td></tr>
+</table>
+<p>注：IP 在后台静默记录，前端 stats-panel 不展示。可通过 SQLite 查询 <code>SELECT client_ip, COUNT(*) FROM practice_records GROUP BY client_ip</code> 查看多设备使用情况。</p>
+
+<h2>4. 数据库表结构</h2>
+<pre><code>-- Web 端 practice_records 表
+CREATE TABLE practice_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL,
+    exercise_type TEXT NOT NULL,
+    score INTEGER NOT NULL,        -- 0-100
+    duration INTEGER NOT NULL,     -- 秒
+    accuracy REAL,                 -- 0-100
+    notes TEXT,
+    client_ip TEXT,                -- 新增：客户端 IP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tauri 端 practice_stats 表
+CREATE TABLE practice_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exercise_type TEXT NOT NULL,
+    exercise_detail TEXT,
+    score INTEGER NOT NULL,
+    duration INTEGER NOT NULL,
+    accuracy REAL,
+    notes TEXT,
+    client_ip TEXT,                -- 新增：客户端 IP（固定为 "local"）
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);</code></pre>
+
+<h2>5. 验证步骤</h2>
+<ol>
+  <li>访问 http://192.168.123.2/</li>
+  <li>进入"找音练习"tab，答对 5 题、答错 5 题，停止</li>
+  <li>查看"统计"面板：应有 1 条记录，得分 50，准确率 50%</li>
+  <li>SSH 到路由器：<code>sqlite3 /www/fretmaster/data/practice.db "SELECT exercise_type, score, accuracy, duration, client_ip FROM practice_records;"</code></li>
+  <li>确认 client_ip 字段为访问设备的 IP（如 192.168.x.x）</li>
+  <li>切换到音程练习 tab，答对 3 题、答错 1 题，停止</li>
+  <li>统计面板应有 2 条记录，第二条得分 75</li>
+</ol>
+
+</body>
+</html>

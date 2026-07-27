@@ -12,6 +12,7 @@ pub struct PracticeStats {
     pub duration: i32,
     pub accuracy: Option<f64>,
     pub notes: Option<String>,
+    pub client_ip: Option<String>,
     pub created_at: Option<String>,
 }
 
@@ -34,24 +35,27 @@ pub struct ExerciseTypeStats {
 
 pub fn save_practice_stats(stats: &PracticeStats) -> SqliteResult<i64> {
     let db = get_db();
+    // Tauri 端是本地设备，client_ip 设为 "local" 表示本地练习
+    let client_ip = stats.client_ip.clone().unwrap_or_else(|| "local".to_string());
     db.execute(
-        "INSERT INTO practice_stats (exercise_type, exercise_detail, score, duration, accuracy, notes)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO practice_stats (exercise_type, exercise_detail, score, duration, accuracy, notes, client_ip)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
             stats.exercise_type,
             stats.exercise_detail,
             stats.score,
             stats.duration,
             stats.accuracy,
-            stats.notes
+            stats.notes,
+            client_ip
         ],
     )?;
-    
+
     let id = db.last_insert_rowid();
-    
+
     // 更新会话统计
     update_session_stats(&db, stats.duration, stats.score)?;
-    
+
     Ok(id)
 }
 
@@ -70,11 +74,11 @@ fn update_session_stats(db: &rusqlite::Connection, duration: i32, _score: i32) -
 pub fn get_all_stats() -> SqliteResult<Vec<PracticeStats>> {
     let db = get_db();
     let mut stmt = db.prepare(
-        "SELECT id, exercise_type, exercise_detail, score, duration, accuracy, notes, created_at
+        "SELECT id, exercise_type, exercise_detail, score, duration, accuracy, notes, client_ip, created_at
          FROM practice_stats
          ORDER BY created_at DESC"
     )?;
-    
+
     let stats = stmt.query_map([], |row| {
         Ok(PracticeStats {
             id: row.get(0)?,
@@ -84,22 +88,23 @@ pub fn get_all_stats() -> SqliteResult<Vec<PracticeStats>> {
             duration: row.get(4)?,
             accuracy: row.get(5)?,
             notes: row.get(6)?,
-            created_at: row.get(7)?,
+            client_ip: row.get(7)?,
+            created_at: row.get(8)?,
         })
     })?;
-    
+
     stats.collect()
 }
 
 pub fn get_recent_stats(days: i32) -> SqliteResult<Vec<PracticeStats>> {
     let db = get_db();
     let mut stmt = db.prepare(
-        "SELECT id, exercise_type, exercise_detail, score, duration, accuracy, notes, created_at
+        "SELECT id, exercise_type, exercise_detail, score, duration, accuracy, notes, client_ip, created_at
          FROM practice_stats
          WHERE created_at >= datetime('now', ?1)
          ORDER BY created_at DESC"
     )?;
-    
+
     let stats = stmt.query_map(params![format!("-{} days", days)], |row| {
         Ok(PracticeStats {
             id: row.get(0)?,
@@ -109,10 +114,11 @@ pub fn get_recent_stats(days: i32) -> SqliteResult<Vec<PracticeStats>> {
             duration: row.get(4)?,
             accuracy: row.get(5)?,
             notes: row.get(6)?,
-            created_at: row.get(7)?,
+            client_ip: row.get(7)?,
+            created_at: row.get(8)?,
         })
     })?;
-    
+
     stats.collect()
 }
 

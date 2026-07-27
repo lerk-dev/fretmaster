@@ -34,6 +34,7 @@ export interface PracticeStats {
   duration: number;
   accuracy?: number;
   notes?: string;
+  client_ip?: string;
   created_at?: string;
   date?: string;
   exerciseType?: string;

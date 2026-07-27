@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -5921,23 +5921,25 @@ export default function FretMasterPage() {
   }, [])
 
   // 记录练习统计
-  // score/duration/accuracy 为可选参数，未传则使用当前会话的实时数据
-  // - score: 本次答题得分（0-100），默认用 scoreRef 实时计算
-  // - duration: 本次练习耗时（秒），默认用会话开始至今的时间
-  // - accuracy: 准确率（0-100），默认用 scoreRef 实时计算
+  // 所有练习 tab 统一为"会话级"记录：会话结束时调用一次，score/duration/accuracy 全部基于真实数据
+  // - score: 本次会话得分（0-100），= round(correct/total * 100)，未答题时记 0
+  // - duration: 本次会话耗时（秒），= 会话开始至今的时间
+  // - accuracy: 准确率（0-100），与 score 同源
   const recordPractice = useCallback((type: PracticeType, detailName: string, opts?: { score?: number; duration?: number; accuracy?: number }) => {
     // 使用本地时区日期，避免 UTC+8 凌晨 0-8 点时今天被记为昨天
     const today = getLocalDateString(new Date())
     
     // 计算真实数据（若未显式传入）
     const currentScore = scoreRef.current
-    const realAccuracy = currentScore.total > 0
+    // score 与 accuracy 同源：答对率 * 100。未答题（total=0）记 0 分，不再硬编码 100
+    const realScore = currentScore.total > 0
       ? Math.round((currentScore.correct / currentScore.total) * 100)
-      : 100
+      : 0
+    const realAccuracy = realScore
     const realDuration = practiceSessionStartTime
       ? Math.max(1, Math.round((Date.now() - practiceSessionStartTime + practiceElapsedTime * 1000) / 1000))
       : 60
-    const finalScore = opts?.score ?? 100
+    const finalScore = opts?.score ?? realScore
     const finalDuration = opts?.duration ?? realDuration
     const finalAccuracy = opts?.accuracy ?? realAccuracy
     
@@ -6034,35 +6036,65 @@ export default function FretMasterPage() {
     })
   }, [practiceSessionStartTime, practiceElapsedTime])
 
-  // ==================== 音高识别练习会话统计 ====================
-  // 音高识别练习按"会话"统计：从开始练习到结束练习（停止/时间到/切Tab）记为一次。
-  // 不再每答对一个音就 +1，避免单次会话被记成几十次。
-  const pitchFindingSessionStartRef = useRef<number | null>(null)
-  const pitchFindingSessionScoreRef = useRef<{ correct: number; total: number }>({ correct: 0, total: 0 })
+  // ==================== 练习会话统计（统一会话级记录） ====================
+  // 所有练习 tab 统一按"会话"统计：从开始练习到结束练习（停止/时间到/切Tab）记为一次。
+  // 不再每答对一题就 +1，避免单次会话被记成几十次，且 score/accuracy 有真实意义。
+  // pitch_finding → practice tab；chord_progression → chord tab；其他 tab 名与类型一致
+  const sessionStartRef = useRef<number | null>(null)
+  const sessionScoreRef = useRef<{ correct: number; total: number }>({ correct: 0, total: 0 })
+  const sessionTabRef = useRef<PracticeType | null>(null)
+
+  // tab → PracticeType 映射（chord tab 对应 chord_progression 类型）
+  const tabToPracticeType = (tab: string): PracticeType | null => {
+    switch (tab) {
+      case 'practice': return 'pitch_finding'
+      case 'interval': return 'interval'
+      case 'scale': return 'scale'
+      case 'chord_exercise': return 'chord_exercise'
+      case 'chord': return 'chord_progression'
+      default: return null
+    }
+  }
 
   useEffect(() => {
-    // 会话开始：进入播放状态且在 practice tab
-    if (isPlaying && activeTab === 'practice' && pitchFindingSessionStartRef.current === null) {
-      pitchFindingSessionStartRef.current = Date.now()
-      pitchFindingSessionScoreRef.current = { correct: 0, total: 0 }
+    const currentType = tabToPracticeType(activeTab)
+
+    // 会话开始：进入播放状态且在某个练习 tab
+    if (isPlaying && currentType && sessionStartRef.current === null) {
+      sessionStartRef.current = Date.now()
+      sessionScoreRef.current = { correct: 0, total: 0 }
+      sessionTabRef.current = currentType
     }
 
-    // 会话进行中：持续记录最新分数（仅当仍在播放且在 practice tab 时更新，
+    // 会话进行中：持续记录最新分数（仅当仍在播放且在同一 tab 时更新，
     // 这样在会话结束的同一渲染周期里即使 score 被重置为 0，ref 仍保留最后一题的分数）
-    if (isPlaying && activeTab === 'practice' && pitchFindingSessionStartRef.current !== null) {
-      pitchFindingSessionScoreRef.current = score
+    if (isPlaying && currentType && sessionStartRef.current !== null && sessionTabRef.current === currentType) {
+      sessionScoreRef.current = score
     }
 
-    // 会话结束：播放停止，且之前确实有一个进行中的 pitch_finding 会话
-    if (!isPlaying && pitchFindingSessionStartRef.current !== null) {
-      const startTime = pitchFindingSessionStartRef.current
-      const sessionScore = pitchFindingSessionScoreRef.current
-      pitchFindingSessionStartRef.current = null
+    // 会话结束：播放停止，且之前确实有一个进行中的会话
+    // 或者：切到非练习 tab（isPlaying 仍为 true 但 currentType 为 null）→ 也视为会话结束
+    const sessionEnded = !isPlaying && sessionStartRef.current !== null
+    const tabSwitchedAway = isPlaying && sessionStartRef.current !== null && !currentType
+    if (sessionEnded || tabSwitchedAway) {
+      const startTime = sessionStartRef.current
+      const sessionScore = sessionScoreRef.current
+      const sessionType = sessionTabRef.current
+      sessionStartRef.current = null
+      sessionTabRef.current = null
       // 仅在用户实际有答题时才记录，避免"开始后立即停止"也被计入
-      if (sessionScore.total > 0) {
+      if (sessionType && sessionScore.total > 0) {
         const accuracy = Math.round((sessionScore.correct / sessionScore.total) * 100)
-        const duration = Math.max(1, Math.round((Date.now() - startTime) / 1000))
-        recordPractice('pitch_finding', '找音练习', { duration, accuracy })
+        const duration = Math.max(1, Math.round((Date.now() - startTime!) / 1000))
+        // detailName 用类型对应的中文名
+        const detailNames: Record<PracticeType, string> = {
+          pitch_finding: '找音练习',
+          interval: '音程练习',
+          scale: '音阶练习',
+          chord_exercise: '和弦练习',
+          chord_progression: '和弦进行',
+        }
+        recordPractice(sessionType, detailNames[sessionType], { duration, accuracy })
       }
     }
   }, [isPlaying, activeTab, score, recordPractice])
@@ -8628,8 +8660,8 @@ export default function FretMasterPage() {
               answered: true
             })
             setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-            // 完成整个音程练习后记录一次统计
-            recordPractice('interval', '音程练习')
+            // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
+
 
             // 立即生成新题目（MIDI输入无需延迟）- 使用 ref 避免循环依赖
             setTimeout(() => {
@@ -8714,8 +8746,8 @@ export default function FretMasterPage() {
             if (nextStep >= scaleExerciseSequence.length) {
               // 完成当前序列，使用预览的下一题
               setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-              // 完成整个音阶序列后记录一次统计
-              recordPractice('scale', selectedScale?.name || '音阶练习')
+              // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
+
               nextScaleExercise()
             } else {
               // 继续下一个音
@@ -8758,8 +8790,8 @@ export default function FretMasterPage() {
             if (nextStep >= chordExerciseSequence.length) {
               // 完成当前和弦，使用预览的下一题
               setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-              // 完成整个和弦序列后记录一次统计
-              recordPractice('chord_exercise', chordExerciseTargetChord?.type || '和弦练习')
+              // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
+
               nextChordExercise()
             } else {
               // 继续下一个音
@@ -9259,8 +9291,7 @@ export default function FretMasterPage() {
       const nextIndex = nextChordInfo.index
       // 检测是否完成一轮（索引回到0且之前不是0）
       if (nextIndex === 0 && currentChordIndex === chords.length - 1) {
-        // 完成一轮所有和弦，记录统计
-        recordPractice('chord_progression', selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name)
+        // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
         // 如果开启随机转调，随机选择新的调
         if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
           const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
@@ -9282,7 +9313,7 @@ export default function FretMasterPage() {
         nextIndex = currentChordIndex === 0 ? chords.length - 1 : currentChordIndex - 1
         // 检测是否完成一轮（倒序时，索引变为最后一个且之前是第一个）
         if (nextIndex === chords.length - 1 && currentChordIndex === 0) {
-          recordPractice('chord_progression', selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name)
+          // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
           // 如果开启随机转调，随机选择新的调
           if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
             const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
@@ -9296,7 +9327,7 @@ export default function FretMasterPage() {
         nextIndex = (currentChordIndex + 1) % chords.length
         // 检测是否完成一轮（正序时，索引变为0且之前是最后一个）
         if (nextIndex === 0 && currentChordIndex === chords.length - 1) {
-          recordPractice('chord_progression', selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name)
+          // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
           // 如果开启随机转调，随机选择新的调
           if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
             const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']

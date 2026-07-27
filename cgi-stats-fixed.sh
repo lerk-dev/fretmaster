@@ -3,6 +3,7 @@
 # 支持多设备共享练习记录
 # 已修复 SQL 注入漏洞
 # 已修复 sanitize_string 中文剥离 bug（不再删除 0x80-0xFF 字节）
+# 后台静默记录练习设备 IP（REMOTE_ADDR），用于多设备使用情况统计
 
 DB_FILE="/www/fretmaster/data/practice.db"
 DATA_DIR="/www/fretmaster/data"
@@ -22,12 +23,19 @@ CREATE TABLE IF NOT EXISTS practice_records (
     duration INTEGER NOT NULL,
     accuracy REAL,
     notes TEXT,
+    client_ip TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_device ON practice_records(device_id);
 CREATE INDEX IF NOT EXISTS idx_date ON practice_records(created_at);
+CREATE INDEX IF NOT EXISTS idx_ip ON practice_records(client_ip);
 EOF
+    else
+        # 已存在的表添加 client_ip 列（幂等操作，列已存在时忽略错误）
+        sqlite3 "$DB_FILE" "ALTER TABLE practice_records ADD COLUMN client_ip TEXT;" 2>/dev/null || true
+        # 添加索引（已存在时忽略）
+        sqlite3 "$DB_FILE" "CREATE INDEX IF NOT EXISTS idx_ip ON practice_records(client_ip);" 2>/dev/null || true
     fi
 }
 
@@ -188,6 +196,17 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     ACCURACY=$(sanitize_float "$RAW_ACCURACY" "NULL")
     NOTES=$(sanitize_string "$RAW_NOTES" 500)
 
+    # 后台静默记录客户端 IP（从 CGI 环境变量 REMOTE_ADDR 获取）
+    # 支持 X-Forwarded-For（反向代理场景，取第一个 IP）
+    CLIENT_IP="${REMOTE_ADDR:-unknown}"
+    if [ -n "$HTTP_X_FORWARDED_FOR" ]; then
+        CLIENT_IP=$(echo "$HTTP_X_FORWARDED_FOR" | cut -d',' -f1 | tr -d ' ')
+    fi
+    # 清理 IP 格式（只允许数字、点、冒号，用于 IPv4/IPv6）
+    CLIENT_IP=$(echo "$CLIENT_IP" | grep -o '[0-9a-fA-F.:]*' | head -1)
+    CLIENT_IP=$(echo "$CLIENT_IP" | cut -c1-45)
+    [ -z "$CLIENT_IP" ] && CLIENT_IP="unknown"
+
     # 验证必要字段
     if [ -z "$DEVICE_ID" ] || [ -z "$EXERCISE_TYPE" ]; then
         echo '{"status":"error","message":"缺少必要字段: device_id, exercise_type"}'
@@ -203,7 +222,8 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
 .param set :score $SCORE
 .param set :duration $DURATION
 .param set :notes '$NOTES'
-INSERT INTO practice_records (device_id, exercise_type, score, duration, notes) VALUES (:device_id, :exercise_type, :score, :duration, :notes);
+.param set :client_ip '$CLIENT_IP'
+INSERT INTO practice_records (device_id, exercise_type, score, duration, notes, client_ip) VALUES (:device_id, :exercise_type, :score, :duration, :notes, :client_ip);
 SELECT last_insert_rowid();
 EOF
 )
@@ -215,7 +235,8 @@ EOF
 .param set :duration $DURATION
 .param set :accuracy $ACCURACY
 .param set :notes '$NOTES'
-INSERT INTO practice_records (device_id, exercise_type, score, duration, accuracy, notes) VALUES (:device_id, :exercise_type, :score, :duration, :accuracy, :notes);
+.param set :client_ip '$CLIENT_IP'
+INSERT INTO practice_records (device_id, exercise_type, score, duration, accuracy, notes, client_ip) VALUES (:device_id, :exercise_type, :score, :duration, :accuracy, :notes, :client_ip);
 SELECT last_insert_rowid();
 EOF
 )
@@ -259,7 +280,7 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     echo '['
     sqlite3 "$DB_FILE" << EOF | awk 'BEGIN{first=1} {if(first){first=0}else{print ","} printf "%s", $0}'
 .param set :limit $LIMIT
-SELECT json_object('id', id, 'device_id', device_id, 'exercise_type', exercise_type, 'score', score, 'duration', duration, 'accuracy', accuracy, 'notes', notes, 'created_at', created_at)
+SELECT json_object('id', id, 'device_id', device_id, 'exercise_type', exercise_type, 'score', score, 'duration', duration, 'accuracy', accuracy, 'notes', notes, 'client_ip', client_ip, 'created_at', created_at)
 FROM practice_records
 $DEVICE_FILTER
 ORDER BY created_at DESC
