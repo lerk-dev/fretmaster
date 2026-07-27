@@ -5855,7 +5855,13 @@ export default function FretMasterPage() {
 
         // Tauri 环境以 SQLite 为唯一真相源，不写入 localStorage，避免历史脏数据污染
         if (!isTauri) {
-          localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
+          // 服务器记录为 0 时（例如管理员清空了数据库），同步清空 localStorage 旧缓存
+          if (newStats.length === 0) {
+            localStorage.removeItem('fretmaster-stats')
+            localStorage.removeItem('fretmaster_stats_backup')
+          } else {
+            localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
+          }
         }
       } catch (e) {
         console.error('Failed to load stats:', e)
