@@ -69,7 +69,7 @@ impl Default for PitchDetectorConfig {
             threshold: 0.12,
             probability_cliff: 0.1,
             sample_rate: 48000,
-            buffer_size: 8192,
+            buffer_size: 4096,
             enable_temporal_smoothing: true,
             enable_harmonic_check: true,
             calibration_offset: 0.0,
@@ -120,7 +120,7 @@ impl PitchDetector {
             confused: false,
             confusion_level: -1.0,
             last_stable_time: 0,
-            base_volume: -1.99,
+            base_volume: 0.0,
             latest_pitch: 0.0,
         }
     }
@@ -542,7 +542,8 @@ impl PitchDetector {
         let volume = peak * 100.0;
 
         if self.base_volume <= 0.0 {
-            self.base_volume += 1.0;
+            // 首次调用直接建立基线，避免前两次检测跳过阈值检查
+            self.base_volume = volume.max(0.001);
         } else {
             let effective = volume.max(self.base_volume);
             self.base_volume = effective * VOLUME_DECAY;

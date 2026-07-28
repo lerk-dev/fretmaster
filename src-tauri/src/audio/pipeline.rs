@@ -78,13 +78,15 @@ impl AudioPipeline {
         // 同步 detector 配置（与传入 buffer 大小一致，使 detect 入口检查通过）
         self.detector.set_buffer_size(PITCH_BUFFER_SIZE);
 
-        let processed = if self.agc_enabled {
-            let agc_buffer = self.apply_agc(&buffer);
+        // 先 noise gate 再 AGC：避免 AGC 先把噪声放大到 0.15 RMS 导致 noise gate 失效
+        let processed = {
             self.preprocessor.set_sample_rate(sample_rate);
-            self.preprocessor.process(&agc_buffer)
-        } else {
-            self.preprocessor.set_sample_rate(sample_rate);
-            self.preprocessor.process(&buffer)
+            let gated = self.preprocessor.process(&buffer);
+            if self.agc_enabled {
+                self.apply_agc(&gated)
+            } else {
+                gated
+            }
         };
 
         self.detector.set_sample_rate(sample_rate);
@@ -114,7 +116,8 @@ impl AudioPipeline {
             self.agc_current_gain = self.agc_current_gain.max(0.05);
         }
 
-        buffer.iter().map(|&x| (x * self.agc_current_gain).clamp(-1.0, 1.0)).collect()
+        // 软限幅 (tanh) 替代硬 clipping，避免引入奇次谐波干扰 YIN 基频检测
+        buffer.iter().map(|&x| (x * self.agc_current_gain).tanh()).collect()
     }
 
     pub fn detect_amplitude_diff(&mut self) -> bool {

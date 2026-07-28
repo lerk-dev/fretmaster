@@ -2,27 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 仅保留 --radius 作为全局不变量；其余主题变量统一由具体主题类
+   (.dark / .light 等) 提供，避免 :root 与 .dark 双重定义导致
+   主题切换时依赖源码顺序的隐患。Pre-hydration 脚本会保证首绘前
+   html 已带上正确主题类，因此 :root 不再需要默认深色值。 */
 :root {
-  color-scheme: dark;
-  --background: 220 13% 5%;
-  --foreground: 0 0% 96%;
-  --card: 220 13% 12%;
-  --card-foreground: 0 0% 96%;
-  --popover: 220 13% 12%;
-  --popover-foreground: 0 0% 96%;
-  --primary: 142 71% 45%;
-  --primary-foreground: 220 13% 5%;
-  --secondary: 220 13% 16%;
-  --secondary-foreground: 0 0% 96%;
-  --muted: 220 13% 16%;
-  --muted-foreground: 0 0% 68%;
-  --accent: 25 95% 53%;
-  --accent-foreground: 220 13% 5%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 96%;
-  --border: 220 13% 22%;
-  --input: 220 13% 16%;
-  --ring: 142 71% 45%;
   --radius: 0.75rem;
 }
 

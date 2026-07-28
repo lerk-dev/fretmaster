@@ -11,7 +11,7 @@
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-blue?logo=tauri)](https://tauri.app/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.2.81-orange.svg)](https://github.com/lerk-dev/fretmaster)
+[![Version](https://img.shields.io/badge/Version-0.2.157-orange.svg)](https://github.com/lerk-dev/fretmaster/releases)
 
 [在线演示](#) | [功能特点](#-功能特点) | [快速开始](#-快速开始) | [练习指南](#-练习指南) | [部署](#-部署指南)
 
@@ -337,7 +337,44 @@ Web 版是 FretMaster 的基础版本，基于 Next.js 构建，支持部署到�
 
 #### 版本更新日志
 
-##### v0.2.81 (当前版本)
+##### v0.2.157 (当前版本)
+
+**P0 关键修复**：
+- 修复 YIN 音高检测采样率硬编码（48000）问题，Tauri 环境下按设备实际采样率计算，避免升号偏差
+- AGC 硬 clipping 改为 tanh 软限幅，消除奇次谐波干扰
+- 修复 `base_volume` 初始值负数导致前两次检测跳过阈值检查
+- Tauri 路径 `processPracticeMatch` 补齐视觉反馈、冷却机制和 `lastChordNote` 同步
+- 切 Tab 时统计 score 记为 0 的问题（改用 sessionScoreRef）
+- 主题颜色跳变：添加 pre-hydration 脚本在首绘前应用 localStorage 主题
+- 统计记录重复保存（saveToServer 移出 state updater，避免 StrictMode 双调用）
+
+**P1 重要修复**：
+- i18n 补齐变化属和弦、减音阶、`level_desc`、`level_group` 等缺失翻译
+- buttons 模式标签改用 `formatNoteByAccidentalSetting`，比较改用 `isEquivalentNote` 处理等音
+- 快捷键一致性：`↓` 键改为"隐藏指板 + 下一题"，`F` 键全局化（不依赖练习状态）
+- 删除与全局 window 监听器重复的 Card 级 React `handleKeyDown`
+- 新增 `Enter` / `PageUp` 快捷键支持
+
+**P2 次要修复**：
+- 版本号三处统一（version.ts / tauri.conf.json / Cargo.toml）
+- 删除死代码：`ThemeProvider`、`ui/sonner.tsx`、未调用的本地 `savePracticeStats`
+- 全屏指板分隔线硬编码 `oklch` 改为 `border-border/60` 主题变量
+- `:root` 与 `.dark` 双重定义合并：`:root` 仅保留 `--radius`，主题值由具体主题类提供
+- 全屏类管理三重重复统一由 `LayoutShell` 管理
+
+**P3 微小修复**：
+- `isTauriEnv` 注释错字"卐议"→"协议"
+- 全局快捷键守卫增加 `contenteditable` 元素检查
+- `preferFlat` / `preferSharp` 改用 `normalizeNoteName` 后的值匹配，统一 ♯/♭ 形式
+- `PitchDetectorConfig` 默认 `buffer_size` 8192→4096，与 `pipeline.rs` 实际使用一致
+- Tauri CSP 添加 `blob:` 协议到 `img-src` / `media-src`
+
+**主题系统重设计**：
+- 浅色主题从纯白改为暖象牙白，长时间使用不疲劳
+- 新增 11 种主题 × 2 种明暗模式（forest / ocean / sunset / monochrome / rose / midnight / sand / celadon / lavender / carbon）
+- Pre-hydration 脚本保证首绘前应用正确主题，消除颜色跳变
+
+##### v0.2.81
 
 **新增功能**：
 - 独立和弦练习模式（chord_exercise 标签页）
@@ -614,14 +651,15 @@ npm run tauri:build
 | `3` | 和弦练习 | 切换到和弦练习标签页 |
 | `4` | 和弦进行 | 切换到和弦进行标签页 |
 | `5` | 音阶练习 | 切换到音阶标签页 |
-| `F` | 全屏模式 | 切换全屏显示 |
+| `F` | 全屏模式 | 全局切换全屏显示（无需练习中） |
 | `M` | 麦克风开关 | 开启/关闭麦克风 |
 | `S` | 设置面板 | 打开设置对话框 |
 | `P` | 开始/停止 | 开始或停止练习 |
 | `H` | 帮助 | 显示快捷键帮助 |
-| `空格` / `→` | 下一题 | 跳到下一个练习 |
-| `↑` | 显示指板 | 显示指板提示 |
-| `↓` | 隐藏指板 | 隐藏指板提示 |
+| `空格` / `→` / `PageDown` | 下一题 | 跳到下一个练习（练习中） |
+| `Enter` | 下一题 | 跳到下一个练习（练习中） |
+| `↑` / `PageUp` | 显示指板 | 显示指板提示（练习中） |
+| `↓` | 隐藏指板 / 下一题 | 隐藏指板；练习中同时生成下一题 |
 
 ---
 

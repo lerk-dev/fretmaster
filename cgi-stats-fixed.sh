@@ -138,8 +138,8 @@ validate_device_id() {
 validate_exercise_type() {
     local input="$1"
 
-    # 定义允许的练习类型
-    local allowed_types="pitch_finding interval scale chord_exercise chord_progression 练习 音程 音阶 和弦 找音"
+    # 定义允许的练习类型（包含前端发送的英文 key 与中文全称/短词）
+    local allowed_types="pitch_finding interval scale chord_exercise chord_progression 练习 音程 音阶 和弦 找音 找音练习 音程练习 音阶练习 和弦练习 和弦进行"
 
     # 检查是否在白名单中
     for type in $allowed_types; do

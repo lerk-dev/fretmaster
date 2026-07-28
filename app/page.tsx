@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -5180,6 +5180,26 @@ export default function FretMasterPage() {
     const html = document.documentElement
     allThemeClasses.forEach(cls => html.classList.remove(cls))
     html.classList.add(theme)
+    // 同步更新 html/body 的 inline 背景色（与 layout.tsx pre-hydration 脚本保持一致）
+    // 避免 overscroll/滚动边界露出深色底
+    const themeBgMap: Record<string, string> = {
+      'light': '#eeebe6', 'dark': '#101317',
+      'forest-light': '#dbe5d6', 'forest-dark': '#0d1410',
+      'ocean-light': '#d9e6f2', 'ocean-dark': '#0a1420',
+      'sunset-light': '#f5e0d4', 'sunset-dark': '#1a0e0a',
+      'monochrome-light': '#e8e8e8', 'monochrome-dark': '#0a0a0a',
+      'rose-light': '#f0dce0', 'rose-dark': '#1a0d11',
+      'midnight-light': '#dfe1f0', 'midnight-dark': '#080a1a',
+      'sand-light': '#ede0c8', 'sand-dark': '#1a140d',
+      'celadon-light': '#dce8e0', 'celadon-dark': '#0a1410',
+      'lavender-light': '#e2dcec', 'lavender-dark': '#0f0a1a',
+      'carbon-light': '#e0e0e0', 'carbon-dark': '#0a0a0a'
+    }
+    const bg = themeBgMap[theme] || '#101317'
+    html.style.backgroundColor = bg
+    if (document.body) {
+      document.body.style.backgroundColor = bg
+    }
   }, [theme])
 
   useEffect(() => {
@@ -5232,7 +5252,7 @@ export default function FretMasterPage() {
   }, [isFullscreen, toggleFullscreenState])
   
   const setFullscreenMode = handleToggleFullscreen
-  
+
   // 专注模式启用时不再自动进入全屏，改为浮动侧边面板
   const prevFocusModeEnabled = useRef(focusMode?.enabled)
   useEffect(() => {
@@ -5243,20 +5263,10 @@ export default function FretMasterPage() {
       }
     }
   }, [focusMode?.enabled, isFullscreen, handleToggleFullscreen])
-  
-  // 全屏时切换 html 元素的 fullscreen-mode 类，防止 scrollbar-gutter 导致白条
-  useEffect(() => {
-    const htmlEl = document.documentElement
-    if (isFullscreen) {
-      htmlEl.classList.add('fullscreen-mode')
-    } else {
-      htmlEl.classList.remove('fullscreen-mode')
-    }
-    return () => {
-      htmlEl.classList.remove('fullscreen-mode')
-    }
-  }, [isFullscreen])
-  
+
+  // html.fullscreen-mode 类的同步统一由 LayoutShell 负责（同时处理 body 样式），
+  // 此处不再重复操作，避免三处维护同一状态导致不一致。
+
   // 练习模式状态
   const isPlaying = storeIsPlaying
   const setIsPlaying = store.setIsPlaying
@@ -5730,10 +5740,13 @@ export default function FretMasterPage() {
 
     // Tauri 环境首次运行：清理历史 localStorage 备份，避免从 Web 版迁移或早期版本遗留的脏数据
     // 被错误加载（导致"未使用却显示练习记录"）
-    if (isTauri) {
+    // 仅首次运行执行（用 CLEANED_FLAG 标记），避免每次启动都清掉当次未保存的会话
+    const CLEANED_FLAG = 'fretmaster-tauri-localstorage-cleaned'
+    if (isTauri && !localStorage.getItem(CLEANED_FLAG)) {
       try {
         localStorage.removeItem('fretmaster-stats')
         localStorage.removeItem('fretmaster_stats_backup')
+        localStorage.setItem(CLEANED_FLAG, '1')
       } catch (e) {
         console.warn('Failed to clean legacy localStorage stats:', e)
       }
@@ -5881,13 +5894,6 @@ export default function FretMasterPage() {
     loadStatsFromServer()
   }, [isTauri])
 
-  // 保存统计数据
-  const savePracticeStats = useCallback((stats: PracticeStats) => {
-    if (typeof window === 'undefined') return
-    localStorage.setItem('fretmaster-stats', JSON.stringify(stats))
-    setPracticeStats(stats)
-  }, [])
-
   const savePracticeState = useCallback(() => {
     if (typeof window === 'undefined' || !isPlaying) return
     const state = {
@@ -5947,13 +5953,14 @@ export default function FretMasterPage() {
     const finalDuration = opts?.duration ?? realDuration
     const finalAccuracy = opts?.accuracy ?? realAccuracy
     
+    // 先计算 newStats（updater 必须是纯函数，副作用移出以避免 StrictMode 重复保存）
     setPracticeStats(prevStats => {
       const newStats = { ...prevStats }
-      
+
       // 更新总计
       newStats.total.count += 1
       newStats.total.byType[type] = (newStats.total.byType[type] || 0) + 1
-      
+
       // 更新详细统计
       const detailList = newStats.total.byDetail[type] || []
       const existingDetail = detailList.find(d => d.name === detailName)
@@ -5963,7 +5970,7 @@ export default function FretMasterPage() {
         detailList.push({ name: detailName, count: 1 })
       }
       newStats.total.byDetail[type] = detailList
-      
+
       // 更新每日统计
       let todayStats = newStats.daily.find(d => d.date === today)
       if (!todayStats) {
@@ -5987,10 +5994,10 @@ export default function FretMasterPage() {
         }
         newStats.daily.push(todayStats)
       }
-      
+
       todayStats.totalCount += 1
       todayStats.byType[type] = (todayStats.byType[type] || 0) + 1
-      
+
       const todayDetailList = todayStats.byDetail[type] || []
       const todayExistingDetail = todayDetailList.find(d => d.name === detailName)
       if (todayExistingDetail) {
@@ -5999,7 +6006,7 @@ export default function FretMasterPage() {
         todayDetailList.push({ name: detailName, count: 1 })
       }
       todayStats.byDetail[type] = todayDetailList
-      
+
       // 只保留最近90天的数据
       newStats.daily = newStats.daily
         .filter(d => {
@@ -6011,34 +6018,28 @@ export default function FretMasterPage() {
           return date >= ninetyDaysAgo
         })
         .sort((a, b) => b.date.localeCompare(a.date))
-      
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
-      }
-      
-      // 同时保存到服务器（SQLite数据库）
-      const typeNames: Record<PracticeType, string> = {
-        pitch_finding: '音高识别',
-        scale: '音阶练习',
-        chord_exercise: '和弦练习',
-        interval: '音程练习',
-        chord_progression: '和弦进行'
-      }
-      
-      // 异步保存到服务器，不阻塞UI
-      // 使用真实的 score/duration/accuracy，而非硬编码的 100/60/100
-      // accuracy 使用 0-100 范围（与导出和验证逻辑一致）
-      saveToServer({
-        exercise_type: typeNames[type] || detailName,
-        score: finalScore,
-        duration: finalDuration,
-        accuracy: finalAccuracy,
-        notes: `练习项目: ${detailName}`
-      }).catch(err => console.error('保存到服务器失败:', err))
-      
+
+      // 副作用移出 updater：在新状态计算完成后，于下一个微任务执行持久化
+      // 避免在 React StrictMode 下 updater 被调用两次导致重复保存
+      queueMicrotask(() => {
+        // Tauri 环境使用 SQLite 作为唯一统计源，不写 localStorage（遵循项目约定）
+        if (typeof window !== 'undefined' && !isTauri) {
+          localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
+        }
+
+        // 保存到服务器（SQLite/CGI）。detailName 已是白名单允许的中文短词（如"找音练习"）
+        saveToServer({
+          exercise_type: detailName,
+          score: finalScore,
+          duration: finalDuration,
+          accuracy: finalAccuracy,
+          notes: `练习项目: ${detailName}`
+        }).catch(err => console.error('保存到服务器失败:', err))
+      })
+
       return newStats
     })
-  }, [practiceSessionStartTime, practiceElapsedTime])
+  }, [practiceSessionStartTime, practiceElapsedTime, isTauri])
 
   // ==================== 练习会话统计（统一会话级记录） ====================
   // 所有练习 tab 统一按"会话"统计：从开始练习到结束练习（停止/时间到/切Tab）记为一次。
@@ -6098,7 +6099,7 @@ export default function FretMasterPage() {
           chord_exercise: '和弦练习',
           chord_progression: '和弦进行',
         }
-        recordPractice(sessionType, detailNames[sessionType], { duration, accuracy })
+        recordPractice(sessionType, detailNames[sessionType], { score: accuracy, duration, accuracy })
       }
     }
   }, [isPlaying, activeTab, score, recordPractice])
@@ -6942,6 +6943,11 @@ export default function FretMasterPage() {
 
   // 音频输入处理
   const startAudioInput = useCallback(async () => {
+    // Tauri 环境使用 Rust cpal 直接采集，不走 getUserMedia（避免 WebView2 权限弹窗）
+    if (isTauriEnv()) {
+      logger.warn('Tauri 环境应使用 native audio，startAudioInput 已阻止')
+      return
+    }
     if (tunerActive) {
       stopTuner()
     }
@@ -7111,7 +7117,7 @@ export default function FretMasterPage() {
     } finally {
       setAudioInitializing(false)
     }
-  }, [selectedAudioDevice, inputGain, language, useAudioWorklet])
+  }, [selectedAudioDevice, inputGain, language, useAudioWorklet, tunerActive, stopTuner])
 
   // 触发正确答案反馈
   const triggerCorrectFeedback = useCallback((note: string) => {
@@ -7466,6 +7472,8 @@ export default function FretMasterPage() {
 
     // 根据练习模式处理 - 完全按照原HTML的processAudio逻辑
     if (currentActiveTab === 'practice') {
+      // 找音练习 - 辨音模式下通过按钮答题，不自动匹配（与 Web 路径一致）
+      if (practiceAnswerModeRef.current === 'buttons') return
       // 找音练习 - 使用音分差匹配
       const currentTargetNote = targetNoteRef.current
       if (!currentTargetNote) return
@@ -7480,10 +7488,16 @@ export default function FretMasterPage() {
 
       if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
         logger.debug('找音练习匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1))
+        isCoolingDownRef.current = true
+        triggerCorrectFeedback(detectedNote)
         setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
         if (generateNewTargetRef.current) {
           generateNewTargetRef.current()
         }
+        cooldownRef.current = setTimeout(() => {
+          isCoolingDownRef.current = false
+          cooldownRef.current = null
+        }, 800)
       }
     } else if (currentActiveTab === 'interval') {
       // 音程练习 - 使用音分差匹配
@@ -7526,6 +7540,7 @@ export default function FretMasterPage() {
       if (matchedIndex !== null) {
         const matchedInterval = intervals[matchedIndex]
         logger.debug('音程练习匹配成功:', matchedInterval, '音分差:', minCents.toFixed(1))
+        triggerCorrectFeedback(detectedNote)
         const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
 
         if (newCompletedIntervals.length >= intervals.length) {
@@ -7568,6 +7583,7 @@ export default function FretMasterPage() {
 
       if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
         logger.debug('音阶练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
+        triggerCorrectFeedback(detectedNote)
         const nextStep = step + 1
         if (nextStep >= sequence.length) {
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
@@ -7603,6 +7619,7 @@ export default function FretMasterPage() {
 
       if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
         logger.debug('和弦练习音高匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1), '阈值:', matchThreshold.toFixed(1))
+        triggerCorrectFeedback(detectedNote)
 
         const nextStep = step + 1
         if (nextStep >= sequence.length) {
@@ -7625,7 +7642,11 @@ export default function FretMasterPage() {
       const currentChord = chords[currentChordIndexRef.current]
       if (!currentChord) return
 
-      const degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
+      // 获取和弦音级，如果开启 voice leading 则应用（与 Web 路径一致）
+      let degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
+      if (shouldVoiceLeadRef.current && lastChordNoteRef.current) {
+        degrees = applyVoiceLeading(degrees, currentChord.root, lastChordNoteRef.current)
+      }
       const currentStep = chordDegreeCurrentStepRef.current
       if (currentStep >= degrees.length) return
 
@@ -7646,8 +7667,13 @@ export default function FretMasterPage() {
 
       if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
         logger.debug('和弦转换练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
+        isCoolingDownRef.current = true
+        triggerCorrectFeedback(detectedNote)
         const nextStep = currentStep + 1
         if (nextStep >= degrees.length) {
+          // 完成当前和弦，记录最后一个音用于 voice leading（与 Web 路径一致）
+          lastChordNoteRef.current = detectedNote
+          setLastChordNote(detectedNote)
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
           if (nextChordInfoRef.current && nextChordRef.current) {
             nextChordRef.current()
@@ -7656,11 +7682,15 @@ export default function FretMasterPage() {
           setChordDegreeCurrentStep(nextStep)
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
         }
+        cooldownRef.current = setTimeout(() => {
+          isCoolingDownRef.current = false
+          cooldownRef.current = null
+        }, 800)
       }
     } else if (currentActiveTab === 'tuner') {
       // 调音表模式 - 只显示音高，不需要答题逻辑
     }
-  }, [getTransposedChordsRef, practiceLevelRef, findRootFirstRef, targetNoteRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, currentIntervalExerciseRef, currentChordIndexRef, chordDegreeCurrentStepRef, nextChordRef, nextChordInfoRef, nextScaleExerciseRef, nextChordExerciseRef, generateNewTargetRef, generateIntervalExerciseRef, isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef])
+  }, [getTransposedChordsRef, practiceLevelRef, findRootFirstRef, targetNoteRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, currentIntervalExerciseRef, currentChordIndexRef, chordDegreeCurrentStepRef, nextChordRef, nextChordInfoRef, nextScaleExerciseRef, nextChordExerciseRef, generateNewTargetRef, generateIntervalExerciseRef, isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef, practiceAnswerModeRef, shouldVoiceLeadRef, lastChordNoteRef, triggerCorrectFeedback, setLastChordNote])
 
   const processPracticeMatchRef = useRef(processPracticeMatch)
   useEffect(() => { processPracticeMatchRef.current = processPracticeMatch }, [processPracticeMatch])
@@ -7859,8 +7889,8 @@ export default function FretMasterPage() {
           }
         }
       } else {
-        // 使用标准YIN算法（使用固定48000采样率）
-        yinResult = YINPitchDetection(inputData, 48000, yinParams.threshold, yinParams.probabilityCliff)
+        // 使用标准YIN算法（使用实际采样率，避免 44100 设备偏高 1.46 半音）
+        yinResult = YINPitchDetection(inputData, sampleRate, yinParams.threshold, yinParams.probabilityCliff)
       }
       
       if (!yinResult || !yinResult.frequency) {
@@ -7892,7 +7922,7 @@ export default function FretMasterPage() {
             }
           }
         } else {
-          fundamentalResult = YINPitchDetection(inputData, 48000, yinParams.threshold, yinParams.probabilityCliff)
+          fundamentalResult = YINPitchDetection(inputData, sampleRate, yinParams.threshold, yinParams.probabilityCliff)
         }
         
         if (fundamentalResult && fundamentalResult.frequency &&
@@ -8474,13 +8504,15 @@ export default function FretMasterPage() {
 
   const preferSharp = (note: string): string => {
     const normalized = normalizeNoteName(note)
-    if (['D♭', 'E♭', 'G♭', 'A♭', 'B♭', 'Db', 'Eb', 'Gb', 'Ab', 'Bb'].includes(note)) return normalizeNoteName(ENHARMONIC_MAP[note] || note)
+    // 使用 normalized 进行匹配，避免传入 # 形式时无法命中 b 形式列表
+    if (['D♭', 'E♭', 'G♭', 'A♭', 'B♭'].includes(normalized)) return normalizeNoteName(ENHARMONIC_MAP[normalized] || ENHARMONIC_MAP[note] || note)
     return normalized
   }
 
   const preferFlat = (note: string): string => {
     const normalized = normalizeNoteName(note)
-    if (['C#', 'D#', 'F#', 'G#', 'A#', 'C♯', 'D♯', 'F♯', 'G♯', 'A♯'].includes(note)) return normalizeNoteName(ENHARMONIC_MAP[note] || note)
+    // 使用 normalized 进行匹配（♯ 形式），避免传入 b 形式时无法命中
+    if (['C♯', 'D♯', 'F♯', 'G♯', 'A♯'].includes(normalized)) return normalizeNoteName(ENHARMONIC_MAP[normalized] || ENHARMONIC_MAP[note] || note)
     return normalized
   }
 
@@ -8710,13 +8742,20 @@ export default function FretMasterPage() {
           // 用 getChordDegrees 获取当前和弦在该 level 下的音级字符串数组
           // 然后把音级字符串转成半音数，判断当前音符是否匹配
           // 注意：level.sequences 存的是序列数字（1,2,3,5），不是半音数，不能直接用
-          const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
+          // 如果开启 voice leading 则应用（与 audio 路径一致）
+          let degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
+          if (shouldVoiceLeadRef.current && lastChordNoteRef.current) {
+            degrees = applyVoiceLeading(degrees, currentChord.root, lastChordNoteRef.current)
+          }
           const validSemitones = degrees
             .map(d => intervalToSemitones[d])
             .filter((s): s is number => s !== undefined)
           const isCorrect = validSemitones.includes(interval)
 
           if (isCorrect) {
+            // 完成当前和弦，记录最后一个音用于 voice leading（与 audio 路径一致）
+            lastChordNoteRef.current = note
+            setLastChordNote(note)
             setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
           } else {
             setScore(prev => ({ ...prev, total: prev.total + 1 }))
@@ -9195,94 +9234,7 @@ export default function FretMasterPage() {
     setActiveTab(tabId)
   }, [resetPractice])
 
-  // 优化键盘事件处理
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown' || e.key === 'Enter') {
-      e.preventDefault()
-      if (isPlayingRef.current) {
-        switch (activeTabRef.current) {
-          case 'practice':
-            generateNewTargetRef.current?.()
-            break
-          case 'interval':
-            generateIntervalExerciseRef.current?.()
-            break
-          case 'chord':
-            nextChordRef.current?.()
-            break
-          case 'chord_exercise':
-            nextChordExerciseRef.current?.()
-            break
-          case 'scale':
-            nextScaleExerciseRef.current?.()
-            break
-        }
-      } else {
-        switch (activeTabRef.current) {
-          case 'practice':
-            setShowFretboard(false)
-            break
-          case 'interval':
-            setShowIntervalFretboard(false)
-            break
-          case 'chord':
-            setShowChordFretboard(false)
-            break
-          case 'chord_exercise':
-            setShowChordExerciseFretboard(false)
-            break
-          case 'scale':
-            setShowScaleFretboard(false)
-            break
-        }
-      }
-      return
-    }
-    if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'PageDown') {
-      if (!isPlayingRef.current) return
-      e.preventDefault()
-      switch (activeTabRef.current) {
-        case 'practice':
-          generateNewTargetRef.current?.()
-          break
-        case 'interval':
-          generateIntervalExerciseRef.current?.()
-          break
-        case 'chord':
-          nextChordRef.current?.()
-          break
-        case 'chord_exercise':
-          nextChordExerciseRef.current?.()
-          break
-        case 'scale':
-          nextScaleExerciseRef.current?.()
-          break
-      }
-      return
-    }
-    if (e.key === 'ArrowUp' || e.key === 'PageUp') {
-      if (!isPlayingRef.current) return
-      e.preventDefault()
-      // 上箭头 - 显示指板（与快捷键说明一致）
-      switch (activeTabRef.current) {
-        case 'practice':
-          setShowFretboard(true)
-          break
-        case 'interval':
-          setShowIntervalFretboard(true)
-          break
-        case 'chord':
-          setShowChordFretboard(true)
-          break
-        case 'chord_exercise':
-          setShowChordExerciseFretboard(true)
-          break
-        case 'scale':
-          setShowScaleFretboard(true)
-          break
-      }
-    }
-  }, [])
+  // 键盘事件由全局 window 监听器统一处理（见下方 useEffect），避免 Card 聚焦时与全局处理器重复触发
 
   // 下一和弦
   const nextChord = useCallback(() => {
@@ -9353,8 +9305,13 @@ export default function FretMasterPage() {
   // 键盘事件监听 - 全局快捷键
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // 忽略输入框中的按键
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      // 忽略输入框/可编辑元素中的按键，避免与文本输入冲突
+      const target = event.target as HTMLElement | null
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        return
+      }
+      // contenteditable 元素（如富文本编辑器）也跳过
+      if (target && target.isContentEditable) {
         return
       }
 
@@ -9378,8 +9335,8 @@ export default function FretMasterPage() {
         return
       }
 
-      // F - 切换全屏模式
-      if ((event.key === 'f' || event.key === 'F') && isPlaying) {
+      // F - 切换全屏模式（全局快捷键，不依赖练习状态，与快捷键说明一致）
+      if (event.key === 'f' || event.key === 'F') {
         event.preventDefault()
         setFullscreenMode(!isFullscreen)
         return
@@ -9432,8 +9389,8 @@ export default function FretMasterPage() {
         return
       }
 
-      // 上箭头 - 显示指板（与快捷键说明一致）
-      if (event.key === 'ArrowUp' && isPlaying) {
+      // 上箭头/PageUp - 显示指板（与快捷键说明一致）
+      if ((event.key === 'ArrowUp' || event.key === 'PageUp') && isPlaying) {
         event.preventDefault()
         // 根据当前练习 tab 显示对应的指板
         if (activeTab === 'practice') {
@@ -9451,8 +9408,9 @@ export default function FretMasterPage() {
         return
       }
 
-      // 下箭头 - 隐藏指板
-      if (event.key === 'ArrowDown' && isPlaying) {
+      // 下箭头 - 隐藏指板 / 下一题（与快捷键说明一致）
+      // 练习中：隐藏指板并生成下一题；非练习中：仅隐藏指板
+      if (event.key === 'ArrowDown') {
         event.preventDefault()
         // 根据当前练习 tab 隐藏对应的指板
         if (activeTab === 'practice') {
@@ -9467,6 +9425,37 @@ export default function FretMasterPage() {
           setShowScaleFretboard(false)
         }
         setShowAllNotes(false)
+        // 练习中同时生成下一题
+        if (isPlaying) {
+          if (activeTab === 'practice') {
+            generateNewTarget()
+          } else if (activeTab === 'interval') {
+            generateIntervalExerciseRef.current?.()
+          } else if (activeTab === 'chord_exercise') {
+            nextChordExercise()
+          } else if (activeTab === 'scale') {
+            nextScaleExercise()
+          } else if (activeTab === 'chord') {
+            nextChord()
+          }
+        }
+        return
+      }
+
+      // Enter - 下一题（练习中）
+      if (event.key === 'Enter' && isPlaying) {
+        event.preventDefault()
+        if (activeTab === 'practice') {
+          generateNewTarget()
+        } else if (activeTab === 'interval') {
+          generateIntervalExerciseRef.current?.()
+        } else if (activeTab === 'chord_exercise') {
+          nextChordExercise()
+        } else if (activeTab === 'scale') {
+          nextScaleExercise()
+        } else if (activeTab === 'chord') {
+          nextChord()
+        }
         return
       }
 
@@ -10826,10 +10815,9 @@ export default function FretMasterPage() {
             <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
               {/* Control Panel - 统计页面不显示*/}
               {activeTab !== "stats" && (
-              <Card 
+              <Card
                 ref={practiceCardRef}
-                tabIndex={0} 
-                onKeyDown={handleKeyDown}
+                tabIndex={0}
                 className="outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 role="region"
                 aria-label={t('fretboard_title')}
@@ -11031,11 +11019,11 @@ export default function FretMasterPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  // 检查答案是否正确
+                                  // 检查答案是否正确（使用 isEquivalentNote 处理等音，如 C♯ = D♭）
                                   if (highlightedTargetPosition) {
                                     const { stringIndex, fret } = highlightedTargetPosition
                                     const correctNote = getNoteAtPosition(stringIndex, fret)
-                                    const isCorrect = note === correctNote
+                                    const isCorrect = isEquivalentNote(note, correctNote)
 
                                     // 显示反馈
                                     setHighlightedFrets(new Map([[`${stringIndex}-${fret}`, isCorrect]]))
@@ -11057,7 +11045,7 @@ export default function FretMasterPage() {
                                 }}
                                 className="h-10 w-10 text-sm font-semibold"
                               >
-                                {note}
+                                {formatNoteByAccidentalSetting(note)}
                               </Button>
                             ))}
                           </div>
@@ -13170,10 +13158,9 @@ export default function FretMasterPage() {
                       {Array.from({ length: 5 }).map((_, i) => (
                         <div
                           key={`fs-sep-${i}`}
-                          className="absolute left-0 right-0 pointer-events-none block z-10 dark:border-t dark:border-dashed dark:border-[oklch(0.35_0.02_260_/_0.8)]"
+                          className="absolute left-0 right-0 pointer-events-none block z-10 border-t border-dashed border-border/60"
                           style={{
                             top: `${((i + 1) / 6) * 100}%`,
-                            borderTop: '1px dashed oklch(0.7 0.02 260 / 0.5)',
                             transform: 'translateY(-1px)',
                           }}
                         />
@@ -13891,7 +13878,7 @@ export default function FretMasterPage() {
                 {/* 变化属和弦结构 */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {language === 'zh-CN' ? '变化属和弦结构' : 'Altered Dominant Structures'}
+                    {t('level_group_altered')}
                   </h4>
                   <div className="grid grid-cols-1 gap-2">
                     {ALTERED_LEVELS.map((level) => (
@@ -13909,9 +13896,9 @@ export default function FretMasterPage() {
                         }}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{language === 'zh-CN' ? level.nameZh : level.name}</div>
+                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
                           <div className="text-xs text-muted-foreground truncate">
-                            {language === 'zh-CN' ? level.descriptionZh : level.description}
+                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
                           </div>
                         </div>
                         <Button
@@ -13934,7 +13921,7 @@ export default function FretMasterPage() {
                 {/* 减音阶 */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {language === 'zh-CN' ? '减音阶' : 'Diminished Scales'}
+                    {t('level_group_diminished')}
                   </h4>
                   <div className="grid grid-cols-1 gap-2">
                     {DIMINISHED_SCALES_LEVELS.map((level) => (
@@ -13952,9 +13939,9 @@ export default function FretMasterPage() {
                         }}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{language === 'zh-CN' ? level.nameZh : level.name}</div>
+                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
                           <div className="text-xs text-muted-foreground truncate">
-                            {language === 'zh-CN' ? level.descriptionZh : level.description}
+                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
                           </div>
                         </div>
                         <Button
