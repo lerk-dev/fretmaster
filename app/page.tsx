@@ -11,7 +11,7 @@ import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
 import { logger } from "@/lib/logger"
 import { SOLO_SONGS } from "@/lib/solo-songs"
 import { PRACTICE_MODE_GROUPS, ALTERED_LEVELS, DIMINISHED_SCALES_LEVELS } from "@/lib/practice-levels"
-import { InstrumentType } from "@/lib/practice-suggestions"
+import { InstrumentType, INSTRUMENT_CONFIG } from "@/lib/practice-suggestions"
 import { calculateRMS, frequencyToNoteName, calculateCents, getAdjustedCents, frequencyToNote, getSOLOYinAnalyser, YINPitchDetection, YINDetector, SOLOYinAnalyser } from "@/lib/pitch-detection"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -128,8 +128,8 @@ import { TRANSLATIONS } from '@/lib/i18n'
 // ==================== 音乐理论常量 ====================
 const NOTES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
 const NOTES_FLAT = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]
-const STRING_TUNING = [4, 11, 7, 2, 9, 4] // E B G D A E (high to low, as semitones from C)
-const GUITAR_TUNING = ["E", "B", "G", "D", "A", "E"] // 1弦到6弦的开放音 (high to low)
+// 当前调弦（半音值，高音→低音）。默认标准吉他，组件内根据所选乐器同步更新
+let STRING_TUNING: number[] = [4, 11, 7, 2, 9, 4] // E B G D A E (high to low, as semitones from C)
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
 
 // 标准化音符名：将 # 转为 ♯、b 转为 ♭（用于兼容旧数据/和弦解析结果）
@@ -5113,6 +5113,10 @@ export default function FretMasterPage() {
   const storeVersion = useVersion()
   const user = useUser()
 
+  // 根据所选乐器派生指板配置（弦数/调弦/品数）
+  const instrumentConfig = INSTRUMENT_CONFIG[user.instrument] || INSTRUMENT_CONFIG.six_string_guitar
+  const STRING_COUNT = instrumentConfig.stringCount
+
   const language = user.language
   const setLanguage = store.setLanguage
   const theme = user.theme
@@ -5276,7 +5280,19 @@ export default function FretMasterPage() {
   // 找音练习状态
   const [targetNote, setTargetNote] = useState<string>("C")
   const [showAllNotes, setShowAllNotes] = useState(false)
-  const [selectedStrings, setSelectedStrings] = useState<number[]>([1, 2, 3, 4, 5, 6]) // 默认选中所有弦
+  const [selectedStrings, setSelectedStrings] = useState<number[]>([1, 2, 3, 4, 5, 6]) // 默认选中所有弦（切换乐器时由 effect 重置）
+
+  // 切换乐器时同步：更新模块级 STRING_TUNING（供 getNoteAtPosition 读取），并校正 selectedStrings
+  // 注意：STRING_TUNING 需在渲染期间同步更新，确保本次渲染的指板即使用新调弦
+  STRING_TUNING = instrumentConfig.tuning
+  useEffect(() => {
+    setSelectedStrings(prev => {
+      const filtered = prev.filter(n => n <= STRING_COUNT)
+      return filtered.length > 0
+        ? filtered
+        : Array.from({ length: STRING_COUNT }, (_, i) => i + 1)
+    })
+  }, [user.instrument, STRING_COUNT])
   
   // 找音练习新模式：指板点亮 + 音名按钮答题
   const [practiceAnswerMode, setPracticeAnswerMode] = useState<"fretboard" | "buttons">("fretboard") // 答题模式：指板点击或按钮选择
@@ -8064,9 +8080,10 @@ export default function FretMasterPage() {
 
   const generateNewTarget = useCallback(() => {
     // 总是生成指板位置（在 fretboard 模式下不会被使用，但确保 buttons 模式下始终有值）
-    const availableStrings = selectedStrings.length > 0 ? selectedStrings : [1, 2, 3, 4, 5, 6]
+    const allStrings = Array.from({ length: STRING_COUNT }, (_, i) => i + 1)
+    const availableStrings = selectedStrings.length > 0 ? selectedStrings : allStrings
     const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
-    const stringIndex = 6 - randomStringNum
+    const stringIndex = STRING_COUNT - randomStringNum
     const randomFret = Math.floor(Math.random() * (fretCount + 1))
     const noteAtPosition = getNoteAtPosition(stringIndex, randomFret)
     
@@ -10902,7 +10919,7 @@ export default function FretMasterPage() {
                         <div className="space-y-0.5">
                           <div className="text-[10px] text-muted-foreground leading-3">{t('select_strings')}</div>
                           <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
-                            {[1, 2, 3, 4, 5, 6].map((stringNum) => (
+                            {Array.from({ length: STRING_COUNT }, (_, i) => i + 1).map((stringNum) => (
                               <Button
                                 key={stringNum}
                                 variant={selectedStrings.includes(stringNum) ? "default" : "ghost"}
@@ -12208,12 +12225,12 @@ export default function FretMasterPage() {
                     {/* 指板外层容器 - 统一圆角 */}
                     <div className="relative rounded-lg overflow-hidden border border-border bg-muted/30 dark:bg-zinc-900/30">
                       {/* 琴弦之间的虚线分隔 - 深浅主题都显示，浅色主题使用更浅的颜色*/}
-                      {Array.from({ length: 5 }).map((_, i) => (
+                      {Array.from({ length: STRING_COUNT - 1 }).map((_, i) => (
                         <div
                           key={`string-separator-${i}`}
                           className="absolute left-0 right-0 pointer-events-none block z-10 dark:border-t dark:border-dashed dark:border-[oklch(0.35_0.02_260_/_0.8)]"
                           style={{
-                            top: `${((i + 1) / 6) * 100}%`,
+                            top: `${((i + 1) / STRING_COUNT) * 100}%`,
                             borderTop: '1px dashed oklch(0.7 0.02 260 / 0.5)',
                             transform: 'translateY(-1px)',
                           }}
@@ -13156,12 +13173,12 @@ export default function FretMasterPage() {
                     {/* 指板外层容器 */}
                     <div className="relative rounded-lg overflow-hidden border border-border bg-muted/30 dark:bg-zinc-900/30">
                       {/* 弦分隔线 */}
-                      {Array.from({ length: 5 }).map((_, i) => (
+                      {Array.from({ length: STRING_COUNT - 1 }).map((_, i) => (
                         <div
                           key={`fs-sep-${i}`}
                           className="absolute left-0 right-0 pointer-events-none block z-10 border-t border-dashed border-border/60"
                           style={{
-                            top: `${((i + 1) / 6) * 100}%`,
+                            top: `${((i + 1) / STRING_COUNT) * 100}%`,
                             transform: 'translateY(-1px)',
                           }}
                         />

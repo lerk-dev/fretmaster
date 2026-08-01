@@ -1,4 +1,4 @@
-export type InstrumentType = 
+export type InstrumentType =
   | 'six_string_guitar'
   | 'six_string_fourths'
   | 'seven_string_guitar'
@@ -9,6 +9,87 @@ export type InstrumentType =
   | 'e_flat_horn'
   | 'concert_pitch'
   | 'concert_pitch_minus_one'
+
+// 乐器指板配置：弦数、调弦（高音→低音，半音值）、开放音名、默认品数
+// 半音值约定: C=0, C♯=1, D=2, D♯=3, E=4, F=5, F♯=6, G=7, G♯=8, A=9, A♯=10, B=11
+export interface InstrumentConfig {
+  stringCount: number
+  // 高音弦 → 低音弦的开放音半音值，用于指板音名计算与渲染迭代
+  tuning: number[]
+  // 用于显示的开放音名（与 tuning 一一对应，同序：高→低）
+  tuningNames: string[]
+  defaultFretCount: number
+}
+
+export const INSTRUMENT_CONFIG: Record<InstrumentType, InstrumentConfig> = {
+  // 六弦吉他标准调弦 E B G D A E（高→低）
+  six_string_guitar: {
+    stringCount: 6,
+    tuning: [4, 11, 7, 2, 9, 4],
+    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
+    defaultFretCount: 15,
+  },
+  // 六弦四度调弦 E A D G C F（高→低，全部纯四度）
+  six_string_fourths: {
+    stringCount: 6,
+    tuning: [4, 9, 2, 7, 0, 5],
+    tuningNames: ['E', 'A', 'D', 'G', 'C', 'F'],
+    defaultFretCount: 15,
+  },
+  // 七弦吉他标准调弦 E B G D A E B（高→低，加低 B）
+  seven_string_guitar: {
+    stringCount: 7,
+    tuning: [4, 11, 7, 2, 9, 4, 11],
+    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E', 'B'],
+    defaultFretCount: 15,
+  },
+  // 七弦四度调弦 E A D G C F B（高→低，全部纯四度）
+  seven_string_fourths: {
+    stringCount: 7,
+    tuning: [4, 9, 2, 7, 0, 5, 11],
+    tuningNames: ['E', 'A', 'D', 'G', 'C', 'F', 'B'],
+    defaultFretCount: 15,
+  },
+  // 四弦贝斯标准调弦 G D A E（高→低）
+  four_string_bass: {
+    stringCount: 4,
+    tuning: [7, 2, 9, 4],
+    tuningNames: ['G', 'D', 'A', 'E'],
+    defaultFretCount: 15,
+  },
+  // 五弦贝斯标准调弦 G D A E B（高→低，加低 B）
+  five_string_bass: {
+    stringCount: 5,
+    tuning: [7, 2, 9, 4, 11],
+    tuningNames: ['G', 'D', 'A', 'E', 'B'],
+    defaultFretCount: 15,
+  },
+  // 管乐器/音乐会音高乐器无真实指板，复用六弦吉他配置以保持 UI 可用
+  b_flat_horn: {
+    stringCount: 6,
+    tuning: [4, 11, 7, 2, 9, 4],
+    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
+    defaultFretCount: 15,
+  },
+  e_flat_horn: {
+    stringCount: 6,
+    tuning: [4, 11, 7, 2, 9, 4],
+    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
+    defaultFretCount: 15,
+  },
+  concert_pitch: {
+    stringCount: 6,
+    tuning: [4, 11, 7, 2, 9, 4],
+    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
+    defaultFretCount: 15,
+  },
+  concert_pitch_minus_one: {
+    stringCount: 6,
+    tuning: [4, 11, 7, 2, 9, 4],
+    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
+    defaultFretCount: 15,
+  },
+}
 
 export interface PracticeSuggestion {
   id: string
