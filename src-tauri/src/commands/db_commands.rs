@@ -46,6 +46,7 @@ pub async fn save_practice_stats(
         duration,
         accuracy,
         notes,
+        client_ip: None,
         created_at: None,
     };
     
