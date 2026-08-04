@@ -6,10 +6,10 @@ import { useMemo, memo } from "react"
 const PIANO_CONFIG = {
   startNote: 21,
   endNote: 108,
-  WHITE_KEY_WIDTH: 24,
-  WHITE_KEY_HEIGHT: 80,
+  WHITE_KEY_WIDTH: 26,
+  WHITE_KEY_HEIGHT: 88,
   BLACK_KEY_WIDTH: 16,
-  BLACK_KEY_HEIGHT: 50,
+  BLACK_KEY_HEIGHT: 56,
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -55,7 +55,7 @@ export const PianoKeyboard = memo(function PianoKeyboard({
   const keyboardLayout = useMemo(() => {
     const startMidi = Math.max(PIANO_CONFIG.startNote, (minOctave + 1) * 12)
     const endMidi = Math.min(PIANO_CONFIG.endNote, (maxOctave + 2) * 12 - 1)
-    
+
     const allNotes: number[] = []
     for (let i = startMidi; i <= endMidi; i++) {
       allNotes.push(i)
@@ -67,140 +67,127 @@ export const PianoKeyboard = memo(function PianoKeyboard({
     const highlightedBases = new Set(highlightedNotes.map(hn => getNoteBase(hn)))
     const currentStepBases = new Set(currentStepNotes.map(cn => getNoteBase(cn)))
 
-    return { whiteKeys, blackKeys, highlightedBases, currentStepBases }
+    // 预计算白键索引映射，用于黑键定位
+    const whiteKeyIndexOf = (midiNote: number) => {
+      let count = 0
+      for (let i = (minOctave + 1) * 12; i < midiNote; i++) {
+        if (!isBlackKey(i)) count++
+      }
+      return count
+    }
+
+    return { whiteKeys, blackKeys, highlightedBases, currentStepBases, whiteKeyIndexOf }
   }, [highlightedNotes, currentStepNotes, minOctave, maxOctave])
 
-  const { whiteKeys, blackKeys, highlightedBases, currentStepBases } = keyboardLayout
+  const { whiteKeys, blackKeys, highlightedBases, currentStepBases, whiteKeyIndexOf } = keyboardLayout
 
-  const isHighlighted = (midiNote: number) => {
-    return highlightedBases.has(getNoteBase(midiNote))
-  }
-
-  const isCurrentStep = (midiNote: number) => {
-    return currentStepBases.has(getNoteBase(midiNote))
-  }
-
+  const isHighlighted = (midiNote: number) => highlightedBases.has(getNoteBase(midiNote))
+  const isCurrentStep = (midiNote: number) => currentStepBases.has(getNoteBase(midiNote))
   const isRootNote = (midiNote: number) => {
     if (!rootNote) return false
     return getNoteBase(midiNote) === rootNote
   }
 
-  const getBlackKeyOffset = (midiNote: number) => {
-    const noteIndex = midiNote % 12
-    const offsets: Record<number, number> = {
-      1: 0.7,
-      3: 0.7,
-      6: 0.7,
-      8: 0.7,
-      10: 0.7,
-    }
-    return offsets[noteIndex] || 0
-  }
-
-  const getPreviousWhiteKeyIndex = (midiNote: number) => {
-    let count = 0
-    for (let i = (minOctave + 1) * 12; i < midiNote; i++) {
-      if (!isBlackKey(i)) count++
-    }
-    return count - 1
-  }
-
-  const getWhiteKeyStyle = (note: number, highlighted: boolean, currentStep: boolean, isRoot: boolean) => {
-    let bgColor = "bg-white dark:bg-zinc-800"
-    let textColor = "text-zinc-600 dark:text-zinc-400"
-    let opacity = "opacity-70"
-
+  // 单一蓝色强调色系：根音=深蓝锚点，当前步骤=亮蓝行动，和弦/音阶音=柔和浅蓝上下文
+  const getWhiteKeyClass = (highlighted: boolean, currentStep: boolean, isRoot: boolean) => {
     if (isRoot && highlighted) {
-      bgColor = "bg-blue-400/70"
-      textColor = "text-white"
-      opacity = "opacity-100"
-    } else if (currentStep) {
-      bgColor = "bg-emerald-400/70"
-      textColor = "text-white"
-      opacity = "opacity-100"
-    } else if (highlighted) {
-      bgColor = "bg-teal-300/60"
-      textColor = "text-zinc-800"
-      opacity = "opacity-90"
+      return "bg-blue-500 text-white shadow-[inset_0_-3px_0_0_rgba(0,0,0,0.18)]"
     }
-
-    return cn(
-      "relative border border-zinc-300 dark:border-zinc-700 rounded-b-md transition-all duration-150",
-      "flex items-end justify-center pb-2",
-      bgColor, textColor, opacity
-    )
+    if (currentStep) {
+      return "bg-sky-400 text-white shadow-[inset_0_-3px_0_0_rgba(0,0,0,0.15)]"
+    }
+    if (highlighted) {
+      return "bg-blue-200/70 dark:bg-blue-500/25 text-blue-900 dark:text-blue-100"
+    }
+    return "bg-white dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-r border-zinc-200 dark:border-zinc-700"
   }
 
-  const getBlackKeyStyle = (highlighted: boolean, currentStep: boolean, isRoot: boolean) => {
+  const getBlackKeyClass = (highlighted: boolean, currentStep: boolean, isRoot: boolean) => {
     if (isRoot && highlighted) {
-      return "bg-blue-500/80"
-    } else if (currentStep) {
-      return "bg-emerald-500/80"
-    } else if (highlighted) {
-      return "bg-teal-400/70"
-    } else {
-      return "bg-zinc-900 dark:bg-black"
+      return "bg-blue-500"
     }
+    if (currentStep) {
+      return "bg-sky-400"
+    }
+    if (highlighted) {
+      return "bg-blue-400/80 dark:bg-blue-500/70"
+    }
+    return "bg-zinc-900 dark:bg-black"
   }
 
   return (
-    <div className={cn("relative w-full overflow-x-auto flex justify-center", className)}>
-      <div className="relative min-w-max py-2">
-        <div className="flex relative justify-center">
-          <div className="flex">
-            {whiteKeys.map((note, index) => {
+    <div className={cn("relative w-full overflow-x-auto", className)}>
+      <div className="relative min-w-max py-3 flex justify-center">
+        <div className="relative flex">
+          {/* 白键层 */}
+          <div className="flex relative z-0">
+            {whiteKeys.map((note) => {
               const highlighted = isHighlighted(note)
               const currentStep = isCurrentStep(note)
               const isRoot = isRootNote(note)
-              
+              const showLabel = showLabels && (highlighted || currentStep || (isRoot && highlighted) || getNoteBase(note) === "C")
+
               return (
                 <div
                   key={note}
-                  className={getWhiteKeyStyle(note, highlighted, currentStep, isRoot)}
-                  style={{ 
+                  className={cn(
+                    "relative transition-colors duration-200 rounded-b-md",
+                    "flex items-end justify-center pb-1.5 select-none",
+                    getWhiteKeyClass(highlighted, currentStep, isRoot)
+                  )}
+                  style={{
                     width: `${PIANO_CONFIG.WHITE_KEY_WIDTH}px`,
                     height: `${PIANO_CONFIG.WHITE_KEY_HEIGHT}px`,
                   }}
                 >
-                  {showLabels && (
-                    <div className="flex flex-col items-center justify-end pb-1 h-full">
-                      <span className={cn(
-                        "text-[9px] font-bold leading-none",
-                        (highlighted || currentStep || (isRoot && highlighted)) ? "opacity-100" : "opacity-60"
-                      )}>
-                        {getNoteBase(note)}
-                      </span>
-                    </div>
+                  {/* 根音锚点：顶部小圆点 */}
+                  {isRoot && highlighted && (
+                    <span className="absolute top-1.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-white/90" />
+                  )}
+                  {/* 当前步骤：呼吸提示 */}
+                  {currentStep && (
+                    <span className="absolute top-1.5 left-1/2 -translate-x-1/2 h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                  )}
+                  {showLabel && (
+                    <span className={cn(
+                      "text-[9px] font-semibold leading-none transition-opacity",
+                      (highlighted || currentStep || (isRoot && highlighted)) ? "opacity-100" : "opacity-50"
+                    )}>
+                      {getNoteBase(note)}
+                    </span>
                   )}
                 </div>
               )
             })}
           </div>
 
-          <div className="absolute top-0 left-0 h-12 pointer-events-none">
+          {/* 黑键层：精确绝对定位 */}
+          <div className="absolute top-0 left-0 pointer-events-none z-10">
             {blackKeys.map((note) => {
               const highlighted = isHighlighted(note)
               const currentStep = isCurrentStep(note)
               const isRoot = isRootNote(note)
-              const whiteKeyIndex = getPreviousWhiteKeyIndex(note)
-              const offset = getBlackKeyOffset(note)
-              
+              // 黑键中心对齐到前一个白键与后一个白键的交界处
+              const prevWhiteIdx = whiteKeyIndexOf(note)
+              const leftPx = (prevWhiteIdx + 1) * PIANO_CONFIG.WHITE_KEY_WIDTH - PIANO_CONFIG.BLACK_KEY_WIDTH / 2
+
               return (
                 <div
                   key={note}
                   className={cn(
-                    "absolute rounded-b-md transition-all duration-150 shadow-sm flex items-end justify-center pb-1",
-                    getBlackKeyStyle(highlighted, currentStep, isRoot)
+                    "absolute rounded-b-md transition-colors duration-200",
+                    "flex items-end justify-center pb-1.5 select-none",
+                    "shadow-[0_2px_4px_rgba(0,0,0,0.35)]",
+                    getBlackKeyClass(highlighted, currentStep, isRoot)
                   )}
                   style={{
-                    left: `calc(${(whiteKeyIndex + 1) * PIANO_CONFIG.WHITE_KEY_WIDTH - PIANO_CONFIG.BLACK_KEY_WIDTH * offset}px)`,
+                    left: `${leftPx}px`,
                     width: `${PIANO_CONFIG.BLACK_KEY_WIDTH}px`,
                     height: `${PIANO_CONFIG.BLACK_KEY_HEIGHT}px`,
-                    zIndex: 10,
                   }}
                 >
-                  {(highlighted || currentStep || (isRoot && highlighted)) && showLabels && (
-                    <span className="text-[8px] font-bold text-white leading-none">
+                  {highlighted && showLabels && (
+                    <span className="text-[8px] font-bold text-white leading-none opacity-90">
                       {getNoteBase(note)}
                     </span>
                   )}

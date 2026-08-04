@@ -163,6 +163,12 @@ export interface PracticeSettings {
   cooldownEnabled: boolean
   cooldownDuration: number
   referenceFrequency: number
+  // 限制练习（Limitation Exercises）
+  fretZoneEnabled: boolean  // 5品区限制开关
+  fretZoneStart: number  // 5品区起点品数（0-based）
+  fretZoneSize: number  // 5品区宽度（默认5）
+  octaveShiftEnabled: boolean  // 八度切换开关
+  octaveShiftMode: 'up' | 'down' | 'random'  // 八度方向
 }
 
 // 节拍器设置
@@ -188,6 +194,8 @@ export interface ChordSymbolSettings {
   dominant7flat9Symbol: '7b9' | '7♭9' | '7-9'  // 属七降九和弦符号
   useUnicode: boolean  // 使用 Unicode 符号 (♯, ♭, Δ, ø, °)
   useJazzNotation: boolean  // 使用爵士乐记谱法
+  // 七降九音阶选择（SevenFlatNineScaleChoice）—— 7b9 和弦对应的音阶
+  sevenFlatNineScaleChoice: 'altered' | 'diminishedWholeHalf' | 'diminishedHalfWhole'
 }
 
 // 音程练习设置
@@ -197,7 +205,7 @@ export interface IntervalPracticeSettings {
   rootNote: string
   findRootFirst: boolean
   addRootBack: boolean
-  direction: 'up' | 'down' | 'random'
+  direction: 'up' | 'down' | 'random' | 'either'
   randomizeOrder: boolean
   practiceDuration: number
   showFretboard: boolean
@@ -340,6 +348,12 @@ export interface AppActions {
   setCooldownEnabled: (enabled: boolean) => void
   setCooldownDuration: (duration: number) => void
   setReferenceFrequency: (freq: number) => void
+  // 限制练习操作
+  setFretZoneEnabled: (enabled: boolean) => void
+  setFretZoneStart: (start: number) => void
+  setFretZoneSize: (size: number) => void
+  setOctaveShiftEnabled: (enabled: boolean) => void
+  setOctaveShiftMode: (mode: 'up' | 'down' | 'random') => void
   
   // 节拍器操作
   setMetronomeEnabled: (enabled: boolean) => void
@@ -444,6 +458,12 @@ const initialState: AppState = {
     cooldownEnabled: false,
     cooldownDuration: 1000,
     referenceFrequency: 440,
+    // 限制练习默认配置
+    fretZoneEnabled: false,
+    fretZoneStart: 0,
+    fretZoneSize: 5,
+    octaveShiftEnabled: false,
+    octaveShiftMode: 'random',
   },
   
   metronome: {
@@ -465,6 +485,7 @@ const initialState: AppState = {
     dominant7flat9Symbol: '7b9',  // SOLO 默认使用 7b9
     useUnicode: true,  // SOLO 默认使用 Unicode 符号
     useJazzNotation: true,  // SOLO 默认使用爵士乐记谱法
+    sevenFlatNineScaleChoice: 'altered',  // SOLO 默认 7b9 用 Altered 音阶
   },
   
   scalePractice: {
@@ -615,6 +636,16 @@ export const useAppStore = create<AppState & AppActions>()(
       setCooldownEnabled: (enabled) => set((state) => ({ practice: { ...state.practice, cooldownEnabled: enabled } })),
       setCooldownDuration: (duration) => set((state) => ({ practice: { ...state.practice, cooldownDuration: duration } })),
       setReferenceFrequency: (freq) => set((state) => ({ practice: { ...state.practice, referenceFrequency: freq } })),
+      // 限制练习操作
+      setFretZoneEnabled: (enabled) => set((state) => ({ practice: { ...state.practice, fretZoneEnabled: enabled } })),
+      setFretZoneStart: (start) => set((state) => ({
+        practice: { ...state.practice, fretZoneStart: Math.max(0, Math.min(state.practice.fretCount - state.practice.fretZoneSize, start)) }
+      })),
+      setFretZoneSize: (size) => set((state) => ({
+        practice: { ...state.practice, fretZoneSize: Math.max(2, Math.min(state.practice.fretCount, size)) }
+      })),
+      setOctaveShiftEnabled: (enabled) => set((state) => ({ practice: { ...state.practice, octaveShiftEnabled: enabled } })),
+      setOctaveShiftMode: (mode) => set((state) => ({ practice: { ...state.practice, octaveShiftMode: mode } })),
       
       // 节拍器操作
       setMetronomeEnabled: (enabled) => set((state) => ({ metronome: { ...state.metronome, enabled } })),
@@ -786,3 +817,4 @@ export const useFavorites = () => useAppStore((state) => state.favorites)
 export const useLevelFavorites = () => useAppStore((state) => state.favorites.levelFavorites)
 export const useSongFavorites = () => useAppStore((state) => state.favorites.songFavorites)
 export const useUser = () => useAppStore((state) => state.user)
+export const useChordSymbols = () => useAppStore((state) => state.chordSymbols)

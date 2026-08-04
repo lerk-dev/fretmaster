@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
 import { VariableSizeList as List } from 'react-window'
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
 import { deduplicateStats } from "@/lib/export-utils"
 import { getLocalDateString, parseDbTimestamp, dbTimestampToLocalDate, getLocalDayStart, getLocalDaysAgoStart, getLocalMonthsAgoStart, normalizeAccuracy } from "@/lib/utils"
-import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser, parseTheme, composeTheme, isLightTheme, type ThemeStyle, type ThemeBrightness } from "@/lib/store"
+import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser, useChordSymbols, parseTheme, composeTheme, isLightTheme, type ThemeStyle, type ThemeBrightness } from "@/lib/store"
 import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
 import { logger } from "@/lib/logger"
 import { SOLO_SONGS } from "@/lib/solo-songs"
@@ -1590,8 +1590,76 @@ const DISPLAY_NAMES = {
 }
 
 // 获取和弦显示名称
-function getChordDisplayName(chordType: string, displayMode: 'chinese' | 'english' | 'english_short' | 'jazz'): string {
-  return DISPLAY_NAMES[displayMode].chordTypes[chordType as keyof typeof DISPLAY_NAMES.chinese.chordTypes] || chordType
+// chordSymbolOptions: 可选的细粒度符号覆盖（小调/半减七/属七降九）
+function getChordDisplayName(
+  chordType: string,
+  displayMode: 'chinese' | 'english' | 'english_short' | 'jazz',
+  chordSymbolOptions?: {
+    minorSymbol?: 'm' | '-' | 'min'
+    minor7flat5Symbol?: 'm7b5' | 'ø7' | 'half-dim'
+    dominant7flat9Symbol?: '7b9' | '7♭9' | '7-9'
+    useUnicode?: boolean
+  }
+): string {
+  const baseName = DISPLAY_NAMES[displayMode].chordTypes[chordType as keyof typeof DISPLAY_NAMES.chinese.chordTypes] || chordType
+  // 中文模式不应用细粒度覆盖（保持中文术语）
+  if (displayMode === 'chinese') return baseName
+  // 仅对英文/爵士记谱应用覆盖
+  // 半减七（m7b5 / m9b5）优先处理（否则会被小调分支覆盖）
+  if ((chordType === 'm7b5' || chordType === 'm9b5') && chordSymbolOptions?.minor7flat5Symbol) {
+    const sym = chordSymbolOptions.minor7flat5Symbol
+    if (chordType === 'm7b5') {
+      if (sym === 'ø7') return 'ø7'
+      if (sym === 'half-dim') return 'half-dim'
+      return 'm7b5'
+    }
+    if (chordType === 'm9b5') {
+      if (sym === 'ø7') return 'ø9'
+      if (sym === 'half-dim') return 'half-dim9'
+      return 'm9b5'
+    }
+  }
+  // 小调和弦（Minor / m6 / m7 / m9 / m11 / m13 / mMaj7 / madd9 等，不含 m7b5/m9b5）
+  const minorPattern = /^(Minor|m6|m7|m9|m11|m13|mMaj7|madd9|m6add9)$/
+  if (minorPattern.test(chordType) && chordSymbolOptions?.minorSymbol) {
+    const sym = chordSymbolOptions.minorSymbol
+    // 简化：根据 chordType 直接生成对应符号
+    const map: Record<string, string> = {
+      'Minor': sym === 'min' ? 'min' : sym,
+      'm6': `${sym}6`,
+      'm7': `${sym}7`,
+      'm9': `${sym}9`,
+      'm11': `${sym}11`,
+      'm13': `${sym}13`,
+      'mMaj7': `${sym}Maj7`,
+      'madd9': `${sym}add9`,
+      'm6add9': `${sym}6add9`,
+    }
+    if (map[chordType]) return map[chordType]
+  }
+  // 属七降九（7b9）
+  if (chordType === '7b9' && chordSymbolOptions?.dominant7flat9Symbol) {
+    const sym = chordSymbolOptions.dominant7flat9Symbol
+    if (sym === '7♭9') return '7♭9'
+    if (sym === '7-9') return '7-9'
+    return '7b9'
+  }
+  return baseName
+}
+
+// 获取和弦显示名称（带用户设置重载）
+// 优先使用 chordSymbols 中的细粒度偏好；否则回退到 DISPLAY_NAMES 表
+function getChordDisplayNameWithSettings(
+  chordType: string,
+  displayMode: 'chinese' | 'english' | 'english_short' | 'jazz',
+  chordSymbolOptions?: {
+    minorSymbol?: 'm' | '-' | 'min'
+    minor7flat5Symbol?: 'm7b5' | 'ø7' | 'half-dim'
+    dominant7flat9Symbol?: '7b9' | '7♭9' | '7-9'
+    useUnicode?: boolean
+  }
+): string {
+  return getChordDisplayName(chordType, displayMode, chordSymbolOptions)
 }
 
 // 获取音阶显示名称
@@ -4325,12 +4393,18 @@ const SCALE_INTERVALS: Record<string, string[]> = {
 
 // 根据 chord type 返回对应的 scale（与 Solo ScaleLibraryData.scaleNameForChordFunction 一致）
 // forceNaturalFive: 关卡是否强制自然 5 音。变化属和弦在 false 时用 altered，true 时用 phrygianDominant
+// sevenFlatNineScaleChoice: 用户偏好的 7b9 音阶（覆盖 forceNaturalFive 的默认行为）
 // 注意：TS 不区分 function，这里取最常用的 function（如 m7→dorian，Maj7→major）
-function getScaleForChord(type: string, forceNaturalFive?: boolean): string {
+function getScaleForChord(type: string, forceNaturalFive?: boolean, sevenFlatNineScaleChoice?: 'altered' | 'diminishedWholeHalf' | 'diminishedHalfWhole'): string {
   // 7b9b13 固定用 phrygianDominant（Solo 所有 function 一致）
   if (type === '7b9b13') return 'phrygianDominant'
-  // 7b9 根据用户偏好（TS 默认：forceNaturalFive=false→altered，true→phrygianDominant）
-  if (type === '7b9') return forceNaturalFive === false ? 'altered' : 'phrygianDominant'
+  // 7b9 优先使用用户偏好（SevenFlatNineScaleChoice），其次用 forceNaturalFive 默认行为
+  if (type === '7b9') {
+    if (sevenFlatNineScaleChoice === 'diminishedWholeHalf') return 'diminishedWholeHalf'
+    if (sevenFlatNineScaleChoice === 'diminishedHalfWhole') return 'diminishedHalfWhole'
+    // 默认 altered vs phrygianDominant 由 forceNaturalFive 决定
+    return forceNaturalFive === false ? 'altered' : 'phrygianDominant'
+  }
   // 其他 altered dominants：forceNaturalFive=false→altered，true→phrygianDominant
   const alteredDominants = ['7alt', '7b5', '7#5', '7#9', '7#5b9', '7#5#9', '7b5b9', '7b5#9', 'aug7']
   if (alteredDominants.includes(type)) {
@@ -4433,7 +4507,8 @@ function getSequenceWithFallback(sequences: PracticeLevel['sequences'], seqType:
 function getChordDegrees(type: string, level?: string, options?: {
   forceNaturalFive?: boolean,
   endOnStartingInterval?: boolean,
-  usePassingNoteBebopScale?: boolean
+  usePassingNoteBebopScale?: boolean,
+  sevenFlatNineScaleChoice?: 'altered' | 'diminishedWholeHalf' | 'diminishedHalfWhole'
 }): string[] {
   const normalizedType = normalizeChordType(type)
   let chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === type || ct.symbol === type)
@@ -4448,7 +4523,7 @@ function getChordDegrees(type: string, level?: string, options?: {
 
       // Solo 架构：sequence 数字作为 1-indexed 索引访问 chord type 对应 scale 的 intervals
       // 越界时跳过（与 Solo ChangesWorkoutStepBuilder 一致）
-      const scaleName = getScaleForChord(type, options?.forceNaturalFive)
+      const scaleName = getScaleForChord(type, options?.forceNaturalFive, options?.sevenFlatNineScaleChoice)
       const scaleIntervals = SCALE_INTERVALS[scaleName] || SCALE_INTERVALS.major
       const chordIntervals = chordType.intervals
       let intervals: string[] = degreeNumbers
@@ -5112,6 +5187,7 @@ export default function FretMasterPage() {
   const storeIsPlaying = useIsPlaying()
   const storeVersion = useVersion()
   const user = useUser()
+  const chordSymbols = useChordSymbols()
 
   // 根据所选乐器派生指板配置（弦数/调弦/品数）
   const instrumentConfig = INSTRUMENT_CONFIG[user.instrument] || INSTRUMENT_CONFIG.six_string_guitar
@@ -5331,6 +5407,16 @@ export default function FretMasterPage() {
   const [timeLeft, setTimeLeft] = useState(300)
   const fretCount = practiceSettings.fretCount
   const setFretCount = store.setFretCount
+  const fretZoneEnabled = practiceSettings.fretZoneEnabled
+  const setFretZoneEnabled = store.setFretZoneEnabled
+  const fretZoneStart = practiceSettings.fretZoneStart
+  const setFretZoneStart = store.setFretZoneStart
+  const fretZoneSize = practiceSettings.fretZoneSize
+  const setFretZoneSize = store.setFretZoneSize
+  const octaveShiftEnabled = practiceSettings.octaveShiftEnabled
+  const setOctaveShiftEnabled = store.setOctaveShiftEnabled
+  const octaveShiftMode = practiceSettings.octaveShiftMode
+  const setOctaveShiftMode = store.setOctaveShiftMode
   const autoNextDelay = practiceSettings.autoNextDelay
   const setAutoNextDelay = store.setAutoNextDelay
   const [pitchFindingTime, setPitchFindingTime] = useState(5) // 找音练习时长（分钟）
@@ -5395,7 +5481,8 @@ export default function FretMasterPage() {
     forceNaturalFive: levelForceNaturalFive,
     endOnStartingInterval: levelEndOnStartingInterval,
     usePassingNoteBebopScale: levelUsePassingNoteBebopScale,
-  }), [levelForceNaturalFive, levelEndOnStartingInterval, levelUsePassingNoteBebopScale])
+    sevenFlatNineScaleChoice: chordSymbols.sevenFlatNineScaleChoice,
+  }), [levelForceNaturalFive, levelEndOnStartingInterval, levelUsePassingNoteBebopScale, chordSymbols.sevenFlatNineScaleChoice])
   const [isPracticePaused, setIsPracticePaused] = useState(false)
   const [practiceSessionStartTime, setPracticeSessionStartTime] = useState<number | null>(null)
   const [practiceElapsedTime, setPracticeElapsedTime] = useState(0)
@@ -5473,7 +5560,7 @@ export default function FretMasterPage() {
   const [showIntervalKeyboard, setShowIntervalKeyboard] = useState(false)
   const [intervalPracticeDuration, setIntervalPracticeDuration] = useState(store.intervalPractice.practiceDuration)
   const [intervalRandomizeOrder, setIntervalRandomizeOrder] = useState(store.intervalPractice.randomizeOrder)
-  const [intervalDirection, setIntervalDirection] = useState<"up" | "down" | "random">(store.intervalPractice.direction)
+  const [intervalDirection, setIntervalDirection] = useState<"up" | "down" | "random" | "either">(store.intervalPractice.direction)
   const [intervalFretboardDuration, setIntervalFretboardDuration] = useState(store.intervalPractice.fretboardDuration)
   const [intervalAutoAdvance, setIntervalAutoAdvance] = useState(store.intervalPractice.autoAdvance)
   const [intervalTimeLeft, setIntervalTimeLeft] = useState(0) // 剩余时间（秒）
@@ -5713,11 +5800,11 @@ export default function FretMasterPage() {
     shouldRandomizeKeyOnRepeatRef.current = shouldRandomizeKeyOnRepeat
     progressionRepeatRef.current = progressionRepeat
     levelOptionsRef.current = getLevelOptions()
-  }, [isPlaying, activeTab, sensitivity, confidenceThreshold, targetNote, scaleKey, 
-      scaleExerciseSequence, scaleExerciseCurrentStep, chordExerciseTargetChord, 
-      chordExerciseSequence, chordExerciseCurrentStep, currentIntervalExercise, 
+  }, [isPlaying, activeTab, sensitivity, confidenceThreshold, targetNote, scaleKey,
+      scaleExerciseSequence, scaleExerciseCurrentStep, chordExerciseTargetChord,
+      chordExerciseSequence, chordExerciseCurrentStep, currentIntervalExercise,
       currentChordIndex, chordDegreeCurrentStep, practiceLevel, findRootFirst, nextChordInfo,
-      shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat, getLevelOptions, audioSettings.pitchAlgorithm])
+      shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat, getLevelOptions, audioSettings.pitchAlgorithm, chordSymbols.sevenFlatNineScaleChoice])
 
   useEffect(() => {
     store.setIntervalPracticeSettings({
@@ -8084,9 +8171,41 @@ export default function FretMasterPage() {
     const availableStrings = selectedStrings.length > 0 ? selectedStrings : allStrings
     const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
     const stringIndex = STRING_COUNT - randomStringNum
-    const randomFret = Math.floor(Math.random() * (fretCount + 1))
-    const noteAtPosition = getNoteAtPosition(stringIndex, randomFret)
-    
+
+    // 限制练习 - 5品区: 仅在指定品区范围内生成品数
+    let minFret = 0
+    let maxFret = fretCount
+    if (fretZoneEnabled) {
+      minFret = fretZoneStart
+      maxFret = Math.min(fretCount, fretZoneStart + fretZoneSize - 1)
+    }
+
+    // 限制练习 - 八度切换: 在已有位置基础上向上下八度平移
+    // 首次随机生成一个基础位置
+    const baseFret = Math.floor(Math.random() * (maxFret - minFret + 1)) + minFret
+    let randomFret = baseFret
+    let noteAtPosition = getNoteAtPosition(stringIndex, randomFret)
+
+    // 八度切换: 找到同弦上等价八度位置（±12 品）
+    if (octaveShiftEnabled) {
+      const candidateOffsets: number[] = []
+      if (octaveShiftMode === 'up') candidateOffsets.push(12)
+      else if (octaveShiftMode === 'down') candidateOffsets.push(-12)
+      else { // random
+        candidateOffsets.push(12, -12, 0)
+      }
+      // 打乱顺序，找到第一个在品区内的位置
+      candidateOffsets.sort(() => Math.random() - 0.5)
+      for (const offset of candidateOffsets) {
+        const shiftedFret = baseFret + offset
+        if (shiftedFret >= minFret && shiftedFret <= maxFret) {
+          randomFret = shiftedFret
+          noteAtPosition = getNoteAtPosition(stringIndex, randomFret)
+          break
+        }
+      }
+    }
+
     // 设置高亮位置（buttons 模式使用，fretboard 模式忽略）
     setHighlightedTargetPosition({ stringIndex, fret: randomFret })
     setTargetNote(noteAtPosition)
@@ -8097,7 +8216,7 @@ export default function FretMasterPage() {
     }
 
     // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
-  }, [intervalRootMode, recordPractice, selectedStrings, fretCount])
+  }, [intervalRootMode, recordPractice, selectedStrings, fretCount, fretZoneEnabled, fretZoneStart, fretZoneSize, octaveShiftEnabled, octaveShiftMode])
 
   // 生成音程练习队列
   const generateIntervalExerciseQueue = useCallback(() => {
@@ -8128,6 +8247,17 @@ export default function FretMasterPage() {
         }
         return idx
       })
+    } else if (intervalDirection === "either") {
+      // Either 模式：上行与下行同时入队，每个音程产生两个条目
+      const expanded: number[] = []
+      queue.forEach(idx => {
+        expanded.push(idx) // 上行
+        const interval = INTERVALS[idx]
+        const downSemitones = (12 - interval.semitones) % 12
+        const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
+        expanded.push(downIndex !== -1 ? downIndex : idx) // 下行
+      })
+      queue = expanded
     }
     
     if (intervalRandomizeOrder) {
@@ -8216,7 +8346,7 @@ export default function FretMasterPage() {
 
     // Solo 架构：sequence 数字作为 1-indexed 索引访问 chord type 对应 scale 的 intervals
     // 越界时跳过（与 Solo ChangesWorkoutStepBuilder 一致）
-    const scaleName = getScaleForChord(chordType, level.forceNaturalFive)
+    const scaleName = getScaleForChord(chordType, level.forceNaturalFive, chordSymbols.sevenFlatNineScaleChoice)
     const scaleIntervals = SCALE_INTERVALS[scaleName] || SCALE_INTERVALS.major
     let sequence = sequenceNumbers
       .filter(n => n >= 1 && n <= scaleIntervals.length)
@@ -8966,8 +9096,14 @@ export default function FretMasterPage() {
   // 处理指板点击
   const handleFretClick = useCallback((stringIndex: number, fret: number) => {
     const clickedNote = getNoteAtPosition(stringIndex, fret)
-    
+
     if (isPlaying) {
+      // 限制练习 - 5品区: 品区外点击不响应（仅练习模式）
+      if (fretZoneEnabled) {
+        const minFret = fretZoneStart
+        const maxFret = Math.min(fretCount, fretZoneStart + fretZoneSize - 1)
+        if (fret < minFret || fret > maxFret) return
+      }
       const key = `${stringIndex}-${fret}`
       
       // 判断答案是否正确（用于显示颜色）
@@ -9076,7 +9212,7 @@ export default function FretMasterPage() {
         handleMIDINoteInput(clickedNote)
       }, 100)
     }
-  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, currentIntervalExercise, rootNote, customChords, selectedSong, currentChordIndex, playFeedbackSound, findRootFirst])
+  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, currentIntervalExercise, rootNote, customChords, selectedSong, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount])
 
   const updateLevelOptions = useCallback((levelId: string) => {
     const level = ALL_SOLO_LEVELS.find(l => l.id === levelId)
@@ -9169,6 +9305,17 @@ export default function FretMasterPage() {
               }
               return idx
             })
+          } else if (intervalDirection === "either") {
+            // Either 模式：上行与下行同时入队
+            const expanded: number[] = []
+            queue.forEach(idx => {
+              expanded.push(idx)
+              const interval = INTERVALS[idx]
+              const downSemitones = (12 - interval.semitones) % 12
+              const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
+              expanded.push(downIndex !== -1 ? downIndex : idx)
+            })
+            queue = expanded
           }
           if (intervalRandomizeOrder) {
             queue = queue.sort(() => Math.random() - 0.5)
@@ -9492,10 +9639,19 @@ export default function FretMasterPage() {
     if (highlightedFrets.has(key)) {
       const isCorrect = highlightedFrets.get(key)
       return isCorrect
-        ? "bg-green-500 text-white fret-feedback-correct" 
+        ? "bg-green-500 text-white fret-feedback-correct"
         : "bg-red-500 text-white fret-feedback-wrong"
     }
-    
+
+    // 限制练习 - 5品区: 品区外置灰（练习中生效，引导用户在品区内演奏）
+    if (isPlaying && fretZoneEnabled) {
+      const minFret = fretZoneStart
+      const maxFret = Math.min(fretCount, fretZoneStart + fretZoneSize - 1)
+      if (fret < minFret || fret > maxFret) {
+        return "opacity-20 cursor-not-allowed hover:bg-transparent"
+      }
+    }
+
     if (activeTab === "practice") {
       // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
       if (highlightedFrets.has(key)) {
@@ -9672,7 +9828,7 @@ export default function FretMasterPage() {
 
     // 默认返回 hover 效果样式
     return "hover:bg-muted/50"
-  }, [activeTab, highlightedFrets, targetNote, showAllNotes, isPlaying, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, rootNote, selectedIntervals, scaleKey, selectedScale, customChords, selectedSong, currentChordIndex, practiceLevel, practiceAnswerMode, highlightedTargetPosition])
+  }, [activeTab, highlightedFrets, targetNote, showAllNotes, isPlaying, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, rootNote, selectedIntervals, scaleKey, selectedScale, customChords, selectedSong, currentChordIndex, practiceLevel, practiceAnswerMode, highlightedTargetPosition, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount])
 
   // 格式化时间
   const formatTime = (seconds: number) => {
@@ -9786,8 +9942,8 @@ export default function FretMasterPage() {
     }
     
     const chordText = customChords.map(chord => {
-      const chordTypeName = getChordDisplayName(chord.type, chordScaleDisplay)
-      const displayName = `${chord.root}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : chordTypeName}${chord.bass ? '/' + chord.bass : ''}`
+      const chordTypeName = getChordDisplayName(chord.type, chordScaleDisplay, chordSymbols)
+      const displayName = `${chord.root}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : chordTypeName}${chord.bass ? '/' + chord.bass : ''}`
       return displayName
     }).join(' | ')
     
@@ -9840,8 +9996,8 @@ export default function FretMasterPage() {
     const chords = transposedChords
     const chord = chords[currentChordIndex]
     if (!chord) return ""
-    const chordTypeName = getChordDisplayName(chord.type, chordScaleDisplay)
-    const displayName = `${normalizeNoteName(chord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : normalizeNoteName(chordTypeName)}${chord.bass ? '/' + normalizeNoteName(chord.bass) : ''}`
+    const chordTypeName = getChordDisplayName(chord.type, chordScaleDisplay, chordSymbols)
+    const displayName = `${normalizeNoteName(chord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : normalizeNoteName(chordTypeName)}${chord.bass ? '/' + normalizeNoteName(chord.bass) : ''}`
     return displayName
   }
 
@@ -10192,6 +10348,91 @@ export default function FretMasterPage() {
                           />
                         </div>
                       )}
+
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Layers className="h-3.5 w-3.5" />
+                      {t('limitation_exercises')}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'zh-CN'
+                        ? '限制练习是 SOLO 教学法中的核心训练方式，通过约束演奏区域、方向或八度，强化指板熟悉度与即兴能力。'
+                        : 'Limitation Exercises are core training methods in the SOLO pedagogy. By constraining fretting region, direction, or octave, they strengthen fretboard familiarity and improvisation skills.'}
+                    </p>
+
+                    {/* 5 品区限制 */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">{t('limit_fret_zone')}</span>
+                      <Switch checked={fretZoneEnabled} onCheckedChange={setFretZoneEnabled} />
+                    </div>
+                    {fretZoneEnabled && (
+                      <>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{t('limit_fret_zone_start')}</span>
+                            <span className="font-mono">{fretZoneStart}</span>
+                          </div>
+                          <Slider
+                            value={[fretZoneStart]}
+                            onValueChange={(v) => setFretZoneStart(v[0])}
+                            min={0}
+                            max={Math.max(0, fretCount - fretZoneSize)}
+                            step={1}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{t('limit_fret_zone_size')}</span>
+                            <span className="font-mono">{fretZoneSize}</span>
+                          </div>
+                          <Slider
+                            value={[fretZoneSize]}
+                            onValueChange={(v) => setFretZoneSize(v[0])}
+                            min={2}
+                            max={fretCount}
+                            step={1}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {language === 'zh-CN'
+                            ? `当前品区：${fretZoneStart} - ${fretZoneStart + fretZoneSize - 1} 品`
+                            : `Current zone: frets ${fretZoneStart} - ${fretZoneStart + fretZoneSize - 1}`}
+                        </p>
+                      </>
+                    )}
+
+                    {/* 八度切换 */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">{t('limit_octave_shift')}</span>
+                      <Switch checked={octaveShiftEnabled} onCheckedChange={setOctaveShiftEnabled} />
+                    </div>
+                    {octaveShiftEnabled && (
+                      <div className="space-y-1.5">
+                        <div className="text-[10px] text-muted-foreground leading-3">{t('limit_octave_mode')}</div>
+                        <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
+                          {[
+                            { id: 'up', label: t('direction_up') },
+                            { id: 'down', label: t('direction_down') },
+                            { id: 'random', label: t('direction_random') },
+                          ].map((mode) => (
+                            <Button
+                              key={mode.id}
+                              variant={octaveShiftMode === mode.id ? 'default' : 'ghost'}
+                              size="sm"
+                              onClick={() => setOctaveShiftMode(mode.id as 'up' | 'down' | 'random')}
+                              className="h-7 text-xs px-2.5 flex-1"
+                            >
+                              {mode.label}
+                            </Button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {language === 'zh-CN'
+                            ? '在同弦上等价八度位置间切换，扩展对指板不同区域的熟悉度。'
+                            : 'Shift between equivalent octave positions on the same string to expand fretboard familiarity.'}
+                        </p>
+                      </div>
+                    )}
                       </AccordionContent>
                     </AccordionItem>
                     
@@ -10701,10 +10942,138 @@ export default function FretMasterPage() {
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {language === 'zh-CN' 
+                        {language === 'zh-CN'
                           ? '升号：所有变化音用♯显示（如C♯, F♯）；降号：所有变化音用♭显示（如D♭, G♭）；混用：根据音名自动选择升降号'
                           : 'Sharp: display all accidentals as ♯ (e.g. C♯, F♯); Flat: display all as ♭ (e.g. D♭, G♭); Mixed: auto-select based on note name'}
                       </p>
+
+                    <Separator className="my-1" />
+                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+                      <Music className="h-3.5 w-3.5" />
+                      {t('chord_symbol_fine_grained')}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'zh-CN'
+                        ? '细粒度和弦符号偏好，仅对英文/爵士记谱法生效（中文显示不受影响）。'
+                        : 'Fine-grained chord symbol preferences. Only affects English/Jazz notation (Chinese display is unchanged).'}
+                    </p>
+
+                    {/* 小调和弦符号 */}
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] text-muted-foreground leading-3">{t('chord_symbol_minor')}</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant={chordSymbols.minorSymbol === 'm' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ minorSymbol: 'm' })}
+                        >
+                          Cm7
+                        </Button>
+                        <Button
+                          variant={chordSymbols.minorSymbol === '-' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ minorSymbol: '-' })}
+                        >
+                          C-7
+                        </Button>
+                        <Button
+                          variant={chordSymbols.minorSymbol === 'min' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ minorSymbol: 'min' })}
+                        >
+                          Cmin7
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 半减七和弦符号 */}
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] text-muted-foreground leading-3">{t('chord_symbol_m7b5')}</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant={chordSymbols.minor7flat5Symbol === 'm7b5' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ minor7flat5Symbol: 'm7b5' })}
+                        >
+                          Cm7b5
+                        </Button>
+                        <Button
+                          variant={chordSymbols.minor7flat5Symbol === 'ø7' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ minor7flat5Symbol: 'ø7' })}
+                        >
+                          Cø7
+                        </Button>
+                        <Button
+                          variant={chordSymbols.minor7flat5Symbol === 'half-dim' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ minor7flat5Symbol: 'half-dim' })}
+                        >
+                          C half-dim
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 属七降九符号 */}
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] text-muted-foreground leading-3">{t('chord_symbol_7b9')}</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant={chordSymbols.dominant7flat9Symbol === '7b9' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ dominant7flat9Symbol: '7b9' })}
+                        >
+                          C7b9
+                        </Button>
+                        <Button
+                          variant={chordSymbols.dominant7flat9Symbol === '7♭9' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ dominant7flat9Symbol: '7♭9' })}
+                        >
+                          C7♭9
+                        </Button>
+                        <Button
+                          variant={chordSymbols.dominant7flat9Symbol === '7-9' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ dominant7flat9Symbol: '7-9' })}
+                        >
+                          C7-9
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 7b9 和弦对应音阶 */}
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] text-muted-foreground leading-3">{t('chord_symbol_7b9_scale')}</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant={chordSymbols.sevenFlatNineScaleChoice === 'altered' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ sevenFlatNineScaleChoice: 'altered' })}
+                        >
+                          Altered
+                        </Button>
+                        <Button
+                          variant={chordSymbols.sevenFlatNineScaleChoice === 'diminishedWholeHalf' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ sevenFlatNineScaleChoice: 'diminishedWholeHalf' })}
+                        >
+                          W-H Dim
+                        </Button>
+                        <Button
+                          variant={chordSymbols.sevenFlatNineScaleChoice === 'diminishedHalfWhole' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => store.setChordSymbolSettings({ sevenFlatNineScaleChoice: 'diminishedHalfWhole' })}
+                        >
+                          H-W Dim
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {language === 'zh-CN'
+                          ? '属七降九和弦（7b9）在和弦音阶练习中对应的音阶：Altered（变化音阶）/ 全半减音阶 / 半全减音阶。'
+                          : 'Scale used for 7b9 chords in chord-scale exercises: Altered / Whole-Half Diminished / Half-Whole Diminished.'}
+                      </p>
+                    </div>
                       </AccordionContent>
                     </AccordionItem>
                     
@@ -11183,13 +11552,14 @@ export default function FretMasterPage() {
                             {[
                               { id: "up", label: t('direction_up') },
                               { id: "down", label: t('direction_down') },
+                              { id: "either", label: t('direction_either') },
                               { id: "random", label: t('direction_random') },
                             ].map((dir) => (
                               <Button
                                 key={dir.id}
                                 variant={intervalDirection === dir.id ? "default" : "ghost"}
                                 size="sm"
-                                onClick={() => setIntervalDirection(dir.id as "up" | "down" | "random")}
+                                onClick={() => setIntervalDirection(dir.id as "up" | "down" | "random" | "either")}
                                 className="h-7 text-xs px-2.5"
                               >
                                 {dir.label}
@@ -12086,7 +12456,7 @@ export default function FretMasterPage() {
                   >
                     <div className="flex items-center gap-2">
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <h4 className="text-sm font-semibold">{normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay))}</h4>
+                      <h4 className="text-sm font-semibold">{normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay, chordSymbols))}</h4>
                     </div>
                     <button
                       onClick={() => setShowChordExerciseStructure(false)}
@@ -12099,7 +12469,7 @@ export default function FretMasterPage() {
                   <div className="space-y-1.5 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{t('chord_type')}:</span>
-                      <span className="font-mono">{getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay)}</span>
+                      <span className="font-mono">{getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay, chordSymbols)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{t('chord_degrees')}:</span>
@@ -12547,8 +12917,8 @@ export default function FretMasterPage() {
                       {(() => {
                         const nextChord = getNextChordDisplay()
                         if (!nextChord) return null
-                        const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay)
-                        const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
+                        const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay, chordSymbols)
+                        const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
                         return (
                           <div className="py-1 border-t border-border/30 flex flex-col justify-center">
                             <p className="text-[10px] text-muted-foreground mb-0.5">{t('next_chord')}</p>
@@ -12625,7 +12995,7 @@ export default function FretMasterPage() {
                         {isPlaying && chordExerciseTargetChord ? (
                           <>
                             <h3 className="text-lg font-semibold">
-                              {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay))}
+                              {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay, chordSymbols))}
                             </h3>
                             <div className="flex flex-wrap justify-center gap-2 mt-3">
                               {chordExerciseSequence.map((degree, i) => (
@@ -12654,7 +13024,7 @@ export default function FretMasterPage() {
                         <div className="py-1 border-t border-border/30 flex flex-col justify-center">
                           <p className="text-[10px] text-muted-foreground mb-0.5">{t('next_chord')}</p>
                           <div className="text-sm font-medium text-muted-foreground mb-0.5">
-                            {nextChordExerciseInfo.root} {getChordDisplayName(nextChordExerciseInfo.type, chordScaleDisplay)}
+                            {nextChordExerciseInfo.root} {getChordDisplayName(nextChordExerciseInfo.type, chordScaleDisplay, chordSymbols)}
                           </div>
                           <div className="text-xs text-muted-foreground tracking-tight">
                             {nextChordExerciseInfo.sequence.map(formatDegree).join(' ')}
@@ -12678,7 +13048,7 @@ export default function FretMasterPage() {
                           <span>{formatTime(timeLeft)}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span>{t('direction')}: {intervalDirection === 'up' ? '↑' : intervalDirection === 'down' ? '↓' : '↕'}</span>
+                          <span>{t('direction')}: {intervalDirection === 'up' ? '↑' : intervalDirection === 'down' ? '↓' : intervalDirection === 'either' ? '↕' : '🔀'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span>{intervalCurrentQueueIndex}/{intervalExerciseQueue.length}</span>
@@ -13062,8 +13432,8 @@ export default function FretMasterPage() {
                   {(() => {
                     const nextChord = getNextChordDisplay()
                     if (!nextChord) return null
-                    const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay)
-                    const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
+                    const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay, chordSymbols)
+                    const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
                     return (
                       <div className="pt-8 mt-8 border-t border-border/30">
                         <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
@@ -13078,7 +13448,7 @@ export default function FretMasterPage() {
               {activeTab === "chord_exercise" && isPlaying && chordExerciseTargetChord && (
                 <div className="space-y-8">
                   <div className="text-7xl font-bold text-primary">
-                    {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay))}
+                    {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay, chordSymbols))}
                   </div>
                   <div className="flex flex-wrap justify-center gap-4">
                     {chordExerciseSequence.map((degree, i) => (
@@ -13099,7 +13469,7 @@ export default function FretMasterPage() {
                     <div className="pt-8 mt-8 border-t border-border/30">
                       <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
                       <div className="text-xl font-medium mb-1">
-                        {nextChordExerciseInfo.root} {getChordDisplayName(nextChordExerciseInfo.type, chordScaleDisplay)}
+                        {nextChordExerciseInfo.root} {getChordDisplayName(nextChordExerciseInfo.type, chordScaleDisplay, chordSymbols)}
                       </div>
                       <div className="text-lg text-muted-foreground/70">
                         {nextChordExerciseInfo.sequence.map(formatDegree).join(' ')}
