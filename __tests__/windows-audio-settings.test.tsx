@@ -33,6 +33,10 @@ const { mockNative, mockToast } = vi.hoisted(() => ({
     setFilters: vi.fn(),
     setGain: vi.fn(),
     setBufferSize: vi.fn(),
+    // 采样率接线（2026-10-07 补）：控件原先只写 store、不调它 ⇒ 下拉是装饰品。
+    // ⛔ 铁律 8：替身必须与真身同形 —— 少了它，被测路径会**静默空转**（调用
+    // undefined 直接抛，或更糟：mock 返回 undefined 让断言看起来还在跑）。
+    setSampleRate: vi.fn(),
   },
   mockToast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
 }))
@@ -596,6 +600,9 @@ describe('WindowsAudioSettings — 性能与滤波器控件写回 store', () => 
     await mount()
     pickOption(2, '96 kHz')
     expect(useAppStore.getState().audio.sampleRate).toBe(96000)
+    // ⛔ 铁律 22：只写 store 不算到位，必须真的送达后端。
+    // 2026-10-07 前这里零调用 ⇒ 桌面端改采样率毫无效果（对照组 bufferSize 一直是好的）。
+    expect(mockNative.setSampleRate).toHaveBeenCalledWith(96000)
   })
 
   it('噪声抑制滑块 → setNoiseSuppression', async () => {

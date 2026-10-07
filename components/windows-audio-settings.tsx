@@ -463,7 +463,15 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
           </div>
           <Select 
             value={String(audioSettings.sampleRate || 48000)} 
-            onValueChange={(v) => store.setSampleRate(Number(v))}
+            onValueChange={(v) => {
+              const n = Number(v)
+              store.setSampleRate(n)
+              // 立即送达后端：未采集时只落配置字段，采集时会按它建流。
+              // 🚨 此前这里只写 store、不调 nativeAudio ⇒ 下拉是**装饰品**
+              // （铁律 #22：UI 写 store ≠ 到达后端），改了采样率桌面端毫无变化。
+              // 对照组是上面的 bufferSize —— 它已经这么做了。
+              void nativeAudio.setSampleRate(n)
+            }}
             disabled={isCapturing}
           >
             <SelectTrigger>

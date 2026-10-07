@@ -2,7 +2,7 @@
 // 按钮答题模式的音名按钮（等音判定、计分、逐位置掌握度统计）
 "use client"
 
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { Clock, Eye, EyeOff, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -91,6 +91,21 @@ export const PracticeModeControls = memo(function PracticeModeControls({
   formatTime,
   currentPracticeSuggestion,
 }: PracticeModeControlsProps) {
+  // 答完一题后「延迟 800ms 再出下一题」的定时器 handle。
+  // 🚨 必须持有并在卸载时清掉：用户答完立刻切 tab / 结束练习的话，800ms 之后
+  // `generateNewTarget()` 照样跑一次 —— 在已卸载的组件上触发换题，
+  // 界面上表现为「刚切到别的模式、题目自己跳了一个」，而且无从归因。
+  const nextTargetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (nextTargetTimer.current !== null) {
+        clearTimeout(nextTargetTimer.current)
+        nextTargetTimer.current = null
+      }
+    },
+    []
+  )
+
   return (
 <div className="space-y-2">
   <div className="flex flex-wrap items-end gap-2">
@@ -246,8 +261,10 @@ export const PracticeModeControls = memo(function PracticeModeControls({
 
                 // 音高识别统计改为按会话记录，不在此处累加 —— 见 pitchFindingSession 统计 effect
 
-                // 延迟后生成新题目
-                setTimeout(() => {
+                // 延迟后生成新题目（连点时不叠加：先清掉上一题挂着的那个）
+                if (nextTargetTimer.current !== null) clearTimeout(nextTargetTimer.current)
+                nextTargetTimer.current = setTimeout(() => {
+                  nextTargetTimer.current = null
                   onHighlightedFretsChange(new Map())
                   generateNewTarget()
                 }, 800)
