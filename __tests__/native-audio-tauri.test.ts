@@ -139,6 +139,48 @@ describe('逐函数：命令名、参数名、返回值透传', () => {
     expect(mocks.invoke).toHaveBeenCalledWith('get_audio_status')
   })
 
+  // 🚨 这条咬的是「AudioStatus 漏归一化」这个真 bug：Rust 侧该结构体**没有**
+  // `rename_all`，serde 按字段原名发出 snake_case；前端此前直接把返回值当
+  // `AudioStatus` 用 ⇒ isCapturing/latencyMs/bufferSize/sampleRate 四个字段恒
+  // `undefined`，且不报任何错。后果是 ensureCaptureRunning 的幂等守卫失效（每次
+  // 按键重开设备 ⇒ 独占模式下反复重建 IAudioClient ⇒ 丢音）、debug 面板永远显示
+  // 「○ OFF / 0.0ms」。这里**逐个字段断言具体值**，而不是断言 length/不为 undefined，
+  // 否则「归一化漏掉一个字段」这类回归照样通过。
+  it('getAudioStatus 把 Rust 的 snake_case payload 归一化成 camelCase（逐字段）', async () => {
+    mocks.invoke.mockResolvedValue({
+      is_capturing: true,
+      latency_ms: 4.25,
+      buffer_size: 128,
+      sample_rate: 44100,
+      backend: 'wasapi_exclusive',
+    })
+    const s = await native.getAudioStatus()
+    expect(s.isCapturing).toBe(true)
+    expect(s.latencyMs).toBe(4.25)
+    expect(s.bufferSize).toBe(128)
+    expect(s.sampleRate).toBe(44100)
+    expect(s.backend).toBe('wasapi_exclusive')
+  })
+
+  it('getAudioStatus：Rust 报「未在采集」时 isCapturing 必须是 false 而不是 undefined', async () => {
+    mocks.invoke.mockResolvedValue({
+      is_capturing: false,
+      latency_ms: 0,
+      buffer_size: 2048,
+      sample_rate: 48000,
+      backend: 'wasapi_shared',
+    })
+    // 下游 `if (status.isCapturing)` 会把 undefined 当假 —— 与「真没在采」同形，
+    // 于是读不到状态和真的没在采无法区分。这里锁死「必须拿到布尔值」。
+    expect(await native.getAudioStatus()).toEqual({
+      isCapturing: false,
+      latencyMs: 0,
+      bufferSize: 2048,
+      sampleRate: 48000,
+      backend: 'wasapi_shared',
+    })
+  })
+
   it('start_audio_capture* 三兄弟：参数名 deviceName/sampleRate/backend + 默认值', async () => {
     await native.startAudioCapture('Mic A')
     expect(mocks.invoke).toHaveBeenCalledWith('start_audio_capture', { deviceName: 'Mic A' })

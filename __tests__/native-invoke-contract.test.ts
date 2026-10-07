@@ -475,3 +475,89 @@ describe('跨语言护栏：前端 invoke 的命令名必须在 Rust 端注册',
     expect(unregistered).toEqual([])
   })
 })
+
+// ==================================================== 跨语言字段名护栏
+
+/**
+ * 命令名对齐（上面那条）只保证「调得到」，**不保证读得到东西**。
+ *
+ * Tauri 只对命令的**顶层参数名**做 camelCase 转换；返回值/嵌套结构体的字段名由
+ * serde 原样序列化。所以一个没有 `#[serde(rename_all = "camelCase")]` 的 Rust 结构体，
+ * 线上发的是 snake_case，而前端 TS 接口按 camelCase 声明 ⇒ **字段全为 undefined，且不报错**。
+ *
+ * 本项目里两种命名口径是**并存**的：`db/stats.rs` 显式写了 camelCase，
+ * `commands/audio_commands.rs` 的 `AudioStatus` 没有。所以不能靠「统一改成 camelCase」
+ * 一次性解决，只能逐个结构体锁定。这条护栏锁 `AudioStatus`：
+ *
+ *   Rust 字段(snake) ⊆ 前端 Raw 接口字段      —— Rust 加字段而前端忘了收 ⇒ 红
+ *   snake→camel(Rust 字段) === 前端 AudioStatus 字段 —— 任一侧重命名/漏字段 ⇒ 红
+ *
+ * 它咬住的就是 2026-10-07 修的那个真 bug：此前 `getAudioStatus()` 直接把返回值当
+ * `AudioStatus` 用，`isCapturing` 恒 undefined ⇒ `ensureCaptureRunning` 幂等守卫失效。
+ */
+describe('跨语言字段名护栏：AudioStatus 的 Rust 字段与前端接口必须一一对上', () => {
+  const ROOT = process.cwd()
+  const RUST_FILE = 'src-tauri/src/commands/audio_commands.rs'
+  const TS_FILE = 'lib/native-audio.ts'
+
+  /** 抽 Rust struct 的 pub 字段名（原样，snake_case）。 */
+  function parseRustStructFields(text: string, structName: string): string[] {
+    const lines = text.split('\n')
+    // 用 includes 而不是 `new RegExp('...\\s...')`：模板字符串里的 `\s` 会被 TS 当普通
+    // `s` 吃掉（未知转义）⇒ 抽取恒为空集。上面那条「扫描下限」就是专门抓这个的。
+    const start = lines.findIndex((l) => l.includes('pub struct ' + structName))
+    if (start < 0) return []
+    const fields: string[] = []
+    for (let i = start + 1; i < lines.length; i++) {
+      if (/^\s*\}/.test(lines[i])) break
+      const m = /^\s*pub\s+([a-z_][a-z_0-9]*)\s*:/.exec(lines[i])
+      if (m) fields.push(m[1])
+    }
+    return fields
+  }
+
+  /** 抽 TS interface 的字段名（去掉可选标记 `?`），跳过注释行。 */
+  function parseTsInterfaceFields(text: string, ifaceName: string): string[] {
+    const lines = text.split('\n')
+    const start = lines.findIndex((l) => l.includes('interface ' + ifaceName))
+    if (start < 0) return []
+    const fields: string[] = []
+    for (let i = start + 1; i < lines.length; i++) {
+      if (/^\s*\}/.test(lines[i])) break
+      if (/^\s*(\/\/|\/\*|\*)/.test(lines[i])) continue
+      const m = /^\s*([A-Za-z_][A-Za-z_0-9]*)\??\s*:/.exec(lines[i])
+      if (m) fields.push(m[1])
+    }
+    return fields
+  }
+
+  const snakeToCamel = (s: string) => s.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase())
+
+  const rustText = fs.readFileSync(path.join(ROOT, RUST_FILE), 'utf8')
+  const tsText = fs.readFileSync(path.join(ROOT, TS_FILE), 'utf8')
+  const rustFields = parseRustStructFields(rustText, 'AudioStatus')
+  const rawFields = parseTsInterfaceFields(tsText, 'RawAudioStatus')
+  const outFields = parseTsInterfaceFields(tsText, 'AudioStatus')
+
+  it('三处抽取都真的抽到了字段（扫描下限，防「空集恒通过」）', () => {
+    expect(rustFields.length, 'Rust AudioStatus 字段抽取过少').toBeGreaterThanOrEqual(5)
+    expect(rawFields.length, 'RawAudioStatus 字段抽取过少').toBeGreaterThanOrEqual(5)
+    expect(outFields.length, 'AudioStatus 字段抽取过少').toBeGreaterThanOrEqual(5)
+  })
+
+  it('Rust 每个字段前端 Raw 接口都收下了（Rust 加字段而前端没收 ⇒ 静默 undefined）', () => {
+    const missing = rustFields.filter((f) => !rawFields.includes(f))
+    expect(missing, `${TS_FILE} 的 RawAudioStatus 缺少字段`).toEqual([])
+  })
+
+  it('Rust 字段转 camelCase 后与前端 AudioStatus 接口字段集合完全相等', () => {
+    const expected = rustFields.map(snakeToCamel).sort()
+    const actual = [...outFields].sort()
+    const missing = expected.filter((f) => !actual.includes(f))
+    const extra = actual.filter((f) => !expected.includes(f))
+    expect(
+      { missing, extra },
+      'Rust 侧加减/重命名了 AudioStatus 字段，但前端 AudioStatus 接口没跟上',
+    ).toEqual({ missing: [], extra: [] })
+  })
+})

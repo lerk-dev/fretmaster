@@ -274,16 +274,75 @@ export async function getLatencyMs(): Promise<number> {
   }
 }
 
+/**
+ * `get_audio_status` 返回值在 **Rust 侧**的线上格式
+ * （`src-tauri/src/commands/audio_commands.rs` 的 `AudioStatus`）。
+ *
+ * 该结构体**没有** `#[serde(rename_all = ...)]` ⇒ serde 按字段原名序列化，
+ * 即 `is_capturing` / `latency_ms` / `buffer_size` / `sample_rate`。
+ * （对照：`db/stats.rs` 显式写了 `rename_all = "camelCase"`，所以它才是 camelCase。
+ *   本项目里两种口径并存，**必须逐个结构体确认**，不能凭印象统一。）
+ *
+ * 🚨 不归一化的话 `status.isCapturing` 恒为 `undefined`，且三条后果全部静默：
+ *   ① `ensureCaptureRunning` 的幂等守卫失效 ⇒ 每次按键都重开设备，独占模式下
+ *      反复重建 COM `IAudioClient` ⇒ 丢音；
+ *   ② 「用户意图关、但 Rust 仍在采集」的清理分支永不执行；
+ *   ③ debug 面板永久显示「○ OFF / 延迟 0.0ms」，等于没法用它诊断任何音频问题。
+ *
+ * 两种命名都接受：将来若 Rust 侧补上 `rename_all = "camelCase"`，前端不必再改。
+ * 字段集合由 `__tests__/native-invoke-contract.test.ts` 与 Rust 侧做**双向比对**，
+ * 任一侧加减字段 / 改命名都会红 —— 这是防同类 bug 再生的护栏，改字段时别绕过它。
+ */
+interface RawAudioStatus {
+  is_capturing?: boolean
+  latency_ms?: number
+  buffer_size?: number
+  sample_rate?: number
+  backend?: AudioBackend
+  // 兼容未来 Rust 侧补 rename_all 的情况
+  isCapturing?: boolean
+  latencyMs?: number
+  bufferSize?: number
+  sampleRate?: number
+}
+
+/** 与 `getAudioStatus()` 非 Tauri / 出错降级分支共用的中性值（未采集 + 48k/2048）。 */
+const NEUTRAL_AUDIO_STATUS: AudioStatus = {
+  isCapturing: false,
+  latencyMs: 0,
+  bufferSize: 2048,
+  sampleRate: 48000,
+  backend: 'wasapi_shared',
+}
+
+/**
+ * 把 Rust 的线上 payload 归一化成前端唯一形状 `AudioStatus`。
+ *
+ * 缺省值语义与 `NEUTRAL_AUDIO_STATUS` 一致：拿不到真实状态时退化成「未采集」，
+ * 而不是把 `undefined` 传播给下游（下游 `if (status.isCapturing)` 会把
+ * `undefined` 当假 ⇒ 与「未采集」同形，无法区分「真没在采」和「读不到状态」）。
+ */
+function normalizeAudioStatus(raw: RawAudioStatus | null | undefined): AudioStatus {
+  if (!raw) return { ...NEUTRAL_AUDIO_STATUS }
+  return {
+    isCapturing: raw.isCapturing ?? raw.is_capturing ?? false,
+    latencyMs: raw.latencyMs ?? raw.latency_ms ?? 0,
+    bufferSize: raw.bufferSize ?? raw.buffer_size ?? 2048,
+    sampleRate: raw.sampleRate ?? raw.sample_rate ?? 48000,
+    backend: raw.backend ?? 'wasapi_shared',
+  }
+}
+
 export async function getAudioStatus(): Promise<AudioStatus> {
   if (!isTauri()) {
-    return { isCapturing: false, latencyMs: 0, bufferSize: 2048, sampleRate: 48000, backend: 'wasapi_shared' as AudioBackend }
+    return { ...NEUTRAL_AUDIO_STATUS }
   }
   try {
     const invoke = await getInvoke()
-    return await invoke<AudioStatus>('get_audio_status')
+    return normalizeAudioStatus(await invoke<RawAudioStatus>('get_audio_status'))
   } catch (error) {
     console.error('Failed to get audio status:', error)
-    return { isCapturing: false, latencyMs: 0, bufferSize: 2048, sampleRate: 48000, backend: 'wasapi_shared' as AudioBackend }
+    return { ...NEUTRAL_AUDIO_STATUS }
   }
 }
 
