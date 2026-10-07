@@ -223,7 +223,9 @@ describe('指板字体 —— 两套皮肤都引用同一个变量', () => {
     }
 
     expect(literalWith('h-8 sm:h-10 text-2xs sm:text-xs'), '空弦（0 品）').toContain('font-fretboard')
-    expect(literalWith('h-8 sm:h-10 text-4xs sm:text-2xs'), '1 品及以上').toContain('font-fretboard')
+    // 音符格字号：2026-10-07 按用户要求上移一档（`text-4xs sm:text-2xs` → `text-3xs sm:text-xs`）。
+    // ⚠️ 这串是**锚点**，不是「值不重要」——它一变测试就得跟着改，等于强制确认「换字号是有意的」。
+    expect(literalWith('h-8 sm:h-10 text-3xs sm:text-xs'), '1 品及以上').toContain('font-fretboard')
     expect(code, '品数行').toContain('"text-2xs font-fretboard"')
     // 反向：旧的「品数行不带字体类」写法必须已消失
     expect(code, '品数行又变回没有字体类').not.toMatch(/"text-2xs",\s*isMarker/)

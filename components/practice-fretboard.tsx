@@ -289,7 +289,10 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                   data-role={role}
                   aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(note)).replace('{string}', String(stringIndex + 1)).replace('{fret}', String(actualFret)) : undefined}
                   className={cn(
-                    "flex-1 h-8 sm:h-10 text-4xs sm:text-2xs font-fretboard font-medium transition-all duration-150 min-w-[20px] sm:min-w-[28px]",
+                    // 🚨 音名字号比空弦列小一档是**刻意**的（刻度 4xs8 < 3xs9 < 2xs10 < xs12）；
+                    // 2026-10-07 用户要求「音字体调大一号」⇒ 由 `text-4xs sm:text-2xs` 上移一档。
+                    // 此串被 `__tests__/fretboard-font-parity.test.ts` 当锚点钉住，改字号要同步改那边。
+                    "flex-1 h-8 sm:h-10 text-3xs sm:text-xs font-fretboard font-medium transition-all duration-150 min-w-[20px] sm:min-w-[28px]",
                     "flex items-center justify-center relative z-10",
                     "border-r",
                     isStringEnabled

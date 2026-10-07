@@ -725,11 +725,48 @@ describe('乐器自洽：分隔线、行数、音名必须同源（2026-10-01 �
   })
 })
 
-describe('找音练习（practice）不参与题目音级', () => {
+describe('找音练习（practice）', () => {
   it('practice tab 下即使 isPlaying 也不显示音级', () => {
     setStore({ activeTab: 'practice' })
     const p = mount({ selectedStrings: [1, 2, 3, 4, 5, 6], transposedChords: [{ root: 'E', type: 'Major' }] })
     expect(p.shown(0, 4)).toBe('')
+    p.unmount()
+  })
+
+  /**
+   * 🚨 辨音模式（按钮答题）：目标格**只亮位置、不写音名**。
+   *
+   * 缝隙证明：修前 `resolveBaseRole` 给目标格 `result('target')`（`showText` 默认 `true`），
+   * 经典皮肤把 `showText` 翻成 `opacity-100` ⇒ 那块亮着的格子上直接写着答案音名。
+   * 这里**同时**钉 role 与屏幕可见性：只钉 role 抓不到文字层，只钉文字抓不到配色层。
+   */
+  it('辨音模式：目标格 role=target，但屏幕上**看不见字**', () => {
+    setStore({ activeTab: 'practice', isPlaying: true })
+    const p = mount({
+      practiceAnswerMode: 'buttons',
+      highlightedTargetPosition: { stringIndex: 2, fret: 3 },
+      selectedStrings: [1, 2, 3, 4, 5, 6],
+    })
+    expect(p.role(2, 3)).toBe('target')
+    expect(p.shown(2, 3)).toBe('') // 屏幕上没有字（`shown` 走 opacity-100 判定，不看 textContent）
+    expect(p.cell(2, 3).visible).toBe(false)
+    // 对照：非目标格本来就没字 ⇒ 上面那格「空」不是因为整块指板都没字
+    expect(p.role(0, 1)).toBe('none')
+    expect(p.shown(0, 1)).toBe('')
+    p.unmount()
+  })
+
+  it('辨音模式：**空弦目标**（品 0）也不写字；同列的非目标空弦仍是弦标签', () => {
+    setStore({ activeTab: 'practice', isPlaying: true })
+    const p = mount({
+      practiceAnswerMode: 'buttons',
+      highlightedTargetPosition: { stringIndex: 0, fret: 0 },
+      selectedStrings: [1, 2, 3, 4, 5, 6],
+    })
+    expect(p.role(0, 0)).toBe('target')
+    expect(p.shown(0, 0)).toBe('')
+    // 「空弦列恒显音名」是既有契约（用户曾反馈「空弦音都不显示了」）—— 这里必须**只**藏目标格
+    expect(p.shown(1, 0)).not.toBe('')
     p.unmount()
   })
 })

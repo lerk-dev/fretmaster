@@ -187,6 +187,24 @@ export function resolveFretCellRole(
     degree,
   })
 
+  /**
+   * 辨音模式（按钮答题）本轮的目标格 —— **只亮位置、不写音名**。
+   *
+   * 🚨 屏幕上的音名就是答案：用户在辨音模式下要「听音 → 在音名按钮里选」，
+   * 指板把目标格的音名写出来等于直接把答案给出去。
+   * 以前这一格走 `result('target')`（`showText` 默认 `true`）⇒ 亮着的同时把音名写在脸上。
+   *
+   * 判定**只在这里做一次**，下面两处都读它（铁律 14：同一「量」不许两份判定）：
+   *   · `resolveBaseRole` 的 practice 分支 ⇒ 给出 `showText:false`；
+   *   · 末尾的空弦列兜底 ⇒ **不能**再把 0 品目标强行改回 `true`（空弦目标同样要藏）。
+   */
+  const isButtonsTarget =
+    ctx.activeTab === 'practice' &&
+    ctx.practiceAnswerMode === 'buttons' &&
+    !!ctx.highlightedTargetPosition &&
+    ctx.highlightedTargetPosition.stringIndex === stringIndex &&
+    ctx.highlightedTargetPosition.fret === fret
+
   let out: FretCellRoleResult
 
   // ① 点击反馈压过一切（GuitarRun 的 .note-hit 也是 !important 级别）
@@ -196,7 +214,7 @@ export function resolveFretCellRole(
   } else {
     // ② 按 tab 做题目判定（这一步**不看**限制品区 —— 品区只影响「压暗」不影响「有没有信息」，
     //    与经典皮肤一致：那边也是颜色函数管压暗、文字函数管显隐，两件事分开）
-    const base = resolveBaseRole(ctx, stringIndex, fret, note, key, result)
+    const base = resolveBaseRole(ctx, stringIndex, fret, note, key, result, isButtonsTarget)
 
     // ③ 限制品区：把**题目内**的格子压暗（题目外的格子本来就是 none，不需要压暗）
     if (base.role !== 'none' && ctx.isPlaying && ctx.fretZoneEnabled) {
@@ -210,12 +228,20 @@ export function resolveFretCellRole(
   // ⓪ 空弦列（0 品）是**弦标签**：音名恒显示（与 GuitarRun 的 OPEN 列同义），
   // 不参与「藏答案」——把 0 品并入统一判定时曾把它一起藏掉，用户实测反馈「空弦音都不显示了」。
   // 题目命中不受影响：命中表达在 role/degree（音级符号 + 配色），这里只兜住**可见性**。
-  if (fret === 0) out = { ...out, showText: true }
+  //
+  // 🚨 唯一的例外是**辨音模式的目标格**（`isButtonsTarget`）：那一格就是答案，即使落在
+  // 空弦列也必须藏 —— 否则「亮着的空弦格」会把音名写在脸上，与本次修复的目的正好相反。
+  if (fret === 0 && !isButtonsTarget) out = { ...out, showText: true }
 
   return out
 }
 
-/** ② 的实体：按 tab 判定，返回不含「品区压暗」的角色 */
+/**
+ * ② 的实体：按 tab 判定，返回不含「品区压暗」的角色。
+ *
+ * @param isButtonsTarget 该格是否为**辨音模式**本轮的目标格（判定在 `resolveFretCellRole`
+ *   里只做一次，见那里的说明）—— 是则只亮不写字。
+ */
 function resolveBaseRole(
   ctx: FretboardRoleContext,
   stringIndex: number,
@@ -223,6 +249,7 @@ function resolveBaseRole(
   note: string,
   key: string,
   result: (role: FretCellRole, degree?: string, showText?: boolean) => FretCellRoleResult,
+  isButtonsTarget: boolean,
 ): FretCellRoleResult {
   // ⓪ tab 级门禁：没在练习就不产生题目信息（`practice` 例外，理由见 `TAB_REQUIRES_PLAYING`）。
   //    以前是各分支自己判一次 isPlaying，`chord` 那份漏了 —— 于是真相源说「亮」、
@@ -231,10 +258,9 @@ function resolveBaseRole(
 
   // 找音练习
   if (ctx.activeTab === 'practice') {
-    if (ctx.practiceAnswerMode === 'buttons' && ctx.highlightedTargetPosition) {
-      const t = ctx.highlightedTargetPosition
-      if (t.stringIndex === stringIndex && t.fret === fret) return result('target')
-    }
+    // 🚨 辨音模式的目标格：**只亮位置，不写音名** —— 写出来就是答案（判定见
+    //    `resolveFretCellRole` 的 `isButtonsTarget`）。`degree` 留空，`showText` 显式 false。
+    if (isButtonsTarget) return result('target', '', false)
     // 「显示全部音符」= 所有格子都亮出音名（与经典皮肤的 showAllNotes 同义）；目标音额外强调
     if (ctx.showAllNotes) {
       return result(ctx.targetNote && note === ctx.targetNote ? 'target' : 'none', '', true)

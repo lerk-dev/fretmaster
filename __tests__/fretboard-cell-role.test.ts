@@ -207,6 +207,35 @@ describe('3. 找音练习（activeTab = practice）', () => {
     expect(roleAt(c, 0, 0)).toBe('none')
   })
 
+  it('🚨 按钮答题模式：目标格**只亮位置、不写音名**（屏上的音名就是答案）', () => {
+    const c = ctx({
+      activeTab: 'practice',
+      isPlaying: true,
+      practiceAnswerMode: 'buttons',
+      highlightedTargetPosition: { stringIndex: 2, fret: 3 },
+    })
+    const hit = at(c, 2, 3)
+    expect(hit.role).toBe('target')
+    expect(hit.degree).toBe('') // 既不是音级、也不该退回音名
+    // 可见性必须为 false ⇒ 经典皮肤 opacity-0、GuitarRun `data-visible="0"`
+    expect(hit.showText).toBe(false)
+  })
+
+  it('🚨 按钮答题模式：**空弦目标**（0 品）同样要藏 —— 「弦标签恒显」对这一格不成立', () => {
+    const c = ctx({
+      activeTab: 'practice',
+      isPlaying: true,
+      practiceAnswerMode: 'buttons',
+      highlightedTargetPosition: { stringIndex: 0, fret: 0 },
+    })
+    expect(at(c, 0, 0).role).toBe('target')
+    expect(at(c, 0, 0).showText).toBe(false)
+    // 对照：同一列里的**非目标**空弦格仍是弦标签（恒显）——
+    // 证明上面藏掉的是「目标格」而不是整列空弦，否则用户又会反馈「空弦音都不显示了」。
+    expect(at(c, 1, 0).role).toBe('none')
+    expect(at(c, 1, 0).showText).toBe(true)
+  })
+
   it('buttons 模式但目标为 null ⇒ 没有 target', () => {
     const c = ctx({
       activeTab: 'practice',
