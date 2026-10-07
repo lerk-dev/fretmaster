@@ -209,6 +209,38 @@ describe('getNextKeyByMovement', () => {
     expect(getNextKeyByMovement('B', 'circleOfFourths')).toBe('E')
   })
 
+  // 🚨 单步断言测不出这个 bug：卡住的那一步**看起来是合法的**（B♭ 的下一个四度
+  // 又返回 B♭）。只有连续推进才能暴露 —— 实测修复前 C→F→B♭→B♭→B♭…
+  // 根因：`preferFlat()` 返回 ♭ 名，而取下标用的是 `NOTES.indexOf()`（NOTES 只有
+  // ♯ 系列）⇒ 下一轮 -1 ⇒ 原地返回自己。修法是改用 `getNoteIndex()`。
+  it('circleOfFourths 连续推进 12 步必须走遍 12 个调并回到起点（不卡住）', () => {
+    let key = 'C'
+    const seen: string[] = []
+    for (let i = 0; i < 12; i++) {
+      key = getNextKeyByMovement(key, 'circleOfFourths')
+      seen.push(key)
+    }
+    expect(new Set(seen).size, `四度圈走不满 12 个调（卡住了）：${seen.join(' → ')}`).toBe(12)
+    // 12 × 5 半音 = 60 ≡ 0 ⇒ 第 12 步回到起点
+    expect(key, `四度圈 12 步后没回到起点：${seen.join(' → ')}`).toBe('C')
+  })
+
+  it('circleOfFifths 连续推进 12 步（对照组：走 ♯ 侧，本来就正常）', () => {
+    let key = 'C'
+    const seen: string[] = []
+    for (let i = 0; i < 12; i++) {
+      key = getNextKeyByMovement(key, 'circleOfFifths')
+      seen.push(key)
+    }
+    expect(new Set(seen).size, `五度圈走不满 12 个调：${seen.join(' → ')}`).toBe(12)
+    expect(key, `五度圈 12 步后没回到起点：${seen.join(' → ')}`).toBe('C')
+  })
+
+  it('♭ 名入参也能继续推进（回归：B♭ → E♭，而不是原地不动）', () => {
+    expect(getNextKeyByMovement('B♭', 'circleOfFourths')).toBe('E♭')
+    expect(getNextKeyByMovement('A♭', 'circleOfFourths')).toBe('D♭')
+  })
+
   it('random：从 12 个音里随机取（打桩后确定）', () => {
     stubRandom(0.999)
     expect(getNextKeyByMovement('C', 'random')).toBe('B') // NOTES[11]

@@ -75,6 +75,16 @@ describe('semitonesToDegree —— 半音 → 度数', () => {
     expect(semitonesToDegree(8, 'Minor')).toBe('b6')
   })
 
+  // 🚨 修前：这两个落进 `isMinor` 的空档 —— 都以 `maj` 开头 ⇒ 被判成大调性质 ⇒
+  // 8 半音取 `#5`，于是和弦名写着 ♭6、界面显示 `#5`，差一个减号。
+  it('和弦名里显式写了 ♭6 的（maj7b6 / maj9b6）也记成 b6', () => {
+    expect(semitonesToDegree(8, 'maj7b6')).toBe('b6')
+    expect(semitonesToDegree(8, 'maj9b6')).toBe('b6')
+    // 对照组：#5 侧不受影响
+    expect(semitonesToDegree(8, 'maj7#5')).toBe('#5')
+    expect(semitonesToDegree(8, 'maj13#5')).toBe('#5')
+  })
+
   it('减五（6 半音）随上下文取 b5 或 #4', () => {
     expect(semitonesToDegree(6, 'm7b5')).toBe('b5')
     expect(semitonesToDegree(6, 'dim7')).toBe('b5')

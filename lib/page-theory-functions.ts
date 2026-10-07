@@ -748,6 +748,11 @@ export function semitonesToDegree(semitones: number, chordContext?: string): str
   const hasSharpFive = chordContext === '7#5' || chordContext === '7#5b9' || chordContext === '7#5#9' || chordContext === '7alt' ||
     chordContext === 'aug' || chordContext === 'Aug' || chordContext === 'aug7' ||
     chordContext === 'maj7#5' || chordContext === 'maj9#5' || chordContext === 'maj13#5'
+  // 和弦名里**显式写了 ♭6** 的（`maj7b6` / `maj9b6` …）：8 半音必须记成 `b6`。
+  // 🚨 修之前它们落进 `isMinor` 判定的空档 —— 都以 `maj` 开头 ⇒ `isMajorQuality`
+  // 为真 ⇒ 被排除在小调之外，于是和弦名写着 ♭6、界面却显示 `#5`，差一个减号。
+  // 与 `hasSharpFive` 对称地按**名字**判定，比继续往 isMinor 里堆字面量更不易漏。
+  const hasFlatSix = /b6/.test(chordContext || '')
   const degreeMap: Record<number, string> = {
     0: "1",
     1: "b2",
@@ -757,7 +762,7 @@ export function semitonesToDegree(semitones: number, chordContext?: string): str
     5: "4",
     6: hasFlatFive ? "b5" : "#4",
     7: "5",
-    8: hasSharpFive ? "#5" : isMinor ? "b6" : "#5",
+    8: hasSharpFive ? "#5" : (isMinor || hasFlatSix) ? "b6" : "#5",
     9: isDiminished ? "bb7" : "6",
     10: "b7",
     11: "7",
@@ -1201,7 +1206,11 @@ export const generateScaleSequence = (scale: typeof SCALE_MODES.basic[0], sequen
 
 export const getNextKeyByMovement = (currentKey: string, movement: ScaleRootMovement): string => {
   const normalizedKey = normalizeNoteName(currentKey)
-  const noteIndex = NOTES.indexOf(normalizedKey)
+  // 🚨 必须走 `getNoteIndex()`（♯/♭ 两种写法都认），不能写 `NOTES.indexOf(...)`：
+  // NOTES 只有 ♯ 系列，而下面的 `circleOfFourths` 分支返回的是 `preferFlat()` 的 ♭ 名
+  // ⇒ 下一轮 `NOTES.indexOf("B♭")` 得 -1 ⇒ 原地返回自己 ⇒ **四度圈卡住不动**。
+  // 实测：C → F → B♭ → B♭ → B♭ …（对照五度圈走 preferSharp，C→G→D→A→E→B→F♯ 正常）。
+  const noteIndex = getNoteIndex(normalizedKey)
   if (noteIndex === -1) return normalizedKey
 
   const isSharpKey = SHARP_KEYS.includes(normalizedKey)
