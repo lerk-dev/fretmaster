@@ -347,6 +347,19 @@ fn run_capture_loop(
         let release_buffer: unsafe extern "system" fn(*mut c_void, u32) -> i32 =
             vtbl_slot(capture_client, SLOT_CAPTURE_RELEASE_BUFFER);
 
+        // 连续失败计数：设备被拔出 / 被其它程序抢占后，`GetBuffer` 会**持续**返回
+        // 失败 HRESULT。原先这里无条件 `continue` ⇒ 线程永远退不出去、`running` 一直
+        // 是 true ⇒ 上层认为采集正常，用户只看到「没有声音」而**没有任何报错**，
+        // 也不会回退到共享模式。
+        //
+        // 阈值 100 × 2ms ≈ 200ms：足以滤掉偶发的单帧失败，又不至于让拔了设备的用户
+        // 等太久。用「连续次数」而不是硬编码 HRESULT，是因为 `AUDCLNT_E_*` 有一长串
+        // （DEVICE_INVALIDATED / NOT_INITIALIZED / ENDPOINT_CREATE_FAILED …），漏一个
+        // 就又变成静默卡死。
+        const MAX_CONSECUTIVE_GET_BUFFER_ERRORS: u32 = 100;
+        let mut consecutive_errors: u32 = 0;
+        let mut device_lost_hr: Option<i32> = None;
+
         while running.load(Ordering::SeqCst) {
             let mut data: *mut u8 = std::ptr::null_mut();
             let mut frames: u32 = 0;
@@ -360,10 +373,22 @@ fn run_capture_loop(
                 std::ptr::null_mut(),
             );
 
-            if hr < 0 || frames == 0 {
+            if hr < 0 {
+                consecutive_errors += 1;
+                if consecutive_errors >= MAX_CONSECUTIVE_GET_BUFFER_ERRORS {
+                    device_lost_hr = Some(hr);
+                    break;
+                }
                 std::thread::sleep(std::time::Duration::from_millis(2));
                 continue;
             }
+            // `frames == 0` 是「本帧还没数据」，属正常空缓冲，不算失败
+            if frames == 0 {
+                consecutive_errors = 0;
+                std::thread::sleep(std::time::Duration::from_millis(2));
+                continue;
+            }
+            consecutive_errors = 0;
 
             if flags & AUDCLNT_BUFFERFLAGS_SILENT != 0 || data.is_null() {
                 let zeros = vec![0.0f32; frames as usize * ch];
@@ -390,6 +415,21 @@ fn run_capture_loop(
         let stop: unsafe extern "system" fn(*mut c_void) -> i32 =
             vtbl_slot(audio_client, SLOT_CLIENT_STOP);
         let _ = stop(audio_client);
+
+        if let Some(hr) = device_lost_hr {
+            // 置回 false：上层（capture.rs）据此判断采集已死，才会回退到共享模式。
+            running.store(false, Ordering::SeqCst);
+            log::error!(
+                "WASAPI 独占采集连续 {} 次 GetBuffer 失败 (hr=0x{:08X})，判定设备已失效并退出采集线程",
+                MAX_CONSECUTIVE_GET_BUFFER_ERRORS,
+                hr
+            );
+            return Err(anyhow!(
+                "WASAPI 独占采集设备已失效（GetBuffer 连续失败，hr=0x{:08X}）",
+                hr
+            ));
+        }
+
         log::info!("WASAPI 独占采集已停止");
         Ok(())
     }

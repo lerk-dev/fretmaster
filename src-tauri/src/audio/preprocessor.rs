@@ -164,8 +164,15 @@ impl AudioPreprocessor {
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: u32) {
-        self.sample_rate = sample_rate as f32;
-        self.rebuild_filters();
+        // 🚨 必须守卫：`pipeline.rs` 的 `detect_pitch` **每帧**都会调这个方法，
+        // 而无条件的 `rebuild_filters()` 会把四个 biquad 的延迟单元清零 —— 陷波器的
+        // 包络建立时间约 95.5ms > 帧长 85.3ms ⇒ 50/60Hz 哼声**永远衰减不到设计值**，
+        // 而哼声会被 YIN 判成 0.9+ 置信度的「答对」，于是用户没弹也被判对。
+        // 对照 `pitch.rs::set_sample_rate` 本来就有这个守卫 —— 那里是显式疏漏。
+        if self.sample_rate != sample_rate as f32 {
+            self.sample_rate = sample_rate as f32;
+            self.rebuild_filters();
+        }
     }
 
     /// 当前生效的噪声门限（RMS）—— **唯一真相源**。
