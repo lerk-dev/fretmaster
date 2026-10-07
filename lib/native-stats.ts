@@ -134,17 +134,6 @@ export async function getStatsByExerciseType(): Promise<Record<string, { count: 
   }
 }
 
-export async function deletePracticeStat(id: number): Promise<void> {
-  if (!isTauri()) return
-  try {
-    const invoke = await getInvoke()
-    await invoke('delete_practice_stat', { id })
-  } catch (error) {
-    logger.error('删除统计数据失败:', error)
-    throw error
-  }
-}
-
 export async function clearAllPracticeStats(): Promise<void> {
   if (!isTauri()) return
   try {
@@ -154,10 +143,6 @@ export async function clearAllPracticeStats(): Promise<void> {
     logger.error('清空统计数据失败:', error)
     throw error
   }
-}
-
-export function getCurrentUserId(): string {
-  return 'local_user'
 }
 
 export async function syncLocalBackupToServer(): Promise<number> {

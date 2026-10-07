@@ -189,7 +189,75 @@ pub fn clear_all_stats() -> SqliteResult<()> {
     let db = get_db();
     db.execute("DELETE FROM practice_stats", [])?;
     db.execute("DELETE FROM practice_sessions", [])?;
+    db.execute("DELETE FROM position_stats", [])?;
     db.execute("DELETE FROM sqlite_sequence WHERE name='practice_stats'", [])?;
     db.execute("DELETE FROM sqlite_sequence WHERE name='practice_sessions'", [])?;
+    db.execute("DELETE FROM sqlite_sequence WHERE name='position_stats'", [])?;
+    Ok(())
+}
+
+// ==================== 逐位置掌握度统计 ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PositionStatEntry {
+    pub string_index: i32,
+    pub fret: i32,
+    pub total: i32,
+    pub correct: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PositionStatRecord {
+    pub string_index: i32,
+    pub fret: i32,
+    pub total: i32,
+    pub correct: i32,
+}
+
+/// 批量写入位置统计（以 (instrument, string_index, fret) 为唯一键覆盖）
+pub fn upsert_position_stats(instrument: &str, entries: &[PositionStatEntry]) -> SqliteResult<()> {
+    let db = get_db();
+    for e in entries {
+        db.execute(
+            "INSERT INTO position_stats (instrument, string_index, fret, total, correct, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
+             ON CONFLICT(instrument, string_index, fret) DO UPDATE SET
+                total = excluded.total,
+                correct = excluded.correct,
+                updated_at = CURRENT_TIMESTAMP",
+            params![instrument, e.string_index, e.fret, e.total, e.correct],
+        )?;
+    }
+    Ok(())
+}
+
+/// 读取指定乐器的全部位置统计
+pub fn get_position_stats(instrument: &str) -> SqliteResult<Vec<PositionStatRecord>> {
+    let db = get_db();
+    let mut stmt = db.prepare(
+        "SELECT string_index, fret, total, correct
+         FROM position_stats
+         WHERE instrument = ?1
+         ORDER BY string_index, fret",
+    )?;
+
+    let stats = stmt.query_map(params![instrument], |row| {
+        Ok(PositionStatRecord {
+            string_index: row.get(0)?,
+            fret: row.get(1)?,
+            total: row.get(2)?,
+            correct: row.get(3)?,
+        })
+    })?;
+
+    stats.collect()
+}
+
+/// 清空指定乐器的位置统计
+pub fn clear_position_stats(instrument: &str) -> SqliteResult<()> {
+    let db = get_db();
+    db.execute("DELETE FROM position_stats WHERE instrument = ?1", params![instrument])?;
     Ok(())
 }

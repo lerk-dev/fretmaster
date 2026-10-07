@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react"
+import { hasExistingUserEvidence } from "@/lib/onboarding-user-evidence"
 
 export type TranslationFunction = (key: string) => string
 
@@ -233,7 +234,13 @@ export function OnboardingProvider({ children, config, t: externalT }: Onboardin
 
   useEffect(() => {
     if (!mounted) return
-    if (config?.autoStartOnFirstVisit !== false && !hasSeenOnboarding && !isCompleted) {
+    // 🚨 自动启动的判据**不能只看 onboarding 自己那个键**（铁律 21：
+    // 持久化意图 ≠ 运行时状态）。实测 0.2.220 exe 的用户 onboarding 键已丢失，
+    // 于是每次启动都被判成「首次访问」，1 秒后弹出全屏 `bg-black/60
+    // pointer-events-auto` 遮罩吞掉全部点击 ⇒「能打开但点哪都没反应」。
+    // 补一条**独立的老用户证据**（`fretmaster-store` 是否落盘），
+    // 语义与唯一真相源见 lib/onboarding-user-evidence.ts。
+    if (config?.autoStartOnFirstVisit !== false && !hasSeenOnboarding && !isCompleted && !hasExistingUserEvidence()) {
       const timer = setTimeout(() => {
         startOnboarding()
       }, 1000)

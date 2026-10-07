@@ -1,7 +1,7 @@
-// ==================== SOLO 风格和弦理论系统 ====================
-// 完整实现 SOLO 的 ChordToken 解析器、Unicode 变音符号、Function 系统
-
+//  ==================== SOLO 风格和弦理论系统 ====================
+//  完整实现 SOLO 的 ChordToken 解析器、Unicode 变音符号、Function 系统
 // ==================== 音符类型 ====================
+
 export type NoteValue = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11
 
 export enum Note {
@@ -34,111 +34,6 @@ export enum NoteFlat {
   B = 11,
 }
 
-export const NOTE_NAMES: Record<number, string> = {
-  [Note.C]: 'C',
-  [Note.C_SHARP]: 'C#',
-  [Note.D]: 'D',
-  [Note.D_SHARP]: 'D#',
-  [Note.E]: 'E',
-  [Note.F]: 'F',
-  [Note.F_SHARP]: 'F#',
-  [Note.G]: 'G',
-  [Note.G_SHARP]: 'G#',
-  [Note.A]: 'A',
-  [Note.A_SHARP]: 'A#',
-  [Note.B]: 'B',
-}
-
-export const NOTE_NAMES_FLAT: Record<number, string> = {
-  [NoteFlat.C]: 'C',
-  [NoteFlat.D_FLAT]: 'Db',
-  [NoteFlat.D]: 'D',
-  [NoteFlat.E_FLAT]: 'Eb',
-  [NoteFlat.E]: 'E',
-  [NoteFlat.F]: 'F',
-  [NoteFlat.G_FLAT]: 'Gb',
-  [NoteFlat.G]: 'G',
-  [NoteFlat.A_FLAT]: 'Ab',
-  [NoteFlat.A]: 'A',
-  [NoteFlat.B_FLAT]: 'Bb',
-  [NoteFlat.B]: 'B',
-}
-
-export const NOTE_UNICODE_NAMES: Record<number, string> = {
-  [Note.C]: 'C',
-  [Note.C_SHARP]: 'C♯',
-  [Note.D]: 'D',
-  [Note.D_SHARP]: 'D♯',
-  [Note.E]: 'E',
-  [Note.F]: 'F',
-  [Note.F_SHARP]: 'F♯',
-  [Note.G]: 'G',
-  [Note.G_SHARP]: 'G♯',
-  [Note.A]: 'A',
-  [Note.A_SHARP]: 'A♯',
-  [Note.B]: 'B',
-}
-
-export const NOTE_UNICODE_NAMES_FLAT: Record<number, string> = {
-  [NoteFlat.C]: 'C',
-  [NoteFlat.D_FLAT]: 'D♭',
-  [NoteFlat.D]: 'D',
-  [NoteFlat.E_FLAT]: 'E♭',
-  [NoteFlat.E]: 'E',
-  [NoteFlat.F]: 'F',
-  [NoteFlat.G_FLAT]: 'G♭',
-  [NoteFlat.G]: 'G',
-  [NoteFlat.A_FLAT]: 'A♭',
-  [NoteFlat.A]: 'A',
-  [NoteFlat.B_FLAT]: 'B♭',
-  [NoteFlat.B]: 'B',
-}
-
-export const NATURAL_NOTES: number[] = [Note.C, Note.D, Note.E, Note.F, Note.G, Note.A, Note.B]
-
-export function noteFromToneId(toneId: number, preferFlat: boolean = false): number {
-  const normalizedToneId = ((toneId % 12) + 12) % 12
-  return normalizedToneId
-}
-
-export function getNoteName(toneId: number, preferFlat: boolean = false, useUnicode: boolean = false): string {
-  const names = preferFlat 
-    ? (useUnicode ? NOTE_UNICODE_NAMES_FLAT : NOTE_NAMES_FLAT)
-    : (useUnicode ? NOTE_UNICODE_NAMES : NOTE_NAMES)
-  return names[toneId] ?? 'C'
-}
-
-export function noteFromString(noteStr: string): number | null {
-  const normalized = noteStr.trim().toLowerCase()
-  const noteMap: Record<string, number> = {
-    'c': Note.C, 'c#': Note.C_SHARP, 'c♯': Note.C_SHARP, 'db': NoteFlat.D_FLAT, 'd♭': NoteFlat.D_FLAT,
-    'd': Note.D, 'd#': Note.D_SHARP, 'd♯': Note.D_SHARP, 'eb': NoteFlat.E_FLAT, 'e♭': NoteFlat.E_FLAT,
-    'e': Note.E, 'f': Note.F, 'f#': Note.F_SHARP, 'f♯': Note.F_SHARP, 'gb': NoteFlat.G_FLAT, 'g♭': NoteFlat.G_FLAT,
-    'g': Note.G, 'g#': Note.G_SHARP, 'g♯': Note.G_SHARP, 'ab': NoteFlat.A_FLAT, 'a♭': NoteFlat.A_FLAT,
-    'a': Note.A, 'a#': Note.A_SHARP, 'a♯': Note.A_SHARP, 'bb': NoteFlat.B_FLAT, 'b♭': NoteFlat.B_FLAT,
-    'b': Note.B,
-  }
-  return noteMap[normalized] ?? null
-}
-
-export function isSharpNote(toneId: number): boolean {
-  return [Note.C_SHARP, Note.D_SHARP, Note.F_SHARP, Note.G_SHARP, Note.A_SHARP].includes(toneId)
-}
-
-export function isFlatNote(toneId: number): boolean {
-  return [NoteFlat.D_FLAT, NoteFlat.E_FLAT, NoteFlat.G_FLAT, NoteFlat.A_FLAT, NoteFlat.B_FLAT].includes(toneId)
-}
-
-export function isNaturalNote(toneId: number): boolean {
-  return NATURAL_NOTES.includes(toneId)
-}
-
-export function getPreferredVisualNote(toneId: number, preferSharp: boolean = true): number {
-  return toneId
-}
-
-// ==================== 等音处理 (Enharmonic) ====================
-
 export interface EnharmonicGroup {
   toneId: number
   sharpName: string
@@ -147,71 +42,6 @@ export interface EnharmonicGroup {
   unicodeFlat: string
 }
 
-export const ENHARMONIC_GROUPS: EnharmonicGroup[] = [
-  { toneId: 0, sharpName: 'C', flatName: 'C', unicodeSharp: 'C', unicodeFlat: 'C' },
-  { toneId: 1, sharpName: 'C#', flatName: 'Db', unicodeSharp: 'C♯', unicodeFlat: 'D♭' },
-  { toneId: 2, sharpName: 'D', flatName: 'D', unicodeSharp: 'D', unicodeFlat: 'D' },
-  { toneId: 3, sharpName: 'D#', flatName: 'Eb', unicodeSharp: 'D♯', unicodeFlat: 'E♭' },
-  { toneId: 4, sharpName: 'E', flatName: 'E', unicodeSharp: 'E', unicodeFlat: 'E' },
-  { toneId: 5, sharpName: 'F', flatName: 'F', unicodeSharp: 'F', unicodeFlat: 'F' },
-  { toneId: 6, sharpName: 'F#', flatName: 'Gb', unicodeSharp: 'F♯', unicodeFlat: 'G♭' },
-  { toneId: 7, sharpName: 'G', flatName: 'G', unicodeSharp: 'G', unicodeFlat: 'G' },
-  { toneId: 8, sharpName: 'G#', flatName: 'Ab', unicodeSharp: 'G♯', unicodeFlat: 'A♭' },
-  { toneId: 9, sharpName: 'A', flatName: 'A', unicodeSharp: 'A', unicodeFlat: 'A' },
-  { toneId: 10, sharpName: 'A#', flatName: 'Bb', unicodeSharp: 'A♯', unicodeFlat: 'B♭' },
-  { toneId: 11, sharpName: 'B', flatName: 'B', unicodeSharp: 'B', unicodeFlat: 'B' },
-]
-
-export function getEnharmonicGroup(toneId: number): EnharmonicGroup {
-  const normalized = ((toneId % 12) + 12) % 12
-  return ENHARMONIC_GROUPS[normalized]
-}
-
-export function areEnharmonicEquivalent(noteA: number, noteB: number): boolean {
-  return ((noteA % 12) + 12) % 12 === ((noteB % 12) + 12) % 12
-}
-
-export function normalizeNoteName(noteStr: string): string {
-  const toneId = noteFromString(noteStr)
-  if (toneId === null) return noteStr.trim().toUpperCase()
-  const group = getEnharmonicGroup(toneId)
-  if (noteStr.includes('b') || noteStr.includes('♭')) {
-    return group.flatName
-  }
-  return group.sharpName
-}
-
-export function getNoteNameWithEnharmonicPreference(
-  toneId: number,
-  contextKey: number | null = null,
-  preferSharp: boolean = true,
-  useUnicode: boolean = false
-): string {
-  const normalized = ((toneId % 12) + 12) % 12
-  const group = ENHARMONIC_GROUPS[normalized]
-
-  if (contextKey !== null) {
-    const keyNormalized = ((contextKey % 12) + 12) % 12
-    const keyGroup = ENHARMONIC_GROUPS[keyNormalized]
-    const keyName = keyGroup.sharpName
-    const hasSharpInKey = keyName.includes('#') || ['G', 'D', 'A', 'E', 'B', 'F#', 'C#'].includes(keyName)
-    const preferSharpForContext = !hasSharpInKey && ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'].includes(keyName)
-      ? false
-      : true
-
-    if (useUnicode) {
-      return preferSharpForContext ? group.unicodeSharp : group.unicodeFlat
-    }
-    return preferSharpForContext ? group.sharpName : group.flatName
-  }
-
-  if (useUnicode) {
-    return preferSharp ? group.unicodeSharp : group.unicodeFlat
-  }
-  return preferSharp ? group.sharpName : group.flatName
-}
-
-// ==================== 和声功能枚举 (Function) ====================
 export enum ChordFunction {
   I = 'I',
   II = 'II',
@@ -226,353 +56,112 @@ export enum ChordFunction {
   Dim = 'Dim',
 }
 
-export const FUNCTION_DISPLAY_NAMES: Record<ChordFunction, string> = {
-  [ChordFunction.I]: 'I',
-  [ChordFunction.II]: 'II',
-  [ChordFunction.III]: 'III',
-  [ChordFunction.IV]: 'IV',
-  [ChordFunction.IVm]: 'IVm',
-  [ChordFunction.V]: 'V',
-  [ChordFunction.Vdim]: 'Vdim',
-  [ChordFunction.VI]: 'VI',
-  [ChordFunction.VII]: 'VII',
-  [ChordFunction.NRD]: 'NRD',
-  [ChordFunction.Dim]: 'Dim',
-}
+// 用「const 对象 + 联合类型」表达字符串枚举语义：
+// 运行时行为与 string enum 一致（成员值即字面量，无反向映射），
+// 但类型上允许直接使用字面量，便于跨模块传递与序列化。
+export const ChordToken = {
+  A: 'A',
+  B: 'B',
+  C: 'C',
+  D: 'D',
+  E: 'E',
+  F: 'F',
+  G: 'G',
+  FLAT: 'FLAT',
+  SHARP: 'SHARP',
+  SLASH: 'SLASH',
+  MAJOR: 'MAJOR',
+  MINOR: 'MINOR',
+  DIMINISHED: 'DIMINISHED',
+  AUGMENTED: 'AUGMENTED',
+  SUS2: 'SUS2',
+  SUS4: 'SUS4',
+  ADD9: 'ADD9',
+  SIX: 'SIX',
+  SEVEN: 'SEVEN',
+  NINE: 'NINE',
+  ELEVEN: 'ELEVEN',
+  THIRTEEN: 'THIRTEEN',
+  FLAT_FIVE: 'FLAT_FIVE',
+  SHARP_FIVE: 'SHARP_FIVE',
+  FLAT_SIX: 'FLAT_SIX',
+  FLAT_NINE: 'FLAT_NINE',
+  SHARP_NINE: 'SHARP_NINE',
+  SHARP_ELEVEN: 'SHARP_ELEVEN',
+  FLAT_THIRTEEN: 'FLAT_THIRTEEN',
+  ALT: 'ALT',
+} as const
+export type ChordToken = (typeof ChordToken)[keyof typeof ChordToken]
 
-export const FUNCTION_CHINESE_NAMES: Record<ChordFunction, string> = {
-  [ChordFunction.I]: 'I级',
-  [ChordFunction.II]: 'II级',
-  [ChordFunction.III]: 'III级',
-  [ChordFunction.IV]: 'IV级',
-  [ChordFunction.IVm]: 'IVm级',
-  [ChordFunction.V]: 'V级',
-  [ChordFunction.Vdim]: 'Vdim级',
-  [ChordFunction.VI]: 'VI级',
-  [ChordFunction.VII]: 'VII级',
-  [ChordFunction.NRD]: '非调内',
-  [ChordFunction.Dim]: '减和弦',
-}
+// 用「const 对象 + 联合类型」表达字符串枚举语义：
+// 运行时行为与 string enum 一致（成员值即字面量，无反向映射），
+// 但类型上允许直接使用字面量，便于跨模块传递与序列化。
+export const ChordType = {
+  majorTriad: 'majorTriad',
+  minorTriad: 'minorTriad',
+  diminishedTriad: 'diminishedTriad',
+  augmentedTriad: 'augmentedTriad',
+  susTwoTriad: 'susTwoTriad',
+  susFourTriad: 'susFourTriad',
+  addNine: 'addNine',
+  minorAddNine: 'minorAddNine',
+  diminished: 'diminished',
+  diminishedMajorSeven: 'diminishedMajorSeven',
+  dominantNine: 'dominantNine',
+  dominantNineFlatThirteen: 'dominantNineFlatThirteen',
+  dominantNineSharpEleven: 'dominantNineSharpEleven',
+  dominantSeven: 'dominantSeven',
+  dominantSevenAlt: 'dominantSevenAlt',
+  dominantSevenFlatFive: 'dominantSevenFlatFive',
+  dominantSevenFlatNine: 'dominantSevenFlatNine',
+  dominantSevenFlatNineFlatThirteen: 'dominantSevenFlatNineFlatThirteen',
+  dominantSevenFlatFiveFlatNine: 'dominantSevenFlatFiveFlatNine',
+  dominantSevenFlatFiveSharpNine: 'dominantSevenFlatFiveSharpNine',
+  dominantSevenSharpFive: 'dominantSevenSharpFive',
+  dominantSevenSharpNine: 'dominantSevenSharpNine',
+  dominantSevenFlatThirteen: 'dominantSevenFlatThirteen',
+  dominantSevenSharpEleven: 'dominantSevenSharpEleven',
+  dominantSevenSharpFiveFlatNine: 'dominantSevenSharpFiveFlatNine',
+  dominantSevenSharpFiveSharpNine: 'dominantSevenSharpFiveSharpNine',
+  dominantThirteen: 'dominantThirteen',
+  dominantThirteenFlatNine: 'dominantThirteenFlatNine',
+  dominantThirteenSharpNine: 'dominantThirteenSharpNine',
+  dominantThirteenSharpEleven: 'dominantThirteenSharpEleven',
+  majorNine: 'majorNine',
+  majorNineSharpEleven: 'majorNineSharpEleven',
+  majorNineSharpFive: 'majorNineSharpFive',
+  majorNineFlatSix: 'majorNineFlatSix',
+  majorSeven: 'majorSeven',
+  majorSevenSharpEleven: 'majorSevenSharpEleven',
+  majorSevenSharpFive: 'majorSevenSharpFive',
+  majorSevenFlatSix: 'majorSevenFlatSix',
+  majorSevenSharpNine: 'majorSevenSharpNine',
+  majorThirteen: 'majorThirteen',
+  majorThirteenSharpEleven: 'majorThirteenSharpEleven',
+  majorThirteenSharpFive: 'majorThirteenSharpFive',
+  minorEleven: 'minorEleven',
+  minorMajorNine: 'minorMajorNine',
+  minorMajorSeven: 'minorMajorSeven',
+  minorMajorThirteen: 'minorMajorThirteen',
+  minorNine: 'minorNine',
+  minorSeven: 'minorSeven',
+  minorSevenFlatFive: 'minorSevenFlatFive',
+  minorSevenFlatFiveNatNine: 'minorSevenFlatFiveNatNine',
+  minorSevenFlatSix: 'minorSevenFlatSix',
+  minorSix: 'minorSix',
+  minorSixNine: 'minorSixNine',
+  minorThirteen: 'minorThirteen',
+  nineSusFour: 'nineSusFour',
+  sevenSusFour: 'sevenSusFour',
+  sevenSusFourFlatNine: 'sevenSusFourFlatNine',
+  six: 'six',
+  sixNine: 'sixNine',
+  susFourFlatNine: 'susFourFlatNine',
+  thirteenSusFour: 'thirteenSusFour',
+  thirteenSusFourFlatNine: 'thirteenSusFourFlatNine',
+} as const
+export type ChordType = (typeof ChordType)[keyof typeof ChordType]
 
-// ==================== ChordToken 枚举 ====================
-export enum ChordToken {
-  A = 'A',
-  B = 'B',
-  C = 'C',
-  D = 'D',
-  E = 'E',
-  F = 'F',
-  G = 'G',
-  FLAT = 'FLAT',
-  SHARP = 'SHARP',
-  SLASH = 'SLASH',
-  MAJOR = 'MAJOR',
-  MINOR = 'MINOR',
-  DIMINISHED = 'DIMINISHED',
-  AUGMENTED = 'AUGMENTED',
-  SUS2 = 'SUS2',
-  SUS4 = 'SUS4',
-  ADD9 = 'ADD9',
-  SIX = 'SIX',
-  SEVEN = 'SEVEN',
-  NINE = 'NINE',
-  ELEVEN = 'ELEVEN',
-  THIRTEEN = 'THIRTEEN',
-  FLAT_FIVE = 'FLAT_FIVE',
-  SHARP_FIVE = 'SHARP_FIVE',
-  FLAT_SIX = 'FLAT_SIX',
-  FLAT_NINE = 'FLAT_NINE',
-  SHARP_NINE = 'SHARP_NINE',
-  SHARP_ELEVEN = 'SHARP_ELEVEN',
-  FLAT_THIRTEEN = 'FLAT_THIRTEEN',
-  ALT = 'ALT',
-}
-
-export const ROOT_NOTE_TOKENS: ChordToken[] = [
-  ChordToken.A, ChordToken.B, ChordToken.C, ChordToken.D, ChordToken.E, ChordToken.F, ChordToken.G
-]
-
-export const ACCIDENTAL_TOKENS: ChordToken[] = [ChordToken.FLAT, ChordToken.SHARP]
-
-export function getChordTokenDisplayString(token: ChordToken): string {
-  const displayMap: Record<ChordToken, string> = {
-    [ChordToken.A]: 'A',
-    [ChordToken.B]: 'B',
-    [ChordToken.C]: 'C',
-    [ChordToken.D]: 'D',
-    [ChordToken.E]: 'E',
-    [ChordToken.F]: 'F',
-    [ChordToken.G]: 'G',
-    [ChordToken.FLAT]: 'b',
-    [ChordToken.SHARP]: '#',
-    [ChordToken.SLASH]: '/',
-    [ChordToken.MAJOR]: 'Maj',
-    [ChordToken.MINOR]: 'm',
-    [ChordToken.DIMINISHED]: 'dim',
-    [ChordToken.AUGMENTED]: 'aug',
-    [ChordToken.SUS2]: 'sus2',
-    [ChordToken.SUS4]: 'sus4',
-    [ChordToken.ADD9]: 'add9',
-    [ChordToken.SIX]: '6',
-    [ChordToken.SEVEN]: '7',
-    [ChordToken.NINE]: '9',
-    [ChordToken.ELEVEN]: '11',
-    [ChordToken.THIRTEEN]: '13',
-    [ChordToken.FLAT_FIVE]: 'b5',
-    [ChordToken.SHARP_FIVE]: '#5',
-    [ChordToken.FLAT_SIX]: 'b6',
-    [ChordToken.FLAT_NINE]: 'b9',
-    [ChordToken.SHARP_NINE]: '#9',
-    [ChordToken.SHARP_ELEVEN]: '#11',
-    [ChordToken.FLAT_THIRTEEN]: 'b13',
-    [ChordToken.ALT]: 'alt',
-  }
-  return displayMap[token] ?? ''
-}
-
-export function getChordTokenUnicodeDisplayString(token: ChordToken): string {
-  const display = getChordTokenDisplayString(token)
-  return display
-    .replace(/b/g, '♭')
-    .replace(/#/g, '♯')
-    .replace(/Maj/g, 'Δ')
-    .replace(/dim7/g, '°7')
-    .replace(/dim/g, '°')
-    .replace(/aug/g, '+')
-}
-
-export function isRootToken(token: ChordToken): boolean {
-  return ROOT_NOTE_TOKENS.includes(token)
-}
-
-// ==================== 和弦类型枚举 (ChordType) ====================
-export enum ChordType {
-  majorTriad = 'majorTriad',
-  minorTriad = 'minorTriad',
-  diminishedTriad = 'diminishedTriad',
-  augmentedTriad = 'augmentedTriad',
-  susTwoTriad = 'susTwoTriad',
-  susFourTriad = 'susFourTriad',
-  addNine = 'addNine',
-  minorAddNine = 'minorAddNine',
-  diminished = 'diminished',
-  diminishedMajorSeven = 'diminishedMajorSeven',
-  dominantNine = 'dominantNine',
-  dominantNineFlatThirteen = 'dominantNineFlatThirteen',
-  dominantNineSharpEleven = 'dominantNineSharpEleven',
-  dominantSeven = 'dominantSeven',
-  dominantSevenAlt = 'dominantSevenAlt',
-  dominantSevenFlatFive = 'dominantSevenFlatFive',
-  dominantSevenFlatNine = 'dominantSevenFlatNine',
-  dominantSevenFlatNineFlatThirteen = 'dominantSevenFlatNineFlatThirteen',
-  dominantSevenFlatFiveFlatNine = 'dominantSevenFlatFiveFlatNine',
-  dominantSevenFlatFiveSharpNine = 'dominantSevenFlatFiveSharpNine',
-  dominantSevenSharpFive = 'dominantSevenSharpFive',
-  dominantSevenSharpNine = 'dominantSevenSharpNine',
-  dominantSevenFlatThirteen = 'dominantSevenFlatThirteen',
-  dominantSevenSharpEleven = 'dominantSevenSharpEleven',
-  dominantSevenSharpFiveFlatNine = 'dominantSevenSharpFiveFlatNine',
-  dominantSevenSharpFiveSharpNine = 'dominantSevenSharpFiveSharpNine',
-  dominantThirteen = 'dominantThirteen',
-  dominantThirteenFlatNine = 'dominantThirteenFlatNine',
-  dominantThirteenSharpNine = 'dominantThirteenSharpNine',
-  dominantThirteenSharpEleven = 'dominantThirteenSharpEleven',
-  majorNine = 'majorNine',
-  majorNineSharpEleven = 'majorNineSharpEleven',
-  majorNineSharpFive = 'majorNineSharpFive',
-  majorNineFlatSix = 'majorNineFlatSix',
-  majorSeven = 'majorSeven',
-  majorSevenSharpEleven = 'majorSevenSharpEleven',
-  majorSevenSharpFive = 'majorSevenSharpFive',
-  majorSevenFlatSix = 'majorSevenFlatSix',
-  majorSevenSharpNine = 'majorSevenSharpNine',
-  majorThirteen = 'majorThirteen',
-  majorThirteenSharpEleven = 'majorThirteenSharpEleven',
-  majorThirteenSharpFive = 'majorThirteenSharpFive',
-  minorEleven = 'minorEleven',
-  minorMajorNine = 'minorMajorNine',
-  minorMajorSeven = 'minorMajorSeven',
-  minorMajorThirteen = 'minorMajorThirteen',
-  minorNine = 'minorNine',
-  minorSeven = 'minorSeven',
-  minorSevenFlatFive = 'minorSevenFlatFive',
-  minorSevenFlatFiveNatNine = 'minorSevenFlatFiveNatNine',
-  minorSevenFlatSix = 'minorSevenFlatSix',
-  minorSix = 'minorSix',
-  minorSixNine = 'minorSixNine',
-  minorThirteen = 'minorThirteen',
-  nineSusFour = 'nineSusFour',
-  sevenSusFour = 'sevenSusFour',
-  sevenSusFourFlatNine = 'sevenSusFourFlatNine',
-  six = 'six',
-  sixNine = 'sixNine',
-  susFourFlatNine = 'susFourFlatNine',
-  thirteenSusFour = 'thirteenSusFour',
-  thirteenSusFourFlatNine = 'thirteenSusFourFlatNine',
-}
-
-export function chordTypeToTokens(chordType: ChordType): ChordToken[] {
-  const tokenMap: Record<ChordType, ChordToken[]> = {
-    [ChordType.majorTriad]: [],
-    [ChordType.minorTriad]: [ChordToken.MINOR],
-    [ChordType.diminishedTriad]: [ChordToken.DIMINISHED],
-    [ChordType.augmentedTriad]: [ChordToken.AUGMENTED],
-    [ChordType.susTwoTriad]: [ChordToken.SUS2],
-    [ChordType.susFourTriad]: [ChordToken.SUS4],
-    [ChordType.addNine]: [ChordToken.ADD9],
-    [ChordType.minorAddNine]: [ChordToken.MINOR, ChordToken.ADD9],
-    [ChordType.diminished]: [ChordToken.DIMINISHED, ChordToken.SEVEN],
-    [ChordType.diminishedMajorSeven]: [ChordToken.DIMINISHED, ChordToken.MAJOR, ChordToken.SEVEN],
-    [ChordType.dominantNine]: [ChordToken.NINE],
-    [ChordType.dominantNineFlatThirteen]: [ChordToken.NINE, ChordToken.FLAT_THIRTEEN],
-    [ChordType.dominantNineSharpEleven]: [ChordToken.NINE, ChordToken.SHARP_ELEVEN],
-    [ChordType.dominantSeven]: [ChordToken.SEVEN],
-    [ChordType.dominantSevenAlt]: [ChordToken.SEVEN, ChordToken.ALT],
-    [ChordType.dominantSevenFlatFive]: [ChordToken.SEVEN, ChordToken.FLAT_FIVE],
-    [ChordType.dominantSevenFlatNine]: [ChordToken.SEVEN, ChordToken.FLAT_NINE],
-    [ChordType.dominantSevenFlatNineFlatThirteen]: [ChordToken.SEVEN, ChordToken.FLAT_NINE, ChordToken.FLAT_THIRTEEN],
-    [ChordType.dominantSevenFlatFiveFlatNine]: [ChordToken.SEVEN, ChordToken.FLAT_FIVE, ChordToken.FLAT_NINE],
-    [ChordType.dominantSevenFlatFiveSharpNine]: [ChordToken.SEVEN, ChordToken.FLAT_FIVE, ChordToken.SHARP_NINE],
-    [ChordType.dominantSevenSharpFive]: [ChordToken.SEVEN, ChordToken.SHARP_FIVE],
-    [ChordType.dominantSevenSharpNine]: [ChordToken.SEVEN, ChordToken.SHARP_NINE],
-    [ChordType.dominantSevenFlatThirteen]: [ChordToken.SEVEN, ChordToken.FLAT_THIRTEEN],
-    [ChordType.dominantSevenSharpEleven]: [ChordToken.SEVEN, ChordToken.SHARP_ELEVEN],
-    [ChordType.dominantSevenSharpFiveFlatNine]: [ChordToken.SEVEN, ChordToken.SHARP_FIVE, ChordToken.FLAT_NINE],
-    [ChordType.dominantSevenSharpFiveSharpNine]: [ChordToken.SEVEN, ChordToken.SHARP_FIVE, ChordToken.SHARP_NINE],
-    [ChordType.dominantThirteen]: [ChordToken.THIRTEEN],
-    [ChordType.dominantThirteenFlatNine]: [ChordToken.THIRTEEN, ChordToken.FLAT_NINE],
-    [ChordType.dominantThirteenSharpNine]: [ChordToken.THIRTEEN, ChordToken.SHARP_NINE],
-    [ChordType.dominantThirteenSharpEleven]: [ChordToken.THIRTEEN, ChordToken.SHARP_ELEVEN],
-    [ChordType.majorNine]: [ChordToken.MAJOR, ChordToken.NINE],
-    [ChordType.majorNineSharpEleven]: [ChordToken.MAJOR, ChordToken.NINE, ChordToken.SHARP_ELEVEN],
-    [ChordType.majorNineSharpFive]: [ChordToken.MAJOR, ChordToken.NINE, ChordToken.SHARP_FIVE],
-    [ChordType.majorNineFlatSix]: [ChordToken.MAJOR, ChordToken.NINE, ChordToken.FLAT_SIX],
-    [ChordType.majorSeven]: [ChordToken.MAJOR, ChordToken.SEVEN],
-    [ChordType.majorSevenSharpEleven]: [ChordToken.MAJOR, ChordToken.SEVEN, ChordToken.SHARP_ELEVEN],
-    [ChordType.majorSevenSharpFive]: [ChordToken.MAJOR, ChordToken.SEVEN, ChordToken.SHARP_FIVE],
-    [ChordType.majorSevenFlatSix]: [ChordToken.MAJOR, ChordToken.SEVEN, ChordToken.FLAT_SIX],
-    [ChordType.majorSevenSharpNine]: [ChordToken.MAJOR, ChordToken.SEVEN, ChordToken.SHARP_NINE],
-    [ChordType.majorThirteen]: [ChordToken.MAJOR, ChordToken.THIRTEEN],
-    [ChordType.majorThirteenSharpEleven]: [ChordToken.MAJOR, ChordToken.THIRTEEN, ChordToken.SHARP_ELEVEN],
-    [ChordType.majorThirteenSharpFive]: [ChordToken.MAJOR, ChordToken.THIRTEEN, ChordToken.SHARP_FIVE],
-    [ChordType.minorEleven]: [ChordToken.MINOR, ChordToken.ELEVEN],
-    [ChordType.minorMajorNine]: [ChordToken.MINOR, ChordToken.MAJOR, ChordToken.NINE],
-    [ChordType.minorMajorSeven]: [ChordToken.MINOR, ChordToken.MAJOR, ChordToken.SEVEN],
-    [ChordType.minorMajorThirteen]: [ChordToken.MINOR, ChordToken.MAJOR, ChordToken.THIRTEEN],
-    [ChordType.minorNine]: [ChordToken.MINOR, ChordToken.NINE],
-    [ChordType.minorSeven]: [ChordToken.MINOR, ChordToken.SEVEN],
-    [ChordType.minorSevenFlatFive]: [ChordToken.MINOR, ChordToken.SEVEN, ChordToken.FLAT_FIVE],
-    [ChordType.minorSevenFlatFiveNatNine]: [ChordToken.MINOR, ChordToken.SEVEN, ChordToken.FLAT_FIVE, ChordToken.NINE],
-    [ChordType.minorSevenFlatSix]: [ChordToken.MINOR, ChordToken.SEVEN, ChordToken.FLAT_SIX],
-    [ChordType.minorSix]: [ChordToken.MINOR, ChordToken.SIX],
-    [ChordType.minorSixNine]: [ChordToken.MINOR, ChordToken.SIX, ChordToken.NINE],
-    [ChordType.minorThirteen]: [ChordToken.MINOR, ChordToken.THIRTEEN],
-    [ChordType.nineSusFour]: [ChordToken.NINE, ChordToken.SUS4],
-    [ChordType.sevenSusFour]: [ChordToken.SEVEN, ChordToken.SUS4],
-    [ChordType.sevenSusFourFlatNine]: [ChordToken.SEVEN, ChordToken.SUS4, ChordToken.FLAT_NINE],
-    [ChordType.six]: [ChordToken.SIX],
-    [ChordType.sixNine]: [ChordToken.SIX, ChordToken.NINE],
-    [ChordType.susFourFlatNine]: [ChordToken.SUS4, ChordToken.FLAT_NINE],
-    [ChordType.thirteenSusFour]: [ChordToken.THIRTEEN, ChordToken.SUS4],
-    [ChordType.thirteenSusFourFlatNine]: [ChordToken.THIRTEEN, ChordToken.SUS4, ChordToken.FLAT_NINE],
-  }
-  return tokenMap[chordType] ?? []
-}
-
-const chordTypeTokenMap: Map<string, ChordType> = new Map(
-  Object.values(ChordType).map(t => {
-    const tokens = chordTypeToTokens(t as ChordType)
-    return [tokens.map(tk => tk).join(','), t as ChordType]
-  })
-)
-
-export function chordTypeFromTokens(tokens: ChordToken[]): ChordType | null {
-  const tokenStr = tokens.map(t => t).join(',')
-  return chordTypeTokenMap.get(tokenStr) ?? null
-}
-
-export function getChordTypeDisplayString(chordType: ChordType, minorSymbol: string = 'm', minor7flat5Symbol: string = 'ø7'): string {
-  let display = chordType.toString()
-    .replace('majorTriad', '')
-    .replace('minorTriad', 'minor_symbol')
-    .replace('diminishedTriad', 'dim')
-    .replace('augmentedTriad', 'aug')
-    .replace('susTwoTriad', 'sus2')
-    .replace('susFourTriad', 'sus4')
-    .replace('addNine', 'add9')
-    .replace('minorAddNine', 'minor_symboladd9')
-    .replace('diminished', 'dim7')
-    .replace('diminishedMajorSeven', 'dimMaj7')
-    .replace('dominantNine', '9')
-    .replace('dominantNineFlatThirteen', '9b13')
-    .replace('dominantNineSharpEleven', '9#11')
-    .replace('dominantSeven', '7')
-    .replace('dominantSevenAlt', '7alt')
-    .replace('dominantSevenFlatFive', '7b5')
-    .replace('dominantSevenFlatNine', '7b9')
-    .replace('dominantSevenFlatNineFlatThirteen', '7b9b13')
-    .replace('dominantSevenFlatFiveFlatNine', '7b5b9')
-    .replace('dominantSevenFlatFiveSharpNine', '7b5#9')
-    .replace('dominantSevenSharpFive', '7#5')
-    .replace('dominantSevenSharpNine', '7#9')
-    .replace('dominantSevenFlatThirteen', '7b13')
-    .replace('dominantSevenSharpEleven', '7#11')
-    .replace('dominantSevenSharpFiveFlatNine', '7#5b9')
-    .replace('dominantSevenSharpFiveSharpNine', '7#5#9')
-    .replace('dominantThirteen', '13')
-    .replace('dominantThirteenFlatNine', '13b9')
-    .replace('dominantThirteenSharpNine', '13#9')
-    .replace('dominantThirteenSharpEleven', '13#11')
-    .replace('majorNine', 'Maj9')
-    .replace('majorNineSharpEleven', 'Maj9#11')
-    .replace('majorNineSharpFive', 'Maj9#5')
-    .replace('majorNineFlatSix', 'Maj9b6')
-    .replace('majorSeven', 'Maj7')
-    .replace('majorSevenSharpEleven', 'Maj7#11')
-    .replace('majorSevenSharpFive', 'Maj7#5')
-    .replace('majorSevenFlatSix', 'Maj7b6')
-    .replace('majorSevenSharpNine', 'Maj7#9')
-    .replace('majorThirteen', 'Maj13')
-    .replace('majorThirteenSharpEleven', 'Maj13#11')
-    .replace('majorThirteenSharpFive', 'Maj13#5')
-    .replace('minorEleven', 'minor_symbol11')
-    .replace('minorMajorNine', 'minor_symbolMaj9')
-    .replace('minorMajorSeven', 'minor_symbolMaj7')
-    .replace('minorMajorThirteen', 'minor_symbolMaj13')
-    .replace('minorNine', 'minor_symbol9')
-    .replace('minorSeven', 'minor_symbol7')
-    .replace('minorSevenFlatFive', 'minor_7_flat_5_symbol')
-    .replace('minorSevenFlatFiveNatNine', 'minor_symbol9b5')
-    .replace('minorSevenFlatSix', 'minor_symbol7b6')
-    .replace('minorSix', 'minor_symbol6')
-    .replace('minorSixNine', 'minor_symbol69')
-    .replace('minorThirteen', 'minor_symbol13')
-    .replace('nineSusFour', '9sus4')
-    .replace('sevenSusFour', '7sus4')
-    .replace('sevenSusFourFlatNine', '7sus4b9')
-    .replace('six', '6')
-    .replace('sixNine', '69')
-    .replace('susFourFlatNine', 'sus4b9')
-    .replace('thirteenSusFour', '13sus4')
-    .replace('thirteenSusFourFlatNine', '13sus4b9')
-  
-  display = display.replace(/minor_symbol/g, minorSymbol)
-  display = display.replace(/minor_7_flat_5_symbol/g, minor7flat5Symbol)
-  
-  return display
-}
-
-export function getChordTypeUnicodeDisplayString(chordType: ChordType): string {
-  return getChordTypeDisplayString(chordType, 'm', 'ø7')
-    .replace(/b/g, '♭')
-    .replace(/#/g, '♯')
-    .replace(/Maj/g, 'Δ')
-    .replace(/dim7/g, '°7')
-    .replace(/dim/g, '°')
-    .replace(/aug/g, '+')
-}
-
-// ==================== 可配置的和弦符号格式化 ====================
 export interface ChordSymbolConfig {
   minorSymbol: 'm' | '-' | 'min'
   minor7flat5Symbol: 'm7b5' | 'ø7' | 'half-dim'
@@ -581,122 +170,6 @@ export interface ChordSymbolConfig {
   useJazzNotation: boolean
 }
 
-export function formatChordWithConfig(
-  chordType: ChordType,
-  config: ChordSymbolConfig
-): string {
-  let display = getChordTypeDisplayString(chordType, config.minorSymbol, config.minor7flat5Symbol)
-  
-  // 处理 7b9 符号
-  if (config.dominant7flat9Symbol !== '7b9') {
-    display = display.replace(/7b9/g, config.dominant7flat9Symbol)
-  }
-  
-  // 应用 Unicode 转换
-  if (config.useUnicode) {
-    display = display
-      .replace(/b/g, '♭')
-      .replace(/#/g, '♯')
-    if (config.useJazzNotation) {
-      display = display
-        .replace(/Maj/g, 'Δ')
-        .replace(/dim7/g, '°7')
-        .replace(/dim/g, '°')
-        .replace(/aug/g, '+')
-    }
-  }
-  
-  return display
-}
-
-// 格式化完整和弦名称（包含根音）
-export function formatFullChordName(
-  rootNote: number,
-  chordType: ChordType,
-  slashRoot: number | null = null,
-  config: ChordSymbolConfig,
-  preferFlat: boolean = false
-): string {
-  const rootName = getNoteName(rootNote, preferFlat, config.useUnicode)
-  const typeDisplay = formatChordWithConfig(chordType, config)
-  
-  let result = rootName + typeDisplay
-  
-  if (slashRoot !== null) {
-    const slashName = getNoteName(slashRoot, preferFlat, config.useUnicode)
-    result += '/' + slashName
-  }
-  
-  return result
-}
-
-// ==================== 和弦音程定义 ====================
-export const CHORD_INTERVALS: Record<ChordType, number[]> = {
-  [ChordType.majorTriad]: [0, 4, 7],
-  [ChordType.minorTriad]: [0, 3, 7],
-  [ChordType.diminishedTriad]: [0, 3, 6],
-  [ChordType.augmentedTriad]: [0, 4, 8],
-  [ChordType.susTwoTriad]: [0, 2, 7],
-  [ChordType.susFourTriad]: [0, 5, 7],
-  [ChordType.addNine]: [0, 4, 7, 14],
-  [ChordType.minorAddNine]: [0, 3, 7, 14],
-  [ChordType.diminished]: [0, 3, 6, 9],
-  [ChordType.diminishedMajorSeven]: [0, 3, 6, 11],
-  [ChordType.dominantNine]: [0, 4, 7, 10, 14],
-  [ChordType.dominantNineFlatThirteen]: [0, 4, 7, 10, 14, 20],
-  [ChordType.dominantNineSharpEleven]: [0, 4, 7, 10, 14, 18],
-  [ChordType.dominantSeven]: [0, 4, 7, 10],
-  [ChordType.dominantSevenAlt]: [0, 4, 8, 10, 13, 15, 18, 21],
-  [ChordType.dominantSevenFlatFive]: [0, 4, 6, 10],
-  [ChordType.dominantSevenFlatNine]: [0, 4, 7, 10, 13],
-  [ChordType.dominantSevenFlatNineFlatThirteen]: [0, 4, 7, 10, 13, 20],
-  [ChordType.dominantSevenFlatFiveFlatNine]: [0, 4, 6, 10, 13],
-  [ChordType.dominantSevenFlatFiveSharpNine]: [0, 4, 6, 10, 15],
-  [ChordType.dominantSevenSharpFive]: [0, 4, 8, 10],
-  [ChordType.dominantSevenSharpNine]: [0, 4, 7, 10, 15],
-  [ChordType.dominantSevenFlatThirteen]: [0, 4, 7, 10, 20],
-  [ChordType.dominantSevenSharpEleven]: [0, 4, 7, 10, 18],
-  [ChordType.dominantSevenSharpFiveFlatNine]: [0, 4, 8, 10, 13],
-  [ChordType.dominantSevenSharpFiveSharpNine]: [0, 4, 8, 10, 15],
-  [ChordType.dominantThirteen]: [0, 4, 7, 10, 14, 21],
-  [ChordType.dominantThirteenFlatNine]: [0, 4, 7, 10, 13, 14, 21],
-  [ChordType.dominantThirteenSharpNine]: [0, 4, 7, 10, 15, 21],
-  [ChordType.dominantThirteenSharpEleven]: [0, 4, 7, 10, 14, 18, 21],
-  [ChordType.majorNine]: [0, 4, 7, 11, 14],
-  [ChordType.majorNineSharpEleven]: [0, 4, 7, 11, 14, 18],
-  [ChordType.majorNineSharpFive]: [0, 4, 8, 11, 14],
-  [ChordType.majorNineFlatSix]: [0, 4, 7, 11, 14, 20],
-  [ChordType.majorSeven]: [0, 4, 7, 11],
-  [ChordType.majorSevenSharpEleven]: [0, 4, 7, 11, 18],
-  [ChordType.majorSevenSharpFive]: [0, 4, 8, 11],
-  [ChordType.majorSevenFlatSix]: [0, 4, 7, 11, 20],
-  [ChordType.majorSevenSharpNine]: [0, 4, 7, 11, 15],
-  [ChordType.majorThirteen]: [0, 4, 7, 11, 14, 21],
-  [ChordType.majorThirteenSharpEleven]: [0, 4, 7, 11, 14, 18, 21],
-  [ChordType.majorThirteenSharpFive]: [0, 4, 8, 11, 14, 21],
-  [ChordType.minorEleven]: [0, 3, 7, 10, 14, 17],
-  [ChordType.minorMajorNine]: [0, 3, 7, 11, 14],
-  [ChordType.minorMajorSeven]: [0, 3, 7, 11],
-  [ChordType.minorMajorThirteen]: [0, 3, 7, 11, 14, 21],
-  [ChordType.minorNine]: [0, 3, 7, 10, 14],
-  [ChordType.minorSeven]: [0, 3, 7, 10],
-  [ChordType.minorSevenFlatFive]: [0, 3, 6, 10],
-  [ChordType.minorSevenFlatFiveNatNine]: [0, 3, 6, 10, 14],
-  [ChordType.minorSevenFlatSix]: [0, 3, 7, 10, 20],
-  [ChordType.minorSix]: [0, 3, 7, 9],
-  [ChordType.minorSixNine]: [0, 3, 7, 9, 14],
-  [ChordType.minorThirteen]: [0, 3, 7, 10, 14, 21],
-  [ChordType.nineSusFour]: [0, 5, 7, 10, 14],
-  [ChordType.sevenSusFour]: [0, 5, 7, 10],
-  [ChordType.sevenSusFourFlatNine]: [0, 5, 7, 10, 13],
-  [ChordType.six]: [0, 4, 7, 9],
-  [ChordType.sixNine]: [0, 4, 7, 9, 14],
-  [ChordType.susFourFlatNine]: [0, 5, 7, 13],
-  [ChordType.thirteenSusFour]: [0, 5, 7, 10, 14, 21],
-  [ChordType.thirteenSusFourFlatNine]: [0, 5, 7, 10, 13, 14, 21],
-}
-
-// ==================== 和弦类 ====================
 export interface ParsedChord {
   rootNote: number
   chordType: ChordType
@@ -706,296 +179,1429 @@ export interface ParsedChord {
   isNewChord: boolean
 }
 
-// ==================== ChordToken 解析器 ====================
-export class ChordTokenizer {
-  private static readonly ROOT_NOTE_PATTERN = /^[A-Ga-g]/
-  private static readonly ACCIDENTAL_PATTERN = /^[#♯b♭]/
-  private static readonly NUMBER_PATTERN = /^\d+/
-  
-  static tokenize(chordString: string): ChordToken[] {
-    const tokens: ChordToken[] = []
-    let remaining = chordString.trim()
-    
-    while (remaining.length > 0) {
-      const result = this.nextToken(remaining)
-      if (result.token) {
-        tokens.push(result.token)
-      }
-      remaining = result.remaining
-      if (!result.token && remaining.length > 0) {
-        remaining = remaining.slice(1)
-      }
-    }
-    
-    return tokens
-  }
-  
-  private static nextToken(str: string): { token: ChordToken | null; remaining: string } {
-    if (str.length === 0) {
-      return { token: null, remaining: '' }
-    }
-    
-    const firstChar = str[0].toUpperCase()
-    const firstTwoChars = str.slice(0, 2).toLowerCase()
-    const firstThreeChars = str.slice(0, 3).toLowerCase()
-    const firstFourChars = str.slice(0, 4).toLowerCase()
+export const NOTE_NAMES: Record<number, string> = {
+    [0]: 'C',
+    [1]: 'C#',
+    [2]: 'D',
+    [3]: 'D#',
+    [4]: 'E',
+    [5]: 'F',
+    [6]: 'F#',
+    [7]: 'G',
+    [8]: 'G#',
+    [9]: 'A',
+    [10]: 'A#',
+    [11]: 'B'
+};
 
-    if (firstThreeChars === 'b13' || firstThreeChars === '♭13') {
-      return { token: ChordToken.FLAT_THIRTEEN, remaining: str.slice(3) }
-    }
+export const NOTE_NAMES_FLAT: Record<number, string> = {
+    [0]: 'C',
+    [1]: 'Db',
+    [2]: 'D',
+    [3]: 'Eb',
+    [4]: 'E',
+    [5]: 'F',
+    [6]: 'Gb',
+    [7]: 'G',
+    [8]: 'Ab',
+    [9]: 'A',
+    [10]: 'Bb',
+    [11]: 'B'
+};
 
-    if (firstThreeChars === '#11' || firstThreeChars === '♯11') {
-      return { token: ChordToken.SHARP_ELEVEN, remaining: str.slice(3) }
-    }
+export const NOTE_UNICODE_NAMES: Record<number, string> = {
+    [0]: 'C',
+    [1]: 'C♯',
+    [2]: 'D',
+    [3]: 'D♯',
+    [4]: 'E',
+    [5]: 'F',
+    [6]: 'F♯',
+    [7]: 'G',
+    [8]: 'G♯',
+    [9]: 'A',
+    [10]: 'A♯',
+    [11]: 'B'
+};
 
-    if (firstTwoChars === '#9' || firstTwoChars === '♯9') {
-      return { token: ChordToken.SHARP_NINE, remaining: str.slice(2) }
-    }
+export const NOTE_UNICODE_NAMES_FLAT: Record<number, string> = {
+    [0]: 'C',
+    [1]: 'D♭',
+    [2]: 'D',
+    [3]: 'E♭',
+    [4]: 'E',
+    [5]: 'F',
+    [6]: 'G♭',
+    [7]: 'G',
+    [8]: 'A♭',
+    [9]: 'A',
+    [10]: 'B♭',
+    [11]: 'B'
+};
 
-    if (firstTwoChars === 'b9' || firstTwoChars === '♭9') {
-      return { token: ChordToken.FLAT_NINE, remaining: str.slice(2) }
-    }
-
-    if (firstTwoChars === 'b6' || firstTwoChars === '♭6') {
-      return { token: ChordToken.FLAT_SIX, remaining: str.slice(2) }
-    }
-
-    if (firstTwoChars === '#5' || firstTwoChars === '♯5') {
-      return { token: ChordToken.SHARP_FIVE, remaining: str.slice(2) }
-    }
-
-    if (firstTwoChars === 'b5' || firstTwoChars === '♭5') {
-      return { token: ChordToken.FLAT_FIVE, remaining: str.slice(2) }
-    }
-
-    if (firstChar === 'b' || firstChar === '♭') {
-      return { token: ChordToken.FLAT, remaining: str.slice(1) }
-    }
-
-    if (firstChar === '#' || firstChar === '♯') {
-      return { token: ChordToken.SHARP, remaining: str.slice(1) }
-    }
-
-    if (ROOT_NOTE_TOKENS.map(t => getChordTokenDisplayString(t)).includes(firstChar)) {
-      const token = Object.values(ChordToken).find(t => getChordTokenDisplayString(t) === firstChar)
-      if (token) {
-        return { token, remaining: str.slice(1) }
-      }
-    }
-
-    if (firstChar === '/') {
-      return { token: ChordToken.SLASH, remaining: str.slice(1) }
-    }
-
-    if (firstFourChars === 'maj7' || firstFourChars === 'maj9' || firstFourChars === 'maj13' || firstFourChars === 'majΔ') {
-      return { token: ChordToken.MAJOR, remaining: str.slice(3) }
-    }
-
-    if (firstThreeChars === 'maj' || firstThreeChars === 'Δ') {
-      return { token: ChordToken.MAJOR, remaining: str.slice(3) }
-    }
-
-    if (firstThreeChars === 'min') {
-      return { token: ChordToken.MINOR, remaining: str.slice(3) }
-    }
-
-    if (firstChar === 'M' && str.length > 1 && /^[0-9]/.test(str.slice(1))) {
-      return { token: ChordToken.MAJOR, remaining: str.slice(1) }
-    }
-
-    if (firstChar === 'M' && str.length > 1 && !['a', 'j'].includes(str[1].toLowerCase())) {
-      return { token: ChordToken.MINOR, remaining: str.slice(1) }
-    }
-
-    if (firstChar === 'M' && str.length === 1) {
-      return { token: ChordToken.MAJOR, remaining: str.slice(1) }
-    }
-
-    if (firstChar === '-' || firstChar === '−') {
-      return { token: ChordToken.MINOR, remaining: str.slice(1) }
-    }
-
-    if (firstFourChars === 'dim7' || firstFourChars === '°7') {
-      return { token: ChordToken.DIMINISHED, remaining: str.slice(3) }
-    }
-
-    if (firstThreeChars === 'dim' || firstChar === '°') {
-      return { token: ChordToken.DIMINISHED, remaining: str.slice(firstChar === '°' ? 1 : 3) }
-    }
-
-    if (firstThreeChars === 'aug' || firstChar === '+') {
-      return { token: ChordToken.AUGMENTED, remaining: str.slice(firstChar === '+' ? 1 : 3) }
-    }
-
-    if (firstFourChars === 'sus2') {
-      return { token: ChordToken.SUS2, remaining: str.slice(4) }
-    }
-
-    if (firstFourChars === 'sus4' || firstThreeChars === 'sus') {
-      return { token: ChordToken.SUS4, remaining: str.slice(firstThreeChars === 'sus' ? 3 : 4) }
-    }
-
-    if (firstFourChars === 'add9') {
-      return { token: ChordToken.ADD9, remaining: str.slice(4) }
-    }
-
-    if (firstThreeChars === 'alt') {
-      return { token: ChordToken.ALT, remaining: str.slice(3) }
-    }
-    
-    if (firstTwoChars === '13') {
-      return { token: ChordToken.THIRTEEN, remaining: str.slice(2) }
-    }
-    
-    if (firstTwoChars === '11') {
-      return { token: ChordToken.ELEVEN, remaining: str.slice(2) }
-    }
-    
-    if (firstChar === '9') {
-      return { token: ChordToken.NINE, remaining: str.slice(1) }
-    }
-    
-    if (firstChar === '7') {
-      return { token: ChordToken.SEVEN, remaining: str.slice(1) }
-    }
-    
-    if (firstChar === '6') {
-      return { token: ChordToken.SIX, remaining: str.slice(1) }
-    }
-    
-    if (firstTwoChars === 'ø7') {
-      return { token: ChordToken.MINOR, remaining: str.slice(2) }
-    }
-    if (firstChar === 'ø') {
-      return { token: ChordToken.MINOR, remaining: str.slice(1) }
-    }
-    
-    return { token: null, remaining: str.slice(1) }
-  }
+export function noteFromToneId(toneId: number, _preferFlat: boolean = false): number {
+    const normalizedToneId = (toneId % 12 + 12) % 12;
+    return normalizedToneId;
 }
 
-// ==================== 和弦解析器 ====================
-export class ChordParser {
-  static parse(chordString: string): ParsedChord | null {
-    const tokens = ChordTokenizer.tokenize(chordString)
-    if (tokens.length === 0) {
-      return null
+export function getNoteName(toneId: number, preferFlat: boolean = false, useUnicode: boolean = false): string {
+    const names = preferFlat ? useUnicode ? NOTE_UNICODE_NAMES_FLAT : NOTE_NAMES_FLAT : useUnicode ? NOTE_UNICODE_NAMES : NOTE_NAMES;
+    return names[toneId] ?? 'C';
+}
+
+export function noteFromString(noteStr: string): number | null {
+    const normalized = noteStr.trim().toLowerCase();
+    const noteMap: Record<string, number> = {
+        'c': 0,
+        'c#': 1,
+        'c♯': 1,
+        'db': 1,
+        'd♭': 1,
+        'd': 2,
+        'd#': 3,
+        'd♯': 3,
+        'eb': 3,
+        'e♭': 3,
+        'e': 4,
+        'f': 5,
+        'f#': 6,
+        'f♯': 6,
+        'gb': 6,
+        'g♭': 6,
+        'g': 7,
+        'g#': 8,
+        'g♯': 8,
+        'ab': 8,
+        'a♭': 8,
+        'a': 9,
+        'a#': 10,
+        'a♯': 10,
+        'bb': 10,
+        'b♭': 10,
+        'b': 11
+    };
+    return noteMap[normalized] ?? null;
+}
+
+export const ENHARMONIC_GROUPS: EnharmonicGroup[] = [
+    {
+        toneId: 0,
+        sharpName: 'C',
+        flatName: 'C',
+        unicodeSharp: 'C',
+        unicodeFlat: 'C'
+    },
+    {
+        toneId: 1,
+        sharpName: 'C#',
+        flatName: 'Db',
+        unicodeSharp: 'C♯',
+        unicodeFlat: 'D♭'
+    },
+    {
+        toneId: 2,
+        sharpName: 'D',
+        flatName: 'D',
+        unicodeSharp: 'D',
+        unicodeFlat: 'D'
+    },
+    {
+        toneId: 3,
+        sharpName: 'D#',
+        flatName: 'Eb',
+        unicodeSharp: 'D♯',
+        unicodeFlat: 'E♭'
+    },
+    {
+        toneId: 4,
+        sharpName: 'E',
+        flatName: 'E',
+        unicodeSharp: 'E',
+        unicodeFlat: 'E'
+    },
+    {
+        toneId: 5,
+        sharpName: 'F',
+        flatName: 'F',
+        unicodeSharp: 'F',
+        unicodeFlat: 'F'
+    },
+    {
+        toneId: 6,
+        sharpName: 'F#',
+        flatName: 'Gb',
+        unicodeSharp: 'F♯',
+        unicodeFlat: 'G♭'
+    },
+    {
+        toneId: 7,
+        sharpName: 'G',
+        flatName: 'G',
+        unicodeSharp: 'G',
+        unicodeFlat: 'G'
+    },
+    {
+        toneId: 8,
+        sharpName: 'G#',
+        flatName: 'Ab',
+        unicodeSharp: 'G♯',
+        unicodeFlat: 'A♭'
+    },
+    {
+        toneId: 9,
+        sharpName: 'A',
+        flatName: 'A',
+        unicodeSharp: 'A',
+        unicodeFlat: 'A'
+    },
+    {
+        toneId: 10,
+        sharpName: 'A#',
+        flatName: 'Bb',
+        unicodeSharp: 'A♯',
+        unicodeFlat: 'B♭'
+    },
+    {
+        toneId: 11,
+        sharpName: 'B',
+        flatName: 'B',
+        unicodeSharp: 'B',
+        unicodeFlat: 'B'
     }
-    
-    let rootNote: number | null = null
-    let slashRootNote: number | null = null
-    let chordTypeTokens: ChordToken[] = []
-    let hasSlash = false
-    let slashNoteTokens: ChordToken[] = []
-    
-    let i = 0
-    
-    if (isRootToken(tokens[0])) {
-      const rootToken = tokens[0]
-      rootNote = this.tokenToNote(rootToken)
-      i++
-      
-      if (i < tokens.length && ACCIDENTAL_TOKENS.includes(tokens[i])) {
-        const accidental = tokens[i]
-        rootNote = this.applyAccidental(rootNote, accidental)
-        i++
-      }
+];
+
+export function getEnharmonicGroup(toneId: number): EnharmonicGroup {
+    const normalized = (toneId % 12 + 12) % 12;
+    return ENHARMONIC_GROUPS[normalized];
+}
+
+export function areEnharmonicEquivalent(noteA: number, noteB: number): boolean {
+    return (noteA % 12 + 12) % 12 === (noteB % 12 + 12) % 12;
+}
+
+export function normalizeNoteName(noteStr: string): string {
+    const toneId = noteFromString(noteStr);
+    if (toneId === null) return noteStr.trim().toUpperCase();
+    const group = getEnharmonicGroup(toneId);
+    if (noteStr.includes('b') || noteStr.includes('♭')) {
+        return group.flatName;
     }
-    
-    while (i < tokens.length && !hasSlash) {
-      if (tokens[i] === ChordToken.SLASH) {
-        hasSlash = true
-        i++
-        break
-      }
-      chordTypeTokens.push(tokens[i])
-      i++
-    }
-    
-    if (hasSlash && i < tokens.length) {
-      if (isRootToken(tokens[i])) {
-        slashRootNote = this.tokenToNote(tokens[i])
-        i++
+    return group.sharpName;
+}
+
+export function getNoteNameWithEnharmonicPreference(
+  toneId: number,
+  contextKey: number | null = null,
+  preferSharp: boolean = true,
+  useUnicode: boolean = false
+): string {
+    const normalized = (toneId % 12 + 12) % 12;
+    const group = ENHARMONIC_GROUPS[normalized];
+    if (contextKey !== null) {
+        const keyNormalized = (contextKey % 12 + 12) % 12;
+        const keyGroup = ENHARMONIC_GROUPS[keyNormalized];
+        const keyName = keyGroup.sharpName;
         
-        if (i < tokens.length && ACCIDENTAL_TOKENS.includes(tokens[i])) {
-          slashRootNote = this.applyAccidental(slashRootNote!, tokens[i])
+        
+        // 必须同时看升/降两种拼写：keyGroup.sharpName 永远不含 'Bb'/'Eb' 等，
+        // 原实现只拿 sharpName 去匹配降号调列表，导致除 F 调外所有降号调都被判成升号调。
+        const SHARP_KEY_TONICS = [
+            'G',
+            'D',
+            'A',
+            'E',
+            'B',
+            'F#',
+            'C#'
+        ];
+        const FLAT_KEY_TONICS = [
+            'F',
+            'Bb',
+            'Eb',
+            'Ab',
+            'Db',
+            'Gb',
+            'Cb'
+        ];
+        const preferSharpForContext = FLAT_KEY_TONICS.includes(keyGroup.flatName) && !SHARP_KEY_TONICS.includes(keyName) ? false : true;
+        if (useUnicode) {
+            return preferSharpForContext ? group.unicodeSharp : group.unicodeFlat;
         }
-      }
+        return preferSharpForContext ? group.sharpName : group.flatName;
     }
-    
-    if (rootNote === null) {
-      return null
+    if (useUnicode) {
+        return preferSharp ? group.unicodeSharp : group.unicodeFlat;
     }
-    
-    const chordType = this.inferChordType(chordTypeTokens)
-    
-    return {
-      rootNote,
-      chordType: chordType ?? ChordType.majorTriad,
-      slashRootNote,
-      function: null,
-      scaleTypeOverride: null,
-      isNewChord: false,
-    }
-  }
-  
-  private static tokenToNote(token: ChordToken): number {
-    const noteMap: Partial<Record<ChordToken, number>> = {
-      [ChordToken.A]: Note.A,
-      [ChordToken.B]: Note.B,
-      [ChordToken.C]: Note.C,
-      [ChordToken.D]: Note.D,
-      [ChordToken.E]: Note.E,
-      [ChordToken.F]: Note.F,
-      [ChordToken.G]: Note.G,
-    }
-    return noteMap[token] ?? Note.C
-  }
-  
-  private static applyAccidental(note: number, accidental: ChordToken): number {
-    const toneId = note
-    if (accidental === ChordToken.SHARP) {
-      return noteFromToneId(toneId + 1, false)
-    } else if (accidental === ChordToken.FLAT) {
-      return noteFromToneId(toneId - 1, true)
-    }
-    return note
-  }
-  
-  private static inferChordType(tokens: ChordToken[]): ChordType | null {
-    if (tokens.length === 0) {
-      return ChordType.majorTriad
-    }
-    
-    return chordTypeFromTokens(tokens)
-  }
+    return preferSharp ? group.sharpName : group.flatName;
 }
 
-// ==================== Unicode 变音符号显示 ====================
-export const UNICODE_ACCIDENTALS = {
-  FLAT: '♭',
-  SHARP: '♯',
-  DOUBLE_FLAT: '𝄫',
-  DOUBLE_SHARP: '𝄪',
-  NATURAL: '♮',
+export const ROOT_NOTE_TOKENS: ChordToken[] = [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G"
+];
+
+export const ACCIDENTAL_TOKENS: ChordToken[] = [
+    "FLAT",
+    "SHARP"
+];
+
+export function getChordTokenDisplayString(token: ChordToken): string {
+    const displayMap = {
+        ["A"]: 'A',
+        ["B"]: 'B',
+        ["C"]: 'C',
+        ["D"]: 'D',
+        ["E"]: 'E',
+        ["F"]: 'F',
+        ["G"]: 'G',
+        ["FLAT"]: 'b',
+        ["SHARP"]: '#',
+        ["SLASH"]: '/',
+        ["MAJOR"]: 'Maj',
+        ["MINOR"]: 'm',
+        ["DIMINISHED"]: 'dim',
+        ["AUGMENTED"]: 'aug',
+        ["SUS2"]: 'sus2',
+        ["SUS4"]: 'sus4',
+        ["ADD9"]: 'add9',
+        ["SIX"]: '6',
+        ["SEVEN"]: '7',
+        ["NINE"]: '9',
+        ["ELEVEN"]: '11',
+        ["THIRTEEN"]: '13',
+        ["FLAT_FIVE"]: 'b5',
+        ["SHARP_FIVE"]: '#5',
+        ["FLAT_SIX"]: 'b6',
+        ["FLAT_NINE"]: 'b9',
+        ["SHARP_NINE"]: '#9',
+        ["SHARP_ELEVEN"]: '#11',
+        ["FLAT_THIRTEEN"]: 'b13',
+        ["ALT"]: 'alt'
+    };
+    return displayMap[token] ?? '';
 }
 
-export const UNICODE_CHORD_SYMBOLS = {
-  MAJOR: 'Δ',
-  MINOR: 'm',
-  DIMINISHED: '°',
-  DIMINISHED_7: '°7',
-  HALF_DIMINISHED: 'ø',
-  HALF_DIMINISHED_7: 'ø7',
-  AUGMENTED: '+',
+export function isRootToken(token: ChordToken): boolean {
+    return ROOT_NOTE_TOKENS.includes(token);
 }
 
-export function displayIntervalUnicode(interval: string): string {
-  return interval
-    .replace(/</g, '♭')
-    .replace(/>/g, '♯')
-    .replace(/b/g, '♭')
-    .replace(/#/g, '♯')
+export function chordTypeToTokens(chordType: ChordType): ChordToken[] {
+    const tokenMap: Record<ChordType, string[]> = {
+        ["majorTriad"]: [],
+        ["minorTriad"]: [
+            "MINOR"
+        ],
+        ["diminishedTriad"]: [
+            "DIMINISHED"
+        ],
+        ["augmentedTriad"]: [
+            "AUGMENTED"
+        ],
+        ["susTwoTriad"]: [
+            "SUS2"
+        ],
+        ["susFourTriad"]: [
+            "SUS4"
+        ],
+        ["addNine"]: [
+            "ADD9"
+        ],
+        ["minorAddNine"]: [
+            "MINOR",
+            "ADD9"
+        ],
+        ["diminished"]: [
+            "DIMINISHED",
+            "SEVEN"
+        ],
+        ["diminishedMajorSeven"]: [
+            "DIMINISHED",
+            "MAJOR",
+            "SEVEN"
+        ],
+        ["dominantNine"]: [
+            "NINE"
+        ],
+        ["dominantNineFlatThirteen"]: [
+            "NINE",
+            "FLAT_THIRTEEN"
+        ],
+        ["dominantNineSharpEleven"]: [
+            "NINE",
+            "SHARP_ELEVEN"
+        ],
+        ["dominantSeven"]: [
+            "SEVEN"
+        ],
+        ["dominantSevenAlt"]: [
+            "SEVEN",
+            "ALT"
+        ],
+        ["dominantSevenFlatFive"]: [
+            "SEVEN",
+            "FLAT_FIVE"
+        ],
+        ["dominantSevenFlatNine"]: [
+            "SEVEN",
+            "FLAT_NINE"
+        ],
+        ["dominantSevenFlatNineFlatThirteen"]: [
+            "SEVEN",
+            "FLAT_NINE",
+            "FLAT_THIRTEEN"
+        ],
+        ["dominantSevenFlatFiveFlatNine"]: [
+            "SEVEN",
+            "FLAT_FIVE",
+            "FLAT_NINE"
+        ],
+        ["dominantSevenFlatFiveSharpNine"]: [
+            "SEVEN",
+            "FLAT_FIVE",
+            "SHARP_NINE"
+        ],
+        ["dominantSevenSharpFive"]: [
+            "SEVEN",
+            "SHARP_FIVE"
+        ],
+        ["dominantSevenSharpNine"]: [
+            "SEVEN",
+            "SHARP_NINE"
+        ],
+        ["dominantSevenFlatThirteen"]: [
+            "SEVEN",
+            "FLAT_THIRTEEN"
+        ],
+        ["dominantSevenSharpEleven"]: [
+            "SEVEN",
+            "SHARP_ELEVEN"
+        ],
+        ["dominantSevenSharpFiveFlatNine"]: [
+            "SEVEN",
+            "SHARP_FIVE",
+            "FLAT_NINE"
+        ],
+        ["dominantSevenSharpFiveSharpNine"]: [
+            "SEVEN",
+            "SHARP_FIVE",
+            "SHARP_NINE"
+        ],
+        ["dominantThirteen"]: [
+            "THIRTEEN"
+        ],
+        ["dominantThirteenFlatNine"]: [
+            "THIRTEEN",
+            "FLAT_NINE"
+        ],
+        ["dominantThirteenSharpNine"]: [
+            "THIRTEEN",
+            "SHARP_NINE"
+        ],
+        ["dominantThirteenSharpEleven"]: [
+            "THIRTEEN",
+            "SHARP_ELEVEN"
+        ],
+        ["majorNine"]: [
+            "MAJOR",
+            "NINE"
+        ],
+        ["majorNineSharpEleven"]: [
+            "MAJOR",
+            "NINE",
+            "SHARP_ELEVEN"
+        ],
+        ["majorNineSharpFive"]: [
+            "MAJOR",
+            "NINE",
+            "SHARP_FIVE"
+        ],
+        ["majorNineFlatSix"]: [
+            "MAJOR",
+            "NINE",
+            "FLAT_SIX"
+        ],
+        ["majorSeven"]: [
+            "MAJOR",
+            "SEVEN"
+        ],
+        ["majorSevenSharpEleven"]: [
+            "MAJOR",
+            "SEVEN",
+            "SHARP_ELEVEN"
+        ],
+        ["majorSevenSharpFive"]: [
+            "MAJOR",
+            "SEVEN",
+            "SHARP_FIVE"
+        ],
+        ["majorSevenFlatSix"]: [
+            "MAJOR",
+            "SEVEN",
+            "FLAT_SIX"
+        ],
+        ["majorSevenSharpNine"]: [
+            "MAJOR",
+            "SEVEN",
+            "SHARP_NINE"
+        ],
+        ["majorThirteen"]: [
+            "MAJOR",
+            "THIRTEEN"
+        ],
+        ["majorThirteenSharpEleven"]: [
+            "MAJOR",
+            "THIRTEEN",
+            "SHARP_ELEVEN"
+        ],
+        ["majorThirteenSharpFive"]: [
+            "MAJOR",
+            "THIRTEEN",
+            "SHARP_FIVE"
+        ],
+        ["minorEleven"]: [
+            "MINOR",
+            "ELEVEN"
+        ],
+        ["minorMajorNine"]: [
+            "MINOR",
+            "MAJOR",
+            "NINE"
+        ],
+        ["minorMajorSeven"]: [
+            "MINOR",
+            "MAJOR",
+            "SEVEN"
+        ],
+        ["minorMajorThirteen"]: [
+            "MINOR",
+            "MAJOR",
+            "THIRTEEN"
+        ],
+        ["minorNine"]: [
+            "MINOR",
+            "NINE"
+        ],
+        ["minorSeven"]: [
+            "MINOR",
+            "SEVEN"
+        ],
+        ["minorSevenFlatFive"]: [
+            "MINOR",
+            "SEVEN",
+            "FLAT_FIVE"
+        ],
+        ["minorSevenFlatFiveNatNine"]: [
+            "MINOR",
+            "SEVEN",
+            "FLAT_FIVE",
+            "NINE"
+        ],
+        ["minorSevenFlatSix"]: [
+            "MINOR",
+            "SEVEN",
+            "FLAT_SIX"
+        ],
+        ["minorSix"]: [
+            "MINOR",
+            "SIX"
+        ],
+        ["minorSixNine"]: [
+            "MINOR",
+            "SIX",
+            "NINE"
+        ],
+        ["minorThirteen"]: [
+            "MINOR",
+            "THIRTEEN"
+        ],
+        ["nineSusFour"]: [
+            "NINE",
+            "SUS4"
+        ],
+        ["sevenSusFour"]: [
+            "SEVEN",
+            "SUS4"
+        ],
+        ["sevenSusFourFlatNine"]: [
+            "SEVEN",
+            "SUS4",
+            "FLAT_NINE"
+        ],
+        ["six"]: [
+            "SIX"
+        ],
+        ["sixNine"]: [
+            "SIX",
+            "NINE"
+        ],
+        ["susFourFlatNine"]: [
+            "SUS4",
+            "FLAT_NINE"
+        ],
+        ["thirteenSusFour"]: [
+            "THIRTEEN",
+            "SUS4"
+        ],
+        ["thirteenSusFourFlatNine"]: [
+            "THIRTEEN",
+            "SUS4",
+            "FLAT_NINE"
+        ]
+    };
+    return (tokenMap[chordType] ?? []) as ChordToken[];
+}
+
+const chordTypeTokenMap = new Map<string, ChordType>(Object.values(ChordType).map((t)=>{
+    const tokens = chordTypeToTokens(t);
+    return [
+        tokens.map((tk)=>tk).join(','),
+        t
+    ];
+}));
+
+export function chordTypeFromTokens(tokens: ChordToken[]): ChordType | null {
+    const tokenStr = tokens.map((t)=>t).join(',');
+    return chordTypeTokenMap.get(tokenStr) ?? null;
+}
+
+// 和弦类型 → 显示字符串的精确映射。
+// 原实现用链式 .replace：短名会先于长名命中（例如 'minorSeven' 抢先替换 'minorSevenFlatFive' 的前缀、
+// 'dominantThirteen' 抢先替换 'dominantThirteenFlatNine'），导致 20+ 个和弦名显示错乱。改为查表彻底消除顺序依赖。
+const CHORD_TYPE_DISPLAY = {
+    ["majorTriad"]: '',
+    ["minorTriad"]: 'minor_symbol',
+    ["diminishedTriad"]: 'dim',
+    ["augmentedTriad"]: 'aug',
+    ["susTwoTriad"]: 'sus2',
+    ["susFourTriad"]: 'sus4',
+    ["addNine"]: 'add9',
+    ["minorAddNine"]: 'minor_symboladd9',
+    ["diminished"]: 'dim7',
+    ["diminishedMajorSeven"]: 'dimMaj7',
+    ["dominantNine"]: '9',
+    ["dominantNineFlatThirteen"]: '9b13',
+    ["dominantNineSharpEleven"]: '9#11',
+    ["dominantSeven"]: '7',
+    ["dominantSevenAlt"]: '7alt',
+    ["dominantSevenFlatFive"]: '7b5',
+    ["dominantSevenFlatNine"]: '7b9',
+    ["dominantSevenFlatNineFlatThirteen"]: '7b9b13',
+    ["dominantSevenFlatFiveFlatNine"]: '7b5b9',
+    ["dominantSevenFlatFiveSharpNine"]: '7b5#9',
+    ["dominantSevenSharpFive"]: '7#5',
+    ["dominantSevenSharpNine"]: '7#9',
+    ["dominantSevenFlatThirteen"]: '7b13',
+    ["dominantSevenSharpEleven"]: '7#11',
+    ["dominantSevenSharpFiveFlatNine"]: '7#5b9',
+    ["dominantSevenSharpFiveSharpNine"]: '7#5#9',
+    ["dominantThirteen"]: '13',
+    ["dominantThirteenFlatNine"]: '13b9',
+    ["dominantThirteenSharpNine"]: '13#9',
+    ["dominantThirteenSharpEleven"]: '13#11',
+    ["majorNine"]: 'Maj9',
+    ["majorNineSharpEleven"]: 'Maj9#11',
+    ["majorNineSharpFive"]: 'Maj9#5',
+    ["majorNineFlatSix"]: 'Maj9b6',
+    ["majorSeven"]: 'Maj7',
+    ["majorSevenSharpEleven"]: 'Maj7#11',
+    ["majorSevenSharpFive"]: 'Maj7#5',
+    ["majorSevenFlatSix"]: 'Maj7b6',
+    ["majorSevenSharpNine"]: 'Maj7#9',
+    ["majorThirteen"]: 'Maj13',
+    ["majorThirteenSharpEleven"]: 'Maj13#11',
+    ["majorThirteenSharpFive"]: 'Maj13#5',
+    ["minorEleven"]: 'minor_symbol11',
+    ["minorMajorNine"]: 'minor_symbolMaj9',
+    ["minorMajorSeven"]: 'minor_symbolMaj7',
+    ["minorMajorThirteen"]: 'minor_symbolMaj13',
+    ["minorNine"]: 'minor_symbol9',
+    ["minorSeven"]: 'minor_symbol7',
+    ["minorSevenFlatFive"]: 'minor_7_flat_5_symbol',
+    ["minorSevenFlatFiveNatNine"]: 'minor_symbol9b5',
+    ["minorSevenFlatSix"]: 'minor_symbol7b6',
+    ["minorSix"]: 'minor_symbol6',
+    ["minorSixNine"]: 'minor_symbol69',
+    ["minorThirteen"]: 'minor_symbol13',
+    ["nineSusFour"]: '9sus4',
+    ["sevenSusFour"]: '7sus4',
+    ["sevenSusFourFlatNine"]: '7sus4b9',
+    ["six"]: '6',
+    ["sixNine"]: '69',
+    ["susFourFlatNine"]: 'sus4b9',
+    ["thirteenSusFour"]: '13sus4',
+    ["thirteenSusFourFlatNine"]: '13sus4b9'
+};
+
+export function getChordTypeDisplayString(chordType: ChordType, minorSymbol: string = 'm', minor7flat5Symbol: string = 'ø7'): string {
+    return (CHORD_TYPE_DISPLAY[chordType] ?? chordType.toString()).replace(/minor_symbol/g, minorSymbol).replace(/minor_7_flat_5_symbol/g, minor7flat5Symbol);
+}
+
+export function getChordTypeUnicodeDisplayString(chordType: ChordType, minorSymbol: string = 'm', minor7flat5Symbol: string = 'ø7'): string {
+    return getChordTypeDisplayString(chordType, minorSymbol, minor7flat5Symbol).replace(/b/g, '♭').replace(/#/g, '♯').replace(/Maj/g, 'Δ').replace(/dim7/g, '°7').replace(/dim/g, '°').replace(/aug/g, '+');
+}
+
+export const CHORD_INTERVALS: Record<ChordType, number[]> = {
+    ["majorTriad"]: [
+        0,
+        4,
+        7
+    ],
+    ["minorTriad"]: [
+        0,
+        3,
+        7
+    ],
+    ["diminishedTriad"]: [
+        0,
+        3,
+        6
+    ],
+    ["augmentedTriad"]: [
+        0,
+        4,
+        8
+    ],
+    ["susTwoTriad"]: [
+        0,
+        2,
+        7
+    ],
+    ["susFourTriad"]: [
+        0,
+        5,
+        7
+    ],
+    ["addNine"]: [
+        0,
+        4,
+        7,
+        14
+    ],
+    ["minorAddNine"]: [
+        0,
+        3,
+        7,
+        14
+    ],
+    ["diminished"]: [
+        0,
+        3,
+        6,
+        9
+    ],
+    ["diminishedMajorSeven"]: [
+        0,
+        3,
+        6,
+        11
+    ],
+    ["dominantNine"]: [
+        0,
+        4,
+        7,
+        10,
+        14
+    ],
+    ["dominantNineFlatThirteen"]: [
+        0,
+        4,
+        7,
+        10,
+        14,
+        20
+    ],
+    ["dominantNineSharpEleven"]: [
+        0,
+        4,
+        7,
+        10,
+        14,
+        18
+    ],
+    ["dominantSeven"]: [
+        0,
+        4,
+        7,
+        10
+    ],
+    
+    // 7alt = 1 3 ♭7 ♭9 ♯9 ♯11 ♭13。原值 [0,4,8,10,13,15,18,21] 同时含 ♭13(8) 与自然 13(21)，自相矛盾。
+    ["dominantSevenAlt"]: [
+        0,
+        4,
+        10,
+        13,
+        15,
+        18,
+        20
+    ],
+    ["dominantSevenFlatFive"]: [
+        0,
+        4,
+        6,
+        10
+    ],
+    ["dominantSevenFlatNine"]: [
+        0,
+        4,
+        7,
+        10,
+        13
+    ],
+    ["dominantSevenFlatNineFlatThirteen"]: [
+        0,
+        4,
+        7,
+        10,
+        13,
+        20
+    ],
+    ["dominantSevenFlatFiveFlatNine"]: [
+        0,
+        4,
+        6,
+        10,
+        13
+    ],
+    ["dominantSevenFlatFiveSharpNine"]: [
+        0,
+        4,
+        6,
+        10,
+        15
+    ],
+    ["dominantSevenSharpFive"]: [
+        0,
+        4,
+        8,
+        10
+    ],
+    ["dominantSevenSharpNine"]: [
+        0,
+        4,
+        7,
+        10,
+        15
+    ],
+    ["dominantSevenFlatThirteen"]: [
+        0,
+        4,
+        7,
+        10,
+        20
+    ],
+    ["dominantSevenSharpEleven"]: [
+        0,
+        4,
+        7,
+        10,
+        18
+    ],
+    ["dominantSevenSharpFiveFlatNine"]: [
+        0,
+        4,
+        8,
+        10,
+        13
+    ],
+    ["dominantSevenSharpFiveSharpNine"]: [
+        0,
+        4,
+        8,
+        10,
+        15
+    ],
+    ["dominantThirteen"]: [
+        0,
+        4,
+        7,
+        10,
+        14,
+        21
+    ],
+    
+    // 13♭9 = 1 3 5 ♭7 ♭9 13。原值同时含 ♭9(13) 与 ♮9(14)，会产生 D♭ 与 D 并存。
+    ["dominantThirteenFlatNine"]: [
+        0,
+        4,
+        7,
+        10,
+        13,
+        21
+    ],
+    ["dominantThirteenSharpNine"]: [
+        0,
+        4,
+        7,
+        10,
+        15,
+        21
+    ],
+    ["dominantThirteenSharpEleven"]: [
+        0,
+        4,
+        7,
+        10,
+        14,
+        18,
+        21
+    ],
+    ["majorNine"]: [
+        0,
+        4,
+        7,
+        11,
+        14
+    ],
+    ["majorNineSharpEleven"]: [
+        0,
+        4,
+        7,
+        11,
+        14,
+        18
+    ],
+    ["majorNineSharpFive"]: [
+        0,
+        4,
+        8,
+        11,
+        14
+    ],
+    ["majorNineFlatSix"]: [
+        0,
+        4,
+        7,
+        11,
+        14,
+        20
+    ],
+    ["majorSeven"]: [
+        0,
+        4,
+        7,
+        11
+    ],
+    ["majorSevenSharpEleven"]: [
+        0,
+        4,
+        7,
+        11,
+        18
+    ],
+    ["majorSevenSharpFive"]: [
+        0,
+        4,
+        8,
+        11
+    ],
+    ["majorSevenFlatSix"]: [
+        0,
+        4,
+        7,
+        11,
+        20
+    ],
+    ["majorSevenSharpNine"]: [
+        0,
+        4,
+        7,
+        11,
+        15
+    ],
+    ["majorThirteen"]: [
+        0,
+        4,
+        7,
+        11,
+        14,
+        21
+    ],
+    ["majorThirteenSharpEleven"]: [
+        0,
+        4,
+        7,
+        11,
+        14,
+        18,
+        21
+    ],
+    ["majorThirteenSharpFive"]: [
+        0,
+        4,
+        8,
+        11,
+        14,
+        21
+    ],
+    ["minorEleven"]: [
+        0,
+        3,
+        7,
+        10,
+        14,
+        17
+    ],
+    ["minorMajorNine"]: [
+        0,
+        3,
+        7,
+        11,
+        14
+    ],
+    ["minorMajorSeven"]: [
+        0,
+        3,
+        7,
+        11
+    ],
+    ["minorMajorThirteen"]: [
+        0,
+        3,
+        7,
+        11,
+        14,
+        21
+    ],
+    ["minorNine"]: [
+        0,
+        3,
+        7,
+        10,
+        14
+    ],
+    ["minorSeven"]: [
+        0,
+        3,
+        7,
+        10
+    ],
+    ["minorSevenFlatFive"]: [
+        0,
+        3,
+        6,
+        10
+    ],
+    ["minorSevenFlatFiveNatNine"]: [
+        0,
+        3,
+        6,
+        10,
+        14
+    ],
+    ["minorSevenFlatSix"]: [
+        0,
+        3,
+        7,
+        10,
+        20
+    ],
+    ["minorSix"]: [
+        0,
+        3,
+        7,
+        9
+    ],
+    ["minorSixNine"]: [
+        0,
+        3,
+        7,
+        9,
+        14
+    ],
+    ["minorThirteen"]: [
+        0,
+        3,
+        7,
+        10,
+        14,
+        21
+    ],
+    ["nineSusFour"]: [
+        0,
+        5,
+        7,
+        10,
+        14
+    ],
+    ["sevenSusFour"]: [
+        0,
+        5,
+        7,
+        10
+    ],
+    ["sevenSusFourFlatNine"]: [
+        0,
+        5,
+        7,
+        10,
+        13
+    ],
+    ["six"]: [
+        0,
+        4,
+        7,
+        9
+    ],
+    ["sixNine"]: [
+        0,
+        4,
+        7,
+        9,
+        14
+    ],
+    ["susFourFlatNine"]: [
+        0,
+        5,
+        7,
+        13
+    ],
+    ["thirteenSusFour"]: [
+        0,
+        5,
+        7,
+        10,
+        14,
+        21
+    ],
+    
+    // 13sus4♭9 = 1 4 5 ♭7 ♭9 13。同上，去掉与 ♭9 冲突的 ♮9(14)。
+    ["thirteenSusFourFlatNine"]: [
+        0,
+        5,
+        7,
+        10,
+        13,
+        21
+    ]
+};
+
+export class ChordTokenizer {
+    static ROOT_NOTE_PATTERN = /^[A-Ga-g]/;
+    static ACCIDENTAL_PATTERN = /^[#♯b♭]/;
+    static NUMBER_PATTERN = /^\d+/;
+    static tokenize(chordString: string): ChordToken[] {
+        const tokens: ChordToken[] = [];
+        let remaining = chordString.trim();
+        while(remaining.length > 0){
+            const result = this.nextToken(remaining);
+            if (result.token) {
+                tokens.push(result.token);
+            }
+            remaining = result.remaining;
+            if (!result.token && remaining.length > 0) {
+                remaining = remaining.slice(1);
+            }
+        }
+        return tokens;
+    }
+    static nextToken(str: string): { token: ChordToken | null; remaining: string } {
+        if (str.length === 0) {
+            return {
+                token: null,
+                remaining: ''
+            };
+        }
+        const firstChar = str[0].toUpperCase();
+        const firstTwoChars = str.slice(0, 2).toLowerCase();
+        const firstThreeChars = str.slice(0, 3).toLowerCase();
+        const firstFourChars = str.slice(0, 4).toLowerCase();
+        if (firstThreeChars === 'b13' || firstThreeChars === '♭13') {
+            return {
+                token: "FLAT_THIRTEEN",
+                remaining: str.slice(3)
+            };
+        }
+        if (firstThreeChars === '#11' || firstThreeChars === '♯11') {
+            return {
+                token: "SHARP_ELEVEN",
+                remaining: str.slice(3)
+            };
+        }
+        if (firstTwoChars === '#9' || firstTwoChars === '♯9') {
+            return {
+                token: "SHARP_NINE",
+                remaining: str.slice(2)
+            };
+        }
+        if (firstTwoChars === 'b9' || firstTwoChars === '♭9') {
+            return {
+                token: "FLAT_NINE",
+                remaining: str.slice(2)
+            };
+        }
+        if (firstTwoChars === 'b6' || firstTwoChars === '♭6') {
+            return {
+                token: "FLAT_SIX",
+                remaining: str.slice(2)
+            };
+        }
+        if (firstTwoChars === '#5' || firstTwoChars === '♯5') {
+            return {
+                token: "SHARP_FIVE",
+                remaining: str.slice(2)
+            };
+        }
+        if (firstTwoChars === 'b5' || firstTwoChars === '♭5') {
+            return {
+                token: "FLAT_FIVE",
+                remaining: str.slice(2)
+            };
+        }
+        if (firstChar === 'b' || firstChar === '♭') {
+            return {
+                token: "FLAT",
+                remaining: str.slice(1)
+            };
+        }
+        if (firstChar === '#' || firstChar === '♯') {
+            return {
+                token: "SHARP",
+                remaining: str.slice(1)
+            };
+        }
+        if (ROOT_NOTE_TOKENS.map((t)=>getChordTokenDisplayString(t)).includes(firstChar)) {
+            const token = Object.values(ChordToken).find((t)=>getChordTokenDisplayString(t) === firstChar);
+            if (token) {
+                return {
+                    token,
+                    remaining: str.slice(1)
+                };
+            }
+        }
+        if (firstChar === '/') {
+            return {
+                token: "SLASH",
+                remaining: str.slice(1)
+            };
+        }
+        if (firstFourChars === 'maj7' || firstFourChars === 'maj9' || firstFourChars === 'maj13' || firstFourChars === 'majΔ') {
+            return {
+                token: "MAJOR",
+                remaining: str.slice(3)
+            };
+        }
+        if (firstThreeChars === 'maj' || firstThreeChars === 'Δ') {
+            return {
+                token: "MAJOR",
+                remaining: str.slice(3)
+            };
+        }
+        if (firstThreeChars === 'min') {
+            return {
+                token: "MINOR",
+                remaining: str.slice(3)
+            };
+        }
+        
+        
+        // 大/小调必须按原始大小写区分：M=major, m=minor。
+        // 原实现用已 toUpperCase 的 firstChar 判定，导致 'm7' 命中 M+数字 分支被当作 majorSeven。
+        if (str[0] === 'M' && str.length > 1 && /^[0-9]/.test(str.slice(1))) {
+            return {
+                token: "MAJOR",
+                remaining: str.slice(1)
+            };
+        }
+        if (str[0] === 'm' && str.length > 1) {
+            return {
+                token: "MINOR",
+                remaining: str.slice(1)
+            };
+        }
+        if (str[0] === 'M' && str.length === 1) {
+            return {
+                token: "MAJOR",
+                remaining: str.slice(1)
+            };
+        }
+        if (str[0] === 'm' && str.length === 1) {
+            return {
+                token: "MINOR",
+                remaining: str.slice(1)
+            };
+        }
+        if (firstChar === '-' || firstChar === '−') {
+            return {
+                token: "MINOR",
+                remaining: str.slice(1)
+            };
+        }
+        if (firstFourChars === 'dim7' || firstFourChars === '°7') {
+            return {
+                token: "DIMINISHED",
+                remaining: str.slice(3)
+            };
+        }
+        if (firstThreeChars === 'dim' || firstChar === '°') {
+            return {
+                token: "DIMINISHED",
+                remaining: str.slice(firstChar === '°' ? 1 : 3)
+            };
+        }
+        if (firstThreeChars === 'aug' || firstChar === '+') {
+            return {
+                token: "AUGMENTED",
+                remaining: str.slice(firstChar === '+' ? 1 : 3)
+            };
+        }
+        if (firstFourChars === 'sus2') {
+            return {
+                token: "SUS2",
+                remaining: str.slice(4)
+            };
+        }
+        if (firstFourChars === 'sus4' || firstThreeChars === 'sus') {
+            return {
+                token: "SUS4",
+                remaining: str.slice(firstThreeChars === 'sus' ? 3 : 4)
+            };
+        }
+        if (firstFourChars === 'add9') {
+            return {
+                token: "ADD9",
+                remaining: str.slice(4)
+            };
+        }
+        if (firstThreeChars === 'alt') {
+            return {
+                token: "ALT",
+                remaining: str.slice(3)
+            };
+        }
+        if (firstTwoChars === '13') {
+            return {
+                token: "THIRTEEN",
+                remaining: str.slice(2)
+            };
+        }
+        if (firstTwoChars === '11') {
+            return {
+                token: "ELEVEN",
+                remaining: str.slice(2)
+            };
+        }
+        if (firstChar === '9') {
+            return {
+                token: "NINE",
+                remaining: str.slice(1)
+            };
+        }
+        if (firstChar === '7') {
+            return {
+                token: "SEVEN",
+                remaining: str.slice(1)
+            };
+        }
+        if (firstChar === '6') {
+            return {
+                token: "SIX",
+                remaining: str.slice(1)
+            };
+        }
+        if (firstTwoChars === 'ø7') {
+            return {
+                token: "MINOR",
+                remaining: str.slice(2)
+            };
+        }
+        if (firstChar === 'ø') {
+            return {
+                token: "MINOR",
+                remaining: str.slice(1)
+            };
+        }
+        return {
+            token: null,
+            remaining: str.slice(1)
+        };
+    }
+}
+
+export class ChordParser {
+    static parse(chordString: string): ParsedChord | null {
+        const tokens = ChordTokenizer.tokenize(chordString);
+        if (tokens.length === 0) {
+            return null;
+        }
+        let rootNote = null;
+        let slashRootNote = null;
+        const chordTypeTokens = [];
+        let hasSlash = false;
+        let i = 0;
+        if (isRootToken(tokens[0])) {
+            const rootToken = tokens[0];
+            rootNote = this.tokenToNote(rootToken);
+            i++;
+            if (i < tokens.length && ACCIDENTAL_TOKENS.includes(tokens[i])) {
+                const accidental = tokens[i];
+                rootNote = this.applyAccidental(rootNote, accidental);
+                i++;
+            }
+        }
+        while(i < tokens.length && !hasSlash){
+            if (tokens[i] === "SLASH") {
+                hasSlash = true;
+                i++;
+                break;
+            }
+            chordTypeTokens.push(tokens[i]);
+            i++;
+        }
+        if (hasSlash && i < tokens.length) {
+            if (isRootToken(tokens[i])) {
+                slashRootNote = this.tokenToNote(tokens[i]);
+                i++;
+                if (i < tokens.length && ACCIDENTAL_TOKENS.includes(tokens[i])) {
+                    slashRootNote = this.applyAccidental(slashRootNote, tokens[i]);
+                }
+            }
+        }
+        if (rootNote === null) {
+            return null;
+        }
+        const chordType = this.inferChordType(chordTypeTokens as ChordToken[]);
+        return {
+            rootNote,
+            chordType: chordType ?? "majorTriad",
+            slashRootNote,
+            function: null,
+            scaleTypeOverride: null,
+            isNewChord: false
+        };
+    }
+    static tokenToNote(token: ChordToken): number {
+        const noteMap: Record<string, number> = {
+            ["A"]: 9,
+            ["B"]: 11,
+            ["C"]: 0,
+            ["D"]: 2,
+            ["E"]: 4,
+            ["F"]: 5,
+            ["G"]: 7
+        };
+        return noteMap[token] ?? 0;
+    }
+    static applyAccidental(note: number, accidental: ChordToken): number {
+        const toneId = note;
+        if (accidental === "SHARP") {
+            return noteFromToneId(toneId + 1, false);
+        } else if (accidental === "FLAT") {
+            return noteFromToneId(toneId - 1, true);
+        }
+        return note;
+    }
+    static inferChordType(tokens: ChordToken[]): ChordType | null {
+        if (tokens.length === 0) {
+            return "majorTriad";
+        }
+        return chordTypeFromTokens(tokens);
+    }
 }
 
 export function displayChordUnicode(
@@ -1005,11 +1611,10 @@ export function displayChordUnicode(
   minorSymbol: string = 'm',
   minor7flat5Symbol: string = 'ø7'
 ): string {
-  const rootStr = NOTE_UNICODE_NAMES[rootNote] ?? NOTE_NAMES[rootNote] ?? 'C'
-  const typeStr = getChordTypeUnicodeDisplayString(chordType)
-  const slashStr = slashRootNote != null ? `/${NOTE_UNICODE_NAMES[slashRootNote] ?? NOTE_NAMES[slashRootNote] ?? ''}` : ''
-  
-  return `${rootStr}${typeStr}${slashStr}`
+    const rootStr = NOTE_UNICODE_NAMES[rootNote] ?? NOTE_NAMES[rootNote] ?? 'C';
+    const typeStr = getChordTypeUnicodeDisplayString(chordType, minorSymbol, minor7flat5Symbol);
+    const slashStr = slashRootNote != null ? `/${NOTE_UNICODE_NAMES[slashRootNote] ?? NOTE_NAMES[slashRootNote] ?? ''}` : '';
+    return `${rootStr}${typeStr}${slashStr}`;
 }
 
 export function displayChordStandard(
@@ -1019,94 +1624,47 @@ export function displayChordStandard(
   minorSymbol: string = 'm',
   minor7flat5Symbol: string = 'm7b5'
 ): string {
-  const rootStr = NOTE_NAMES[rootNote] ?? 'C'
-  const typeStr = getChordTypeDisplayString(chordType, minorSymbol, minor7flat5Symbol)
-  const slashStr = slashRootNote != null ? `/${NOTE_NAMES[slashRootNote] ?? ''}` : ''
-  
-  return `${rootStr}${typeStr}${slashStr}`
-}
-
-// ==================== 音程显示 ====================
-export const INTERVAL_DISPLAY_NAMES: Record<string, { standard: string; unicode: string; chinese: string }> = {
-  '1': { standard: '1', unicode: '1', chinese: '根音' },
-  'b2': { standard: 'b2', unicode: '♭2', chinese: '小二度' },
-  '2': { standard: '2', unicode: '2', chinese: '大二度' },
-  'b3': { standard: 'b3', unicode: '♭3', chinese: '小三度' },
-  '3': { standard: '3', unicode: '3', chinese: '大三度' },
-  '4': { standard: '4', unicode: '4', chinese: '纯四度' },
-  '#4': { standard: '#4', unicode: '♯4', chinese: '增四度' },
-  'b5': { standard: 'b5', unicode: '♭5', chinese: '减五度' },
-  '5': { standard: '5', unicode: '5', chinese: '纯五度' },
-  '#5': { standard: '#5', unicode: '♯5', chinese: '增五度' },
-  'b6': { standard: 'b6', unicode: '♭6', chinese: '小六度' },
-  '6': { standard: '6', unicode: '6', chinese: '大六度' },
-  'bb7': { standard: 'bb7', unicode: '𝄫7', chinese: '减七度' },
-  'b7': { standard: 'b7', unicode: '♭7', chinese: '小七度' },
-  '7': { standard: '7', unicode: '7', chinese: '大七度' },
-  'b9': { standard: 'b9', unicode: '♭9', chinese: '小九度' },
-  '9': { standard: '9', unicode: '9', chinese: '大九度' },
-  '#9': { standard: '#9', unicode: '♯9', chinese: '增九度' },
-  '11': { standard: '11', unicode: '11', chinese: '纯十一度' },
-  '#11': { standard: '#11', unicode: '♯11', chinese: '增十一度' },
-  'b13': { standard: 'b13', unicode: '♭13', chinese: '小十三度' },
-  '13': { standard: '13', unicode: '13', chinese: '大十三度' },
-}
-
-export function getIntervalDisplayName(interval: string, useUnicode: boolean = true, language: 'zh' | 'en' = 'zh'): string {
-  const info = INTERVAL_DISPLAY_NAMES[interval]
-  if (!info) return interval
-  
-  if (language === 'zh') {
-    return info.chinese
-  }
-  return useUnicode ? info.unicode : info.standard
+    const rootStr = NOTE_NAMES[rootNote] ?? 'C';
+    const typeStr = getChordTypeDisplayString(chordType, minorSymbol, minor7flat5Symbol);
+    const slashStr = slashRootNote != null ? `/${NOTE_NAMES[slashRootNote] ?? ''}` : '';
+    return `${rootStr}${typeStr}${slashStr}`;
 }
 
 // ==================== 缓存系统 ====================
-const chordParseCache = new Map<string, ParsedChord | null>()
-const chordNotesCache = new Map<string, number[]>()
-const chordDisplayCache = new Map<string, string>()
-const chordTypeTokenCache = new Map<ChordType, ChordToken[]>()
+const chordParseCache = new Map<string, ParsedChord | null>();
 
-const MAX_CACHE_SIZE = 1000
+const chordNotesCache = new Map<string, number[]>();
 
-function getCacheKey<T extends Record<string, unknown>>(prefix: string, params: T): string {
-  return prefix + ':' + Object.entries(params).map(([k, v]) => `${k}=${v}`).join(',')
-}
+const chordDisplayCache = new Map<string, string>();
+
+const MAX_CACHE_SIZE = 1000;
 
 function setCacheWithLRU<K, V>(map: Map<K, V>, key: K, value: V, maxSize: number = MAX_CACHE_SIZE): void {
-  if (map.size >= maxSize) {
-    const firstKey = map.keys().next().value
-    if (firstKey !== undefined) {
-      map.delete(firstKey)
+    if (map.size >= maxSize) {
+        const firstKey = map.keys().next().value;
+        if (firstKey !== undefined) {
+            map.delete(firstKey);
+        }
     }
-  }
-  map.set(key, value)
+    map.set(key, value);
 }
 
-// ==================== 导出便捷函数 (带缓存) ====================
 export function parseChord(chordString: string): ParsedChord | null {
-  const cached = chordParseCache.get(chordString)
-  if (cached !== undefined) return cached
-
-  const result = ChordParser.parse(chordString)
-  setCacheWithLRU(chordParseCache, chordString, result)
-  return result
-}
-
-export function tokenizeChord(chordString: string): ChordToken[] {
-  return ChordTokenizer.tokenize(chordString)
+    const cached = chordParseCache.get(chordString);
+    if (cached !== undefined) return cached;
+    const result = ChordParser.parse(chordString);
+    setCacheWithLRU(chordParseCache, chordString, result);
+    return result;
 }
 
 export function getChordNotes(rootNote: number, chordType: ChordType): number[] {
-  const cacheKey = `${rootNote}-${chordType}`
-  const cached = chordNotesCache.get(cacheKey)
-  if (cached !== undefined) return cached
-
-  const intervals = CHORD_INTERVALS[chordType] ?? []
-  const result = intervals.map(interval => noteFromToneId(rootNote + interval, false))
-  setCacheWithLRU(chordNotesCache, cacheKey, result)
-  return result
+    const cacheKey = `${rootNote}-${chordType}`;
+    const cached = chordNotesCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+    const intervals = CHORD_INTERVALS[chordType] ?? [];
+    const result = intervals.map((interval)=>noteFromToneId(rootNote + interval, false));
+    setCacheWithLRU(chordNotesCache, cacheKey, result);
+    return result;
 }
 
 export function formatChord(
@@ -1119,24 +1677,22 @@ export function formatChord(
     minor7flat5Symbol?: string
   }
 ): string {
-  const { slashRootNote = null, useUnicode = true, minorSymbol = 'm', minor7flat5Symbol = 'ø7' } = options ?? {}
-  const cacheKey = `${rootNote}-${chordType}-${slashRootNote}-${useUnicode}-${minorSymbol}-${minor7flat5Symbol}`
-  const cached = chordDisplayCache.get(cacheKey)
-  if (cached !== undefined) return cached
-
-  let result: string
-  if (useUnicode) {
-    result = displayChordUnicode(rootNote, chordType, slashRootNote, minorSymbol, minor7flat5Symbol)
-  } else {
-    result = displayChordStandard(rootNote, chordType, slashRootNote, minorSymbol, minor7flat5Symbol)
-  }
-  setCacheWithLRU(chordDisplayCache, cacheKey, result)
-  return result
+    const { slashRootNote = null, useUnicode = true, minorSymbol = 'm', minor7flat5Symbol = 'ø7' } = options ?? {};
+    const cacheKey = `${rootNote}-${chordType}-${slashRootNote}-${useUnicode}-${minorSymbol}-${minor7flat5Symbol}`;
+    const cached = chordDisplayCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+    let result;
+    if (useUnicode) {
+        result = displayChordUnicode(rootNote, chordType, slashRootNote, minorSymbol, minor7flat5Symbol);
+    } else {
+        result = displayChordStandard(rootNote, chordType, slashRootNote, minorSymbol, minor7flat5Symbol);
+    }
+    setCacheWithLRU(chordDisplayCache, cacheKey, result);
+    return result;
 }
 
-export function clearChordTheoryCache(): void {
-  chordParseCache.clear()
-  chordNotesCache.clear()
-  chordDisplayCache.clear()
-  chordTypeTokenCache.clear()
+export function clearChordTheoryCache() {
+    chordParseCache.clear();
+    chordNotesCache.clear();
+    chordDisplayCache.clear();
 }

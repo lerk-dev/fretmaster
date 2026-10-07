@@ -1,6 +1,5 @@
 "use client"
 
-import React from "react"
 import { useOnboarding } from "./onboarding-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,6 +10,7 @@ import {
 } from "@/components/ui/tooltip"
 import { HelpCircle, RotateCcw, GraduationCap } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/lib/store"
 
 interface OnboardingTriggerProps {
   variant?: "icon" | "button" | "menu"
@@ -24,6 +24,12 @@ export function OnboardingTrigger({
   showBadge = true,
 }: OnboardingTriggerProps) {
   const { startOnboarding, hasSeenOnboarding, isCompleted, resetOnboarding } = useOnboarding()
+  const user = useUser()
+  const isZh = user.language === "zh-CN"
+  const label = (hasSeenOnboarding || isCompleted)
+    ? (isZh ? "重新观看教程" : "Restart Tutorial")
+    : (isZh ? "新手指引" : "Getting Started")
+  const newBadge = isZh ? "新" : "New"
 
   const handleClick = () => {
     if (hasSeenOnboarding || isCompleted) {
@@ -46,6 +52,7 @@ export function OnboardingTrigger({
               size="icon"
               onClick={handleClick}
               className={cn("relative", className)}
+              aria-label={label}
             >
               {hasSeenOnboarding || isCompleted ? (
                 <RotateCcw className="w-5 h-5" />
@@ -58,7 +65,7 @@ export function OnboardingTrigger({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{hasSeenOnboarding || isCompleted ? "重新观看教程" : "新手指引"}</p>
+            <p>{label}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -74,10 +81,10 @@ export function OnboardingTrigger({
         className={cn("gap-2", className)}
       >
         <GraduationCap className="w-4 h-4" />
-        {hasSeenOnboarding || isCompleted ? "重新观看教程" : "新手指引"}
-        {isNew && (
+        {label}
+        {showBadge && isNew && (
           <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">
-            新
+            {newBadge}
           </span>
         )}
       </Button>
@@ -100,11 +107,11 @@ export function OnboardingTrigger({
         <HelpCircle className="w-4 h-4" />
       )}
       <span className="flex-1 text-left">
-        {hasSeenOnboarding || isCompleted ? "重新观看教程" : "新手指引"}
+        {label}
       </span>
-      {isNew && (
+      {showBadge && isNew && (
         <span className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">
-          新
+          {newBadge}
         </span>
       )}
     </button>

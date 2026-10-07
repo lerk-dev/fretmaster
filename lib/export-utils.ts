@@ -160,6 +160,12 @@ const getExerciseTypeKey = (type: string): string => {
   return EXERCISE_TYPE_MAP[normalized] || normalized || 'unknown'
 }
 
+/** HTML 转义：导出的报告会把数据插进 <td>，不转义就是注入面（notes 之外的类型名 / 项目名同样要转） */
+const escapeHtml = (value: unknown): string =>
+  String(value ?? '').replace(/[<>&"']/g, (c) => (
+    { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c] || c
+  ))
+
 /**
  * 从 notes 字段提取练习项目名称
  */
@@ -250,13 +256,17 @@ function normalizeAndDeduplicate(
       const prevDetail = getDetailName(prevKept)
       const curDetail = getDetailName(stat)
       const gap = prevTs - curTs // 倒序，prev 比 cur 更新
-      // 取两条记录中较大的 duration 作为判断基准
-      const maxDuration = Math.max(prevKept.duration || 0, stat.duration || 0)
+      // 判据应为「两条记录的时长区间是否重叠」：
+      //   每条记录占 [ts - duration, ts]，两条重叠 ⟺ gap < min(dur_prev, dur_cur)。
+      // 用 max 偏严：长会话(60s)结束后 25 秒又完成一次 20s 的短会话，
+      //   25 < max(60,20)=60 会把这次合法的短会话吃掉；
+      // 只取当前条自己的 duration 也不对 —— 这里是**倒序**遍历，stat 其实是更早的那条。
+      const minDuration = Math.min(prevKept.duration || 0, stat.duration || 0)
       // 仅对非 pitch_finding 类型应用 duration 时间窗去重
       // pitch_finding 每答对一题就记一次，duration 是会话累计值，时间窗判断无意义
       const isPitchFinding = prevTypeKey === 'pitch_finding' || curTypeKey === 'pitch_finding'
-      if (!isPitchFinding && prevTypeKey === curTypeKey && prevDetail === curDetail && maxDuration > 0 && gap < maxDuration * 1000) {
-        // 时间差小于 duration，视为重复，跳过当前记录
+      if (!isPitchFinding && prevTypeKey === curTypeKey && prevDetail === curDetail && minDuration > 0 && gap < minDuration * 1000) {
+        // 两条时长区间重叠，视为重复，跳过当前记录
         continue
       }
     }
@@ -315,7 +325,9 @@ export function exportToCSV(stats: PracticeStats[], options: ExportOptions): str
     : ['Date', 'Time', 'Type', 'Detail', 'Score', 'Duration(sec)', 'Accuracy(%)', 'Notes']
 
   const sanitizeCsvCell = (value: string): string => {
-    let sanitized = value.replace(/"/g, '""').replace(/\r?\n/g, ' ')
+    // 换行必须一律换成空格：裸 \r（老 Mac 换行、部分剪贴板内容）同样是 CSV 的**行分隔符**，
+    // 只处理 \r?\n 会漏掉它 —— 单元格里残留 \r 会把这一行截断，后续列全部错位。
+    let sanitized = value.replace(/"/g, '""').replace(/\r\n|\r|\n/g, ' ')
     if (/^[=+\-@\t\r]/.test(sanitized)) {
       sanitized = "'" + sanitized
     }
@@ -334,14 +346,16 @@ export function exportToCSV(stats: PracticeStats[], options: ExportOptions): str
       String(stat.score || 0),
       String(stat.duration || 0),
       String(Math.round(normalizeAccuracy(stat.accuracy))),
-      sanitizeCsvCell(stat.notes || ''),
+      stat.notes || '',
     ]
   })
 
   const BOM = '\uFEFF'
   const csvContent = BOM + [
     headers.join(','),
-    ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+    // 所有列统一走 sanitizeCsvCell：此前只有 notes 列做了转义，其余列
+    // （练习项目名 / 类型名 / 备注）含 " 会提前闭合字段、含 =+-@ 可被表格软件当公式执行
+    ...rows.map(row => row.map(cell => `"${sanitizeCsvCell(cell)}"`).join(',')),
   ].join('\n')
 
   return csvContent
@@ -436,11 +450,11 @@ export function exportToHTML(stats: PracticeStats[], options: ExportOptions): st
       .join('、')
     return `
       <tr>
-        <td>${d.date}</td>
-        <td>${d.count}</td>
-        <td>${Math.round(d.totalDuration / 60)} ${t('minutes', language)} (${d.totalDuration} ${t('seconds', language)})</td>
-        <td>${d.count > 0 ? Math.round(d.totalScore / d.count) : 0}</td>
-        <td>${typeBreakdown || '-'}</td>
+        <td>${escapeHtml(d.date)}</td>
+        <td>${escapeHtml(d.count)}</td>
+        <td>${escapeHtml(`${Math.round(d.totalDuration / 60)} ${t('minutes', language)} (${d.totalDuration} ${t('seconds', language)})`)}</td>
+        <td>${escapeHtml(d.count > 0 ? Math.round(d.totalScore / d.count) : 0)}</td>
+        <td>${escapeHtml(typeBreakdown || '-')}</td>
       </tr>
     `
   }).join('')
@@ -452,19 +466,16 @@ export function exportToHTML(stats: PracticeStats[], options: ExportOptions): st
     const timeStr = isNaN(dt.getTime()) ? '-' : dt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     const accuracy = Math.round(normalizeAccuracy(stat.accuracy))
     const detail = getDetailName(stat)
-    const escapedNotes = (stat.notes || '').replace(/[<>&"']/g, c => ({
-      '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'
-    }[c] || c))
     return `
     <tr>
-      <td>${dateStr}</td>
-      <td>${timeStr}</td>
-      <td>${getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language)}</td>
-      <td>${detail}</td>
-      <td>${stat.score || 0}</td>
-      <td>${stat.duration || 0}</td>
-      <td>${accuracy}%</td>
-      <td>${escapedNotes || '-'}</td>
+      <td>${escapeHtml(dateStr)}</td>
+      <td>${escapeHtml(timeStr)}</td>
+      <td>${escapeHtml(getExerciseTypeName(stat.exercise_type || stat.exerciseType || '', language))}</td>
+      <td>${escapeHtml(detail)}</td>
+      <td>${escapeHtml(stat.score || 0)}</td>
+      <td>${escapeHtml(stat.duration || 0)}</td>
+      <td>${escapeHtml(accuracy)}%</td>
+      <td>${escapeHtml(stat.notes || '') || '-'}</td>
     </tr>
   `
   }).join('')
@@ -831,12 +842,21 @@ async function exportToPDF(
     iframeDoc.close()
 
     // 4. 等待 iframe 内图片和字体加载完成
+    //    fonts.ready 可能 **reject**（字体加载失败）或 **永不 settle**（字体卡在加载中）。
+    //    原实现只写 `.then(() => resolve())`，这两种情况下 Promise 永不落定 ⇒ 导出**永久挂起**
+    //    （按钮一直转圈、既无 toast 也无日志），reject 时还会额外抛 unhandled rejection。
+    //    截图并不真的依赖字体就绪（没有 fonts API 时这里本来就只等 200ms），所以一律 resolve，
+    //    并加一个上限兜底，把最坏等待时间钳在 1s。
     await new Promise<void>((resolve) => {
-      // 等待字体加载
+      const done = () => resolve()
       if (iframeDoc.fonts && iframeDoc.fonts.ready) {
-        iframeDoc.fonts.ready.then(() => resolve())
+        const timer = setTimeout(done, 1000)
+        iframeDoc.fonts.ready.then(
+          () => { clearTimeout(timer); done() },
+          () => { clearTimeout(timer); done() },
+        )
       } else {
-        setTimeout(resolve, 200)
+        setTimeout(done, 200)
       }
     })
     // 额外等待 100ms 确保 DOM 渲染完成
@@ -918,18 +938,6 @@ async function exportToPDF(
     // 清理 iframe
     if (iframe.parentNode) {
       iframe.parentNode.removeChild(iframe)
-    }
-  }
-}
-
-export function printPDFReport(stats: PracticeStats[], options: ExportOptions): void {
-  const htmlContent = exportToHTML(stats, options)
-  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const printWindow = window.open(url, '_blank')
-  if (printWindow) {
-    printWindow.onload = () => {
-      printWindow.print()
     }
   }
 }

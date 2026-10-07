@@ -11,7 +11,6 @@ const PITCH_MAJOR_QUEUE_SIZE: usize = 7;
 const CONFUSION_TTL_MILLIS: u64 = 3000;
 const SMOOTHING_RATIO: f64 = 0.75;
 const SIMILAR_THRESHOLD: f64 = 0.05;
-const VOLUME_DECAY: f64 = 0.97;
 const CONFUSION_DECAY: f64 = 0.95;
 const BOX_FILTER_ROUNDS: usize = 4;
 
@@ -66,7 +65,10 @@ pub struct PitchDetectorConfig {
 impl Default for PitchDetectorConfig {
     fn default() -> Self {
         Self {
-            threshold: 0.12,
+            // 与 web 侧 lib/pitch-detection 的 resolveYinThreshold 对齐（常规 0.15；
+            // 低频乐器 0.2 可经 set_pitch_threshold 命令下发）。
+            // YIN 的 threshold 是 CMND 上限，**越小越严格** —— 低频（贝斯/七弦）需要更宽松。
+            threshold: 0.15,
             probability_cliff: 0.1,
             sample_rate: 48000,
             buffer_size: 4096,
@@ -182,10 +184,7 @@ impl PitchDetector {
 
         let pitch_result = self.get_pitch(&filtered, &double_buffer);
 
-        let (detected_freq, ac_confidence, _) = match pitch_result {
-            Some(r) => r,
-            None => return None,
-        };
+        let (detected_freq, ac_confidence, _) = pitch_result?;
 
         if detected_freq >= 99999.0 {
             return None;
@@ -193,7 +192,9 @@ impl PitchDetector {
 
         let frequency = detected_freq as f32;
 
-        if frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY {
+        // NaN 频率在此会被 `contains` 判为「不在范围内」⇒ 直接丢弃（比原写法更严格，
+        // 原先 NaN 会穿过这道判断继续往下走）。
+        if !(MIN_FREQUENCY..=MAX_FREQUENCY).contains(&frequency) {
             return None;
         }
 
@@ -254,7 +255,7 @@ impl PitchDetector {
     }
 
     fn create_note_frequencies(a4_freq: f64) -> Vec<f64> {
-        let a4_index = (A4_MIDI - NOTE_START) as i32;
+        let a4_index = A4_MIDI - NOTE_START;
         let min_octave = NOTE_START / 12 - 1;
         let max_octave = 6;
         let freq_to_note_offset = NOTE_START % 12;
@@ -529,25 +530,31 @@ impl PitchDetector {
     }
 
     fn get_volume(&mut self, buffer: &[f32]) -> f64 {
-        let len = buffer.len();
-        let check_len = if len < 1000 { len } else { 1000 };
-        let step = if len < 500 { 1 } else { 2 };
-        let mut peak: f64 = -1000.0;
-        for i in (0..check_len).step_by(step) {
-            let abs_val = buffer[i].abs() as f64;
+        // 扫描整个缓冲区取真实峰值。
+        // 原实现只检查前 1000 个样本（且步长为 2），若起音能量落在缓冲区后段会被直接漏检，
+        // 使 detect 的音量门限把有信号的帧误判为静音。
+        let mut peak: f64 = 0.0;
+        for &sample in buffer {
+            let abs_val = (sample as f64).abs();
             if abs_val > peak {
                 peak = abs_val;
             }
         }
         let volume = peak * 100.0;
 
+        // base_volume 用作"环境噪声底"估计，而非历史峰值：下降时快速跟随、上升时极慢。
+        // 原实现用 volume.max(base_volume) * VOLUME_DECAY 跟踪峰值，一旦弹过响音就会把门限长期抬高，
+        // 导致随后的轻音被 `peak_volume < base_volume * 0.3` 长期拒判。
+        const RISE_ALPHA: f64 = 0.001;
+        const FALL_ALPHA: f64 = 0.5;
         if self.base_volume <= 0.0 {
-            // 首次调用直接建立基线，避免前两次检测跳过阈值检查
             self.base_volume = volume.max(0.001);
+        } else if volume < self.base_volume {
+            self.base_volume += (volume - self.base_volume) * FALL_ALPHA;
         } else {
-            let effective = volume.max(self.base_volume);
-            self.base_volume = effective * VOLUME_DECAY;
+            self.base_volume += (volume - self.base_volume) * RISE_ALPHA;
         }
+        self.base_volume = self.base_volume.max(0.001);
 
         volume
     }
@@ -555,7 +562,8 @@ impl PitchDetector {
     fn apply_confusion_smoothing(&mut self, frequency: f64, note_idx: usize) -> f64 {
         if let Some(prev) = self.smoothed_frequency {
             let ratio = frequency / prev;
-            if ratio < 0.94 || ratio > 1.06 {
+            // 同上：NaN/异常比例 ⇒ `contains` 为 false ⇒ 视为「跳变」并清空队列。
+            if !(0.94..=1.06).contains(&ratio) {
                 self.pitch_queue.clear();
                 self.pitch_major_queue.clear();
                 self.confused = false;

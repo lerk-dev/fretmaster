@@ -164,3 +164,23 @@ askpass.bat
 音高识别改进方案.md
 音高识别改进最终报告.md
 音高识别测试报告.md
+
+# 临时草稿 / 分析残留
+.tmp*
+._pdf_shapes/
+__pycache__/
+
+# 构建缓存备份目录（只应存在于工作区，勿提交）
+.next-bk/
+.next-*/
+
+# 🚨 Steinberg ASIO SDK —— 专有许可，**严禁提交**（本项目是 MIT + 公开仓库）
+# 许可要点：未经商业授权不得再分发；且与 GPLv3 不兼容。
+# 只在本地按需放置，供 `cargo build --features asio` 使用（CPAL_ASIO_DIR 指向它）。
+# 获取方式见 src-tauri/vendor/README-asio.md
+src-tauri/vendor/asiosdk/
+
+# 🚨 本地专用归档 —— **严禁提交**（公开仓库）
+# 存放不宜公开的内容，例如改编自第三方课程（Tom Quayle《Ultimate Fretboard
+# Visualization》）的教程数据原件，及其配套组件/测试的本地备份。
+local-only/

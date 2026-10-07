@@ -6,9 +6,6 @@ const isTauri = process.env.TAURI_BUILD === 'true' || process.env.TAURI === 'tru
 // 导致客户端无法 hydrate（点击无反应）
 const nextConfig = isDev
   ? {
-      typescript: {
-        ignoreBuildErrors: true,
-      },
       images: {
         unoptimized: true,
       },
@@ -22,9 +19,6 @@ const nextConfig = isDev
       basePath: '',
       assetPrefix: './',
       trailingSlash: true,
-      typescript: {
-        ignoreBuildErrors: true,
-      },
       images: {
         unoptimized: true,
       },

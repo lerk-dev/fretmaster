@@ -55,21 +55,20 @@ export default function RootLayout({
               for (var i = 0; i < THEME_CLASSES.length; i++) html.classList.remove(THEME_CLASSES[i]);
               html.classList.add(theme);
               html.style.backgroundColor = bg;
+              // 同步 html lang 与持久化语言，避免读屏与搜索引擎拿到错误的语言标注
+              var lang = (parsed && parsed.state && parsed.state.user && parsed.state.user.language) || 'zh-CN';
+              html.lang = lang;
             } catch(e) {}
           })();
           window.__fmerrors = [];
           window.onerror = function(msg, src, line, col, err) {
             var info = (err && err.message) || msg;
-            if (info && info.indexOf('Hydration') !== -1) return;
-            if (info && info.indexOf('418') !== -1) return;
             window.__fmerrors.push('[onerror] ' + info + ' @ ' + src + ':' + line);
             var el = document.getElementById('__fmerr');
             if (el) { el.textContent = window.__fmerrors.join('\\n'); el.classList.remove('hidden'); }
           };
           window.addEventListener('unhandledrejection', function(e) {
             var info = e.reason && (e.reason.message || e.reason);
-            if (info && info.indexOf('Hydration') !== -1) return;
-            if (info && info.indexOf('418') !== -1) return;
             window.__fmerrors.push('[rejection] ' + info);
             var el = document.getElementById('__fmerr');
             if (el) { el.textContent = window.__fmerrors.join('\\n'); el.classList.remove('hidden'); }
@@ -83,8 +82,8 @@ export default function RootLayout({
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-icon.png" />
       </head>
-      <body className="font-sans antialiased flex flex-col h-screen overflow-hidden" suppressHydrationWarning>
-        <div id="__fmerr" className="hidden fixed bottom-0 left-0 right-0 z-[99999] bg-red-950 text-red-400 p-2 text-[11px] font-mono max-h-[120px] overflow-auto whitespace-pre-wrap border-t-2 border-red-600"></div>
+      <body className="font-sans antialiased app-height flex flex-col overflow-hidden" suppressHydrationWarning>
+        <div id="__fmerr" className="hidden fixed bottom-0 left-0 right-0 z-[99999] bg-red-950 text-red-400 p-2 text-2xs-plus font-mono max-h-[120px] overflow-auto whitespace-pre-wrap border-t-2 border-red-600"></div>
         <LayoutShell>{children}</LayoutShell>
       </body>
     </html>

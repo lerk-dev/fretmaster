@@ -16,79 +16,96 @@ export interface InstrumentConfig {
   stringCount: number
   // 高音弦 → 低音弦的开放音半音值，用于指板音名计算与渲染迭代
   tuning: number[]
-  // 用于显示的开放音名（与 tuning 一一对应，同序：高→低）
-  tuningNames: string[]
   defaultFretCount: number
+  // 最低空弦的**实际发声音高**（Hz）。必须显式给出：调弦数组里的半音值只有音级、
+  // 没有八度，同一音级（如 E）在不同乐器上可能是 E1(贝斯 41.20)/E2(吉他 82.41)/E4(329.63)，
+  // 靠启发式无法区分。音高检测的下限按它推导（见 detectFloorForLowestHz）。
+  lowestStringHz: number
 }
 
 export const INSTRUMENT_CONFIG: Record<InstrumentType, InstrumentConfig> = {
   // 六弦吉他标准调弦 E B G D A E（高→低）
   six_string_guitar: {
+    lowestStringHz: 82.41,
     stringCount: 6,
     tuning: [4, 11, 7, 2, 9, 4],
-    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
     defaultFretCount: 15,
   },
   // 六弦四度调弦 E A D G C F（高→低，全部纯四度）
   six_string_fourths: {
+    lowestStringHz: 87.31,
     stringCount: 6,
     tuning: [4, 9, 2, 7, 0, 5],
-    tuningNames: ['E', 'A', 'D', 'G', 'C', 'F'],
     defaultFretCount: 15,
   },
   // 七弦吉他标准调弦 E B G D A E B（高→低，加低 B）
   seven_string_guitar: {
+    lowestStringHz: 61.74,
     stringCount: 7,
     tuning: [4, 11, 7, 2, 9, 4, 11],
-    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E', 'B'],
     defaultFretCount: 15,
   },
   // 七弦四度调弦 E A D G C F B（高→低，全部纯四度）
   seven_string_fourths: {
+    lowestStringHz: 61.74,
     stringCount: 7,
     tuning: [4, 9, 2, 7, 0, 5, 11],
-    tuningNames: ['E', 'A', 'D', 'G', 'C', 'F', 'B'],
     defaultFretCount: 15,
   },
   // 四弦贝斯标准调弦 G D A E（高→低）
   four_string_bass: {
+    lowestStringHz: 41.2,
     stringCount: 4,
     tuning: [7, 2, 9, 4],
-    tuningNames: ['G', 'D', 'A', 'E'],
     defaultFretCount: 15,
   },
   // 五弦贝斯标准调弦 G D A E B（高→低，加低 B）
   five_string_bass: {
+    lowestStringHz: 30.87,
     stringCount: 5,
     tuning: [7, 2, 9, 4, 11],
-    tuningNames: ['G', 'D', 'A', 'E', 'B'],
     defaultFretCount: 15,
   },
   // 管乐器/音乐会音高乐器无真实指板，复用六弦吉他配置以保持 UI 可用
   b_flat_horn: {
+    lowestStringHz: 82.41,
     stringCount: 6,
     tuning: [4, 11, 7, 2, 9, 4],
-    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
     defaultFretCount: 15,
   },
   e_flat_horn: {
+    lowestStringHz: 82.41,
     stringCount: 6,
     tuning: [4, 11, 7, 2, 9, 4],
-    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
     defaultFretCount: 15,
   },
   concert_pitch: {
+    lowestStringHz: 82.41,
     stringCount: 6,
     tuning: [4, 11, 7, 2, 9, 4],
-    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
     defaultFretCount: 15,
   },
   concert_pitch_minus_one: {
+    lowestStringHz: 82.41,
     stringCount: 6,
     tuning: [4, 11, 7, 2, 9, 4],
-    tuningNames: ['E', 'B', 'G', 'D', 'A', 'E'],
     defaultFretCount: 15,
   },
+}
+
+/**
+ * 取当前乐器的指板配置（未知乐器名一律回退到标准六弦）。
+ *
+ * 🚨 唯一入口：各处**不要**再各写一份 `INSTRUMENT_CONFIG[x] || INSTRUMENT_CONFIG.six_string_guitar`。
+ * 指板渲染必须从这一个配置同时取「弦数」与「调弦」—— 曾因一处取 `stringCount`、
+ * 另一处取模块级全局 `getStringTuning()`，单个组件挂载时会画出「分隔线数 ≠ 行数」的指板。
+ *
+ * `INSTRUMENT_CONFIG` 只覆盖 `InstrumentType`，但 `user.instrument` 来自持久化存储，
+ * 可能是旧版本写入的、或用户手改的任意字符串 ⇒ 参数收 `string` 而非 `InstrumentType`。
+ */
+export function resolveInstrumentConfig(instrument: string): InstrumentConfig {
+  return (INSTRUMENT_CONFIG as Record<string, InstrumentConfig | undefined>)[instrument]
+    ?? INSTRUMENT_CONFIG.six_string_guitar
 }
 
 export interface PracticeSuggestion {
@@ -200,54 +217,4 @@ export const PRACTICE_SUGGESTIONS: Record<InstrumentType, PracticeSuggestion[]> 
     { id: 'cm5', text: 'Practice arpeggios with transposition', textZh: '练习带移调的琶音', category: 'technique' },
     { id: 'cm6', text: 'Work on sight-reading with transposition', textZh: '练习带移调的视奏', category: 'technique' },
   ],
-}
-
-export function getRandomPracticeSuggestion(instrument: InstrumentType, language: 'zh' | 'en' = 'zh'): PracticeSuggestion {
-  const suggestions = PRACTICE_SUGGESTIONS[instrument] || PRACTICE_SUGGESTIONS.concert_pitch
-  const randomIndex = Math.floor(Math.random() * suggestions.length)
-  return {
-    ...suggestions[randomIndex],
-    text: language === 'zh' ? suggestions[randomIndex].textZh : suggestions[randomIndex].text,
-  }
-}
-
-export function getPracticeSuggestionsByCategory(
-  instrument: InstrumentType, 
-  category: PracticeSuggestion['category'],
-  language: 'zh' | 'en' = 'zh'
-): PracticeSuggestion[] {
-  const suggestions = PRACTICE_SUGGESTIONS[instrument] || PRACTICE_SUGGESTIONS.concert_pitch
-  return suggestions
-    .filter(s => s.category === category)
-    .map(s => ({
-      ...s,
-      text: language === 'zh' ? s.textZh : s.text,
-    }))
-}
-
-export const INSTRUMENT_NAMES = {
-  zh: {
-    six_string_guitar: '六弦吉他',
-    six_string_fourths: '六弦吉他(四度调弦)',
-    seven_string_guitar: '七弦吉他',
-    seven_string_fourths: '七弦吉他(四度调弦)',
-    four_string_bass: '四弦贝斯',
-    five_string_bass: '五弦贝斯',
-    b_flat_horn: '降B调管乐器',
-    e_flat_horn: '降E调管乐器',
-    concert_pitch: '音乐会音高乐器',
-    concert_pitch_minus_one: '音乐会音高乐器(-1)',
-  },
-  en: {
-    six_string_guitar: '6-String Guitar',
-    six_string_fourths: '6-String Guitar (Fourths Tuning)',
-    seven_string_guitar: '7-String Guitar',
-    seven_string_fourths: '7-String Guitar (Fourths Tuning)',
-    four_string_bass: '4-String Bass',
-    five_string_bass: '5-String Bass',
-    b_flat_horn: 'Bb Horn',
-    e_flat_horn: 'Eb Horn',
-    concert_pitch: 'Concert Pitch Instrument',
-    concert_pitch_minus_one: 'Concert Pitch -1',
-  },
 }

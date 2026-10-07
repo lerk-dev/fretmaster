@@ -4,8 +4,22 @@ import { VERSION } from './version'
 import { InstrumentType } from './practice-suggestions'
 import { CustomSong } from './custom-song-editor'
 import { logger } from './logger'
+import type { PianoKeyboardStyle } from './piano-keyboard-style'
 
-function debounceStorage(storage: Storage): Storage {
+/**
+ * 给底层 Storage 包一层 300ms 写入合并（debounce）。
+ *
+ * 导出仅为可测（零行为变化）：它是 `persist` 的实际落盘通道，
+ * 「写太频」与「写丢失」两类问题都藏在这里，而通过 zustand 内部 `persist.getOptions()`
+ * 去够 storage 在 vitest 下取不到，所以直接导出这个纯函数用假 Storage 单测。
+ *
+ * ⚠️ 已知语义（测试已钉住，改动前先想清楚）：
+ *  - 单槽合并：只保留**最后一次**待写值，同一窗口内先写的会被丢弃（当前只有一个 key，无影响）；
+ *  - 定时器句柄在闭包里，模块级单例 —— 因此整个应用共享一条 300ms 队列；
+ *  - **没有 beforeunload / visibilitychange 兜底冲刷**：页面在写入后 300ms 内被关闭
+ *    （或刷新）时，最后一次设置变更会丢。见 __tests__/store-persist.test.ts 的说明。
+ */
+export function debounceStorage(storage: Storage): Storage {
   let timer: ReturnType<typeof setTimeout> | null = null
   let pendingData: string | null = null
   let pendingKey: string | null = null
@@ -52,6 +66,30 @@ export interface AudioSettings {
   enableLowPass?: boolean  // 低通滤波
   enableNotch50?: boolean  // 50Hz 陷波
   enableNotch60?: boolean  // 60Hz 陷波
+  // 桌面端音频后端（默认 wasapi_shared；独占/ASIO 不可用时会回退）
+  audioBackend?: 'wasapi_shared' | 'wasapi_exclusive' | 'asio'
+  /**
+   * 用户主动校准出的环境噪声底（RMS，见 lib/noise-calibration.ts）。
+   * `undefined` = 从未校准过，worklet 用它内置的默认值 0.0005。
+   *
+   * 注意它是**测量值而不是偏好**：`resetSettings` 会随 audio slice 一起清掉
+   * （与其余音频设置同语义）。清掉只是回到「自动跟踪」状态，不影响可用性。
+   */
+  noiseFloor?: number
+  /**
+   * 用户**主动**把「音频输入」关掉的标记（桌面端默认开的反例证据）。
+   *
+   * 为什么要单独一个字段：产品语义是「桌面端**默认开**，不需要每次开启；
+   * 关闭才需要记住」（2026-10-02 用户确认「跨会话记住」）。但 `micEnabled`
+   * 的默认值是 false —— 它无法区分「用户主动关了」和「从没碰过开关」。
+   * 只看 micEnabled 的话，默认开没法实现（会把「没碰过」误判成「想关」）。
+   *
+   * 读写约定：只经 `setMicUserPreference(enabled)` 写入（`micEnabled=enabled`
+   * 与 `micUserDisabled=!enabled` 同步落盘）；`setMicEnabled` 不动它（仅用于
+   * 启动恢复时把 UI 对齐成默认开，语义上不是用户选择）。
+   * Web 路径不读它（浏览器需要用户手势授权，不存在默认开）。
+   */
+  micUserDisabled?: boolean
 }
 
 export type FullscreenModeType = 'windowed' | 'fullscreen'
@@ -132,6 +170,8 @@ export const isLightTheme = (theme: ThemeMode): boolean => {
 }
 export type ChordScaleDisplayMode = 'chinese' | 'english' | 'english_short' | 'jazz'
 export type NoteAccidentalDisplay = 'sharp' | 'flat' | 'mixed'
+/** 指板显示方案：classic = 经典实心色块；guitarrun = GuitarRun 风格圆点霓虹皮肤 */
+export type FretboardStyle = 'classic' | 'guitarrun' | 'trainer'
 
 export interface UserSettings {
   instrument: InstrumentType
@@ -140,6 +180,9 @@ export interface UserSettings {
   chordScaleDisplay: ChordScaleDisplayMode
   noteAccidentalDisplay: NoteAccidentalDisplay
   showPracticeSuggestion: boolean
+  fretboardStyle: FretboardStyle
+  /** 钢琴键盘样式：classic = 整键底色高亮；musmath = 键面留白 + 音级色标 */
+  pianoKeyboardStyle: PianoKeyboardStyle
 }
 
 // Premium功能状态
@@ -169,6 +212,7 @@ export interface PracticeSettings {
   fretZoneSize: number  // 5品区宽度（默认5）
   octaveShiftEnabled: boolean  // 八度切换开关
   octaveShiftMode: 'up' | 'down' | 'random'  // 八度方向
+  weaknessWeightedEnabled: boolean  // 弱点加权出题开关
 }
 
 // 节拍器设置
@@ -208,6 +252,8 @@ export interface IntervalPracticeSettings {
   direction: 'up' | 'down' | 'random' | 'either'
   randomizeOrder: boolean
   practiceDuration: number
+  /** ⚠️ 已弃用：辅助开关不再持久化（页面不再写回、hook 初值恒 false）。
+   * 字段保留只为兼容 persist 的旧数据，**不要**再拿它当初值。 */
   showFretboard: boolean
   fretboardDuration: number
   autoAdvance: boolean
@@ -222,6 +268,8 @@ export interface ChordProgressionSettings {
   shouldRepeat: boolean
   shouldVoiceLead: boolean
   randomizeKeyOnRepeat: boolean
+  /** ⚠️ 已弃用（同 `IntervalPracticeSettings.showFretboard`）：
+   * 三个辅助显隐开关都不再持久化，字段保留仅为兼容旧 persist 数据。 */
   showFretboard: boolean
   showKeyboard: boolean
   showStructure: boolean
@@ -296,7 +344,7 @@ export interface AppState {
   
   // 当前练习建议
   currentPracticeSuggestion: string | null
-  
+
   // 版本号
   version: string
 }
@@ -319,6 +367,12 @@ export interface AppActions {
   
   // 音频操作
   setMicEnabled: (enabled: boolean) => void
+  /**
+   * 用户**显式**开/关「音频输入」（设置页开关、M 快捷键）。与 `setMicEnabled` 的区别：
+   * 本 action 同步落 `micUserDisabled=!enabled` —— 这是「用户偏好」，桌面端启动恢复
+   * 靠它区分「主动关了」（记住关）与「从没碰过」（默认开）。
+   */
+  setMicUserPreference: (enabled: boolean) => void
   setInputGain: (gain: number) => void
   setConfidenceThreshold: (threshold: number) => void
   setSensitivity: (sensitivity: number) => void
@@ -340,6 +394,9 @@ export interface AppActions {
   setAudioDevices: (devices: MediaDeviceInfo[]) => void
   setAudioInitializing: (initializing: boolean) => void
   setAudioError: (error: string | null) => void
+  setAudioBackend: (backend: 'wasapi_shared' | 'wasapi_exclusive' | 'asio') => void
+  /** 写入校准出的环境噪声底；传 null 清除（回到 worklet 内置默认） */
+  setNoiseFloor: (floor: number | null) => void
   
   // 练习设置操作
   setPracticeTime: (time: number) => void
@@ -354,6 +411,7 @@ export interface AppActions {
   setFretZoneSize: (size: number) => void
   setOctaveShiftEnabled: (enabled: boolean) => void
   setOctaveShiftMode: (mode: 'up' | 'down' | 'random') => void
+  setWeaknessWeightedEnabled: (enabled: boolean) => void
   
   // 节拍器操作
   setMetronomeEnabled: (enabled: boolean) => void
@@ -391,6 +449,8 @@ export interface AppActions {
   setTheme: (theme: ThemeMode) => void
   setChordScaleDisplay: (display: ChordScaleDisplayMode) => void
   setNoteAccidentalDisplay: (display: NoteAccidentalDisplay) => void
+  setFretboardStyle: (style: FretboardStyle) => void
+  setPianoKeyboardStyle: (style: PianoKeyboardStyle) => void
   setShowPracticeSuggestion: (show: boolean) => void
   setCurrentPracticeSuggestion: (suggestion: string | null) => void
   
@@ -406,12 +466,77 @@ export interface AppActions {
   // 收藏操作
   toggleLevelFavorite: (id: string) => void
   toggleSongFavorite: (id: string) => void
-  isLevelFavorite: (id: string) => boolean
-  isSongFavorite: (id: string) => boolean
   
   // 重置
   resetSettings: () => void
+
 }
+
+/**
+ * 把旧命名方案的练习等级 id 映射到当前方案。
+ * 背景：早期 page.tsx 自带一份等级数据，id 形如 `voice_led_voice_led_structure_1`；
+ * 现已统一到 lib/practice-levels 的 `voice_led_structure_1` 命名。
+ * 此函数用于把老用户已保存的「当前等级」与「等级收藏」迁到新 id，避免失效。
+ * 返回 null 表示该等级已被合并掉（调用方应回退到默认值）。
+ */
+export function remapLegacyLevelId(id: string): string | null {
+  const explicit: Record<string, string> = {
+    'chord_scales_chord_scale': 'chord_scale',
+    'chord_scales_chord_scale_3rd_to_3rd': 'chord_scale_3rd_to_3rd',
+    'chord_scales_chord_scale_5th_to_5th': 'chord_scale_5th_to_5th',
+    'chord_scales_chord_scale_7th_to_7th': 'chord_scale_7th_to_7th',
+    'chord_scales_chord_scale_random_starting_chord_tone': 'chord_scale_random_chord_tone',
+    'chord_scales_chord_scale_random_starting_scale_tone': 'chord_scale_random_scale_tone',
+    'four_chord_tones_root_3rd_5th_7th_random_inversions': 'four_chord_tones_random_inversions',
+    'melodic_5th_to_9th_melodic_structure_10_random_inversions': 'melodic_structure_10_random_inversions',
+    'melodic_5th_to_9th_melodic_structure_6': 'melodic_structure_6',
+    'melodic_5th_to_9th_melodic_structure_7': 'melodic_structure_7',
+    'melodic_5th_to_9th_melodic_structure_8': 'melodic_structure_8',
+    'melodic_5th_to_9th_melodic_structure_9': 'melodic_structure_9',
+    'melodic_root_to_5th_melodic_structure_1': 'melodic_structure_1',
+    'melodic_root_to_5th_melodic_structure_2': 'melodic_structure_2',
+    'melodic_root_to_5th_melodic_structure_3': 'melodic_structure_3',
+    'melodic_root_to_5th_melodic_structure_4': 'melodic_structure_4',
+    'melodic_root_to_5th_melodic_structure_5_random_inversions': 'melodic_structure_5_random_inversions',
+    'passing_note_scales_passing_note_scale': 'passing_note_scale',
+    'passing_note_scales_passing_note_scale_3rd_to_3rd': 'passing_note_scale_3rd_to_3rd',
+    'passing_note_scales_passing_note_scale_5th_to_5th': 'passing_note_scale_5th_to_5th',
+    'passing_note_scales_passing_note_scale_6th7th_to_6th7th': 'passing_note_scale_6th_7th_to_6th_7th',
+    'passing_note_scales_passing_note_scale_random_starting_chord_tone': 'passing_note_scale_random_chord_tone',
+    'suspended_suspended_2_resolution': 'suspended_2_resolution',
+    'suspended_suspended_4_resolution': 'suspended_4_resolution',
+    'three_chord_tones_root_3rd_5th_random_inversions': 'three_chord_tones_random_inversions',
+    'voice_led_voice_led_structure_1': 'voice_led_structure_1',
+    'voice_led_voice_led_structure_2': 'voice_led_structure_2',
+    'voice_led_voice_led_structure_3': 'voice_led_structure_3',
+    'voice_led_voice_led_structure_4': 'voice_led_structure_4',
+    'voice_led_voice_led_structure_5': 'voice_led_structure_5',
+  }
+  const hit = explicit[id]
+  if (hit) return hit
+  // 兜底：多数改名只是去掉了重复的分类前缀
+  for (const prefix of [
+    'voice_led_',
+    'melodic_root_to_5th_',
+    'melodic_5th_to_9th_',
+    'suspended_',
+    'chord_scales_',
+    'passing_note_scales_',
+  ]) {
+    if (id.startsWith(prefix)) {
+      const stripped = id.slice(prefix.length)
+      if (stripped !== id) return stripped
+    }
+  }
+  return null
+}
+
+/** 已被合并掉的旧等级（无法映射，回退默认等级） */
+const REMOVED_LEGACY_LEVEL_IDS: string[] = [
+  'four_chord_tones_3rd_5th_7th_root_3rd',
+  'four_chord_tones_5th_7th_root_3rd_5th',
+  'four_chord_tones_7th_root_3rd_5th_7th',
+]
 
 // 初始状态
 const initialState: AppState = {
@@ -440,6 +565,9 @@ const initialState: AppState = {
     enableLowPass: true,     // Windows 最佳实践：启用低通滤波
     enableNotch50: true,     // Windows 最佳实践：启用50Hz陷波(亚洲/欧洲)
     enableNotch60: false,    // 北美用户可手动启用60Hz陷波
+    audioBackend: 'wasapi_shared',
+    // 「音频输入默认开」的反例证据：用户从未主动关过 ⇒ false（Tauri 启动恢复用）
+    micUserDisabled: false,
   },
   
   audioDevice: {
@@ -464,6 +592,7 @@ const initialState: AppState = {
     fretZoneSize: 5,
     octaveShiftEnabled: false,
     octaveShiftMode: 'random',
+    weaknessWeightedEnabled: false,
   },
   
   metronome: {
@@ -545,6 +674,8 @@ const initialState: AppState = {
     chordScaleDisplay: 'chinese' as ChordScaleDisplayMode,
     noteAccidentalDisplay: 'sharp' as NoteAccidentalDisplay,
     showPracticeSuggestion: true,
+    fretboardStyle: 'classic' as FretboardStyle,
+    pianoKeyboardStyle: 'classic' as PianoKeyboardStyle,
   },
   
   premium: {
@@ -561,14 +692,124 @@ const initialState: AppState = {
   },
   
   currentPracticeSuggestion: null,
-  
+
   version: VERSION,
 }
+
+/**
+ * 把持久化的 state 迁移到当前版本（zustand persist 的 migrate 回调）。
+ * 抽为导出的纯函数以便测试 —— 迁移出错不会抛异常、只会让老用户静默失效。
+ */
+export function migratePersistedState(persistedState: any, version: number): any {
+  try {
+    if (!persistedState || typeof persistedState !== 'object') {
+      return initialState
+    }
+    if (!persistedState.focusMode) {
+      persistedState.focusMode = initialState.focusMode
+    } else {
+      if (persistedState.focusMode.fullscreenMode === undefined) {
+        persistedState.focusMode.fullscreenMode = 'windowed'
+      }
+      if (persistedState.focusMode.enabled === undefined) {
+        persistedState.focusMode.enabled = false
+      }
+      if (persistedState.focusMode.enableWakeLock === undefined) {
+        persistedState.focusMode.enableWakeLock = true
+      }
+      if (persistedState.focusMode.enableFullscreen === undefined) {
+        persistedState.focusMode.enableFullscreen = true
+      }
+    }
+    if (!persistedState.user) {
+      persistedState.user = initialState.user
+    } else {
+      if (persistedState.user.language === undefined || persistedState.user.language === 'zh') {
+        persistedState.user.language = 'zh-CN'
+      }
+      if (persistedState.user.instrument === undefined) {
+        persistedState.user.instrument = initialState.user.instrument
+      }
+      if (persistedState.user.theme === undefined) {
+        persistedState.user.theme = 'dark'
+      }
+      if (persistedState.user.chordScaleDisplay === undefined) {
+        persistedState.user.chordScaleDisplay = 'chinese'
+      }
+      if (persistedState.user.noteAccidentalDisplay === undefined) {
+        persistedState.user.noteAccidentalDisplay = 'sharp'
+      }
+      if (persistedState.user.showPracticeSuggestion === undefined) {
+        persistedState.user.showPracticeSuggestion = initialState.user.showPracticeSuggestion
+      }
+      // 嵌套字段不会随顶层浅合并补默认值 ⇒ 老 blob 必须在这里补齐，否则永久 undefined
+      if (persistedState.user.fretboardStyle === undefined) {
+        persistedState.user.fretboardStyle = 'classic'
+      }
+      if (persistedState.user.pianoKeyboardStyle === undefined) {
+        persistedState.user.pianoKeyboardStyle = 'classic'
+      }
+    }
+    // audio.micUserDisabled：2026-10-02 新增（「桌面端音频输入默认开」语义）。
+    // 老 blob 的 audio 对象整体浅覆盖 initialState.audio ⇒ 嵌套新字段必须在这里补齐。
+    // ⚠️ 老 blob 里 micEnabled=false 分不清「主动关」还是「从没开」，统一按
+    // 「从未主动关」处理 ⇒ 升级后享受默认开 —— 与本次产品诉求方向一致。
+    if (persistedState.audio && persistedState.audio.micUserDisabled === undefined) {
+      persistedState.audio.micUserDisabled = false
+    }
+    if (persistedState.fullscreenMode !== undefined) {
+      persistedState.isFullscreen = persistedState.fullscreenMode
+      delete persistedState.fullscreenMode
+    }
+
+    // v1 -> v2：练习等级 id 统一到 lib/practice-levels 命名方案。
+    // 把老用户已选等级与等级收藏从旧 id 迁到新 id（已被合并掉的等级回退默认）。
+    if (version < 2) {
+      const DEFAULT_LEVEL_ID = 'single_chord_tones_root'
+      if (persistedState.chordProgression && typeof persistedState.chordProgression.selectedLevelId === 'string') {
+        const oldId = persistedState.chordProgression.selectedLevelId
+        if (REMOVED_LEGACY_LEVEL_IDS.includes(oldId)) {
+          persistedState.chordProgression.selectedLevelId = DEFAULT_LEVEL_ID
+        } else {
+          const mapped = remapLegacyLevelId(oldId)
+          if (mapped) persistedState.chordProgression.selectedLevelId = mapped
+        }
+      }
+      if (persistedState.favorites && Array.isArray(persistedState.favorites.levelFavorites)) {
+        persistedState.favorites.levelFavorites = persistedState.favorites.levelFavorites
+          .map((id: string) => (REMOVED_LEGACY_LEVEL_IDS.includes(id) ? null : (remapLegacyLevelId(id) ?? id)))
+          .filter((id: string | null): id is string => !!id)
+      }
+    }
+
+    return persistedState
+  } catch (error) {
+    logger.error('Store migration failed, resetting to defaults:', error)
+    return initialState
+  }
+}
+
+export const storePartialize = (state: AppState) => ({
+  displayScale: state.displayScale,
+  audio: state.audio,
+  practice: state.practice,
+  metronome: state.metronome,
+  feedbackSound: state.feedbackSound,
+  focusMode: state.focusMode,
+  user: state.user,
+  premium: state.premium,
+  customSongs: state.customSongs,
+  favorites: state.favorites,
+  chordSymbols: state.chordSymbols,
+  scalePractice: state.scalePractice,
+  intervalPractice: state.intervalPractice,
+  chordProgression: state.chordProgression,
+})
 
 // 创建 Store
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       ...initialState,
       
       // UI 操作
@@ -598,6 +839,11 @@ export const useAppStore = create<AppState & AppActions>()(
       
       // 音频操作
       setMicEnabled: (enabled) => set((state) => ({ audio: { ...state.audio, micEnabled: enabled } })),
+      // 只写 micEnabled 的话，「主动关」与「从没碰过」无法区分 ⇒ 桌面端永远实现不了默认开
+      setMicUserPreference: (enabled) =>
+        set((state) => ({
+          audio: { ...state.audio, micEnabled: enabled, micUserDisabled: !enabled },
+        })),
       setInputGain: (gain) => set((state) => ({ audio: { ...state.audio, inputGain: gain } })),
       setConfidenceThreshold: (threshold) => set((state) => ({ audio: { ...state.audio, confidenceThreshold: threshold } })),
       setSensitivity: (sensitivity) => set((state) => ({ audio: { ...state.audio, sensitivity } })),
@@ -628,6 +874,8 @@ export const useAppStore = create<AppState & AppActions>()(
       setAudioDevices: (devices) => set((state) => ({ audioDevice: { ...state.audioDevice, devices } })),
       setAudioInitializing: (initializing) => set((state) => ({ audioDevice: { ...state.audioDevice, initializing } })),
       setAudioError: (error) => set((state) => ({ audioDevice: { ...state.audioDevice, error } })),
+      setAudioBackend: (backend) => set((state) => ({ audio: { ...state.audio, audioBackend: backend } })),
+      setNoiseFloor: (floor) => set((state) => ({ audio: { ...state.audio, noiseFloor: floor ?? undefined } })),
       
       // 练习设置操作
       setPracticeTime: (time) => set((state) => ({ practice: { ...state.practice, practiceTime: time } })),
@@ -646,6 +894,7 @@ export const useAppStore = create<AppState & AppActions>()(
       })),
       setOctaveShiftEnabled: (enabled) => set((state) => ({ practice: { ...state.practice, octaveShiftEnabled: enabled } })),
       setOctaveShiftMode: (mode) => set((state) => ({ practice: { ...state.practice, octaveShiftMode: mode } })),
+      setWeaknessWeightedEnabled: (enabled) => set((state) => ({ practice: { ...state.practice, weaknessWeightedEnabled: enabled } })),
       
       // 节拍器操作
       setMetronomeEnabled: (enabled) => set((state) => ({ metronome: { ...state.metronome, enabled } })),
@@ -683,6 +932,8 @@ export const useAppStore = create<AppState & AppActions>()(
       setTheme: (theme) => set((state) => ({ user: { ...state.user, theme } })),
       setChordScaleDisplay: (chordScaleDisplay) => set((state) => ({ user: { ...state.user, chordScaleDisplay } })),
       setNoteAccidentalDisplay: (noteAccidentalDisplay) => set((state) => ({ user: { ...state.user, noteAccidentalDisplay } })),
+      setFretboardStyle: (fretboardStyle) => set((state) => ({ user: { ...state.user, fretboardStyle } })),
+      setPianoKeyboardStyle: (pianoKeyboardStyle) => set((state) => ({ user: { ...state.user, pianoKeyboardStyle } })),
       setShowPracticeSuggestion: (show) => set((state) => ({ user: { ...state.user, showPracticeSuggestion: show } })),
       setCurrentPracticeSuggestion: (suggestion) => set({ currentPracticeSuggestion: suggestion }),
       
@@ -720,8 +971,6 @@ export const useAppStore = create<AppState & AppActions>()(
           }
         }
       }),
-      isLevelFavorite: (id) => get().favorites.levelFavorites.includes(id),
-      isSongFavorite: (id) => get().favorites.songFavorites.includes(id),
       
       // 重置
       resetSettings: () => set({
@@ -732,74 +981,14 @@ export const useAppStore = create<AppState & AppActions>()(
         focusMode: initialState.focusMode,
         user: initialState.user,
       }),
+
     }),
     {
       name: 'fretmaster-store',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => debounceStorage(localStorage)),
-      partialize: (state) => ({
-        displayScale: state.displayScale,
-        audio: state.audio,
-        practice: state.practice,
-        metronome: state.metronome,
-        feedbackSound: state.feedbackSound,
-        focusMode: state.focusMode,
-        user: state.user,
-        premium: state.premium,
-        customSongs: state.customSongs,
-        favorites: state.favorites,
-        chordSymbols: state.chordSymbols,
-        scalePractice: state.scalePractice,
-        intervalPractice: state.intervalPractice,
-        chordProgression: state.chordProgression,
-      }),
-      migrate: (persistedState: any, version) => {
-        try {
-          if (!persistedState || typeof persistedState !== 'object') {
-            return initialState
-          }
-          if (!persistedState.focusMode) {
-            persistedState.focusMode = initialState.focusMode
-          } else {
-            if (persistedState.focusMode.fullscreenMode === undefined) {
-              persistedState.focusMode.fullscreenMode = 'windowed'
-            }
-            if (persistedState.focusMode.enabled === undefined) {
-              persistedState.focusMode.enabled = false
-            }
-            if (persistedState.focusMode.enableWakeLock === undefined) {
-              persistedState.focusMode.enableWakeLock = true
-            }
-            if (persistedState.focusMode.enableFullscreen === undefined) {
-              persistedState.focusMode.enableFullscreen = true
-            }
-          }
-          if (!persistedState.user) {
-            persistedState.user = initialState.user
-          } else {
-            if (persistedState.user.language === 'zh') {
-              persistedState.user.language = 'zh-CN'
-            }
-            if (persistedState.user.theme === undefined) {
-              persistedState.user.theme = 'dark'
-            }
-            if (persistedState.user.chordScaleDisplay === undefined) {
-              persistedState.user.chordScaleDisplay = 'chinese'
-            }
-            if (persistedState.user.noteAccidentalDisplay === undefined) {
-              persistedState.user.noteAccidentalDisplay = 'sharp'
-            }
-          }
-          if (persistedState.fullscreenMode !== undefined) {
-            persistedState.isFullscreen = persistedState.fullscreenMode
-            delete persistedState.fullscreenMode
-          }
-          return persistedState
-        } catch (error) {
-          logger.error('Store migration failed, resetting to defaults:', error)
-          return initialState
-        }
-      },
+      partialize: (state) => storePartialize(state),
+      migrate: migratePersistedState,
     }
   )
 )
@@ -811,10 +1000,8 @@ export const useMetronomeSettings = () => useAppStore((state) => state.metronome
 export const useFeedbackSoundSettings = () => useAppStore((state) => state.feedbackSound)
 export const useScore = () => useAppStore((state) => state.score)
 export const useIsPlaying = () => useAppStore((state) => state.isPlaying)
-export const useVersion = () => useAppStore((state) => state.version)
 export const useDisplayScale = () => useAppStore((state) => state.displayScale)
-export const useFavorites = () => useAppStore((state) => state.favorites)
-export const useLevelFavorites = () => useAppStore((state) => state.favorites.levelFavorites)
-export const useSongFavorites = () => useAppStore((state) => state.favorites.songFavorites)
 export const useUser = () => useAppStore((state) => state.user)
+export const useFretboardStyle = () => useAppStore((state) => state.user.fretboardStyle)
+export const usePianoKeyboardStyle = () => useAppStore((state) => state.user.pianoKeyboardStyle)
 export const useChordSymbols = () => useAppStore((state) => state.chordSymbols)

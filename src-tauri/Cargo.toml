@@ -1,6 +1,6 @@
 [package]
 name = "fretmaster"
-version = "0.2.157"
+version = "0.2.219"
 description = "FretMaster - Professional Guitar Fretboard Practice Tool"
 authors = ["FretMaster Team"]
 edition = "2021"
@@ -38,8 +38,58 @@ once_cell = "1.20"
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
+    # 诊断探针 examples/win_fullscreen_probe.rs 用（keybd_event 发送测试按键）
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_Graphics_Gdi",
+    # WASAPI 独占模式所需（CoCreateInstance / CoInitializeEx 等）
+    "Win32_System_Com",
 ] }
+
+[features]
+default = []
+# ASIO 音频后端。需要本机安装 ASIO SDK 并设置 CPAL_ASIO_DIR 环境变量。
+# 默认不启用，避免在无 SDK 的环境下编译失败（启用方式：cargo build --features asio）。
+asio = ["cpal/asio"]
+
+# 🚨 构建修复（2026-10-02）—— 这是本机唯一能让 release 构建通过的办法。
+#
+# 症状：`cargo build --release` 在 `schemars v0.8.22` 上失败：
+#     error[E0107]: struct takes 3 generic arguments but 2 were supplied
+#       --> schemars-0.8.22/src/lib.rs:12:32
+#      12 | pub type Map<K, V> = indexmap::IndexMap<K, V>;
+#     note: struct defined here, with 3 generic parameters: K, V, S
+#       --> indexmap-1.9.3/src/map.rs:76:12
+#    76 | pub struct IndexMap<K, V, S> {
+#
+# 根因链（逐环实测确认，非猜测）：
+#   ① Tauri 生态（tauri-build / tauri-utils / tauri-plugin-*）都需要 schemars 0.8.22，
+#      且都会打开它的 `preserve_order` feature（`cargo tree -e features` 可见）。
+#   ② `preserve_order` 下 schemars 定义为 `indexmap::IndexMap<K, V>`（**2 个参数**）。
+#   ③ `indexmap 1.9.3` 的 `IndexMap` 只有在 `has_std` 时才有第 3 个参数的默认值：
+#        #[cfg(has_std)]       pub struct IndexMap<K, V, S = RandomState>   // map.rs:71
+#        #[cfg(not(has_std))]  pub struct IndexMap<K, V, S>                // map.rs:76
+#   ④ `has_std` 由 indexmap 的 build.rs 判定，没显式开 `std` feature 时用 `autocfg`
+#      **探测** sysroot 里的 std。本机该探测恒假（实测）：
+#        warning: autocfg could not probe for `std`
+#        probe_sysroot_crate(std) = false
+#      ⇒ 落到 `not(has_std)` ⇒ 2 参数不合法 ⇒ 编译失败。
+#
+# 已试过但**无效**的办法（别再重复）：显式 `indexmap = { features = ["std"] }` ——
+#   `cargo tree` 里确实能看到 `indexmap feature "std" └── fretmaster`，
+#   但 build script 的编译命令行里**始终没有** `--cfg 'feature="std"'`
+#   （只有 `serde` / `serde-1`），所以 build.rs 仍走探测分支。原因未明，
+#   可能与 `default-features = false` 或 cargo 对空 feature 的处理有关。
+#
+# 因此改用 `[patch]` 换掉 indexmap 的 build.rs，**无条件 emit `has_std`**。
+# 桌面端目标必有 std，这个假设是安全且正确的；若将来要 cross-compile 到 no_std
+# 目标，需要改回按目标判定（见补丁文件内的注释）。
+#
+# 补丁源码在 `src-tauri/vendor/indexmap-patched/`（**入库跟踪**，不是 .workbuddy/tmp
+# ——那里被 .gitignore 忽略，path 依赖放那儿会导致 clone 下来直接构建失败）。
+# 补丁内容 = crates.io 的 indexmap 1.9.3 原样拷贝，**只改了一个 build.rs**，
+# 升级 indexmap 或 rustc 后若问题消失，删掉 [patch] + vendor 目录即可。
+[patch.crates-io]
+indexmap = { path = "vendor/indexmap-patched" }
 
 [profile.release]
 lto = true

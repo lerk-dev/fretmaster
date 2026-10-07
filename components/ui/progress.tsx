@@ -17,6 +17,10 @@ function Progress({
         'bg-primary/20 relative h-2 w-full overflow-hidden rounded-full',
         className,
       )}
+      // 必须把 value 透给 Root：此前只用来算下面 Indicator 的 transform，
+      // Root 拿不到值 ⇒ 永远是 data-state="indeterminate"、没有 aria-valuenow，
+      // 读屏软件读不出进度（视觉上是对的，所以一直没被发现）。
+      value={value}
       {...props}
     >
       <ProgressPrimitive.Indicator

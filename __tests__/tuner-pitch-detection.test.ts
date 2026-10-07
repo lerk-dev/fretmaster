@@ -224,11 +224,11 @@ describe('YINPitchDetection 音高检测', () => {
 })
 
 // ==================== SOLO YIN 算法测试（需预热） ====================
-// 注意: SOLO (FFT加速版) 在 Node.js 测试环境中存在已知问题：
-// FFT 自相关计算不稳定，总是返回 F#。标准 YIN 算法正常工作。
-// 在浏览器环境中的实际表现可能不同，这里跳过 SOLO 测试。
+// SOLO (FFT加速版) 的自相关依赖 FloatFFT。此前 FFT 旋转因子被错误地声明在
+// j 循环内（每轮重置为 (1,0)），导致自相关全错、"总是返回 F#"，测试被跳过。
+// 该 bug 已在 lib/pitch-detection.ts complexForward 中修复，现恢复这些测试。
 
-describe.skip('SOLOYinAnalyser 音高检测（预热后）- 已知 SOLO FFT-ACF 问题', () => {
+describe('SOLOYinAnalyser 音高检测（预热后）', () => {
   let analyser: SOLOYinAnalyser
 
   beforeEach(() => {
@@ -362,7 +362,7 @@ describe('调音器检测流程模拟', () => {
 
   it.each(GUITAR_STRINGS)(
     '调音器流程 (SOLO) 应正确检测 $name 弦（预热后）- SOLO FFT-ACF 已知问题',
-    ({ freq, expectedNote }) => {
+    ({ freq }) => {
       const phaseOffset = WARMUP_FRAMES * BUFFER_SIZE
       const audio = generateSineWave(freq, SAMPLE_RATE, BUFFER_SIZE, 0.3, phaseOffset)
       const result = simulateTunerDetection(audio, SAMPLE_RATE, 'solo', freq)

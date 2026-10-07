@@ -16,21 +16,8 @@ export function isSafari(): boolean {
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
 }
 
-export function isIOSSafari(): boolean {
-  return isIOS() && isSafari()
-}
-
 export function needsUserInteractionForAudio(): boolean {
   return isIOS() || isSafari()
-}
-
-export function supportsAudioWorklet(): boolean {
-  if (typeof window === 'undefined') return false
-
-  return (
-    typeof AudioContext !== 'undefined' &&
-    typeof AudioWorkletNode !== 'undefined'
-  )
 }
 
 export function supportsWebAudio(): boolean {

@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -24,6 +24,16 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Plus,
   Trash2,
   Copy,
@@ -37,9 +47,9 @@ import {
   ListMusic,
   Edit3,
   X,
-  Check,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { activateOnEnterSpace } from '@/lib/a11y'
 import {
   CustomSong,
   ChordViewModel,
@@ -67,12 +77,29 @@ interface CustomSongEditorProps {
   onClose?: () => void
 }
 
+/**
+ * `lib/custom-song-editor.ts` 的 `validateSong()` 返回的是**写死的中文**消息
+ * （它的契约测试在断言这些字符串，不宜改动），这里把已知消息映射到界面语言。
+ * 映射不全时 `t()` 会原样返回消息本身（不会显示成 key），
+ * 并由 `__tests__/custom-song-editor-ui.test.ts` 里的一致性用例兜住 ——
+ * 库那边改了文案，那条用例会红。
+ */
+const VALIDATION_ERROR_KEYS: Record<string, string> = {
+  '歌曲名称不能为空': 'empty_name',
+  '至少需要一个和弦': 'empty_chords',
+  '速度应在40-300 BPM之间': 'tempo_range',
+  '每小节拍数应在1-16之间': 'beats_range',
+}
+export { VALIDATION_ERROR_KEYS }
+
 export const CustomSongEditor = memo(function CustomSongEditor({
   language,
   onClose,
 }: CustomSongEditorProps) {
   const store = useAppStore()
-  const customSongs = store.customSongs || []
+  // 用 useMemo 固定引用：`store.customSongs || []` 在为空时每次渲染都会新建空数组，
+  // 会让下游 useCallback 的依赖每次都变（memo 子组件随之失效）。
+  const customSongs = useMemo(() => store.customSongs || [], [store.customSongs])
   const addCustomSong = store.addCustomSong
   const updateCustomSong = store.updateCustomSong
   const deleteCustomSong = store.deleteCustomSong
@@ -84,6 +111,8 @@ export const CustomSongEditor = memo(function CustomSongEditor({
   const [importText, setImportText] = useState('')
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [transposeValue, setTransposeValue] = useState(0)
+  /** 待确认删除的歌曲（删除不可撤销，必须先过一道确认） */
+  const [pendingDelete, setPendingDelete] = useState<CustomSong | null>(null)
 
   const isZh = language === 'zh-CN'
 
@@ -121,6 +150,8 @@ export const CustomSongEditor = memo(function CustomSongEditor({
         'validation_errors': '验证错误',
         'empty_name': '歌曲名称不能为空',
         'empty_chords': '至少需要一个和弦',
+        'tempo_range': '速度应在40-300 BPM之间',
+        'beats_range': '每小节拍数应在1-16之间',
         'saved': '已保存',
         'move_up': '上移',
         'move_down': '下移',
@@ -166,6 +197,8 @@ export const CustomSongEditor = memo(function CustomSongEditor({
         'validation_errors': 'Validation Errors',
         'empty_name': 'Song name is required',
         'empty_chords': 'At least one chord is required',
+        'tempo_range': 'Tempo must be between 40 and 300 BPM',
+        'beats_range': 'Beats per bar must be between 1 and 16',
         'saved': 'Saved',
         'move_up': 'Move Up',
         'move_down': 'Move Down',
@@ -182,6 +215,9 @@ export const CustomSongEditor = memo(function CustomSongEditor({
     }
     return translations[language]?.[key] || key
   }, [language])
+
+  /** 把库里写死的中文校验消息翻成界面语言（未映射到的原样显示） */
+  const displayError = (message: string) => t(VALIDATION_ERROR_KEYS[message] ?? message)
 
   const handleNewSong = useCallback(() => {
     const song = createEmptySong()
@@ -220,6 +256,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
 
   const handleDeleteSong = useCallback((id: string) => {
     deleteCustomSong(id)
+    setPendingDelete(null)
   }, [deleteCustomSong])
 
   const handleDuplicateSong = useCallback((song: CustomSong) => {
@@ -322,8 +359,13 @@ export const CustomSongEditor = memo(function CustomSongEditor({
     }
     if (song) {
       setEditingSong(song)
+      // 必须切到编辑器视图：否则导入结果只躺在 editingSong 里，
+      // 用户点完「导入」还停在列表页，看起来像什么都没发生。
+      setShowSongList(false)
       setShowImportDialog(false)
       setImportText('')
+      // 清掉上一次导入失败留下的报错，否则它会跟着进入编辑器页的错误横幅
+      setValidationErrors([])
     } else {
       setValidationErrors([t('import_failed')])
     }
@@ -362,12 +404,12 @@ export const CustomSongEditor = memo(function CustomSongEditor({
               <Plus className="h-4 w-4 mr-1" />
               {t('new_song')}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowImportDialog(true)}>
+            <Button size="sm" variant="outline" onClick={() => { setValidationErrors([]); setShowImportDialog(true) }}>
               <Upload className="h-4 w-4 mr-1" />
               {t('import')}
             </Button>
             {onClose && (
-              <Button size="sm" variant="ghost" onClick={onClose}>
+              <Button size="sm" variant="ghost" onClick={onClose} aria-label={t('cancel')} title={t('cancel')}>
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -393,34 +435,34 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-sm truncate">{song.name}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          <Badge variant="secondary" className="text-2xs px-1.5 py-0">
                             {song.key.replace('Major', isZh ? '大调' : 'Maj').replace('Minor', isZh ? '小调' : 'Min')}
                           </Badge>
-                          <span className="text-[10px] text-muted-foreground">{song.tempo} BPM</span>
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-2xs text-muted-foreground">{song.tempo} BPM</span>
+                          <span className="text-2xs text-muted-foreground">
                             {song.chords.length} {isZh ? '个和弦' : 'chords'}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {song.chords.slice(0, 8).map((c, i) => (
-                            <span key={c.id} className="text-[10px] text-muted-foreground font-mono">
+                            <span key={c.id} className="text-2xs text-muted-foreground font-mono">
                               {chordToSymbol(c, isZh ? 'chinese' : 'english')}
                               {i < song.chords.length - 1 && i < 7 && ' →'}
                             </span>
                           ))}
                           {song.chords.length > 8 && (
-                            <span className="text-[10px] text-muted-foreground">...</span>
+                            <span className="text-2xs text-muted-foreground">...</span>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1 ml-2">
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditSong(song)}>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditSong(song)} aria-label={t('edit_song')} title={t('edit_song')}>
                           <Edit3 className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDuplicateSong(song)}>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDuplicateSong(song)} aria-label={t('duplicate')} title={t('duplicate')}>
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeleteSong(song.id)}>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => setPendingDelete(song)} aria-label={t('delete')} title={t('delete')}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -447,7 +489,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
             {validationErrors.length > 0 && (
               <div className="text-destructive text-sm">
                 {validationErrors.map((err, i) => (
-                  <p key={i}>{err}</p>
+                  <p key={i}>{displayError(err)}</p>
                 ))}
               </div>
             )}
@@ -459,6 +501,27 @@ export const CustomSongEditor = memo(function CustomSongEditor({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* 删除确认：自定义歌曲删了就没了，不能一点就删 */}
+        <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => { if (!open) setPendingDelete(null) }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('confirm_delete')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingDelete ? `《${pendingDelete.name}》 · ${t('confirm_delete_desc')}` : t('confirm_delete_desc')}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-white hover:bg-destructive/90"
+                onClick={() => { if (pendingDelete) handleDeleteSong(pendingDelete.id) }}
+              >
+                {t('delete')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     )
   }
@@ -489,7 +552,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
             <Save className="h-4 w-4 mr-1" />
             {t('save')}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => { setEditingSong(null); setShowSongList(true) }}>
+          <Button size="sm" variant="ghost" onClick={() => { setEditingSong(null); setShowSongList(true) }} aria-label={t('cancel')} title={t('cancel')}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -501,7 +564,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
               <p className="text-destructive text-sm font-medium mb-1">{t('validation_errors')}</p>
               {validationErrors.map((err, i) => (
-                <p key={i} className="text-destructive/80 text-xs">{err}</p>
+                <p key={i} className="text-destructive/80 text-xs">{displayError(err)}</p>
               ))}
             </div>
           )}
@@ -628,7 +691,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                 <Card key={chord.id} className="overflow-hidden">
                   <CardContent className="p-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground w-4 text-center font-mono">
+                      <span className="text-2xs text-muted-foreground w-4 text-center font-mono">
                         {index + 1}
                       </span>
                       <Select
@@ -657,7 +720,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                         <SelectContent>
                           {Object.entries(chordTypeGroups).map(([category, types]) => (
                             <div key={category}>
-                              <p className="text-[10px] text-muted-foreground px-2 py-1 font-medium">
+                              <p className="text-2xs text-muted-foreground px-2 py-1 font-medium">
                                 {categoryLabels[category]?.[isZh ? 'zh' : 'en'] || category}
                               </p>
                               {types.map(ct => (
@@ -671,7 +734,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                       </Select>
 
                       <div className="flex items-center gap-1">
-                        <Label className="text-[10px] text-muted-foreground">{t('beats')}</Label>
+                        <Label className="text-2xs text-muted-foreground">{t('beats')}</Label>
                         <Input
                           type="number"
                           min={1}
@@ -706,6 +769,8 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                           className="h-6 w-6 p-0"
                           disabled={index === 0}
                           onClick={() => handleMoveChord(chord.id, 'up')}
+                          aria-label={t('move_up')}
+                          title={t('move_up')}
                         >
                           <ArrowUp className="h-3 w-3" />
                         </Button>
@@ -715,6 +780,8 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                           className="h-6 w-6 p-0"
                           disabled={index === editingSong.chords.length - 1}
                           onClick={() => handleMoveChord(chord.id, 'down')}
+                          aria-label={t('move_down')}
+                          title={t('move_down')}
                         >
                           <ArrowDown className="h-3 w-3" />
                         </Button>
@@ -723,6 +790,8 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                           variant="ghost"
                           className="h-6 w-6 p-0 text-destructive"
                           onClick={() => handleRemoveChord(chord.id)}
+                          aria-label={t('remove_chord')}
+                          title={t('remove_chord')}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -761,14 +830,18 @@ export const CustomSongEditor = memo(function CustomSongEditor({
               {COMMON_PROGRESSIONS.map(preset => (
                 <Card
                   key={preset.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={isZh ? preset.nameZh : preset.name}
                   className="cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => handleLoadPreset(preset.id)}
+                  onKeyDown={activateOnEnterSpace(() => handleLoadPreset(preset.id))}
                 >
                   <CardContent className="p-3">
                     <h4 className="text-sm font-medium">{isZh ? preset.nameZh : preset.name}</h4>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {preset.chords.map((c, i) => (
-                        <span key={i} className="text-[10px] font-mono text-muted-foreground">
+                        <span key={i} className="text-2xs font-mono text-muted-foreground">
                           {c.rootNote}{c.chordType === 'Major' ? '' : c.chordType}
                           {i < preset.chords.length - 1 && ' →'}
                         </span>

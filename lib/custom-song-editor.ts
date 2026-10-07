@@ -282,27 +282,56 @@ export function chordToSymbol(chord: ChordViewModel, displayMode: 'chinese' | 'e
 }
 
 export function parseChordSymbol(symbol: string): ChordViewModel | null {
-  const match = symbol.match(/^([A-G][#b]?)([^\/]*)(?:\/([A-G][#b]?))?$/)
+  const match = symbol.trim().match(/^([A-G][#b]?)(.*)$/)
   if (!match) return null
-  
-  const [, root, typeStr, bass] = match
-  
-  let chordType: ChordType = 'Major'
-  if (typeStr) {
-    const found = CHORD_TYPES.find(t => 
-      t.name.toLowerCase() === typeStr.toLowerCase() ||
-      t.nameZh === typeStr
-    )
-    if (found) chordType = found.id
-  }
-  
-  return {
+
+  const root = match[1] as RootNote
+  const rest = match[2]
+
+  const make = (chordType: ChordType, bass?: string): ChordViewModel => ({
     id: `chord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    rootNote: root as RootNote,
+    rootNote: root,
     chordType,
     bass: bass as RootNote | undefined,
     beats: 4,
+  })
+
+  // 1) 无类型后缀 → 大三和弦
+  if (!rest) return make('Major')
+
+  // 2) 只有 slash bass（如 "C/E"）
+  const bassOnly = rest.match(/^\/\s*([A-G][#b]?)$/)
+  if (bassOnly) return make('Major', bassOnly[1])
+
+  // 3) 类型名本身可能含 '/'（CHORD_TYPES 里 6add9 的英文名就是 '6/9'）——
+  //    必须按「最长前缀」先匹配已知类型，再解析剩余 '/bass'。
+  //    否则 'C6/9' 会被当成 root=C + bass=9（9 不是音名）而整个解析失败，
+  //    使「导出简单格式 → 粘贴导入」时这类和弦静默丢失。
+  const byAliasLength = [...CHORD_TYPES].sort((a, b) =>
+    Math.max(b.name.length, b.nameZh.length, b.id.length) -
+    Math.max(a.name.length, a.nameZh.length, a.id.length))
+  for (const t of byAliasLength) {
+    for (const alias of [t.name, t.nameZh, t.id]) {
+      if (!alias || !rest.toLowerCase().startsWith(alias.toLowerCase())) continue
+      const tail = rest.slice(alias.length)
+      if (!tail) return make(t.id)
+      const bm = tail.match(/^\/\s*([A-G][#b]?)$/)
+      if (bm) return make(t.id, bm[1])
+    }
   }
+
+  // 4) 兜底：与旧实现一致（未识别的类型名降级为 Major），保持向后兼容
+  const legacy = rest.match(/^([^/]*)(?:\/\s*([A-G][#b]?))?$/)
+  if (legacy) {
+    const typeStr = legacy[1]
+    const found = CHORD_TYPES.find(t =>
+      t.name.toLowerCase() === typeStr.toLowerCase() ||
+      t.nameZh === typeStr ||
+      t.id.toLowerCase() === typeStr.toLowerCase())
+    return make(found ? found.id : 'Major', legacy[2])
+  }
+
+  return null
 }
 
 export function validateSong(song: CustomSong): { valid: boolean; errors: string[] } {
@@ -328,24 +357,6 @@ export function validateSong(song: CustomSong): { valid: boolean; errors: string
     valid: errors.length === 0,
     errors,
   }
-}
-
-export function exportSongToText(song: CustomSong): string {
-  const lines = [
-    `Name: ${song.name}`,
-    `Composer: ${song.composer}`,
-    `Key: ${song.key}`,
-    `Time: ${song.beatsPerMeasure}/${song.beatSize}`,
-    `Tempo: ${song.tempo} BPM`,
-    '',
-    'Chords:',
-    ...song.chords.map(c => {
-      const symbol = chordToSymbol(c)
-      const func = c.function ? ` (${c.function})` : ''
-      return `  ${symbol}${func} - ${c.beats} beats`
-    }),
-  ]
-  return lines.join('\n')
 }
 
 export function exportSongToJSON(song: CustomSong): string {
@@ -426,7 +437,11 @@ export function transposeSong(song: CustomSong, semitones: number): CustomSong {
     const noteList = isFlat ? flatNotes : notes
     const index = noteList.indexOf(note)
     if (index === -1) return note
-    const newIndex = (index + semitones + 12) % 12
+    // ⚠️ 必须把取模结果再规正到 0..11：JS 的 % 对负数返回负值，原来
+    // `(index + semitones + 12) % 12` 在 semitones <= -13 时会得到负下标，
+    // noteList[负数] === undefined，于是 rootNote / bass 变成 undefined
+    // （UI 的「重置移调」会传 -transposeValue，点十余次加号后就会触发）。
+    const newIndex = ((index + semitones) % 12 + 12) % 12
     return noteList[newIndex]
   }
   
@@ -439,18 +454,4 @@ export function transposeSong(song: CustomSong, semitones: number): CustomSong {
     })),
     updatedAt: Date.now(),
   }
-}
-
-export function getSongsByFavorite(songs: CustomSong[], favoriteIds: string[]): CustomSong[] {
-  return songs.filter(song => favoriteIds.includes(song.id))
-}
-
-export function sortSongsByDate(songs: CustomSong[], ascending: boolean = false): CustomSong[] {
-  return [...songs].sort((a, b) => 
-    ascending ? a.updatedAt - b.updatedAt : b.updatedAt - a.updatedAt
-  )
-}
-
-export function sortSongsByName(songs: CustomSong[]): CustomSong[] {
-  return [...songs].sort((a, b) => a.name.localeCompare(b.name))
 }

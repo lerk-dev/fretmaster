@@ -2,12 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 仅保留 --radius 作为全局不变量；其余主题变量统一由具体主题类
-   (.dark / .light 等) 提供，避免 :root 与 .dark 双重定义导致
+/* 仅保留与主题**无关**的全局不变量（--radius、--font-fretboard）；其余主题变量统一由
+   具体主题类 (.dark / .light 等) 提供，避免 :root 与 .dark 双重定义导致
    主题切换时依赖源码顺序的隐患。Pre-hydration 脚本会保证首绘前
    html 已带上正确主题类，因此 :root 不再需要默认深色值。 */
 :root {
   --radius: 0.75rem;
+
+  /* ===== 指板字体的**唯一真相源** =====
+     两套皮肤都只引用这一个变量，改字体只改这一行：
+       · 经典皮肤 `components/practice-fretboard.tsx` —— Tailwind 工具类 `font-fretboard`
+         （tailwind.config.ts 里映射到本变量，**不重复写字体栈**）；
+       · GuitarRun 皮肤 `.gr-note-dot` / `.gr-fret-numbers`（本文件下方）。
+     护栏：`__tests__/fretboard-font-parity.test.ts`。
+
+     🚨 族的**顺序有语义**，别凭「好看」重排：
+       ① 等宽层打头 —— 品数是数字、音名是「C♯ / E♭」这类拉丁字母，等宽才能让列对齐；
+          且两套皮肤观感自此一致（经典皮肤原来是 Segoe UI，与 GuitarRun 的等宽字形不同）。
+          `ui-monospace` 在 Windows 上由 Chromium 解析为 Consolas，具名族逐个列出只为跨平台兜底。
+       ② 符号层必须排在等宽层**之后** —— 'Noto Music' 的 latin 子集（U+0000-00FF）含 A-G 与数字，
+          若排在前面会把数字/音名整体抢走（字形变成乐谱字体）。
+          它是 ♯/♭/♮（U+266D-266F，见 @fontsource/noto-music 的 unicode-range）的**确定性**来源；
+          'Segoe UI Symbol' 排在它前面，是为了在 Windows 上优先用系统符号字体。
+          ⚠️ 指板里的 ♯/♭ 由 `formatDegree()`（lib/page-theory-functions.ts）产出 ——
+          此前**没有任何一层显式兜底**（`.font-mono` 那条栈尾是泛型 monospace），
+          经典皮肤靠继承 sans 栈里的 'Segoe UI Symbol' 侥幸能看，GuitarRun 则看运气。
+       ③ CJK 层 —— GuitarRun 的空弦标签是中文「空弦」（lib/i18n.ts:220），前面两层都没有汉字，
+          必须显式兜底；否则由浏览器按系统默认挑，跨平台会变方框。
+       ④ 泛型族垫底，只在前面具名族全不可用时生效。 */
+  --font-fretboard: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New',
+    'Segoe UI Symbol', 'Noto Music', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB',
+    'Noto Sans SC', monospace, sans-serif;
+}
+
+/* 应用高度：优先动态视口（100dvh），回退固定视口（100vh）。
+   嵌入式 WebView 或移动端可见地址栏场景下，100vh 可能超出可视区域，
+   导致 body 高度按内容撑高、overflow-hidden 直接裁掉底部内容（课程页「开始练习/标记完成」不可见）。
+   使用动态视口可将 body 精确钳到当前可视高度，内部 flex 滚动容器即可正常滚动到底。 */
+.app-height {
+  height: 100vh; /* 不支持 dvh 的浏览器回退 */
+  height: 100dvh;
 }
 
 /* ============================================
@@ -604,6 +638,13 @@
     height: 100% !important;
     overflow: hidden !important;
   }
+  /* 专注模式「隐藏干扰元素」（focusMode.hideDistractions）：
+     FocusMode 组件在 <html> 上打 .focus-clean 时，页面上带 data-focus-distraction
+     标记的辅助元素（结构浮动窗口 / 练习建议条）统一隐藏。
+     用 display:none 而非条件卸载 —— 保留 DOM 与组件状态（铁律 18①）。 */
+  html.focus-clean [data-focus-distraction] {
+    display: none;
+  }
   body {
     @apply bg-background text-foreground;
     transition: background-color 0.3s ease, color 0.3s ease;
@@ -651,6 +692,12 @@
   /* P1.10: 仅在键盘聚焦时显示焦点环 */
   .focus-ring-none:focus { outline: none; }
   .focus-ring-none:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+  /* 经典皮肤的「下一把位预览」呼吸动画（复用 GuitarRun 的 keyframes，避免两套皮肤两种节奏）。
+     配色见 lib/fretboard-note-button-color.ts 的三个 PREVIEW_* 常量；
+     reduced-motion 由下面的通配块统一降级。 */
+  .fret-next-blink {
+    animation: gr-next-blink 0.72s ease-in-out infinite;
+  }
   @media (prefers-reduced-motion: reduce) {
     body,
     .theme-transition,
@@ -748,4 +795,674 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ============================================
+   GuitarRun 风格指板（备选显示方案）
+   复刻 guitarrun.com 的指板渲染：深色舞台 + 横向品列 + 圆点音符 + 霓虹强调色。
+   作用域全部限定在 .gr-stage 子树内，因此不会影响经典皮肤（components/practice-fretboard.tsx）。
+   注意：这套皮肤**自带走深色底**（不跟随 .light/.dark 主题），因为它的可读性依赖深底 + 亮圆点；
+   主题切换时它保持原样，这是刻意的（皮肤本身就是"另一个方案"）。
+   动效遵循系统「减少动态效果」——上面的 prefers-reduced-motion 块已统一降级。
+   ============================================ */
+/* 🚨 本单位是**与字号直接耦合的容器**，必须 rem（随显示缩放走）：
+   显示缩放 = 只改 `html` 根字号（见 lib/display-scale.ts）⇒ 字号放大后圆点/行高/空弦列
+   若不跟着放大，文字会溢出圆点、圆点溢出列。下面「乐器比例件」（1px 发丝线、琴枕、弦距、
+   品记点、圆角）**保持 px** —— 它们是乐器上的固定比例，放大后不该变粗变圆。 */
+.gr-stage {
+  --gr-acid: #d7ff45;
+  --gr-orange: #ff7048;
+  --gr-cyan: #48cfff;
+  --gr-ink: #eef3ec;
+  --gr-dim: #838d96;
+  --gr-open-w: 2.125rem; /* 34px 基准：空弦列宽（装「空弦」标签与圆点） */
+  --gr-row-h: 1.875rem;  /* 30px 基准：一行（= 一根弦）的高度 */
+  --gr-dot: 1.125rem;    /* 18px 基准：音名圆点直径（装 11px 文字） */
+  position: relative;
+  overflow: hidden;
+  padding: 12px 10px 6px;
+  border: 1px solid #2a3038;
+  border-radius: var(--radius, 0.75rem);
+  background: linear-gradient(180deg, #111820, #090d11);
+}
+@media (min-width: 640px) {
+  .gr-stage {
+    --gr-open-w: 3.375rem; /* 54px 基准 */
+    --gr-row-h: 2.5rem;    /* 40px 基准 */
+    --gr-dot: 2.125rem;    /* 34px 基准 */
+    padding: 20px 18px 8px;
+  }
+}
+.gr-scroll {
+  overflow-x: auto;
+}
+.gr-grid {
+  min-width: 0;
+}
+.gr-fretboard {
+  position: relative;
+  display: grid;
+  border: 1px solid #343a40;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #171a1f, #1e1d1b 45%, #15191d);
+}
+.gr-fret-numbers {
+  display: grid;
+  align-items: center;
+  height: 1.375rem; /* 22px 基准：品数行高（容器随字号缩放） */
+  color: #555e67;
+  text-align: center;
+  font-family: var(--font-fretboard);
+  font-size: 0.625rem; /* 10px 基准 */
+  line-height: 1;
+}
+.gr-fret-number--marker {
+  color: var(--gr-acid);
+  font-weight: 600;
+}
+.gr-fret-number--open {
+  font-size: 0.5625rem; /* 9px 基准 */
+  letter-spacing: 0.025rem; /* 0.4px 基准：字距是文字度量 ⇒ 随字号缩放 */
+  color: #6a737b;
+}
+
+/* 一个格子 = 一根弦 × 一个品 */
+.gr-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--gr-row-h);
+  padding: 0;
+  border: 0;
+  border-right: 1px solid #4a5058;
+  background: transparent;
+  cursor: pointer;
+}
+/* 琴弦：横跨格子的细线；同弦的所有格子拼起来 = 一根连续弦线（粗细由 --gr-string-w 决定）
+   ⚠️ 弦线粗细是**乐器比例**（components/guitarrun-fretboard.tsx 按弦号给 px）
+   ⇒ 刻意不随显示缩放变粗，别「顺手」改成 rem。 */
+.gr-cell::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: var(--gr-string-w, 1px);
+  transform: translateY(-50%);
+  background: #9aa0a4;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+/* 空弦列：右侧粗线 = 琴枕（乐器比例件 ⇒ 保持 px） */
+.gr-cell--open {
+  background: #0d1014;
+  border-right: 3px solid #d9d4c8;
+}
+@media (min-width: 640px) {
+  .gr-cell--open {
+    border-right-width: 6px;
+  }
+}
+.gr-cell:disabled,
+.gr-cell--disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+.gr-cell:focus-visible {
+  outline: 2px solid var(--gr-cyan);
+  outline-offset: -2px;
+}
+.gr-cell:not(:disabled):hover .gr-note-dot {
+  box-shadow: 0 0 0 3px rgba(72, 207, 255, 0.18);
+}
+
+.gr-note-dot {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: var(--gr-dot);
+  height: var(--gr-dot);
+  border-radius: 50%;
+  font-family: var(--font-fretboard);
+  font-size: 0.6875rem; /* 11px 基准 */
+  font-weight: 600;
+  line-height: 1;
+  color: transparent;
+  transition: transform 0.12s, background-color 0.12s, box-shadow 0.12s, color 0.12s;
+}
+@media (max-width: 639px) {
+  .gr-note-dot {
+    font-size: 0.4375rem; /* 7px 基准 */
+  }
+}
+/* 文字可见性由 data-visible 控制（不靠 opacity，便于测试断言） */
+.gr-note-dot[data-visible='1'] {
+  color: var(--gr-ink);
+}
+
+/* 空弦：自带底色与描边；可见性由判定层保证（弦标签恒 showText=true），CSS 不再特判 */
+.gr-cell--open .gr-note-dot {
+  background: #202830;
+  border: 1px solid #65717b;
+  box-shadow: 0 0 0 4px rgba(11, 16, 20, 0.55);
+  color: #eef3ec;
+}
+
+/* 题目内的普通音（音阶音 / 和弦音 / 音程音） */
+.gr-cell--tone .gr-note-dot {
+  border: 1px solid #343e47;
+  background: #262d34;
+  color: var(--gr-dim);
+}
+.gr-cell--tone .gr-note-dot[data-visible='0'] {
+  color: transparent;
+}
+
+/* 题目内的根音：加酸黄描边与内圈 */
+.gr-cell--root .gr-note-dot {
+  border: 1px solid var(--gr-acid);
+  background: #262d34;
+  box-shadow: inset 0 0 0 1px rgba(215, 255, 69, 0.27);
+  color: var(--gr-acid);
+}
+
+/* 当前目标音：橙色实心 + 放大 + 光晕 */
+.gr-cell--target .gr-note-dot {
+  border: 1px solid var(--gr-orange);
+  background: var(--gr-orange);
+  box-shadow: 0 0 0 6px rgba(255, 112, 72, 0.1), 0 0 25px rgba(255, 112, 72, 0.4);
+  color: #fff;
+  transform: scale(1.15);
+}
+
+/* 刚点对 / 刚点错（瞬时反馈，优先级最高） */
+.gr-cell--hit .gr-note-dot {
+  border-color: var(--gr-acid) !important;
+  background: var(--gr-acid) !important;
+  box-shadow: 0 0 32px rgba(215, 255, 69, 0.53) !important;
+  color: #091008 !important;
+  animation: gr-note-bounce 0.52s cubic-bezier(0.2, 0.9, 0.25, 1.35);
+}
+.gr-cell--wrong .gr-note-dot {
+  border-color: #ff8b6b;
+  background: #ff4b48;
+  box-shadow: 0 0 22px rgba(255, 75, 72, 0.5);
+  color: #fff;
+}
+
+/* 压暗（限制品区外 / 一弦三音把位外） */
+.gr-cell--muted .gr-note-dot {
+  opacity: 0.28;
+}
+
+/* 一弦三音：下一把位预览（青色虚线闪烁那套） */
+.gr-cell--next .gr-note-dot {
+  border: 1px dashed var(--gr-cyan);
+  background: rgba(72, 207, 255, 0.14);
+  box-shadow: 0 0 0 3px rgba(72, 207, 255, 0.09), 0 0 18px rgba(72, 207, 255, 0.33);
+  color: #c9f4ff;
+  animation: gr-next-blink 0.72s ease-in-out infinite;
+}
+.gr-cell--next-root .gr-note-dot {
+  border: 2px solid var(--gr-acid);
+  background: rgba(215, 255, 69, 0.4);
+  box-shadow: 0 0 24px rgba(215, 255, 69, 0.53);
+  color: #102000;
+}
+.gr-cell--next-start .gr-note-dot {
+  border: 2px solid #ffd0c4;
+  background: var(--gr-orange);
+  box-shadow: 0 0 0 7px rgba(255, 112, 72, 0.16), 0 0 32px var(--gr-orange);
+  color: #fff;
+  animation: gr-next-start-blink 0.5s ease-in-out infinite;
+}
+
+/* 品记点：画在指板下沿（GuitarRun 的 .cell.marker:after 同义）
+   ⚠️ 指板嵌饰是**乐器比例件** ⇒ 保持 px，不随显示缩放放大。 */
+.gr-cell[data-marker='1']::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #4a545c;
+}
+@media (max-width: 639px) {
+  .gr-cell[data-marker='1']::after {
+    width: 4px;
+    height: 4px;
+    bottom: 2px;
+  }
+}
+
+@keyframes gr-next-blink {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.88);
+    box-shadow: 0 0 4px rgba(72, 207, 255, 0.13);
+  }
+}
+@keyframes gr-next-start-blink {
+  50% {
+    transform: scale(1.28);
+    box-shadow: 0 0 0 11px rgba(255, 112, 72, 0.09), 0 0 40px var(--gr-orange);
+  }
+}
+@keyframes gr-note-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.15);
+  }
+  34% {
+    transform: translateY(-10px) scale(1.42);
+  }
+  62% {
+    transform: translateY(2px) scale(1.08);
+  }
+  80% {
+    transform: translateY(-2px) scale(1.2);
+  }
+}
+
+/* ============================================
+   MyFretboardTrainer 风格指板（第三套显示方案；同时供乐理面板的「整幅 CAGED」使用）
+   复刻 myfretboardtrainer.com 的深色 3D 琴颈：木纹颈身 + 金属弦 + 亮银品丝 + 珠光品记 + 发光圆点。
+   作用域限定在 .ft-stage 子树内，不与 .gr-*（GuitarRun）或经典皮肤互相影响。
+   这套皮肤**自带深色底**、不跟随 .light/.dark —— 与 GuitarRun 同样的取舍（可读性依赖深底 + 亮圆点）。
+
+   🚨 「一半一半」是这套皮肤的核心：一个音位同时落在 CAGED 的两个形状里时，参考站用**一句**
+   linear-gradient 表达（左右各半、40%–60% 之间是过渡带）：
+       .note.clicked.CAColor { background: linear-gradient(90deg, var(--CColor) 40%, var(--AColor) 60%) }
+   这里原样保留该写法，只把类名换成 `[data-role='form-CA']`（用 data 属性而非动态类名，
+   避免类名拼接被打包/purge 影响）。
+   ⚠️ 形状配色与「相邻对顺序」的唯一真相源是 lib/fretboard-trainer-theory.ts
+   （CAGED_FORM_COLORS / CAGED_ADJACENT_PAIRS），下面的 --ft-form-* 必须与之一致（有护栏比对）。
+   ============================================ */
+.ft-stage {
+  /* CAGED 五形状色（= CAGED_FORM_COLORS） */
+  --ft-form-C: #95609f;
+  --ft-form-A: #8eb676;
+  --ft-form-G: #06b6d4;
+  --ft-form-E: #f43f5e;
+  --ft-form-D: #eab308;
+  /* 音级色（照参考站 fretboard3.css 的 .note.clicked.* 规则取值） */
+  --ft-root-a: #fb7185;
+  --ft-root-b: #e11d48;
+  --ft-default-a: #94a3b8;
+  --ft-default-b: #475569;
+  --ft-seventh-a: #22d3ee;
+  --ft-seventh-b: #0891b2;
+  --ft-blue-a: #60a5fa;
+  --ft-blue-b: #2563eb;
+  --ft-success-a: #34d399;
+  --ft-success-b: #059669;
+  --ft-danger-a: #f87171;
+  --ft-danger-b: #dc2626;
+  --ft-orange-a: #fb923c;
+  --ft-orange-b: #ea580c;
+  /* 装文字的容器尺寸 ⇒ 随显示缩放走 rem（与 GuitarRun 同一取舍）；
+     下面的弦粗/品丝/琴枕/品记/圆角是**乐器比例件**，保持 px，别改 rem。 */
+  --ft-open-w: 2.5rem;
+  --ft-row-h: 1.75rem;
+  --ft-dot: 1.5rem;
+  --ft-num-h: 1.25rem;
+  position: relative;
+  overflow: hidden;
+  padding: 10px 8px 4px;
+  border: 1px solid #2a3038;
+  border-radius: var(--radius, 0.75rem);
+  background: #0b0f19;
+}
+@media (min-width: 640px) {
+  .ft-stage {
+    --ft-open-w: 3.25rem;
+    --ft-row-h: 2.1875rem;
+    --ft-dot: 2rem;
+    --ft-num-h: 1.375rem;
+    padding: 16px 14px 6px;
+  }
+}
+.ft-scroll {
+  overflow-x: auto;
+}
+.ft-grid {
+  min-width: 0;
+}
+/* 琴颈颈身：木纹 + 纵向明暗（照参考站 .dark-theme .fretboard-body） */
+.ft-board {
+  position: relative;
+  display: grid;
+  border-top: 3px solid rgba(255, 255, 255, 0.18);
+  border-bottom: 3px solid rgba(255, 255, 255, 0.18);
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  background-color: #141416;
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.007) 0px,
+      rgba(255, 255, 255, 0.007) 1px,
+      transparent 1px,
+      transparent 12px
+    ),
+    repeating-linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.15) 0px,
+      rgba(0, 0, 0, 0.15) 2px,
+      transparent 2px,
+      transparent 7px
+    ),
+    linear-gradient(
+      to bottom,
+      #0f0f11 0%,
+      #19191d 15%,
+      #1e1e24 35%,
+      #222228 50%,
+      #1a1a20 65%,
+      #141416 85%,
+      #0a0a0d 100%
+    );
+  box-shadow:
+    inset 0 8px 16px rgba(0, 0, 0, 0.6),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.6),
+    0 12px 28px rgba(0, 0, 0, 0.45);
+}
+.ft-nums {
+  display: grid;
+  align-items: center;
+  height: var(--ft-num-h);
+  color: #f1f5f9;
+  text-align: center;
+  font-family: var(--font-fretboard);
+  font-size: 0.6875rem; /* 11px 基准 */
+  line-height: 1;
+}
+.ft-num--marker {
+  color: #e2e8f0;
+  font-weight: 700;
+}
+.ft-num--open {
+  font-size: 0.625rem; /* 10px 基准 */
+  letter-spacing: 0.025rem;
+  color: #94a3b8;
+}
+
+/* 一个格子 = 一根弦 × 一个品 */
+.ft-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ft-row-h);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+/* 品丝（乐器比例件 ⇒ px）：亮银渐变 + 双侧阴影，z 序在弦之下（品记点与音名圆点都在其上方） */
+.ft-cell::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(to right, #555 0%, #dcdcdc 35%, #ffffff 50%, #b0b0b0 70%, #3c3c3c 100%);
+  box-shadow:
+    1px 0 3px rgba(0, 0, 0, 0.75),
+    -1px 0 1px rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+  z-index: 2;
+}
+/* 琴弦：横跨格子的金属线；同弦所有格子拼起来 = 一根连续弦（粗细由 --ft-string-w 决定） */
+.ft-cell::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: var(--ft-string-w, 1px);
+  transform: translateY(-50%);
+  background: linear-gradient(to bottom, #8b929a 0%, #d5dde6 50%, #5d636b 100%);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  z-index: 5;
+}
+/* 0 品列右边界 = 琴枕（骨色，乐器比例件） */
+.ft-cell--open::after {
+  width: 8px;
+  background: linear-gradient(to right, #d3cbbd 0%, #eae5da 45%, #fbf8f0 55%, #ded7c8 100%);
+  box-shadow:
+    2px 0 6px rgba(0, 0, 0, 0.8),
+    -1px 0 1px rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+/* 珠光品记点（乐器比例件；嵌在木里，但**必须画在琴弦之上** —— 否则被金属弦线切掉） */
+.ft-inlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #e8e8ed 50%, #cccccc 85%, #b3b3b8 100%);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.12);
+  opacity: 0.9;
+  pointer-events: none;
+  /* 6 = 在琴弦（.ft-cell::before, z-index 5）之上，避免品记被弦线切掉 */
+  z-index: 6;
+}
+.ft-cell--static {
+  cursor: default;
+}
+.ft-cell:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: -2px;
+}
+
+/* 音名圆点：默认不可见（data-visible 控制），可见时是发光气泡 */
+.ft-dot {
+  position: relative;
+  /* 7 = 最上层：必须高于琴弦（.ft-cell::before, z-index 5）与品记点（.ft-inlay, z-index 6）。
+     音名/音级标记是主体内容，绝不能被弦线遮挡（2026-10-06 修：原来 z-index 3 < 弦的 5）。 */
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  width: var(--ft-dot);
+  height: var(--ft-dot);
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  font-family: var(--font-fretboard);
+  font-size: 0.75rem; /* 12px 基准（小屏）；≥640px 提到 0.8125rem */
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s linear;
+}
+@media (min-width: 640px) {
+  .ft-dot {
+    font-size: 0.8125rem; /* 13px 基准 */
+  }
+}
+.ft-dot[data-visible='1'] {
+  opacity: 1;
+}
+
+/* ---------- CAGED 五形状：单形状 ---------- */
+.ft-dot[data-role='form-C'] {
+  background: var(--ft-form-C);
+  box-shadow:
+    0 0 15px rgba(149, 96, 159, 0.7),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='form-A'] {
+  background: var(--ft-form-A);
+  box-shadow:
+    0 0 15px rgba(16, 185, 129, 0.7),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='form-G'] {
+  background: var(--ft-form-G);
+  box-shadow:
+    0 0 15px rgba(6, 182, 212, 0.7),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='form-E'] {
+  background: var(--ft-form-E);
+  box-shadow:
+    0 0 15px rgba(244, 63, 94, 0.7),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='form-D'] {
+  background: var(--ft-form-D);
+  box-shadow:
+    0 0 15px rgba(234, 179, 8, 0.7),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- CAGED 相邻形状**共享音**：左右各半（40%–60% 过渡带） ----------
+   顺序即 CAGED_ADJACENT_PAIRS（CAGED 是环，D 的后继回到 C ⇒ 最后一对是 DC）。 */
+.ft-dot[data-role='form-CA'] {
+  background: linear-gradient(90deg, var(--ft-form-C) 40%, var(--ft-form-A) 60%);
+  box-shadow:
+    0 0 15px rgba(16, 185, 129, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='form-AG'] {
+  background: linear-gradient(90deg, var(--ft-form-A) 40%, var(--ft-form-G) 60%);
+  box-shadow:
+    0 0 15px rgba(6, 182, 212, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='form-GE'] {
+  background: linear-gradient(90deg, var(--ft-form-G) 40%, var(--ft-form-E) 60%);
+  box-shadow:
+    0 0 15px rgba(244, 63, 94, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='form-ED'] {
+  background: linear-gradient(90deg, var(--ft-form-E) 40%, var(--ft-form-D) 60%);
+  box-shadow:
+    0 0 15px rgba(234, 179, 8, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='form-DC'] {
+  background: linear-gradient(90deg, var(--ft-form-D) 40%, var(--ft-form-C) 60%);
+  box-shadow:
+    0 0 15px rgba(149, 96, 159, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- 音级色（非 CAGED 档 / 练习皮肤共用） ---------- */
+.ft-dot[data-role='root'] {
+  background: linear-gradient(135deg, var(--ft-root-a) 0%, var(--ft-root-b) 100%);
+  box-shadow:
+    0 0 15px rgba(225, 29, 72, 0.85),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='tone'],
+.ft-dot[data-role='default'] {
+  background: linear-gradient(135deg, var(--ft-default-a) 0%, var(--ft-default-b) 100%);
+  box-shadow:
+    0 0 12px rgba(71, 85, 105, 0.6),
+    inset 0 2px 4px rgba(255, 255, 255, 0.3);
+}
+.ft-dot[data-role='seventh'] {
+  background: linear-gradient(135deg, var(--ft-seventh-a) 0%, var(--ft-seventh-b) 100%);
+  box-shadow:
+    0 0 15px rgba(6, 182, 212, 0.8),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='blue'] {
+  background: linear-gradient(135deg, var(--ft-blue-a) 0%, var(--ft-blue-b) 100%);
+  box-shadow:
+    0 0 15px rgba(59, 130, 246, 0.8),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='target'] {
+  background: linear-gradient(135deg, var(--ft-orange-a) 0%, var(--ft-orange-b) 100%);
+  box-shadow:
+    0 0 15px rgba(249, 115, 22, 0.8),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='matched'] {
+  background: linear-gradient(135deg, var(--ft-success-a) 0%, var(--ft-success-b) 100%);
+  box-shadow:
+    0 0 15px rgba(16, 185, 129, 0.8),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+.ft-dot[data-role='wrong'] {
+  background: rgba(148, 163, 184, 0.3);
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.ft-dot[data-role='preview'] {
+  background: rgba(96, 165, 250, 0.35);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.45);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.ft-dot[data-role='preview-root'] {
+  background: rgba(251, 113, 133, 0.4);
+  box-shadow: 0 0 10px rgba(225, 29, 72, 0.4);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.ft-dot[data-role='preview-start'] {
+  background: rgba(251, 146, 60, 0.45);
+  box-shadow: 0 0 10px rgba(234, 88, 12, 0.45);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.ft-cell--disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+.ft-dot[data-role='muted'] {
+  background: rgba(100, 116, 139, 0.35);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 图例：C A G E D（颜色即形状色） */
+.ft-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font-family: var(--font-fretboard);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+}
+.ft-legend[data-size='sm'] {
+  font-size: 0.75rem;
+  gap: 0.5rem;
+}
+.ft-legend-C {
+  color: var(--ft-form-C);
+}
+.ft-legend-A {
+  color: var(--ft-form-A);
+}
+.ft-legend-G {
+  color: var(--ft-form-G);
+}
+.ft-legend-E {
+  color: var(--ft-form-E);
+}
+.ft-legend-D {
+  color: var(--ft-form-D);
 }

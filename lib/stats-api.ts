@@ -287,7 +287,7 @@ function saveToLocalBackup(stats: PracticeStats) {
 function getLocalBackup(): PracticeStats[] {
   try {
     return JSON.parse(localStorage.getItem(LOCAL_BACKUP_KEY) || '[]');
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -302,12 +302,11 @@ export async function syncLocalBackupToServer(): Promise<number> {
   const localData = getLocalBackup();
   if (localData.length === 0) return 0;
 
-  localStorage.setItem(LOCAL_BACKUP_KEY, '[]');
-
   let syncedCount = 0;
+  const failed: typeof localData = [];
   for (const record of localData) {
     try {
-      await fetch(`${API_BASE_URL}/stats`, {
+      const res = await fetch(`${API_BASE_URL}/stats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -318,12 +317,22 @@ export async function syncLocalBackupToServer(): Promise<number> {
           notes: record.notes,
         }),
       });
+      // 服务器可能以非 2xx 表示失败，必须显式校验，否则会把失败当成功丢进备份
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       syncedCount++;
     } catch (e) {
-      logger.error('同步记录失败:', e);
+      logger.error('同步记录失败，保留待下次重试:', e);
+      failed.push(record);
     }
   }
-  
+
+  // 只把失败的记录回写备份。原实现同步前就先清空备份，弱网下记录会永久丢失。
+  try {
+    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(failed));
+  } catch (e) {
+    logger.error('回写本地备份失败:', e);
+  }
+
   return syncedCount;
 }
 
@@ -339,12 +348,4 @@ export async function clearAllPracticeStats(): Promise<void> {
   } catch (e) {
     logger.error('清空本地备份失败:', e);
   }
-}
-
-// 获取用户 ID（用于调试）
-export function getCurrentUserId(): string {
-  if (isTauri) {
-    return 'local_user';
-  }
-  return getUserId();
 }

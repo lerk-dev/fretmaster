@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useOnboarding } from "./onboarding-context"
 import { Button } from "@/components/ui/button"
@@ -129,6 +129,26 @@ export function OnboardingOverlay() {
     }
   }, [mounted, isActive, currentStep, targetRect])
 
+  /**
+   * 🚨 自救通道（0.2.220 exe「点哪都没反应」的教训）：
+   * 本浮层一旦出现就用 `bg-black/60 pointer-events-auto` 遮罩吞掉**全屏**点击。
+   * 万一自动启动被绕过、或用户不想看教程，鼠标路径上唯一的出口是
+   * 遮罩（= 暂停，视觉上只是卡片变半透明 ⇒ 看着更像「没反应」）。
+   * 所以必须给一条**明确可退出的键盘路径**：`Esc` 直接跳过（并落盘 hasSeen，
+   * 保证下次不再弹 —— 否则用户每次启动都要重按一次 Esc）。
+   */
+  useEffect(() => {
+    if (!mounted || !isActive) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        skipOnboarding()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mounted, isActive, skipOnboarding])
+
   if (!mounted || !isActive || !currentStep) return null
 
   const position = currentStep.position || "bottom"
@@ -240,6 +260,8 @@ export function OnboardingOverlay() {
                   size="icon"
                   className="h-7 w-7"
                   onClick={pauseOnboarding}
+                  aria-label={t('pause')}
+                  title={t('pause')}
                 >
                   <Pause className="w-4 h-4" />
                 </Button>
@@ -249,6 +271,8 @@ export function OnboardingOverlay() {
                 size="icon"
                 className="h-7 w-7"
                 onClick={skipOnboarding}
+                aria-label={t('onboarding_skip')}
+                title={t('onboarding_skip')}
               >
                 <X className="w-4 h-4" />
               </Button>

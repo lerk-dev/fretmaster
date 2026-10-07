@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
-import { Timer, Eye, EyeOff, Target, Zap, Coffee, Play, Pause, RotateCcw, X, CheckCircle2, Circle, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Eye, EyeOff, Play, Pause, RotateCcw, X, CheckCircle2, Circle, ChevronRight, ChevronLeft } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 
 interface FocusModeProps {
@@ -34,6 +34,7 @@ export const FocusMode = memo(function FocusMode({
   const pomodoroRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const phaseDurationRef = useRef(25 * 60)
   const phaseRef = useRef<'work' | 'break'>('work')
+  const pomodoroTimeRef = useRef(0)
   const wakeLockRef = useRef<any>(null)
 
   const workDuration = focusMode.targetDuration || 25
@@ -42,6 +43,7 @@ export const FocusMode = memo(function FocusMode({
 
   phaseDurationRef.current = currentPhaseDuration
   phaseRef.current = pomodoroPhase
+  pomodoroTimeRef.current = pomodoroTime
   const progressPercent = currentPhaseDuration > 0 ? (pomodoroTime / currentPhaseDuration) * 100 : 0
 
   const t = useCallback((key: string) => {
@@ -53,6 +55,7 @@ export const FocusMode = memo(function FocusMode({
         'break_phase': '休息中',
         'start': '开始',
         'pause': '暂停',
+        'resume': '继续',
         'reset': '重置',
         'work_duration': '专注时长(分钟)',
         'progress': '练习进度',
@@ -61,6 +64,7 @@ export const FocusMode = memo(function FocusMode({
         'completed_pomodoros': '已完成番茄',
         'settings': '设置',
         'wake_lock': '保持屏幕常亮',
+        'auto_fullscreen': '专注时自动全屏',
         'dim_background': '背景调暗',
         'hide_distractions': '隐藏干扰元素',
         'show_timer': '显示计时器',
@@ -80,6 +84,7 @@ export const FocusMode = memo(function FocusMode({
         'break_phase': 'Break',
         'start': 'Start',
         'pause': 'Pause',
+        'resume': 'Resume',
         'reset': 'Reset',
         'work_duration': 'Work Duration (min)',
         'progress': 'Progress',
@@ -88,6 +93,7 @@ export const FocusMode = memo(function FocusMode({
         'completed_pomodoros': 'Completed Pomodoros',
         'settings': 'Settings',
         'wake_lock': 'Keep Screen On',
+        'auto_fullscreen': 'Auto Fullscreen',
         'dim_background': 'Dim Background',
         'hide_distractions': 'Hide Distractions',
         'show_timer': 'Show Timer',
@@ -123,19 +129,24 @@ export const FocusMode = memo(function FocusMode({
   useEffect(() => {
     if (pomodoroRunning) {
       pomodoroRef.current = setInterval(() => {
-        setPomodoroTime(prev => {
-          const next = prev + 1
-          if (next >= phaseDurationRef.current) {
-            if (phaseRef.current === 'work') {
-              setPomodoroPhase('break')
-              setPomodoroCount(c => c + 1)
-            } else {
-              setPomodoroPhase('work')
-            }
-            return 0
+        const next = pomodoroTimeRef.current + 1
+        if (next >= phaseDurationRef.current) {
+          // ⚠️ 相位切换必须写在 setState **updater 之外**：updater 要求是纯函数，
+          // React StrictMode（Next.js 默认开启）会双重调用它来检测副作用，
+          // 而 setPomodoroCount(c => c + 1) 不幂等 —— 写在里面会让番茄计数翻倍
+          // （开发模式下跑满一个专注相位，完成数是 2 而不是 1）。
+          if (phaseRef.current === 'work') {
+            setPomodoroPhase('break')
+            setPomodoroCount(c => c + 1)
+          } else {
+            setPomodoroPhase('work')
           }
-          return next
-        })
+          pomodoroTimeRef.current = 0
+          setPomodoroTime(0)
+        } else {
+          pomodoroTimeRef.current = next
+          setPomodoroTime(next)
+        }
       }, 1000)
     }
     return () => {
@@ -148,6 +159,17 @@ export const FocusMode = memo(function FocusMode({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 在输入框/复选框/可编辑元素上操作时，把按键交还给控件本身，
+      // 否则键盘用户无法用空格勾选设置面板中的 <input type="checkbox">
+      const target = e.target as HTMLElement | null
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable
+      ) {
+        return
+      }
       if (e.key === 'Escape') {
         store.setFocusModeSettings({ enabled: false })
         onClose?.()
@@ -184,6 +206,19 @@ export const FocusMode = memo(function FocusMode({
     }
   }, [focusMode.enableWakeLock])
 
+  // 「隐藏干扰元素」：给 <html> 打 .focus-clean，globals.css 据此隐藏页面上所有
+  // [data-focus-distraction] 辅助元素（display:none，保留 DOM 与组件状态 —— 铁律 18①）。
+  // 组件挂载即代表专注模式已启用（页面按 focusMode.enabled 条件渲染），
+  // 所以条件只看 hideDistractions（缺省=生效，与勾选框 `?? true` 的默认一致）。
+  useEffect(() => {
+    const root = document.documentElement
+    const active = focusMode.hideDistractions !== false
+    root.classList.toggle('focus-clean', active)
+    return () => {
+      root.classList.remove('focus-clean')
+    }
+  }, [focusMode.hideDistractions])
+
   const remainingTime = currentPhaseDuration - pomodoroTime
   const correctRate = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0
   const practiceProgress = practiceTime > 0 ? Math.min(100, Math.round(((practiceTime * 60 - timeLeft) / (practiceTime * 60)) * 100)) : 0
@@ -205,7 +240,18 @@ export const FocusMode = memo(function FocusMode({
   }
 
   return (
-    <div className="fixed top-16 right-2 bottom-16 z-[9999] w-64 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg flex flex-col overflow-hidden">
+    <>
+      {/* 「背景调暗」：专注面板的暗纱（z 在页面之上、全屏练习层与面板之下 ——
+          全屏大视图不被压暗）。pointer-events-none ⇒ 只做视觉沉降、不拦点击；
+          收起态（上方早返回）不渲染，保持轻量。 */}
+      {focusMode.dimBackground !== false && (
+        <div
+          data-focus-dim
+          aria-hidden="true"
+          className="fixed inset-0 z-[9990] bg-black/30 pointer-events-none"
+        />
+      )}
+      <div className="fixed top-16 right-2 bottom-16 z-[9999] w-64 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg flex flex-col overflow-hidden">
       {/* 顶部栏 */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
         <div className="flex items-center gap-2">
@@ -273,6 +319,33 @@ export const FocusMode = memo(function FocusMode({
               />
               {t('wake_lock')}
             </label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={focusMode.enableFullscreen ?? true}
+                onChange={(e) => setFocusModeSettings({ enableFullscreen: e.target.checked })}
+                className="rounded"
+              />
+              {t('auto_fullscreen')}
+            </label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={focusMode.dimBackground ?? true}
+                onChange={(e) => setFocusModeSettings({ dimBackground: e.target.checked })}
+                className="rounded"
+              />
+              {t('dim_background')}
+            </label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={focusMode.hideDistractions ?? true}
+                onChange={(e) => setFocusModeSettings({ hideDistractions: e.target.checked })}
+                className="rounded"
+              />
+              {t('hide_distractions')}
+            </label>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground whitespace-nowrap">{t('work_duration')}</span>
@@ -318,7 +391,7 @@ export const FocusMode = memo(function FocusMode({
                 <span className="text-2xl font-mono font-light tracking-wider">
                   {formatTime(remainingTime)}
                 </span>
-                <span className="text-muted-foreground text-[10px] mt-1">
+                <span className="text-muted-foreground text-2xs mt-1">
                   {pomodoroPhase === 'work' ? t('work_phase') : t('break_phase')}
                 </span>
               </div>
@@ -329,12 +402,16 @@ export const FocusMode = memo(function FocusMode({
               <button
                 onClick={resetPomodoro}
                 className="p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+                aria-label={t('reset')}
+                title={t('reset')}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={togglePomodoro}
                 className="p-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                aria-label={pomodoroRunning ? t('pause') : t('resume')}
+                title={pomodoroRunning ? t('pause') : t('resume')}
               >
                 {pomodoroRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
               </button>
@@ -348,7 +425,7 @@ export const FocusMode = memo(function FocusMode({
               {Array.from({ length: Math.max(0, 4 - Math.min(pomodoroCount, 4)) }).map((_, i) => (
                 <Circle key={`empty-${i}`} className="w-3 h-3 text-muted-foreground/30" />
               ))}
-              <span className="text-muted-foreground text-[10px] ml-1">{pomodoroCount} {t('completed_pomodoros')}</span>
+              <span className="text-muted-foreground text-2xs ml-1">{pomodoroCount} {t('completed_pomodoros')}</span>
             </div>
           </div>
         )}
@@ -375,7 +452,7 @@ export const FocusMode = memo(function FocusMode({
                   style={{ width: `${practiceProgress}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <div className="flex items-center justify-between text-2xs text-muted-foreground">
                 <span>{t('time_elapsed')}</span>
                 <span>{practiceProgress}%</span>
               </div>
@@ -386,10 +463,11 @@ export const FocusMode = memo(function FocusMode({
 
       {/* 底部提示 */}
       <div className="text-center py-2 border-t border-border/30">
-        <span className="text-muted-foreground text-[10px]">
+        <span className="text-muted-foreground text-2xs">
           {t('focus_mode')} · {workDuration}{t('minutes')}
         </span>
       </div>
     </div>
+    </>
   )
 })

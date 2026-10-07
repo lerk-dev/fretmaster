@@ -55,7 +55,22 @@ fn init_db() -> SqliteResult<Connection> {
         )",
         [],
     )?;
-    
+
+    // 创建逐位置掌握度统计表（找音练习按 弦×品 记录对错）
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS position_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            instrument TEXT NOT NULL,
+            string_index INTEGER NOT NULL,
+            fret INTEGER NOT NULL,
+            total INTEGER NOT NULL DEFAULT 0,
+            correct INTEGER NOT NULL DEFAULT 0,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(instrument, string_index, fret)
+        )",
+        [],
+    )?;
+
     // 创建索引
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_stats_type ON practice_stats(exercise_type)",

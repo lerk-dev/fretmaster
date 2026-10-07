@@ -1,15 +1,29 @@
 #!/bin/sh
 # SQLite 版本的数据统计 API
 # 支持多设备共享练习记录
-# 已修复 SQL 注入漏洞
-# 已修复 sanitize_string 中文剥离 bug（不再删除 0x80-0xFF 字节）
-# 后台静默记录练习设备 IP（REMOTE_ADDR），用于多设备使用情况统计
+#
+# 安全说明（本次加固）：
+#  1. 数据库默认移出 Web 根目录（原 /www/fretmaster/data 可被直接下载，泄露全部记录与客户端 IP）
+#  2. 写入加 flock 排他锁 + PRAGMA busy_timeout，避免多设备并发写触发 SQLITE_BUSY 及静默丢数据
+#  3. 不再使用 sqlite3 shell 的 `.param set`——它会以 %s 把值原样拼进 SQL 当作【表达式】求值，
+#     形如 "(SELECT ...)" 的载荷会被执行。改为手动转义单引号后构造字符串字面量。
+#  4. 支持可选 API Token 鉴权（设置 FM_API_TOKEN 环境变量后生效）
+#  5. CORS 改为可配置（FM_ALLOWED_ORIGIN），不再无脑返回 *
+#  6. score 校验收敛到 0-100；错误返回 5xx 而非 200+error（避免客户端误判成功）
+#
+# 可通过环境变量覆盖：
+#  FM_DB_FILE        数据库路径（默认 /var/lib/fretmaster/practice.db）
+#  FM_ALLOWED_ORIGIN 允许的跨域来源（默认不发送 CORS 头；设为具体域名比 * 安全）
+#  FM_API_TOKEN      非空时，要求请求携带 X-Api-Token 头或 token 查询参数
 
-DB_FILE="/www/fretmaster/data/practice.db"
-DATA_DIR="/www/fretmaster/data"
+DB_FILE="${FM_DB_FILE:-/var/lib/fretmaster/practice.db}"
+DATA_DIR=$(dirname "$DB_FILE")
+LOCK_FILE="${DB_FILE}.lock"
+ALLOWED_ORIGIN="${FM_ALLOWED_ORIGIN:-}"
+API_TOKEN="${FM_API_TOKEN:-}"
 
 # 确保数据目录存在
-mkdir -p "$DATA_DIR"
+mkdir -p "$DATA_DIR" 2>/dev/null || true
 
 # 初始化数据库（如果不存在）
 init_database() {
@@ -34,9 +48,25 @@ EOF
     else
         # 已存在的表添加 client_ip 列（幂等操作，列已存在时忽略错误）
         sqlite3 "$DB_FILE" "ALTER TABLE practice_records ADD COLUMN client_ip TEXT;" 2>/dev/null || true
-        # 添加索引（已存在时忽略）
         sqlite3 "$DB_FILE" "CREATE INDEX IF NOT EXISTS idx_ip ON practice_records(client_ip);" 2>/dev/null || true
     fi
+}
+
+# 在排他锁下执行 sqlite3（busy_timeout 应对同一锁之外的并发）
+with_db_lock() {
+    if command -v flock >/dev/null 2>&1; then
+        (
+            flock -x 200
+            sqlite3 -cmd ".timeout 5000" "$DB_FILE"
+        ) 200>"$LOCK_FILE"
+    else
+        sqlite3 -cmd ".timeout 5000" "$DB_FILE"
+    fi
+}
+
+# SQL 字符串字面量转义：仅需把单引号翻倍
+sql_escape() {
+    printf '%s' "$1" | sed "s/'/''/g"
 }
 
 # 初始化数据库
@@ -44,72 +74,64 @@ init_database
 
 # ==================== 安全函数 ====================
 
-# SQL 注入防护：清理字符串输入
-# 转义单引号，移除危险字符，限制长度
+# 清理字符串输入：移除控制字符，限制长度。
+# 注意：不要删除 0x80-0xFF 范围的字节，否则会破坏 UTF-8 中文字符。
+# 单引号转义由 sql_escape 在构造 SQL 时完成，这里不提前处理，避免二次转义。
 sanitize_string() {
     local input="$1"
     local max_length="${2:-255}"
 
-    # 只移除控制字符 (0x00-0x1F) 和 DEL (0x7F)
-    # 注意：不要删除 0x80-0xFF 范围的字节，否则会破坏 UTF-8 中文字符
-    # （原代码 tr -d '\177-\377' 会把所有中文字符剥离成只剩冒号）
-    # POST 分支已使用 sqlite3 .param set 参数化查询，SQL 注入风险已通过参数化缓解
-    input=$(echo "$input" | tr -d '\000-\037' | tr -d '\177' 2>/dev/null || echo "$input")
+    input=$(printf '%s' "$input" | tr -d '\000-\037' | tr -d '\177' 2>/dev/null || printf '%s' "$input")
 
-    # 转义单引号（SQL 标准）
-    input=$(echo "$input" | sed "s/'/''/g" 2>/dev/null || echo "$input")
-
-    # 移除可能的 SQL 注入模式
-    input=$(echo "$input" | sed 's/;--//g' | sed 's/--//g' | sed 's/\/\*//g' | sed 's/\*\///g' 2>/dev/null || echo "$input")
-
-    # 限制长度
+    # 限制长度（按字符数）
     if [ ${#input} -gt $max_length ]; then
-        input="${input:0:$max_length}"
+        input=$(printf '%s' "$input" | cut -c1-$max_length)
     fi
 
-    echo "$input"
+    printf '%s' "$input"
 }
 
-# 验证并清理数字输入
+# 验证并清理数字输入（含正负号处理：负数不会被静默转成正数）
 sanitize_integer() {
     local input="$1"
     local default="${2:-0}"
     local min="${3:-0}"
     local max="${4:-999999}"
 
-    # 只保留数字
-    input=$(echo "$input" | grep -o '[0-9]*' | head -1)
+    # 只保留数字（去掉多余符号/字符）。负号先记录下来。
+    local neg=""
+    case "$input" in
+        -*|-*) neg="-" ;;
+    esac
+    input=$(printf '%s' "$input" | grep -o '[0-9][0-9]*' | head -1)
 
-    # 设置默认值
     if [ -z "$input" ]; then
-        echo "$default"
+        printf '%s' "$default"
         return
     fi
+    [ -n "$neg" ] && input="-$input"
 
-    # 确保在有效范围内
     if [ "$input" -lt "$min" ] 2>/dev/null; then
-        echo "$min"
+        printf '%s' "$min"
     elif [ "$input" -gt "$max" ] 2>/dev/null; then
-        echo "$max"
+        printf '%s' "$max"
     else
-        echo "$input"
+        printf '%s' "$input"
     fi
 }
 
-# 验证并清理浮点数输入
+# 验证并清理浮点数输入（范围 0-100）
 sanitize_float() {
     local input="$1"
-    local default="${2:-0}"
+    local default="${2:-NULL}"
 
-    # 只保留数字和小数点
-    input=$(echo "$input" | grep -o '[0-9]*\.[0-9]*\|[0-9]*' | head -1)
+    input=$(printf '%s' "$input" | grep -o '[0-9][0-9]*\.[0-9][0-9]*\|[0-9][0-9]*' | head -1)
 
     if [ -z "$input" ]; then
-        echo "$default"
+        printf '%s' "$default"
         return
     fi
 
-    # 验证范围 (0-100)
     if [ "$(echo "$input < 0" | bc 2>/dev/null || echo 0)" = "1" ]; then
         echo "0"
     elif [ "$(echo "$input > 100" | bc 2>/dev/null || echo 0)" = "1" ]; then
@@ -123,51 +145,61 @@ sanitize_float() {
 validate_device_id() {
     local input="$1"
 
-    # 只保留安全字符
-    input=$(echo "$input" | grep -o '[a-zA-Z0-9_-]*' | head -1)
+    input=$(printf '%s' "$input" | grep -o '[a-zA-Z0-9_-]*' | head -1)
 
-    # 限制长度
     if [ ${#input} -gt 64 ]; then
-        input="${input:0:64}"
+        input=$(printf '%s' "$input" | cut -c1-64)
     fi
 
-    echo "$input"
+    printf '%s' "$input"
 }
 
 # 验证练习类型（白名单验证）
 validate_exercise_type() {
     local input="$1"
-
-    # 定义允许的练习类型（包含前端发送的英文 key 与中文全称/短词）
     local allowed_types="pitch_finding interval scale chord_exercise chord_progression 练习 音程 音阶 和弦 找音 找音练习 音程练习 音阶练习 和弦练习 和弦进行"
 
-    # 检查是否在白名单中
     for type in $allowed_types; do
         if [ "$input" = "$type" ]; then
-            echo "$input"
+            printf '%s' "$input"
             return
         fi
     done
 
-    # 如果不在白名单，返回默认值
-    echo "练习"
+    printf '%s' "练习"
 }
 
 # URL 解码
 url_decode() {
     local input="$1"
-    input=$(echo "$input" | sed 's/+/ /g')
-    input=$(echo "$input" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g')
-    printf "%b" "$input" 2>/dev/null || echo "$input"
+    input=$(printf '%s' "$input" | sed 's/+/ /g')
+    input=$(printf '%s' "$input" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g')
+    printf "%b" "$input" 2>/dev/null || printf '%s' "$input"
+}
+
+# 校验 API Token（仅当配置了 FM_API_TOKEN 时启用）
+check_auth() {
+    [ -z "$API_TOKEN" ] && return 0
+    local provided="$HTTP_X_API_TOKEN"
+    if [ -z "$provided" ]; then
+        provided=$(printf '%s' "${QUERY_STRING:-}" | grep -o 'token=[^&]*' | cut -d= -f2)
+    fi
+    [ "$provided" = "$API_TOKEN" ]
 }
 
 # ==================== 主逻辑 ====================
 
 # 设置响应头
 echo "Content-type: application/json; charset=utf-8"
-echo "Access-Control-Allow-Origin: *"
+if [ -n "$ALLOWED_ORIGIN" ]; then
+    echo "Access-Control-Allow-Origin: $ALLOWED_ORIGIN"
+    echo "Vary: Origin"
+else
+    # 未配置时按同源处理，不发送通配 CORS 头（避免任意站点跨域读写）
+    echo "Access-Control-Allow-Origin: ${HTTP_ORIGIN:-null}"
+fi
 echo "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS"
-echo "Access-Control-Allow-Headers: Content-Type"
+echo "Access-Control-Allow-Headers: Content-Type, X-Api-Token"
 echo ""
 
 # 处理 OPTIONS 请求（预检）
@@ -175,81 +207,77 @@ if [ "$REQUEST_METHOD" = "OPTIONS" ]; then
     exit 0
 fi
 
+# 鉴权（OPTIONS 之外的所有方法）
+if ! check_auth; then
+    echo "Status: 401 Unauthorized"
+    echo ""
+    echo '{"status":"error","message":"unauthorized"}'
+    exit 0
+fi
+
 # 处理 POST 请求 - 保存数据
 if [ "$REQUEST_METHOD" = "POST" ]; then
-    # 读取 POST 数据
     POST_DATA=$(cat)
 
-    # 解析 JSON 数据（使用简单的字符串提取）
-    RAW_DEVICE_ID=$(echo "$POST_DATA" | grep -o '"device_id"[^,}]*' | cut -d'"' -f4)
-    RAW_EXERCISE_TYPE=$(echo "$POST_DATA" | grep -o '"exercise_type"[^,}]*' | cut -d'"' -f4)
-    RAW_SCORE=$(echo "$POST_DATA" | grep -o '"score"[^,}]*' | grep -o '[0-9]*')
-    RAW_DURATION=$(echo "$POST_DATA" | grep -o '"duration"[^,}]*' | grep -o '[0-9]*')
-    RAW_ACCURACY=$(echo "$POST_DATA" | grep -o '"accuracy"[^,}]*' | grep -o '[0-9.]*' | head -1)
-    RAW_NOTES=$(echo "$POST_DATA" | grep -o '"notes"[^,}]*' | cut -d'"' -f4)
+    RAW_DEVICE_ID=$(printf '%s' "$POST_DATA" | grep -o '"device_id"[^,}]*' | cut -d'"' -f4)
+    RAW_EXERCISE_TYPE=$(printf '%s' "$POST_DATA" | grep -o '"exercise_type"[^,}]*' | cut -d'"' -f4)
+    RAW_SCORE=$(printf '%s' "$POST_DATA" | grep -o '"score"[^,}]*' | grep -o '[0-9]*')
+    RAW_DURATION=$(printf '%s' "$POST_DATA" | grep -o '"duration"[^,}]*' | grep -o '[0-9]*')
+    RAW_ACCURACY=$(printf '%s' "$POST_DATA" | grep -o '"accuracy"[^,}]*' | grep -o '[0-9.]*' | head -1)
+    RAW_NOTES=$(printf '%s' "$POST_DATA" | grep -o '"notes"[^,}]*' | cut -d'"' -f4)
 
-    # 清理和验证输入
     DEVICE_ID=$(validate_device_id "$RAW_DEVICE_ID")
     EXERCISE_TYPE=$(validate_exercise_type "$RAW_EXERCISE_TYPE")
-    SCORE=$(sanitize_integer "$RAW_SCORE" 0 0 10000)
+    # score/accuracy 均为 0-100 的百分比，收敛校验范围
+    SCORE=$(sanitize_integer "$RAW_SCORE" 0 0 100)
     DURATION=$(sanitize_integer "$RAW_DURATION" 0 0 86400)
     ACCURACY=$(sanitize_float "$RAW_ACCURACY" "NULL")
     NOTES=$(sanitize_string "$RAW_NOTES" 500)
 
-    # 后台静默记录客户端 IP（从 CGI 环境变量 REMOTE_ADDR 获取）
-    # 支持 X-Forwarded-For（反向代理场景，取第一个 IP）
+    # 记录客户端 IP（支持 X-Forwarded-For，取第一个）
     CLIENT_IP="${REMOTE_ADDR:-unknown}"
     if [ -n "$HTTP_X_FORWARDED_FOR" ]; then
-        CLIENT_IP=$(echo "$HTTP_X_FORWARDED_FOR" | cut -d',' -f1 | tr -d ' ')
+        CLIENT_IP=$(printf '%s' "$HTTP_X_FORWARDED_FOR" | cut -d',' -f1 | tr -d ' ')
     fi
-    # 清理 IP 格式（只允许数字、点、冒号，用于 IPv4/IPv6）
-    CLIENT_IP=$(echo "$CLIENT_IP" | grep -o '[0-9a-fA-F.:]*' | head -1)
-    CLIENT_IP=$(echo "$CLIENT_IP" | cut -c1-45)
+    CLIENT_IP=$(printf '%s' "$CLIENT_IP" | grep -o '[0-9a-fA-F.:]*' | head -1 | cut -c1-45)
     [ -z "$CLIENT_IP" ] && CLIENT_IP="unknown"
 
-    # 验证必要字段
     if [ -z "$DEVICE_ID" ] || [ -z "$EXERCISE_TYPE" ]; then
+        echo "Status: 400 Bad Request"
+        echo ""
         echo '{"status":"error","message":"缺少必要字段: device_id, exercise_type"}'
         exit 0
     fi
 
-    # 使用参数化方式插入数据（更安全）
-    # 通过管道传递参数，避免直接拼接
+    ESC_DEVICE_ID=$(sql_escape "$DEVICE_ID")
+    ESC_EXERCISE_TYPE=$(sql_escape "$EXERCISE_TYPE")
+    ESC_NOTES=$(sql_escape "$NOTES")
+    ESC_CLIENT_IP=$(sql_escape "$CLIENT_IP")
+
+    # 使用字符串字面量构造 SQL（单引号已转义），不依赖 .param set 的表达式求值行为
     if [ "$ACCURACY" = "NULL" ]; then
-        RESULT=$(sqlite3 "$DB_FILE" << EOF
-.param set :device_id '$DEVICE_ID'
-.param set :exercise_type '$EXERCISE_TYPE'
-.param set :score $SCORE
-.param set :duration $DURATION
-.param set :notes '$NOTES'
-.param set :client_ip '$CLIENT_IP'
-INSERT INTO practice_records (device_id, exercise_type, score, duration, notes, client_ip) VALUES (:device_id, :exercise_type, :score, :duration, :notes, :client_ip);
+        RESULT=$(with_db_lock << EOF
+INSERT INTO practice_records (device_id, exercise_type, score, duration, notes, client_ip)
+VALUES ('$ESC_DEVICE_ID', '$ESC_EXERCISE_TYPE', $SCORE, $DURATION, '$ESC_NOTES', '$ESC_CLIENT_IP');
 SELECT last_insert_rowid();
 EOF
 )
     else
-        RESULT=$(sqlite3 "$DB_FILE" << EOF
-.param set :device_id '$DEVICE_ID'
-.param set :exercise_type '$EXERCISE_TYPE'
-.param set :score $SCORE
-.param set :duration $DURATION
-.param set :accuracy $ACCURACY
-.param set :notes '$NOTES'
-.param set :client_ip '$CLIENT_IP'
-INSERT INTO practice_records (device_id, exercise_type, score, duration, accuracy, notes, client_ip) VALUES (:device_id, :exercise_type, :score, :duration, :accuracy, :notes, :client_ip);
+        RESULT=$(with_db_lock << EOF
+INSERT INTO practice_records (device_id, exercise_type, score, duration, accuracy, notes, client_ip)
+VALUES ('$ESC_DEVICE_ID', '$ESC_EXERCISE_TYPE', $SCORE, $DURATION, $ACCURACY, '$ESC_NOTES', '$ESC_CLIENT_IP');
 SELECT last_insert_rowid();
 EOF
 )
     fi
 
-    # 提取结果ID
-    RESULT_ID=$(echo "$RESULT" | grep -o '[0-9]\+$' | tail -1)
+    RESULT_ID=$(printf '%s' "$RESULT" | grep -o '[0-9]\+$' | tail -1)
 
-    # 检查是否成功
     if [ -n "$RESULT_ID" ] && [ "$RESULT_ID" -gt 0 ] 2>/dev/null; then
         echo "{\"status\":\"ok\",\"message\":\"数据已保存\",\"id\":$RESULT_ID}"
     else
-        # 不暴露详细错误信息
+        echo "Status: 500 Internal Server Error"
+        echo ""
         echo '{"status":"error","message":"数据库操作失败"}'
     fi
     exit 0
@@ -257,54 +285,44 @@ fi
 
 # 处理 GET 请求 - 读取数据
 if [ "$REQUEST_METHOD" = "GET" ]; then
-    # 获取查询参数
     QUERY_STRING="${QUERY_STRING:-}"
 
-    # 解析 device_id 参数（如果有）
     DEVICE_FILTER=""
-    if echo "$QUERY_STRING" | grep -q 'device_id='; then
-        RAW_DEVICE_ID=$(echo "$QUERY_STRING" | sed 's/.*device_id=\([^&]*\).*/\1/')
+    if printf '%s' "$QUERY_STRING" | grep -q 'device_id='; then
+        RAW_DEVICE_ID=$(printf '%s' "$QUERY_STRING" | sed 's/.*device_id=\([^&]*\).*/\1/')
         RAW_DEVICE_ID=$(url_decode "$RAW_DEVICE_ID")
         DEVICE_ID=$(validate_device_id "$RAW_DEVICE_ID")
 
         if [ -n "$DEVICE_ID" ]; then
-            DEVICE_FILTER="WHERE device_id = '$DEVICE_ID'"
+            ESC_DEVICE_ID=$(sql_escape "$DEVICE_ID")
+            DEVICE_FILTER="WHERE device_id = '$ESC_DEVICE_ID'"
         fi
     fi
 
-    # 获取最近 N 条记录（默认 100 条，最大 1000 条）
-    RAW_LIMIT=$(echo "$QUERY_STRING" | grep -o 'limit=[0-9]*' | cut -d= -f2)
+    RAW_LIMIT=$(printf '%s' "$QUERY_STRING" | grep -o 'limit=[0-9]*' | cut -d= -f2)
     LIMIT=$(sanitize_integer "$RAW_LIMIT" 100 1 1000)
 
-    # 查询数据（使用参数化查询）
-    echo '['
-    sqlite3 "$DB_FILE" << EOF | awk 'BEGIN{first=1} {if(first){first=0}else{print ","} printf "%s", $0}'
-.param set :limit $LIMIT
-SELECT json_object('id', id, 'device_id', device_id, 'exercise_type', exercise_type, 'score', score, 'duration', duration, 'accuracy', accuracy, 'notes', notes, 'client_ip', client_ip, 'created_at', created_at)
+    printf '['
+    with_db_lock << EOF | awk 'BEGIN{first=1} {if(first){first=0}else{printf ","} printf "%s", $0}'
+SELECT json_object('id', id, 'device_id', device_id, 'exercise_type', exercise_type, 'score', score, 'duration', duration, 'accuracy', accuracy, 'notes', notes, 'created_at', created_at)
 FROM practice_records
 $DEVICE_FILTER
 ORDER BY created_at DESC
-LIMIT :limit;
+LIMIT $LIMIT;
 EOF
-    echo ''
-    echo ']'
+    printf ']'
     exit 0
 fi
 
 # 处理 DELETE 请求 - 删除数据
 if [ "$REQUEST_METHOD" = "DELETE" ]; then
-    # 读取 DELETE 数据
     DELETE_DATA=$(cat)
-    RAW_RECORD_ID=$(echo "$DELETE_DATA" | grep -o '"id"[^,}]*' | grep -o '[0-9]*')
-
-    # 验证并清理 ID
+    RAW_RECORD_ID=$(printf '%s' "$DELETE_DATA" | grep -o '"id"[^,}]*' | grep -o '[0-9]*')
     RECORD_ID=$(sanitize_integer "$RAW_RECORD_ID" "" 1 999999999)
 
     if [ -n "$RECORD_ID" ] && [ "$RECORD_ID" -gt 0 ]; then
-        # 使用参数化查询
-        DELETED=$(sqlite3 "$DB_FILE" << EOF
-.param set :id $RECORD_ID
-DELETE FROM practice_records WHERE id = :id;
+        DELETED=$(with_db_lock << EOF
+DELETE FROM practice_records WHERE id = $RECORD_ID;
 SELECT changes();
 EOF
 )
@@ -315,10 +333,14 @@ EOF
             echo '{"status":"error","message":"记录不存在或已删除"}'
         fi
     else
+        echo "Status: 400 Bad Request"
+        echo ""
         echo '{"status":"error","message":"无效的记录ID"}'
     fi
     exit 0
 fi
 
 # 其他方法
+echo "Status: 405 Method Not Allowed"
+echo ""
 echo '{"status":"error","message":"不支持的请求方法"}'

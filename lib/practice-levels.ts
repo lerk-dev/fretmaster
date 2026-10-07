@@ -4,7 +4,6 @@ export interface PracticeLevel {
   name: string
   nameZh: string
   description: string
-  descriptionZh: string
   groupName: string
   groupNameZh: string
   sequences: {
@@ -37,9 +36,8 @@ export const SINGLE_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root",
     nameZh: "根音",
     description: "Single chord tones\n\nRoot notes only",
-    descriptionZh: "单和弦音\n\n仅练习根音",
     groupName: "Single Chord Tones",
-    groupNameZh: "单和弦音",
+    groupNameZh: "单个和弦音",
     sequences: {
       dominant: [1],
       major: [1],
@@ -62,9 +60,8 @@ export const SINGLE_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "3rd",
     nameZh: "三音",
     description: "Single chord tones\n\n3rd only\n2nd or 4th on sus chords",
-    descriptionZh: "单和弦音\n\n仅练习三音\n挂留和弦使用二音或四音",
     groupName: "Single Chord Tones",
-    groupNameZh: "单和弦音",
+    groupNameZh: "单个和弦音",
     sequences: {
       dominant: [3],
       major: [3],
@@ -88,9 +85,8 @@ export const SINGLE_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "5th",
     nameZh: "五音",
     description: "Single chord tones\n\n5th only\n\n(No altered 5ths on dominant chords)",
-    descriptionZh: "单和弦音\n\n仅练习五音\n\n（属和弦不使用变化五音）",
     groupName: "Single Chord Tones",
-    groupNameZh: "单和弦音",
+    groupNameZh: "单个和弦音",
     sequences: {
       dominant: [5],
       major: [5],
@@ -114,9 +110,8 @@ export const SINGLE_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "7th",
     nameZh: "七音",
     description: "Single chord tones\n\n7th only\n\n(6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "单和弦音\n\n仅练习七音\n\n（六和弦和减和弦使用六音/♭♭7）",
     groupName: "Single Chord Tones",
-    groupNameZh: "单和弦音",
+    groupNameZh: "单个和弦音",
     sequences: {
       dominant: [7],
       major: [7],
@@ -143,9 +138,8 @@ export const TWO_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root, 3rd",
     nameZh: "根音、三音",
     description: "Two chord tones\n\nRoot & 3rd\n\n(2nd or 4th on sus chords)",
-    descriptionZh: "双和弦音\n\n根音和三音\n\n（挂留和弦使用二音或四音）",
     groupName: "Two Chord Tones",
-    groupNameZh: "双和弦音",
+    groupNameZh: "两个和弦音",
     sequences: {
       dominant: [1, 3],
       major: [1, 3],
@@ -169,9 +163,8 @@ export const TWO_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root, 5th",
     nameZh: "根音、五音",
     description: "Two chord tones\n\nRoot & 5th\n\n(No altered 5ths on dominant chords)",
-    descriptionZh: "双和弦音\n\n根音和五音\n\n（属和弦不使用变化五音）",
     groupName: "Two Chord Tones",
-    groupNameZh: "双和弦音",
+    groupNameZh: "两个和弦音",
     sequences: {
       dominant: [1, 5],
       major: [1, 5],
@@ -195,9 +188,8 @@ export const TWO_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root, 7th",
     nameZh: "根音、七音",
     description: "Two chord tones\n\nRoot & 7th\n\n(6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "双和弦音\n\n根音和七音\n\n（六和弦和减和弦使用六音/♭♭7）",
     groupName: "Two Chord Tones",
-    groupNameZh: "双和弦音",
+    groupNameZh: "两个和弦音",
     sequences: {
       dominant: [1, 7],
       major: [1, 7],
@@ -221,9 +213,8 @@ export const TWO_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "3rd, 5th",
     nameZh: "三音、五音",
     description: "Two chord tones\n\n3rd & 5th\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords)",
-    descriptionZh: "双和弦音\n\n三音和五音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音）",
     groupName: "Two Chord Tones",
-    groupNameZh: "双和弦音",
+    groupNameZh: "两个和弦音",
     sequences: {
       dominant: [3, 5],
       major: [3, 5],
@@ -248,9 +239,8 @@ export const TWO_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "3rd, 7th",
     nameZh: "三音、七音",
     description: "Two chord tones\n\n3rd & 7th\n\n(2nd or 4th on sus chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "双和弦音\n\n三音和七音\n\n（挂留和弦使用二音或四音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Two Chord Tones",
-    groupNameZh: "双和弦音",
+    groupNameZh: "两个和弦音",
     sequences: {
       dominant: [3, 7],
       major: [3, 7],
@@ -275,9 +265,8 @@ export const TWO_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "5th, 7th",
     nameZh: "五音、七音",
     description: "Two chord tones\n\n5th & 7th\n\n(No altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "双和弦音\n\n五音和七音\n\n（属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Two Chord Tones",
-    groupNameZh: "双和弦音",
+    groupNameZh: "两个和弦音",
     sequences: {
       dominant: [5, 7],
       major: [5, 7],
@@ -305,9 +294,8 @@ export const THREE_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root, 3rd, 5th",
     nameZh: "根音、三音、五音",
     description: "Three chord tones\n\nRoot, 3rd & 5th\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords)",
-    descriptionZh: "三和弦音\n\n根音、三音和五音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音）",
     groupName: "Three Chord Tones",
-    groupNameZh: "三和弦音",
+    groupNameZh: "三个和弦音",
     sequences: {
       dominant: [1, 3, 5],
       major: [1, 3, 5],
@@ -332,9 +320,8 @@ export const THREE_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root, 3rd, 7th",
     nameZh: "根音、三音、七音",
     description: "Three chord tones\n\nRoot, 3rd & 7th\n\n(2nd or 4th on sus chords)",
-    descriptionZh: "三和弦音\n\n根音、三音和七音\n\n（挂留和弦使用二音或四音）",
     groupName: "Three Chord Tones",
-    groupNameZh: "三和弦音",
+    groupNameZh: "三个和弦音",
     sequences: {
       dominant: [1, 3, 7],
       major: [1, 3, 7],
@@ -359,9 +346,8 @@ export const THREE_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "3rd, 5th, 7th",
     nameZh: "三音、五音、七音",
     description: "Three chord tones\n\n3rd, 5th & 7th\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "三和弦音\n\n三音、五音和七音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Three Chord Tones",
-    groupNameZh: "三和弦音",
+    groupNameZh: "三个和弦音",
     sequences: {
       dominant: [3, 5, 7],
       major: [3, 5, 7],
@@ -383,13 +369,12 @@ export const THREE_CHORD_TONES_LEVELS: PracticeLevel[] = [
   },
   {
     id: "three_chord_tones_random_inversions",
-    nameKey: "level_random_inversions",
+    nameKey: "level_root_3rd_5th_random_inversions",
     name: "Root, 3rd, 5th (Random Inversions)",
     nameZh: "根音、三音、五音（随机转位）",
     description: "Three chord tones\n\nThis level randomises between:-\nRoot, 3rd & 5th\n3rd, 5th, Root\n5th, Root, 3rd\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords)",
-    descriptionZh: "三和弦音\n\n此模式在以下排列中随机选择：\n根音、三音、五音\n三音、五音、根音\n五音、根音、三音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音）",
     groupName: "Three Chord Tones",
-    groupNameZh: "三和弦音",
+    groupNameZh: "三个和弦音",
     sequences: {
       dominant: [1, 3, 5],
       major: [1, 3, 5],
@@ -417,9 +402,8 @@ export const FOUR_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root, 3rd, 5th, 7th",
     nameZh: "根音、三音、五音、七音",
     description: "Four chord tones\n\nRoot, 3rd, 5th & 7th\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "四和弦音\n\n根音、三音、五音和七音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Four Chord Tones",
-    groupNameZh: "四和弦音",
+    groupNameZh: "四个和弦音",
     sequences: {
       dominant: [1, 3, 5, 7],
       major: [1, 3, 5, 7],
@@ -445,9 +429,8 @@ export const FOUR_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "3rd, 5th, 7th, Root",
     nameZh: "三音、五音、七音、根音",
     description: "Four chord tones\n\n3rd, 5th, 7th, Root\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "四和弦音\n\n三音、五音、七音、根音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Four Chord Tones",
-    groupNameZh: "四和弦音",
+    groupNameZh: "四个和弦音",
     sequences: {
       dominant: [3, 5, 7, 1],
       major: [3, 5, 7, 1],
@@ -473,9 +456,8 @@ export const FOUR_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "5th, 7th, Root, 3rd",
     nameZh: "五音、七音、根音、三音",
     description: "Four chord tones\n\n5th, 7th, Root, 3rd\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "四和弦音\n\n五音、七音、根音、三音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Four Chord Tones",
-    groupNameZh: "四和弦音",
+    groupNameZh: "四个和弦音",
     sequences: {
       dominant: [5, 7, 1, 3],
       major: [5, 7, 1, 3],
@@ -501,9 +483,8 @@ export const FOUR_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "7th, Root, 3rd, 5th",
     nameZh: "七音、根音、三音、五音",
     description: "Four chord tones\n\n7th, Root, 3rd, 5th\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "四和弦音\n\n七音、根音、三音、五音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Four Chord Tones",
-    groupNameZh: "四和弦音",
+    groupNameZh: "四个和弦音",
     sequences: {
       dominant: [7, 1, 3, 5],
       major: [7, 1, 3, 5],
@@ -525,13 +506,12 @@ export const FOUR_CHORD_TONES_LEVELS: PracticeLevel[] = [
   },
   {
     id: "four_chord_tones_random_inversions",
-    nameKey: "level_four_random_inversions",
+    nameKey: "level_root_3rd_5th_7th_random_inversions",
     name: "Root, 3rd, 5th, 7th (Random Inversions)",
     nameZh: "根音、三音、五音、七音（随机转位）",
     description: "Four chord tones\n\nThis level randomises between:-\nRoot, 3rd, 5th & 7th\n3rd, 5th, 7th, Root\n5th, 7th, Root, 3rd\n7th, Root, 3rd, 5th\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "四和弦音\n\n此模式在以下排列中随机选择：\n根音、三音、五音、七音\n三音、五音、七音、根音\n五音、七音、根音、三音\n七音、根音、三音、五音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Four Chord Tones",
-    groupNameZh: "四和弦音",
+    groupNameZh: "四个和弦音",
     sequences: {
       dominant: [1, 3, 5, 7],
       major: [1, 3, 5, 7],
@@ -557,9 +537,8 @@ export const FOUR_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root, 3rd, 5th, 7th (Random Order)",
     nameZh: "根音、三音、五音、七音（随机顺序）",
     description: "Four chord tones\n\nRoot, 3rd, 5th & 7th in random order\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "四和弦音\n\n根音、三音、五音和七音随机顺序\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Four Chord Tones",
-    groupNameZh: "四和弦音",
+    groupNameZh: "四个和弦音",
     sequences: {
       dominant: [1, 3, 5, 7],
       major: [1, 3, 5, 7],
@@ -585,9 +564,8 @@ export const FOUR_CHORD_TONES_LEVELS: PracticeLevel[] = [
     name: "Root, 3rd, 5th, 7th, Root",
     nameZh: "根音、三音、五音、七音、根音",
     description: "Four chord tones\n\nRoot, 3rd, 5th, 7th & Root\n\n(2nd or 4th on sus chords\nNo altered 5ths on dominant chords\n6th/♭♭7 on 6th & diminished chords)",
-    descriptionZh: "四和弦音\n\n根音、三音、五音、七音、根音\n\n（挂留和弦使用二音或四音\n属和弦不使用变化五音\n六和弦和减和弦使用六音/♭♭7）",
     groupName: "Four Chord Tones",
-    groupNameZh: "四和弦音",
+    groupNameZh: "四个和弦音",
     sequences: {
       dominant: [1, 3, 5, 7],
       major: [1, 3, 5, 7],
@@ -617,7 +595,6 @@ export const MELODIC_ROOT_TO_5TH_LEVELS: PracticeLevel[] = [
     name: "Melodic Structure 1",
     nameZh: "旋律结构 1",
     description: "Melodic structures - Root to 5th\n\n1, 2, 3, 5 on major/dominant chords\n\n1, 3, 4, 5 on minor chords\n\n1, 2, 4, 5 on sus chords\n\n1, 2, 3, 5 on diminished chords\n\n(No altered 5ths on dominant chords)",
-    descriptionZh: "旋律结构 - 根音到五音\n\n大调/属和弦：1, 2, 3, 5\n\n小调和弦：1, 3, 4, 5\n\n挂留和弦：1, 2, 4, 5\n\n减和弦：1, 2, 3, 5\n\n（属和弦不使用变化五音）",
     groupName: "Melodic Structures - Root to 5th",
     groupNameZh: "旋律结构 - 根音到五音",
     sequences: {
@@ -643,7 +620,6 @@ export const MELODIC_ROOT_TO_5TH_LEVELS: PracticeLevel[] = [
     name: "Melodic Structure 2",
     nameZh: "旋律结构 2",
     description: "Melodic structures - Root to 5th\n\n2, 1, 5, 3 on major/dominant chords\n\n3, 1, 5, 4 on minor chords\n\n2, 1, 5, 4 on sus chords\n\n2, 1, 5, 3 on diminished chords\n\n(No altered 5ths on dominant chords)",
-    descriptionZh: "旋律结构 - 根音到五音\n\n大调/属和弦：2, 1, 5, 3\n\n小调和弦：3, 1, 5, 4\n\n挂留和弦：2, 1, 5, 4\n\n减和弦：2, 1, 5, 3\n\n（属和弦不使用变化五音）",
     groupName: "Melodic Structures - Root to 5th",
     groupNameZh: "旋律结构 - 根音到五音",
     sequences: {
@@ -669,7 +645,6 @@ export const MELODIC_ROOT_TO_5TH_LEVELS: PracticeLevel[] = [
     name: "Melodic Structure 3",
     nameZh: "旋律结构 3",
     description: "Melodic structures - Root to 5th\n\n3, 5, 2, 1 on major/dominant chords\n\n4, 5, 3, 1 on minor chords\n\n4, 5, 2, 1 on sus chords\n\n3, 5, 2, 1 on diminished chords\n\n(No altered 5ths on dominant chords)",
-    descriptionZh: "旋律结构 - 根音到五音\n\n大调/属和弦：3, 5, 2, 1\n\n小调和弦：4, 5, 3, 1\n\n挂留和弦：4, 5, 2, 1\n\n减和弦：3, 5, 2, 1\n\n（属和弦不使用变化五音）",
     groupName: "Melodic Structures - Root to 5th",
     groupNameZh: "旋律结构 - 根音到五音",
     sequences: {
@@ -695,7 +670,6 @@ export const MELODIC_ROOT_TO_5TH_LEVELS: PracticeLevel[] = [
     name: "Melodic Structure 4",
     nameZh: "旋律结构 4",
     description: "Melodic structures - Root to 5th\n\n5, 1, 2, 3 on major/dominant chords\n\n5, 1, 3, 4 on minor chords\n\n5, 1, 2, 4 on sus chords\n\n5, 1, 2, 3 on diminished chords\n\n(No altered 5ths on dominant chords)",
-    descriptionZh: "旋律结构 - 根音到五音\n\n大调/属和弦：5, 1, 2, 3\n\n小调和弦：5, 1, 3, 4\n\n挂留和弦：5, 1, 2, 4\n\n减和弦：5, 1, 2, 3\n\n（属和弦不使用变化五音）",
     groupName: "Melodic Structures - Root to 5th",
     groupNameZh: "旋律结构 - 根音到五音",
     sequences: {
@@ -717,11 +691,10 @@ export const MELODIC_ROOT_TO_5TH_LEVELS: PracticeLevel[] = [
   },
   {
     id: "melodic_structure_5_random_inversions",
-    nameKey: "level_melodic_structure_5",
+    nameKey: "level_melodic_structure_5_random_inversions",
     name: "Melodic Structure 5 (Random Inversions)",
     nameZh: "旋律结构 5（随机转位）",
     description: "Melodic structures - Root to 5th\n\nThis level creates random inversions of the following structures:-\n\n1, 2, 3, 5 on major/dominant chords\n\n1, 3, 4, 5 on minor chords\n\n1, 2, 4, 5 on sus chords\n\n1, 2, 3, 5 on diminished chords\n\n(No altered 5ths on dominant chords)",
-    descriptionZh: "旋律结构 - 根音到五音\n\n此模式创建以下结构的随机转位：\n\n大调/属和弦：1, 2, 3, 5\n\n小调和弦：1, 3, 4, 5\n\n挂留和弦：1, 2, 4, 5\n\n减和弦：1, 2, 3, 5\n\n（属和弦不使用变化五音）",
     groupName: "Melodic Structures - Root to 5th",
     groupNameZh: "旋律结构 - 根音到五音",
     sequences: {
@@ -750,7 +723,6 @@ export const MELODIC_5TH_TO_9TH_LEVELS: PracticeLevel[] = [
     name: "Melodic Structure 6",
     nameZh: "旋律结构 6",
     description: "Melodic structures - 5th to 9th\n\n5, 6, 7, 2 on major/dominant chords\n\n5, 7, 1, 2 on minor chords\n\n5, 6, 7, 1 on diminished chords",
-    descriptionZh: "旋律结构 - 五音到九音\n\n大调/属和弦：5, 6, 7, 2\n\n小调和弦：5, 7, 1, 2\n\n减和弦：5, 6, 7, 1",
     groupName: "Melodic Structures - 5th to 9th",
     groupNameZh: "旋律结构 - 五音到九音",
     sequences: {
@@ -776,7 +748,6 @@ export const MELODIC_5TH_TO_9TH_LEVELS: PracticeLevel[] = [
     name: "Melodic Structure 7",
     nameZh: "旋律结构 7",
     description: "Melodic structures - 5th to 9th\n\n6, 5, 2, 7 on major/dominant chords\n\n7, 5, 2, 1 on minor chords\n\n6, 5, 1, 7 on diminished chords",
-    descriptionZh: "旋律结构 - 五音到九音\n\n大调/属和弦：6, 5, 2, 7\n\n小调和弦：7, 5, 2, 1\n\n减和弦：6, 5, 1, 7",
     groupName: "Melodic Structures - 5th to 9th",
     groupNameZh: "旋律结构 - 五音到九音",
     sequences: {
@@ -802,7 +773,6 @@ export const MELODIC_5TH_TO_9TH_LEVELS: PracticeLevel[] = [
     name: "Melodic Structure 8",
     nameZh: "旋律结构 8",
     description: "Melodic structures - 5th to 9th\n\n7, 2, 6, 5 on major/dominant chords\n\n1, 2, 7, 5 on minor chords\n\n6, 1, 7, 5 on diminished chords",
-    descriptionZh: "旋律结构 - 五音到九音\n\n大调/属和弦：7, 2, 6, 5\n\n小调和弦：1, 2, 7, 5\n\n减和弦：6, 1, 7, 5",
     groupName: "Melodic Structures - 5th to 9th",
     groupNameZh: "旋律结构 - 五音到九音",
     sequences: {
@@ -828,7 +798,6 @@ export const MELODIC_5TH_TO_9TH_LEVELS: PracticeLevel[] = [
     name: "Melodic Structure 9",
     nameZh: "旋律结构 9",
     description: "Melodic structures - 5th to 9th\n\n2, 7, 6, 5 on major/dominant chords\n\n2, 1, 7, 5 on minor chords\n\n2, 7, 1, 6 on diminished chords",
-    descriptionZh: "旋律结构 - 五音到九音\n\n大调/属和弦：2, 7, 6, 5\n\n小调和弦：2, 1, 7, 5\n\n减和弦：2, 7, 1, 6",
     groupName: "Melodic Structures - 5th to 9th",
     groupNameZh: "旋律结构 - 五音到九音",
     sequences: {
@@ -850,11 +819,10 @@ export const MELODIC_5TH_TO_9TH_LEVELS: PracticeLevel[] = [
   },
   {
     id: "melodic_structure_10_random_inversions",
-    nameKey: "level_melodic_structure_10",
+    nameKey: "level_melodic_structure_10_random_inversions",
     name: "Melodic Structure 10 (Random Inversions)",
     nameZh: "旋律结构 10（随机转位）",
     description: "Melodic structures - 5th to 9th\n\nThis level creates random inversions of the following structures:-\n\n5, 6, 7, 2 on major/dominant chords\n\n5, 7, 1, 2 on minor chords\n\n5, 6, 7, 1 on diminished chords",
-    descriptionZh: "旋律结构 - 五音到九音\n\n此模式创建以下结构的随机转位：\n\n大调/属和弦：5, 6, 7, 2\n\n小调和弦：5, 7, 1, 2\n\n减和弦：5, 6, 7, 1",
     groupName: "Melodic Structures - 5th to 9th",
     groupNameZh: "旋律结构 - 五音到九音",
     sequences: {
@@ -880,12 +848,11 @@ export const VOICE_LED_LEVELS: PracticeLevel[] = [
   {
     id: "voice_led_structure_1",
     nameKey: "level_voice_led_1",
-    name: "Voice Led Structure 1",
-    nameZh: "Voice Led 结构 1",
+    name: "Voice Leading 1",
+    nameZh: "声部连接 1",
     description: "Voice led structures\n\n3, 2, 1, 7 on minor chords\n\n3, 2, 1, 7 on dominant chords\n\n3, 2, 1, 7 on major chords\n\n4, 2, 1, 7 on sus chords\n\n3, 2, 1, 6 on diminished chords\n\n(Works best with cyclical progression e.g II-V-I)",
-    descriptionZh: "Voice Led 声部连接\n\n小调和弦：3, 2, 1, 7\n\n属和弦：3, 2, 1, 7\n\n大调和弦：3, 2, 1, 7\n\n挂留和弦：4, 2, 1, 7\n\n减和弦：3, 2, 1, 6\n\n（最适合循环进行，如 II-V-I）",
-    groupName: "Voice Led Structures",
-    groupNameZh: "Voice Led 声部连接",
+    groupName: "Voice Leading",
+    groupNameZh: "声部连接",
     sequences: {
       dominant: [3, 2, 1, 7],
       major: [3, 2, 1, 7],
@@ -905,12 +872,11 @@ export const VOICE_LED_LEVELS: PracticeLevel[] = [
   {
     id: "voice_led_structure_2",
     nameKey: "level_voice_led_2",
-    name: "Voice Led Structure 2",
-    nameZh: "Voice Led 结构 2",
+    name: "Voice Leading 2",
+    nameZh: "声部连接 2",
     description: "Voice led structures\n\n3, 2, 1, 7 on minor chords\n\n3, 5, 7, 2 on dominant chords\n\n5, 1, 2, 3 on major chords\n\n4, 5, 7, 2 on sus chords\n\n3, 2, 1, 6 on diminished chords\n\n(Works best with cyclical progression e.g II-V-I)",
-    descriptionZh: "Voice Led 声部连接\n\n小调和弦：3, 2, 1, 7\n\n属和弦：3, 5, 7, 2\n\n大调和弦：5, 1, 2, 3\n\n挂留和弦：4, 5, 7, 2\n\n减和弦：3, 2, 1, 6\n\n（最适合循环进行，如 II-V-I）",
-    groupName: "Voice Led Structures",
-    groupNameZh: "Voice Led 声部连接",
+    groupName: "Voice Leading",
+    groupNameZh: "声部连接",
     sequences: {
       dominant: [3, 5, 7, 2],
       major: [5, 1, 2, 3],
@@ -931,12 +897,11 @@ export const VOICE_LED_LEVELS: PracticeLevel[] = [
   {
     id: "voice_led_structure_3",
     nameKey: "level_voice_led_3",
-    name: "Voice Led Structure 3",
-    nameZh: "Voice Led 结构 3",
+    name: "Voice Leading 3",
+    nameZh: "声部连接 3",
     description: "Voice led structures\n\n1, 3, 5, 7 on minor chords\n\n3, 2, 1, 7 on dominant chords\n\n3, 2, 1, 7 on major chords\n\n4, 2, 1, 7 on sus chords\n\n3, 2, 1, 6 on diminished chords\n\n(Works best with cyclical progression e.g II-V-I)",
-    descriptionZh: "Voice Led 声部连接\n\n小调和弦：1, 3, 5, 7\n\n属和弦：3, 2, 1, 7\n\n大调和弦：3, 2, 1, 7\n\n挂留和弦：4, 2, 1, 7\n\n减和弦：3, 2, 1, 6\n\n（最适合循环进行，如 II-V-I）",
-    groupName: "Voice Led Structures",
-    groupNameZh: "Voice Led 声部连接",
+    groupName: "Voice Leading",
+    groupNameZh: "声部连接",
     sequences: {
       dominant: [3, 2, 1, 7],
       major: [3, 2, 1, 7],
@@ -956,12 +921,11 @@ export const VOICE_LED_LEVELS: PracticeLevel[] = [
   {
     id: "voice_led_structure_4",
     nameKey: "level_voice_led_4",
-    name: "Voice Led Structure 4",
-    nameZh: "Voice Led 结构 4",
+    name: "Voice Leading 4",
+    nameZh: "声部连接 4",
     description: "Voice led structures\n\n1, 3, 5, 7 on minor chords\n\n3, 5, 7, 2 on dominant chords\n\n3, 2, 1, 7 on major chords\n\n4, 5, 7, 2 on sus chords\n\n3, 2, 1, 6 on diminished chords\n\n(Works best with cyclical progression e.g II-V-I)",
-    descriptionZh: "Voice Led 声部连接\n\n小调和弦：1, 3, 5, 7\n\n属和弦：3, 5, 7, 2\n\n大调和弦：3, 2, 1, 7\n\n挂留和弦：4, 5, 7, 2\n\n减和弦：3, 2, 1, 6\n\n（最适合循环进行，如 II-V-I）",
-    groupName: "Voice Led Structures",
-    groupNameZh: "Voice Led 声部连接",
+    groupName: "Voice Leading",
+    groupNameZh: "声部连接",
     sequences: {
       dominant: [3, 5, 7, 2],
       major: [3, 2, 1, 7],
@@ -982,12 +946,11 @@ export const VOICE_LED_LEVELS: PracticeLevel[] = [
   {
     id: "voice_led_structure_5",
     nameKey: "level_voice_led_5",
-    name: "Voice Led Structure 5",
-    nameZh: "Voice Led 结构 5",
+    name: "Voice Leading 5",
+    nameZh: "声部连接 5",
     description: "Voice led structures\n\n5, 3, 1, 7 on minor chords\n\n3, 5, 7, 2 on dominant chords\n\n3, 2, 1, 7 on major chords\n\n4, 5, 7, 2 on sus chords\n\n3, 2, 1, 6 on diminished chords\n\n(Works best with cyclical progression e.g II-V-I)",
-    descriptionZh: "Voice Led 声部连接\n\n小调和弦：5, 3, 1, 7\n\n属和弦：3, 5, 7, 2\n\n大调和弦：3, 2, 1, 7\n\n挂留和弦：4, 5, 7, 2\n\n减和弦：3, 2, 1, 6\n\n（最适合循环进行，如 II-V-I）",
-    groupName: "Voice Led Structures",
-    groupNameZh: "Voice Led 声部连接",
+    groupName: "Voice Leading",
+    groupNameZh: "声部连接",
     sequences: {
       dominant: [3, 5, 7, 2],
       major: [3, 2, 1, 7],
@@ -1010,11 +973,10 @@ export const VOICE_LED_LEVELS: PracticeLevel[] = [
 export const SUSPENDED_LEVELS: PracticeLevel[] = [
   {
     id: "suspended_2_resolution",
-    nameKey: "level_suspended_2",
+    nameKey: "level_suspended_2_resolution",
     name: "Suspended 2 Resolution",
     nameZh: "挂二解决",
     description: "Suspended Structures\n\nSuspended 2 resolving to 3 then 1",
-    descriptionZh: "挂留结构\n\n挂二解决到三音再到根音",
     groupName: "Suspended Structures",
     groupNameZh: "挂留结构",
     sequences: {
@@ -1035,11 +997,10 @@ export const SUSPENDED_LEVELS: PracticeLevel[] = [
   },
   {
     id: "suspended_4_resolution",
-    nameKey: "level_suspended_4",
+    nameKey: "level_suspended_4_resolution",
     name: "Suspended 4 Resolution",
     nameZh: "挂四解决",
     description: "Suspended Structures\n\nSuspended 4 resolving to 3 then 1",
-    descriptionZh: "挂留结构\n\n挂四解决到三音再到根音",
     groupName: "Suspended Structures",
     groupNameZh: "挂留结构",
     sequences: {
@@ -1067,7 +1028,6 @@ export const CHORD_SCALES_LEVELS: PracticeLevel[] = [
     name: "Chord Scale",
     nameZh: "和弦音阶",
     description: "All notes of the relevant chord scale played from the root note through one octave",
-    descriptionZh: "从根音开始演奏一个八度的完整和弦音阶",
     groupName: "Chord Scales",
     groupNameZh: "和弦音阶",
     sequences: {
@@ -1093,7 +1053,6 @@ export const CHORD_SCALES_LEVELS: PracticeLevel[] = [
     name: "Chord Scale (3rd to 3rd)",
     nameZh: "和弦音阶（三音到三音）",
     description: "All notes of the relevant chord scale played from the 3rd through one octave",
-    descriptionZh: "从三音开始演奏一个八度的完整和弦音阶",
     groupName: "Chord Scales",
     groupNameZh: "和弦音阶",
     sequences: {
@@ -1119,7 +1078,6 @@ export const CHORD_SCALES_LEVELS: PracticeLevel[] = [
     name: "Chord Scale (5th to 5th)",
     nameZh: "和弦音阶（五音到五音）",
     description: "All notes of the relevant chord scale played from the 5th through one octave",
-    descriptionZh: "从五音开始演奏一个八度的完整和弦音阶",
     groupName: "Chord Scales",
     groupNameZh: "和弦音阶",
     sequences: {
@@ -1145,7 +1103,6 @@ export const CHORD_SCALES_LEVELS: PracticeLevel[] = [
     name: "Chord Scale (7th to 7th)",
     nameZh: "和弦音阶（七音到七音）",
     description: "All notes of the relevant chord scale played from the 7th through one octave",
-    descriptionZh: "从七音开始演奏一个八度的完整和弦音阶",
     groupName: "Chord Scales",
     groupNameZh: "和弦音阶",
     sequences: {
@@ -1167,11 +1124,10 @@ export const CHORD_SCALES_LEVELS: PracticeLevel[] = [
   },
   {
     id: "chord_scale_random_chord_tone",
-    nameKey: "level_chord_scale_random_ct",
+    nameKey: "level_chord_scale_random_starting_chord_tone",
     name: "Chord Scale (Random Starting Chord Tone)",
     nameZh: "和弦音阶（随机和弦音起始）",
     description: "All notes of the relevant chord scale starting from a randomised chord tone",
-    descriptionZh: "从随机和弦音开始演奏完整和弦音阶",
     groupName: "Chord Scales",
     groupNameZh: "和弦音阶",
     sequences: {
@@ -1193,11 +1149,10 @@ export const CHORD_SCALES_LEVELS: PracticeLevel[] = [
   },
   {
     id: "chord_scale_random_scale_tone",
-    nameKey: "level_chord_scale_random_st",
+    nameKey: "level_chord_scale_random_starting_scale_tone",
     name: "Chord Scale (Random Starting Scale Tone)",
     nameZh: "和弦音阶（随机音阶音起始）",
     description: "All notes of the relevant chord scale starting from a randomised scale tone",
-    descriptionZh: "从随机音阶音开始演奏完整和弦音阶",
     groupName: "Chord Scales",
     groupNameZh: "和弦音阶",
     sequences: {
@@ -1226,7 +1181,6 @@ export const PASSING_NOTE_CHORD_SCALES_LEVELS: PracticeLevel[] = [
     name: "Passing Note Scale",
     nameZh: "经过音音阶",
     description: "All notes of the relevant chord scale with appropriate passing notes, played from root note to root note. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.",
-    descriptionZh: "从根音到根音演奏带有适当经过音的完整和弦音阶。如果在强拍开始，后续所有和弦音也将落在强拍上。",
     groupName: "Passing Note Chord Scales",
     groupNameZh: "经过音和弦音阶",
     sequences: {
@@ -1253,7 +1207,6 @@ export const PASSING_NOTE_CHORD_SCALES_LEVELS: PracticeLevel[] = [
     name: "Passing Note Scale 3rd to 3rd",
     nameZh: "经过音音阶（三音到三音）",
     description: "All notes of the relevant chord scale with appropriate passing notes, played from 3rd to 3rd. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.",
-    descriptionZh: "从三音到三音演奏带有适当经过音的完整和弦音阶。如果在强拍开始，后续所有和弦音也将落在强拍上。",
     groupName: "Passing Note Chord Scales",
     groupNameZh: "经过音和弦音阶",
     sequences: {
@@ -1280,7 +1233,6 @@ export const PASSING_NOTE_CHORD_SCALES_LEVELS: PracticeLevel[] = [
     name: "Passing Note Scale 5th to 5th",
     nameZh: "经过音音阶（五音到五音）",
     description: "All notes of the relevant chord scale with appropriate passing notes, played from 5th to 5th. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.",
-    descriptionZh: "从五音到五音演奏带有适当经过音的完整和弦音阶。如果在强拍开始，后续所有和弦音也将落在强拍上。",
     groupName: "Passing Note Chord Scales",
     groupNameZh: "经过音和弦音阶",
     sequences: {
@@ -1303,11 +1255,10 @@ export const PASSING_NOTE_CHORD_SCALES_LEVELS: PracticeLevel[] = [
   },
   {
     id: "passing_note_scale_6th_7th_to_6th_7th",
-    nameKey: "level_passing_note_scale_6th_7th",
+    nameKey: "level_passing_note_scale_6th7th_to_6th7th",
     name: "Passing Note Scale 6th/7th to 6th/7th",
     nameZh: "经过音音阶（六音/七音到六音/七音）",
     description: "All notes of the relevant chord scale with passing notes, played from 6th to 6th or 7th to 7th, as harmonicaly appopriate. If played starting on a downbeat all of the subsequent chord tones will also fall on downbeats.",
-    descriptionZh: "从六音到六音或七音到七音演奏带有经过音的完整和弦音阶（根据和声适当选择）。如果在强拍开始，后续所有和弦音也将落在强拍上。",
     groupName: "Passing Note Chord Scales",
     groupNameZh: "经过音和弦音阶",
     sequences: {
@@ -1330,11 +1281,10 @@ export const PASSING_NOTE_CHORD_SCALES_LEVELS: PracticeLevel[] = [
   },
   {
     id: "passing_note_scale_random_chord_tone",
-    nameKey: "level_passing_note_scale_random_ct",
+    nameKey: "level_passing_note_scale_random_starting_chord_tone",
     name: "Passing Note Scale (Random Starting Chord Tone)",
     nameZh: "经过音音阶（随机和弦音起始）",
     description: "All notes of the relevant chord scale with appropriate passing notes, from a randomised starting chord tone. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.",
-    descriptionZh: "从随机和弦音开始演奏带有适当经过音的完整和弦音阶。如果在强拍开始，后续所有和弦音也将落在强拍上。",
     groupName: "Passing Note Chord Scales",
     groupNameZh: "经过音和弦音阶",
     sequences: {
@@ -1364,7 +1314,6 @@ export const ALTERED_LEVELS: PracticeLevel[] = [
     name: "Altered Dominant (♭9)",
     nameZh: "变化属和弦（♭9）",
     description: "Altered dominant structures\n\n♭9, 3, ♯9, 7 on dominant chords\n\nWorks with altered dominant chords",
-    descriptionZh: "变化属和弦结构\n\n属和弦：♭9, 3, ♯9, 7\n\n适用于变化属和弦",
     groupName: "Altered Dominant Structures",
     groupNameZh: "变化属和弦结构",
     sequences: {
@@ -1390,7 +1339,6 @@ export const ALTERED_LEVELS: PracticeLevel[] = [
     name: "Altered Dominant (♯9)",
     nameZh: "变化属和弦（♯9）",
     description: "Altered dominant structures\n\n♯9, 3, ♭9, 7 on dominant chords\n\nWorks with altered dominant chords",
-    descriptionZh: "变化属和弦结构\n\n属和弦：♯9, 3, ♭9, 7\n\n适用于变化属和弦",
     groupName: "Altered Dominant Structures",
     groupNameZh: "变化属和弦结构",
     sequences: {
@@ -1416,7 +1364,6 @@ export const ALTERED_LEVELS: PracticeLevel[] = [
     name: "Altered Dominant (♭5)",
     nameZh: "变化属和弦（♭5）",
     description: "Altered dominant structures\n\n1, 3, ♭5, 7 on dominant chords\n\nWorks with altered dominant chords",
-    descriptionZh: "变化属和弦结构\n\n属和弦：1, 3, ♭5, 7\n\n适用于变化属和弦",
     groupName: "Altered Dominant Structures",
     groupNameZh: "变化属和弦结构",
     sequences: {
@@ -1442,7 +1389,6 @@ export const ALTERED_LEVELS: PracticeLevel[] = [
     name: "Altered Dominant (♯5)",
     nameZh: "变化属和弦（♯5）",
     description: "Altered dominant structures\n\n1, 3, ♯5, 7 on dominant chords\n\nWorks with altered dominant chords",
-    descriptionZh: "变化属和弦结构\n\n属和弦：1, 3, ♯5, 7\n\n适用于变化属和弦",
     groupName: "Altered Dominant Structures",
     groupNameZh: "变化属和弦结构",
     sequences: {
@@ -1468,7 +1414,6 @@ export const ALTERED_LEVELS: PracticeLevel[] = [
     name: "Altered Dominant (Full)",
     nameZh: "变化属和弦（完整）",
     description: "Altered dominant structures\n\n1, 3, ♭5, ♯5, ♭9, ♯9, 7 on dominant chords\n\nWorks with altered dominant chords",
-    descriptionZh: "变化属和弦结构\n\n属和弦：1, 3, ♭5, ♯5, ♭9, ♯9, 7\n\n适用于变化属和弦",
     groupName: "Altered Dominant Structures",
     groupNameZh: "变化属和弦结构",
     sequences: {
@@ -1494,7 +1439,6 @@ export const ALTERED_LEVELS: PracticeLevel[] = [
     name: "Altered Scale",
     nameZh: "变化音阶",
     description: "Altered scale (7th mode of melodic minor)\n\n1, ♭2, ♭3, 3, ♭5, ♯5, ♭7\n\nWorks with altered dominant chords",
-    descriptionZh: "变化音阶（旋律小调第7调式）\n\n1, ♭2, ♭3, 3, ♭5, ♯5, ♭7\n\n适用于变化属和弦",
     groupName: "Altered Dominant Structures",
     groupNameZh: "变化属和弦结构",
     sequences: {
@@ -1524,7 +1468,6 @@ export const DIMINISHED_SCALES_LEVELS: PracticeLevel[] = [
     name: "Diminished (Whole-Half)",
     nameZh: "减音阶（全半）",
     description: "Diminished whole-half scale\n\n1, 2, ♭3, 4, ♭5, ♭6, 6, 7\n\nWorks with diminished chords",
-    descriptionZh: "减音阶（全半）\n\n1, 2, ♭3, 4, ♭5, ♭6, 6, 7\n\n适用于减和弦",
     groupName: "Diminished Scales",
     groupNameZh: "减音阶",
     sequences: {
@@ -1533,7 +1476,7 @@ export const DIMINISHED_SCALES_LEVELS: PracticeLevel[] = [
       minor: [1, 2, 3, 4, 5, 6, 7, 8],
       sus: [1, 2, 4, 5, 5, 6, 7, 8],
       diminished: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminishedDominant: [1, 2, 4, 5, 6, 7, 8, 9],
+      diminishedDominant: [1, 2, 4, 5, 6, 7, 8],
       six: [1, 2, 3, 4, 5, 6, 7, 8],
     },
     startingIntervalOption: "first",
@@ -1550,7 +1493,6 @@ export const DIMINISHED_SCALES_LEVELS: PracticeLevel[] = [
     name: "Diminished (Half-Whole)",
     nameZh: "减音阶（半全）",
     description: "Diminished half-whole scale\n\n1, ♭2, ♭3, 3, ♯4, 5, 6, ♭7\n\nWorks with dominant 7♭9 chords",
-    descriptionZh: "减音阶（半全）\n\n1, ♭2, ♭3, 3, ♯4, 5, 6, ♭7\n\n适用于属7♭9和弦",
     groupName: "Diminished Scales",
     groupNameZh: "减音阶",
     sequences: {
@@ -1559,7 +1501,7 @@ export const DIMINISHED_SCALES_LEVELS: PracticeLevel[] = [
       minor: [1, 2, 3, 4, 5, 6, 7, 8],
       sus: [1, 2, 4, 5, 5, 6, 7, 8],
       diminished: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminishedDominant: [1, 2, 4, 5, 6, 7, 8, 9],
+      diminishedDominant: [1, 2, 4, 5, 6, 7, 8],
       six: [1, 2, 3, 4, 5, 6, 7, 8],
     },
     startingIntervalOption: "first",
@@ -1588,25 +1530,16 @@ export const ALL_PRACTICE_LEVELS: PracticeLevel[] = [
 ]
 
 export const PRACTICE_MODE_GROUPS = [
-  { id: 'single_chord_tones', name: 'Single Chord Tones', nameZh: '单和弦音', levels: SINGLE_CHORD_TONES_LEVELS },
-  { id: 'two_chord_tones', name: 'Two Chord Tones', nameZh: '双和弦音', levels: TWO_CHORD_TONES_LEVELS },
-  { id: 'three_chord_tones', name: 'Three Chord Tones', nameZh: '三和弦音', levels: THREE_CHORD_TONES_LEVELS },
-  { id: 'four_chord_tones', name: 'Four Chord Tones', nameZh: '四和弦音', levels: FOUR_CHORD_TONES_LEVELS },
+  { id: 'single_chord_tones', name: 'Single Chord Tones', nameZh: '单个和弦音', levels: SINGLE_CHORD_TONES_LEVELS },
+  { id: 'two_chord_tones', name: 'Two Chord Tones', nameZh: '两个和弦音', levels: TWO_CHORD_TONES_LEVELS },
+  { id: 'three_chord_tones', name: 'Three Chord Tones', nameZh: '三个和弦音', levels: THREE_CHORD_TONES_LEVELS },
+  { id: 'four_chord_tones', name: 'Four Chord Tones', nameZh: '四个和弦音', levels: FOUR_CHORD_TONES_LEVELS },
   { id: 'melodic_root_to_5th', name: 'Melodic Structures - Root to 5th', nameZh: '旋律结构 - 根音到五音', levels: MELODIC_ROOT_TO_5TH_LEVELS },
   { id: 'melodic_5th_to_9th', name: 'Melodic Structures - 5th to 9th', nameZh: '旋律结构 - 五音到九音', levels: MELODIC_5TH_TO_9TH_LEVELS },
-  { id: 'voice_led', name: 'Voice Led Structures', nameZh: 'Voice Led 声部连接', levels: VOICE_LED_LEVELS },
+  { id: 'voice_led', name: 'Voice Leading', nameZh: '声部连接', levels: VOICE_LED_LEVELS },
   { id: 'suspended', name: 'Suspended Structures', nameZh: '挂留结构', levels: SUSPENDED_LEVELS },
   { id: 'chord_scales', name: 'Chord Scales', nameZh: '和弦音阶', levels: CHORD_SCALES_LEVELS },
   { id: 'passing_note_chord_scales', name: 'Passing Note Chord Scales', nameZh: '经过音和弦音阶', levels: PASSING_NOTE_CHORD_SCALES_LEVELS },
   { id: 'altered', name: 'Altered Dominant Structures', nameZh: '变化属和弦结构', levels: ALTERED_LEVELS },
   { id: 'diminished_scales', name: 'Diminished Scales', nameZh: '减音阶', levels: DIMINISHED_SCALES_LEVELS },
 ]
-
-export function getPracticeLevelById(id: string): PracticeLevel | undefined {
-  return ALL_PRACTICE_LEVELS.find(level => level.id === id)
-}
-
-export function getPracticeLevelsByGroup(groupId: string): PracticeLevel[] {
-  const group = PRACTICE_MODE_GROUPS.find(g => g.id === groupId)
-  return group ? group.levels : []
-}

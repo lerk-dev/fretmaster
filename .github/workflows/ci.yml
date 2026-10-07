@@ -1,0 +1,44 @@
+name: CI
+
+# 质量门禁（2026-10-04 新增）：push / PR 到 main 时把「类型 / lint / 测试 / 构建」
+# 四道闸门完整跑一遍。历史上这四项全靠人手跑，本文件把它们变成机器强制。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check (tsc)
+        run: npx tsc --noEmit
+
+      - name: Lint (eslint, flat config)
+        run: npm run lint
+
+      - name: Unit tests (vitest)
+        run: npx vitest run --no-file-parallelism
+
+      - name: 'Build (next, output: export)'
+        run: npm run build

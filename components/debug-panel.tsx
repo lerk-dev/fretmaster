@@ -263,14 +263,14 @@ const DebugPanelInner = memo(function DebugPanelInner() {
               <Bug className="w-3.5 h-3.5 text-amber-500" />
               <span className="text-xs font-semibold">Debug Panel</span>
               {data.isCapturing && (
-                <Badge variant="outline" className="h-4 px-1.5 text-[10px] border-green-500 text-green-500">
+                <Badge variant="outline" className="h-4 px-1.5 text-2xs border-green-500 text-green-500">
                   <Radio className="w-2.5 h-2.5 mr-0.5 animate-pulse" />
                   LIVE
                 </Badge>
               )}
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] font-mono text-muted-foreground">
+              <span className="text-2xs font-mono text-muted-foreground">
                 {data.fps} FPS
               </span>
               {minimized ? (
@@ -291,7 +291,7 @@ const DebugPanelInner = memo(function DebugPanelInner() {
           {!minimized && (
             <div className="overflow-y-auto max-h-[70vh] p-3 space-y-3 text-xs">
               <section>
-                <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                <h4 className="text-2xs uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Signal className="w-3 h-3" /> Pitch Detection
                 </h4>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono">
@@ -332,7 +332,7 @@ const DebugPanelInner = memo(function DebugPanelInner() {
               </section>
 
               <section>
-                <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                <h4 className="text-2xs uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Activity className="w-3 h-3" /> Audio Status
                 </h4>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono">
@@ -360,7 +360,7 @@ const DebugPanelInner = memo(function DebugPanelInner() {
               </section>
 
               <section>
-                <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                <h4 className="text-2xs uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Volume2 className="w-3 h-3" /> Audio Level
                 </h4>
                 <div className="space-y-1.5">
@@ -415,7 +415,7 @@ const DebugPanelInner = memo(function DebugPanelInner() {
               </section>
 
               <section>
-                <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                <h4 className="text-2xs uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Cpu className="w-3 h-3" /> Device
                 </h4>
                 <div className="space-y-1 font-mono">

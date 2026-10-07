@@ -31,6 +31,25 @@ pub async fn start_audio_capture_with_sample_rate(
     pipeline.start_capture(device_name, sample_rate)
 }
 
+/// 按指定后端启动采集。
+/// backend 取值：`wasapi_shared`（默认）| `wasapi_exclusive` | `asio`
+#[tauri::command]
+pub async fn start_audio_capture_with_backend(
+    state: State<'_, AppState>,
+    device_name: Option<String>,
+    sample_rate: Option<u32>,
+    backend: String,
+) -> Result<(), String> {
+    let backend = match backend.as_str() {
+        "wasapi_shared" | "" => crate::audio::capture::AudioBackend::WasapiShared,
+        "wasapi_exclusive" => crate::audio::capture::AudioBackend::WasapiExclusive,
+        "asio" => crate::audio::capture::AudioBackend::Asio,
+        other => return Err(format!("未知音频后端: {}", other)),
+    };
+    let mut pipeline = state.inner().pipeline.lock();
+    pipeline.start_capture_with_backend(device_name, sample_rate, backend)
+}
+
 #[tauri::command]
 pub async fn stop_audio_capture(state: State<'_, AppState>) -> Result<(), String> {
     let mut pipeline = state.inner().pipeline.lock();
@@ -199,6 +218,8 @@ pub struct AudioStatus {
     pub latency_ms: f32,
     pub buffer_size: usize,
     pub sample_rate: u32,
+    /// 实际生效的后端：wasapi_shared / wasapi_exclusive / asio
+    pub backend: String,
 }
 
 #[tauri::command]
@@ -207,8 +228,12 @@ pub async fn get_audio_status(state: State<'_, AppState>) -> Result<AudioStatus,
     Ok(AudioStatus {
         is_capturing: pipeline.is_capturing(),
         latency_ms: pipeline.get_capture().get_latency_ms(),
-        buffer_size: pipeline.get_capture().get_buffer_size(),
+        // 「Buffer」状态字段语义 = 当前**配置的**缓冲帧数（用户设置 / 起流实际值）。
+        // ⚠️ 别换回 get_buffer_size()：那返回的是环形缓冲的实时样本数（另一个量），
+        // debug 面板显示「Buffer」时会给出与设置页无关的漂移值。
+        buffer_size: pipeline.get_capture().get_buffer_frame_size(),
         sample_rate: pipeline.get_capture().get_sample_rate(),
+        backend: pipeline.get_capture().get_backend().as_str().to_string(),
     })
 }
 

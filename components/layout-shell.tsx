@@ -11,10 +11,20 @@ import { useEffect, useState } from 'react'
 export function LayoutShell({ children }: { children: React.ReactNode }) {
   const isFullscreen = useAppStore((state) => state.isFullscreen)
   const theme = useAppStore((state) => state.user.theme)
+  const language = useAppStore((state) => state.user.language)
   // 客户端 mounted 标记，避免 hydration mismatch
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   const sonnerTheme = mounted && isLightTheme(theme) ? 'light' : 'dark'
+
+  // 语言切换时同步文档标题与 <html lang> 标注
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.title = language === 'zh-CN'
+      ? 'FretMaster - 吉他指板练习工具'
+      : 'FretMaster - Guitar Fretboard Practice Tool'
+    document.documentElement.lang = language
+  }, [language])
 
   // 同步 isFullscreen 到 html/body 标签（html/body 在 server component 中渲染，需在此副作用操作 DOM）
   useEffect(() => {
@@ -53,7 +63,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
         </ClientOnly>
       )}
       <div className="flex-1 overflow-hidden">
-        <ErrorBoundary language="zh-CN">
+        <ErrorBoundary language={language}>
           {children}
         </ErrorBoundary>
       </div>

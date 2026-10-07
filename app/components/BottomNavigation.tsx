@@ -37,7 +37,7 @@ const BottomNavigation = memo(function BottomNavigation({
             title={mode.label}
           >
             <mode.Icon className="h-4 w-4" />
-            <span className="text-[10px] leading-none">{mode.label}</span>
+            <span className="text-2xs leading-none">{mode.label}</span>
           </button>
         ))}
       </div>

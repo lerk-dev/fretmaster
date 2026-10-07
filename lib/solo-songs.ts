@@ -156,7 +156,9 @@ export function convertRootNote(rootNote: string): string {
 
 // 将SOLO的chordType转换为标准符号
 export function convertChordType(chordType: string): string {
-  return CHORD_TYPE_MAP[chordType] || chordType
+  // 必须用 ?? 而非 ||：'major' 在映射表里对应 ''（大三和弦无后缀），
+  // 而空字符串是 falsy，用 || 会被短路吃掉、返回原文 'major'。
+  return CHORD_TYPE_MAP[chordType] ?? chordType
 }
 
 // 将SOLO的key转换为标准格式
@@ -206,16 +208,6 @@ export async function loadSoloSongs(): Promise<Song[]> {
     logger.error('Failed to load songs:', error)
     return []
   }
-}
-
-// 同步获取已加载的歌曲（用于已加载后的场景）
-export function getSoloSongs(): Song[] {
-  return cachedSongs || []
-}
-
-// 预加载歌曲数据
-export function preloadSoloSongs(): void {
-  loadSoloSongs().catch((e) => logger.error('Failed to preload songs:', e))
 }
 
 // 默认导出空数组，实际使用时通过loadSoloSongs加载

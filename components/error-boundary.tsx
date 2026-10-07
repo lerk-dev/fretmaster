@@ -105,7 +105,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             {this.state.errorInfo?.componentStack && (
               <details className="mb-3 text-left">
                 <summary className="text-xs text-red-500 cursor-pointer">{msg.details}</summary>
-                <pre className="mt-2 text-[10px] text-red-400 overflow-auto max-h-32 p-2 bg-red-100 dark:bg-red-900 rounded">
+                <pre className="mt-2 text-2xs text-red-400 overflow-auto max-h-32 p-2 bg-red-100 dark:bg-red-900 rounded">
                   {this.state.errorInfo.componentStack}
                 </pre>
               </details>
@@ -130,18 +130,5 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
 
     return this.props.children
-  }
-}
-
-export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
-  componentName?: string
-): React.FC<P> {
-  return function WrappedComponent(props: P) {
-    return (
-      <ErrorBoundary componentName={componentName}>
-        <Component {...props} />
-      </ErrorBoundary>
-    )
   }
 }

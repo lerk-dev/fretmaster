@@ -1,4 +1,4 @@
-use crate::audio::{AudioCapture, PitchDetector, PitchResult, AudioPreprocessor, preprocessor};
+use crate::audio::{AudioCapture, PitchDetector, PitchResult, AudioPreprocessor, ClockedOnsetDetector, preprocessor};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -15,8 +15,8 @@ pub struct AudioPipeline {
     agc_current_gain: f32,
     agc_attack: f32,
     agc_release: f32,
-    last_amplitude: f32,
-    amplitude_diff_threshold: f32,
+    /// 起音检测（原 last_amplitude / amplitude_diff_threshold 两个字段已并入其中）
+    onset: ClockedOnsetDetector,
     last_pitch_result: Option<PitchResult>,
 }
 
@@ -33,8 +33,7 @@ impl AudioPipeline {
             agc_current_gain: 1.0,
             agc_attack: 0.01,
             agc_release: 0.001,
-            last_amplitude: 0.0,
-            amplitude_diff_threshold: 0.15,
+            onset: ClockedOnsetDetector::new(),
             last_pitch_result: None,
         }
     }
@@ -43,10 +42,22 @@ impl AudioPipeline {
         self.capture.start_with_sample_rate(device_name, sample_rate).map_err(|e| e.to_string())
     }
 
+    /// 按指定音频后端启动采集（共享 / WASAPI 独占 / ASIO）。
+    pub fn start_capture_with_backend(
+        &mut self,
+        device_name: Option<String>,
+        sample_rate: Option<u32>,
+        backend: crate::audio::capture::AudioBackend,
+    ) -> Result<(), String> {
+        self.capture
+            .start_with_backend(device_name, sample_rate, backend)
+            .map_err(|e| e.to_string())
+    }
+
     pub fn stop_capture(&mut self) {
         self.capture.stop();
         self.agc_current_gain = 1.0;
-        self.last_amplitude = 0.0;
+        self.onset.reset();
         self.last_pitch_result = None;
     }
 
@@ -120,6 +131,16 @@ impl AudioPipeline {
         buffer.iter().map(|&x| (x * self.agc_current_gain).tanh()).collect()
     }
 
+    /// 起音检测：本帧是否是一次**新的拨弦**。
+    ///
+    /// 判定规则全部在 crate::audio::onset::OnsetDetector 里（附完整单测），
+    /// 本方法只负责取一帧原始音频、算出 RMS 再交给它。
+    ///
+    /// ⚠️ 用**原始** buffer（不走 preprocessor / AGC）：预处理会改变电平包络，
+    /// 而 AGC 更是会把「拨弦的陡升」直接抹平成缓慢渐强，起音就再也检不出来了。
+    /// worklet 侧同样取 prefilter 之前的 energy，两边口径一致。
+    ///
+    /// 原实现在这里内联了 `diff > 0.15` 配 EMA 基线，两个错都写在 onset.rs 的模块注释里。
     pub fn detect_amplitude_diff(&mut self) -> bool {
         if !self.capture.is_capturing() {
             return false;
@@ -133,9 +154,7 @@ impl AudioPipeline {
         }
 
         let rms: f32 = (buffer.iter().map(|&x| x * x).sum::<f32>() / buffer.len() as f32).sqrt();
-        let diff = rms - self.last_amplitude;
-        self.last_amplitude = self.last_amplitude * 0.9 + rms * 0.1;
-        diff > self.amplitude_diff_threshold
+        self.onset.update(rms)
     }
 
     pub fn set_agc_enabled(&mut self, enabled: bool) {

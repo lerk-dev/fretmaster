@@ -3,6 +3,9 @@
 import { useState, useEffect, memo, useCallback, useRef } from 'react'
 import { Minus, Square, X, Maximize2 } from 'lucide-react'
 import { cn, isTauriEnv } from '@/lib/utils'
+import { useAppStore } from '@/lib/store'
+import { createTranslator } from '@/lib/i18n'
+import { logger } from '@/lib/logger'
 
 interface TitleBarProps {
   className?: string
@@ -11,6 +14,10 @@ interface TitleBarProps {
 const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false)
   const isTauri = isTauriEnv()
+  const language = useAppStore((s) => s.user.language)
+  // 译文统一走 i18n 表（title_* 键早已存在）；此前这里内联了同义中英文三元表达式，
+  // 相当于把译文复制了一份 —— 改 i18n 表不会同步，是典型的"看似没问题"的漂移隐患。
+  const t = createTranslator(language)
   const unlistenRef = useRef<(() => void) | null>(null)
 
   const checkMaximized = useCallback(async () => {
@@ -20,7 +27,7 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
       const maximized = await isWindowMaximized()
       setIsMaximized(maximized)
     } catch (e) {
-      console.debug('checkMaximized failed:', e)
+      logger.debug('checkMaximized failed:', e)
     }
   }, [isTauri])
 
@@ -29,26 +36,40 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
 
     checkMaximized()
 
+    let cancelled = false
+    let stopPolling: (() => void) | null = null
+
     const setupListener = async () => {
       try {
         const { getCurrentWindow } = await import('@tauri-apps/api/window')
         const window = getCurrentWindow()
-        
+
         const unlisten = await window.onResized(async () => {
           checkMaximized()
         })
-        
+
+        // 若在 await 期间组件已卸载，立刻注销，避免监听器泄漏
+        if (cancelled) {
+          unlisten()
+          return
+        }
         unlistenRef.current = unlisten
       } catch (e) {
-        console.debug('Failed to setup window resize listener, falling back to polling:', e)
+        logger.debug('Failed to setup window resize listener, falling back to polling:', e)
+        if (cancelled) return
+        // ⚠️ 轮询必须能被卸载清理。原先这里 `return () => clearInterval(...)`，
+        // 但 `setupListener()` 的返回值没人接收 ⇒ setInterval 永不释放：
+        // 进全屏时 layout-shell 会卸载 TitleBar，轮询却继续每 2s 发一次 IPC。
         const pollInterval = setInterval(checkMaximized, 2000)
-        return () => clearInterval(pollInterval)
+        stopPolling = () => clearInterval(pollInterval)
       }
     }
 
     setupListener()
 
     return () => {
+      cancelled = true
+      if (stopPolling) stopPolling()
       if (unlistenRef.current) {
         unlistenRef.current()
         unlistenRef.current = null
@@ -62,7 +83,7 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
       const { minimizeWindow } = await import('@/lib/native-window')
       await minimizeWindow()
     } catch (e) {
-      console.debug('handleMinimize failed:', e)
+      logger.debug('handleMinimize failed:', e)
     }
   }
 
@@ -73,7 +94,7 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
       await maximizeWindow()
       setTimeout(checkMaximized, 100)
     } catch (e) {
-      console.debug('handleMaximize failed:', e)
+      logger.debug('handleMaximize failed:', e)
     }
   }
 
@@ -83,7 +104,7 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
       const { closeWindow } = await import('@/lib/native-window')
       await closeWindow()
     } catch (e) {
-      console.debug('handleClose failed:', e)
+      logger.debug('handleClose failed:', e)
     }
   }
 
@@ -93,7 +114,7 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
       const { startDragging } = await import('@/lib/native-window')
       await startDragging()
     } catch (e) {
-      console.debug('handleDragStart failed:', e)
+      logger.debug('handleDragStart failed:', e)
     }
   }
 
@@ -119,8 +140,8 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
           onClick={handleMinimize}
           onMouseDown={(e) => e.stopPropagation()}
           className="h-11 w-12 flex items-center justify-center hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:bg-accent/50"
-          title="Minimize"
-          aria-label="Minimize"
+          title={t('title_minimize')}
+          aria-label={t('title_minimize')}
         >
           <Minus className="w-4 h-4 text-foreground/70" />
         </button>
@@ -128,8 +149,8 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
           onClick={handleMaximize}
           onMouseDown={(e) => e.stopPropagation()}
           className="h-11 w-12 flex items-center justify-center hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:bg-accent/50"
-          title={isMaximized ? 'Restore' : 'Maximize'}
-          aria-label={isMaximized ? 'Restore' : 'Maximize'}
+          title={isMaximized ? t('title_restore') : t('title_maximize')}
+          aria-label={isMaximized ? t('title_restore') : t('title_maximize')}
         >
           {isMaximized ? (
             <Square className="w-3.5 h-3.5 text-foreground/70" />
@@ -141,8 +162,8 @@ const TitleBarInner = memo(function TitleBarInner({ className }: TitleBarProps) 
           onClick={handleClose}
           onMouseDown={(e) => e.stopPropagation()}
           className="h-11 w-12 flex items-center justify-center hover:bg-red-500/90 hover:text-white transition-colors focus-visible:outline-none focus-visible:bg-red-500/90"
-          title="Close"
-          aria-label="Close"
+          title={t('title_close')}
+          aria-label={t('title_close')}
         >
           <X className="w-4 h-4 text-foreground/70 hover:text-white" />
         </button>

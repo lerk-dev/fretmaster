@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState, useRef, memo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useEffect, useState, useRef, memo } from 'react'
 
 interface MetronomeVisualizerProps {
   bpm: number
   enabled: boolean
   isPlaying: boolean
   beatsPerMeasure?: number
+  /** 调用方（app/page.tsx）会传语言；当前 UI 没有需要翻译的文案，保留字段以兼容调用方 */
   language?: 'zh-CN' | 'en'
 }
 
@@ -16,25 +16,12 @@ export const MetronomeVisualizer = memo(function MetronomeVisualizer({
   enabled,
   isPlaying,
   beatsPerMeasure = 4,
-  language = 'zh-CN',
 }: MetronomeVisualizerProps) {
   const [currentBeat, setCurrentBeat] = useState(0)
   const [pulseScale, setPulseScale] = useState(1)
   const [beatHistory, setBeatHistory] = useState<number[]>([])
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const beatCountRef = useRef(0)
-
-  const t = useCallback((key: string) => {
-    const translations: Record<string, Record<string, string>> = {
-      'zh-CN': {
-        'beat': '拍',
-      },
-      'en': {
-        'beat': 'Beat',
-      },
-    }
-    return translations[language]?.[key] || key
-  }, [language])
 
   useEffect(() => {
     if (!enabled || !isPlaying || bpm <= 0) {
@@ -133,41 +120,5 @@ export const MetronomeVisualizer = memo(function MetronomeVisualizer({
         </div>
       </div>
     </div>
-  )
-})
-
-interface MetronomePulseProps {
-  isPulsing: boolean
-  bpm: number
-  color?: string
-}
-
-export const MetronomePulse = memo(function MetronomePulse({
-  isPulsing,
-  bpm,
-  color = 'hsl(var(--primary))',
-}: MetronomePulseProps) {
-  const [scale, setScale] = useState(1)
-
-  useEffect(() => {
-    if (!isPulsing) return
-
-    const interval = (60 / bpm) * 1000
-    const pulseInterval = setInterval(() => {
-      setScale(1.2)
-      setTimeout(() => setScale(1), 80)
-    }, interval)
-
-    return () => clearInterval(pulseInterval)
-  }, [isPulsing, bpm])
-
-  return (
-    <div
-      className="w-3 h-3 rounded-full transition-transform duration-75"
-      style={{
-        backgroundColor: color,
-        transform: `scale(${scale})`,
-      }}
-    />
   )
 })

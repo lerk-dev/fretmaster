@@ -9,6 +9,7 @@
     "target": "ES6",
     "skipLibCheck": true,
     "strict": true,
+    "noUnusedLocals": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -43,6 +44,8 @@
   ],
   "exclude": [
     "node_modules",
-    "src-tauri/target"
+    "src-tauri/target",
+    "local-only",
+    ".workbuddy"
   ]
 }

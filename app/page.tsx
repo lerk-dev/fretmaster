@@ -1,5196 +1,301 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿"use client"
+﻿"use client"
 
-import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from "react"
-import { VariableSizeList as List } from 'react-window'
+import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
 import { deduplicateStats } from "@/lib/export-utils"
-import { getLocalDateString, parseDbTimestamp, dbTimestampToLocalDate, getLocalDayStart, getLocalDaysAgoStart, getLocalMonthsAgoStart, normalizeAccuracy } from "@/lib/utils"
-import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useVersion, useDisplayScale, useFeedbackSoundSettings, useUser, useChordSymbols, parseTheme, composeTheme, isLightTheme, type ThemeStyle, type ThemeBrightness } from "@/lib/store"
-import { VERSION, BUILD_DATE_LOCAL } from "@/lib/version"
+import { getLocalDateString, dbTimestampToLocalDate, getLocalDaysAgoStart } from "@/lib/utils"
+import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useDisplayScale, useUser, useChordSymbols } from "@/lib/store"
+import { getEffectiveAudioSettings } from "@/lib/audio-settings-effective"
+import { useChordExercise } from "@/hooks/use-chord-exercise"
+import { useIntervalExercise } from "@/hooks/use-interval-exercise"
+import { useStructureWindowDrag } from "@/hooks/use-structure-window-drag"
+import { useFullscreen } from "@/hooks/use-fullscreen"
+import { usePracticeStats } from "@/hooks/use-practice-stats"
+import { useAudioDeviceEnumeration } from "@/hooks/use-audio-device-enumeration"
+import { useFeedbackSound } from "@/hooks/use-feedback-sound"
 import { logger } from "@/lib/logger"
-import { SOLO_SONGS } from "@/lib/solo-songs"
-import { PRACTICE_MODE_GROUPS, ALTERED_LEVELS, DIMINISHED_SCALES_LEVELS } from "@/lib/practice-levels"
-import { InstrumentType, INSTRUMENT_CONFIG } from "@/lib/practice-suggestions"
-import { calculateRMS, frequencyToNoteName, calculateCents, getAdjustedCents, frequencyToNote, getSOLOYinAnalyser, YINPitchDetection, YINDetector, SOLOYinAnalyser } from "@/lib/pitch-detection"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
-import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
+import { SONG_PROGRESSIONS } from "@/lib/page-songs"
+import { transposeSongChords, parseIrealPro, parseIrealUrl } from "@/lib/song-chords"
+import { CUSTOM_CHORD_STORAGE_KEY, parseStoredCustomChords, buildCustomChordsExport } from "@/lib/custom-chords-io"
+import { filterAndGroupSongs } from "@/lib/song-filters"
+import { setStringTuning } from "@/lib/string-tuning"
+import type {
+  PracticeType,
+  PracticeStats,
+  StatsTimeRange,
+} from "@/lib/page-stats-types"
+import { getStatsByTimeRange as computeStatsByTimeRange } from "@/lib/stats-range"
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetFooter,
-} from "@/components/ui/sheet"
+  NOTES,
+  NOTES_FLAT,
+  CHORD_TYPES,
+  INTERVALS,
+  SCALE_MODES,
+} from "@/lib/page-theory-data"
+import {
+  normalizeNoteName,
+  getNoteIndex,
+  formatDegree,
+  getChordDegrees,
+  getChordDisplayName,
+  formatChordShape,
+  getNoteAtPosition,
+  noteToSemitones,
+  intervalToSemitones,
+  normalizeChordType,
+  parseChord,
+  getScaleDisplayName,
+  isEquivalentNote,
+  applyVoiceLeading,
+  getScaleNoteNames,
+  findNoteIndexInArray,
+  preferSharp,
+  preferFlat,
+  generateScaleSequence,
+  getNextKeyByMovement,
+  getKeyNote,
+  resolveScaleDegreeSemitone,
+} from "@/lib/page-theory-functions"
+import { getNoteButtonColor as computeNoteButtonColor } from "@/lib/fretboard-note-button-color"
+import { ALL_PRACTICE_LEVELS, PRACTICE_MODE_GROUPS } from "@/lib/practice-levels"
+
+// UI 层别名：沿用页面里的历史命名，数据统一来自 lib/practice-levels（唯一真相源）
+const ALL_SOLO_LEVELS = ALL_PRACTICE_LEVELS
+const LOCAL_PRACTICE_MODE_GROUPS = PRACTICE_MODE_GROUPS
+import { resolveInstrumentConfig, PRACTICE_SUGGESTIONS } from "@/lib/practice-suggestions"
+import { recordPositionResult, getPositionWeight, loadPositionStats } from "@/lib/position-stats"
+import { calculateRMS, frequencyToNoteName, frequencyToNote, getSOLOYinAnalyser, YINPitchDetection, setMinDetectFreq, getMinDetectFreq, detectFloorForLowestHz, resetPitchDetectionState, resolveYinThreshold, seedPitchDetectionNoiseFloor, updateOnsetGate, getOnsetGate } from "@/lib/pitch-detection"
+import {
+  runNoiseFloorCalibration,
+  onsetGateFromNoiseFloor,
+  formatNoisePercent,
+} from "@/lib/noise-calibration"
+import {
+  isThreeNpsEligible,
+  buildThreeNpsPositions,
+  nextThreeNpsPositionIndex,
+  threeNpsWindow,
+  type ThreeNpsPosition,
+  type ThreeNpsStep,
+} from "@/lib/three-notes-per-string"
+import { evaluatePitchMatch, findBestIntervalMatch, targetSemitoneOf } from "@/lib/pitch-match"
+import type { ThreeNpsPreviewKind } from "@/lib/fretboard-cell-role"
+import { getTabFretboardFlag, type TabFretboardFlag } from "@/lib/tab-fretboard-toggle"
+import { applyRootFontSize } from "@/lib/display-scale"
+import {
+  createOnsetState,
+  createNoteConfirmState,
+  detectOnset,
+  confirmNote,
+  resetNoteConfirmState,
+  type OnsetState,
+  type NoteConfirmState,
+} from "@/lib/note-confirm"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn, isTauriEnv, getAudioContextClass } from "@/lib/utils"
-import { WindowsAudioSettings } from "@/components/windows-audio-settings"
-import { ErrorBoundary } from "@/components/error-boundary"
+import { ShortcutsHelpDialog } from "@/components/shortcuts-help-dialog"
+import { ChordExerciseLevelSelector } from "@/components/chord-exercise-level-selector"
+import { ChordExerciseControls } from "@/components/chord-exercise-controls"
+import { IntervalControls } from "@/components/interval-controls"
+import { PracticeModeControls } from "@/components/practice-mode-controls"
+import { AudioInputNotice } from "@/components/audio-input-notice"
+import { ChordProgressionControls } from "@/components/chord-progression-controls"
+import { ChordStructureWindow } from "@/components/chord-structure-window"
+import { ScaleControls } from "@/components/scale-controls"
+import { AppHeader } from "@/components/app-header"
+import { FullscreenOverlay } from "@/components/fullscreen-overlay"
+import { PracticeFretboard } from "@/components/practice-fretboard"
+import { GuitarRunFretboard } from "@/components/guitarrun-fretboard"
+import { StatsPanel } from "@/components/stats-panel"
+import { ChordExerciseKeyboard } from "@/components/chord-exercise-keyboard"
+import { ChordProgressionKeyboard } from "@/components/chord-progression-keyboard"
+import { ScaleKeyboard } from "@/components/scale-keyboard"
+import { ChordDegreesDisplay } from "@/components/chord-degrees-display"
+import { ScaleSequenceDisplay } from "@/components/scale-sequence-display"
+import { ChordExerciseQuestion } from "@/components/chord-exercise-question"
+import { IntervalQuestion } from "@/components/interval-question"
+import { SongInfoDialog } from "@/components/song-info-dialog"
+import { LevelInfoDialog } from "@/components/level-info-dialog"
+import { PracticeSummaryDialog } from "@/components/practice-summary-dialog"
+import { LevelSelectorDialog } from "@/components/level-selector-dialog"
+import { SongSelectorDialog } from "@/components/song-selector-dialog"
 import { FocusMode } from "@/components/focus-mode"
 import { CustomSongEditor } from "@/components/custom-song-editor-ui"
 import { MetronomeVisualizer } from "@/components/metronome-visualizer"
-import Sidebar from "@/app/components/Sidebar"
-import Header from "@/app/components/Header"
-import BottomNavigation from "@/app/components/BottomNavigation"
-import { 
+import { PositionHeatmap } from "@/components/position-heatmap"
+import { TheoryPanel } from "@/components/theory-panel"
+import {
   OnboardingProvider,
   OnboardingOverlay,
-  OnboardingTrigger,
-  FeedbackDialog,
 } from "@/components/onboarding"
-import { 
-  Guitar, 
-  Play, 
-  Pause, 
-  RotateCcw, 
-  Eye, 
-  EyeOff, 
+import {
+  Guitar,
+  Play,
+  Pause,
+  RotateCcw,
   Target,
   Music,
-  Layers,
   ChevronLeft,
   ChevronRight,
-  Settings,
-  Timer,
-  Volume2,
-  VolumeX,
-  Mic,
-  MicOff,
   ListMusic,
-  Shuffle,
-  ArrowUp,
-  ArrowDown,
-  Plus,
-  Trash2,
-  Save,
-  Upload,
   X,
   Check,
-  Info,
-  Zap,
-  Clock,
-  Hash,
   Activity,
-  Piano,
-  SkipForward,
-  Globe,
-  Download,
-  RefreshCw,
-  Headphones,
-  SlidersHorizontal,
-  Languages,
   Maximize2,
-  Keyboard,
   BarChart3,
-  Palette,
-  Moon,
-  Sun,
-  Monitor,
   GripVertical,
-  HelpCircle,
-  Edit3,
-  Star,
-  StarOff,
   Square,
+  BookOpen,
 } from "lucide-react"
 import { toast } from "sonner"
-import { PianoKeyboard, SimplePianoKeyboard } from "@/components/piano-keyboard"
 import { TRANSLATIONS } from '@/lib/i18n'
 
-// ==================== 音乐理论常量 ====================
-const NOTES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
-const NOTES_FLAT = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]
-// 当前调弦（半音值，高音→低音）。默认标准吉他，组件内根据所选乐器同步更新
-let STRING_TUNING: number[] = [4, 11, 7, 2, 9, 4] // E B G D A E (high to low, as semitones from C)
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
 
-// 标准化音符名：将 # 转为 ♯、b 转为 ♭（用于兼容旧数据/和弦解析结果）
-function normalizeNoteName(note: string): string {
-  if (!note) return note
-  return note.replace(/#/g, '♯').replace(/b/g, '♭')
+/** 音阶练习「练习序列」里表示一弦三音（3NPS）的选项 id */
+const THREE_NPS_SEQUENCE_ID = '3nps'
+
+/**
+ * 音级标签 → 半音（mod 12）的解析**已搬到** `lib/page-theory-functions.ts` 的
+ * `resolveScaleDegreeSemitone()` —— 原先这里是第二个真相源（一份手写表），
+ * 既和 lib 里的 `degreeToSemitone`（**复合音程**语义）容易混淆，也让「兜底表有洞」
+ * 这个 bug 无法被测试覆盖。搬过去后由 `__tests__/scale-degree-semitone.test.ts` 穷举钉住。
+ */
+
+/** 音阶练习「下一题」的描述。一弦三音模式下额外带把位信息（Marathon 推进靠它） */
+type NextScaleExerciseInfo = {
+  key: string
+  scaleName: string
+  sequence: string[]
+  /** 一弦三音：下一题是「同一调同一音阶的下一个把位」时填这里 */
+  threeNps?: {
+    /** 0 起的把位下标（positions 数组下标） */
+    positionIndex: number
+    /** 显示用把位号（1 起） */
+    position: number
+    totalPositions: number
+    /** 该把位起点的弦索引（0 = 最高音弦） */
+    startStringIndex: number
+    startFret: number
+  } | null
 }
 
-function findNoteIndexInArray(note: string, arr: string[]): number {
-  return arr.findIndex(n => n === note)
-}
 
-// 练习建议数据（参考SOLO的PracticeSuggestionProvider）
-const PRACTICE_SUGGESTIONS = [
-  "尝试在不同弦上弹奏这个音，找到最舒适的位置。",
-  "先专注于在低把位找到这个音，然后再向高把位移动。",
-  "练习在指板上找到这个音的所有位置。",
-  "尝试在弹奏前先在脑海中可视化音符位置。",
-  "用耳朵引导你——先唱出这个音再找到它。",
-  "练习在不同八度找到这个音。",
-  "尝试闭着眼睛找音来培养肌肉记忆。",
-  "练习将这个音与附近的音阶位置连接起来。",
-  "专注于干净的按弦和清晰的音色。",
-  "尝试用不同的手指弹奏来增加灵活性。",
-  "练习快速连续找音来提高速度。",
-  "使用节拍器来计时你的找音练习。",
-  "尝试在保持稳定节奏的同时找音。",
-  "练习在指板上远距离跳跃。",
-  "专注于在找音时最小化手部移动。",
-  "尝试在不同调性中找音来增加多样性。",
-  "练习找到常见和弦进行的根音。",
-  "在你熟悉的歌曲中练习找音。",
-  "尝试一边看谱一边找音。",
-  "练习不看指板只用耳朵找音。",
-  "专注于相邻弦之间的关系。",
-  "尝试用不同的指法找到同一个音。",
-  "练习在所有12个调中找音。",
-  "练习在和弦进行中找到和弦音。",
-  "尝试在保持良好姿势的同时找音。",
-]
+// 练习建议数据由 @/lib/practice-suggestions 的 PRACTICE_SUGGESTIONS 提供（按乐器 + 双语 + 分类）
 
-// 音级到半音的映射（全局常量）
-const DEGREE_TO_SEMITONE: Record<string, number> = {
-  "1": 0, "b2": 1, "2": 2, "#2": 3, "b3": 3, "3": 4, "4": 5,
-  "#4": 6, "b5": 6, "5": 7, "#5": 8, "b6": 8, "6": 9,
-  "#6": 10, "b7": 10, "7": 11, "maj7": 11, "bb7": 9,
-  "b9": 1, "9": 2, "#9": 3, "b13": 8, "13": 9, "11": 5, "#11": 6
-}
 
-// Chord types with intervals - 完整62种和弦类型，与SOLO保持一致
-const CHORD_TYPES = [
-  // 三和弦类 (6种)
-  { name: "Major", intervals: [0, 4, 7], symbol: "", group: "triad", groupName: "Triads", groupZh: "三和弦" },
-  { name: "Minor", intervals: [0, 3, 7], symbol: "m", group: "triad", groupName: "Triads", groupZh: "三和弦" },
-  { name: "Dim", intervals: [0, 3, 6], symbol: "dim", group: "triad", groupName: "Triads", groupZh: "三和弦" },
-  { name: "Aug", intervals: [0, 4, 8], symbol: "aug", group: "triad", groupName: "Triads", groupZh: "三和弦" },
-  { name: "sus2", intervals: [0, 2, 7], symbol: "sus2", group: "triad", groupName: "Triads", groupZh: "三和弦" },
-  { name: "sus4", intervals: [0, 5, 7], symbol: "sus4", group: "triad", groupName: "Triads", groupZh: "三和弦" },
-  
-  // 加音和弦 (4种)
-  { name: "add9", intervals: [0, 4, 7, 14], symbol: "add9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
-  { name: "madd9", intervals: [0, 3, 7, 14], symbol: "madd9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
-  { name: "6add9", intervals: [0, 4, 7, 9, 14], symbol: "6/9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
-  { name: "m6add9", intervals: [0, 3, 7, 9, 14], symbol: "m6/9", group: "add", groupName: "Add Chords", groupZh: "加音和弦" },
-  
-  // 减和弦类 (2种)
-  { name: "dim7", intervals: [0, 3, 6, 9], symbol: "dim7", group: "dim", groupName: "Diminished", groupZh: "减和弦" },
-  { name: "dimMaj7", intervals: [0, 3, 6, 11], symbol: "dim(maj7)", group: "dim", groupName: "Diminished", groupZh: "减和弦" },
-  
-  // 六和弦类 (2种)
-  { name: "6", intervals: [0, 4, 7, 9], symbol: "6", group: "six", groupName: "Six Chords", groupZh: "六和弦" },
-  { name: "m6", intervals: [0, 3, 7, 9], symbol: "m6", group: "six", groupName: "Six Chords", groupZh: "六和弦" },
-  
-  // 属七和弦类 (18种)
-  { name: "7", intervals: [0, 4, 7, 10], symbol: "7", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7b5", intervals: [0, 4, 6, 10], symbol: "7♭5", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7#5", intervals: [0, 4, 8, 10], symbol: "7♯5", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7b9", intervals: [0, 4, 7, 10, 13], symbol: "7♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7#9", intervals: [0, 4, 7, 10, 15], symbol: "7♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7#11", intervals: [0, 4, 7, 10, 18], symbol: "7♯11", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7b13", intervals: [0, 4, 7, 10, 20], symbol: "7♭13", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7#5b9", intervals: [0, 4, 8, 10, 13], symbol: "7♯5♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7#5#9", intervals: [0, 4, 8, 10, 15], symbol: "7♯5♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7b5b9", intervals: [0, 4, 6, 10, 13], symbol: "7♭5♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7b5#9", intervals: [0, 4, 6, 10, 15], symbol: "7♭5♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7b9b13", intervals: [0, 4, 7, 10, 13, 20], symbol: "7♭9♭13", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7alt", intervals: [0, 4, 8, 10, 13, 15, 20], symbol: "7alt", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  
-  // 属九和弦类 (4种)
-  { name: "9", intervals: [0, 4, 7, 10, 14], symbol: "9", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
-  { name: "9b13", intervals: [0, 4, 7, 10, 14, 20], symbol: "9♭13", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
-  { name: "9#11", intervals: [0, 4, 7, 10, 14, 18], symbol: "9♯11", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
-  { name: "9sus4", intervals: [0, 5, 7, 10, 14], symbol: "9sus4", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
-  
-  // 属十三和弦类 (4种)
-  { name: "13", intervals: [0, 4, 7, 10, 14, 21], symbol: "13", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
-  { name: "13b9", intervals: [0, 4, 7, 10, 13, 21], symbol: "13♭9", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
-  { name: "13#9", intervals: [0, 4, 7, 10, 15, 21], symbol: "13♯9", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
-  { name: "13#11", intervals: [0, 4, 7, 10, 14, 18, 21], symbol: "13♯11", group: "dominant13", groupName: "Dominant 13th", groupZh: "属十三和弦" },
-  
-  // 大七和弦类 (8种)
-  { name: "Maj7", intervals: [0, 4, 7, 11], symbol: "maj7", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
-  { name: "maj7#5", intervals: [0, 4, 8, 11], symbol: "maj7♯5", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
-  { name: "maj7#11", intervals: [0, 4, 7, 11, 18], symbol: "maj7♯11", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
-  { name: "maj7b6", intervals: [0, 4, 7, 11, 8], symbol: "maj7♭6", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
-  { name: "maj7#9", intervals: [0, 4, 7, 11, 15], symbol: "maj7♯9", group: "major7", groupName: "Major 7th", groupZh: "大七和弦" },
-  
-  // 大九和弦类 (4种)
-  { name: "Maj9", intervals: [0, 4, 7, 11, 14], symbol: "maj9", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
-  { name: "maj9#11", intervals: [0, 4, 7, 11, 14, 18], symbol: "maj9♯11", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
-  { name: "maj9#5", intervals: [0, 4, 8, 11, 14], symbol: "maj9♯5", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
-  { name: "maj9b6", intervals: [0, 4, 7, 11, 14, 8], symbol: "maj9♭6", group: "major9", groupName: "Major 9th", groupZh: "大九和弦" },
-  
-  // 大十三和弦类 (3种)
-  { name: "maj13", intervals: [0, 4, 7, 11, 14, 21], symbol: "maj13", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
-  { name: "maj13#11", intervals: [0, 4, 7, 11, 14, 18, 21], symbol: "maj13♯11", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
-  { name: "maj13#5", intervals: [0, 4, 8, 11, 14, 21], symbol: "maj13♯5", group: "major13", groupName: "Major 13th", groupZh: "大十三和弦" },
-  
-  // 小七和弦类 (8种)
-  { name: "m7", intervals: [0, 3, 7, 10], symbol: "m7", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
-  { name: "m7b5", intervals: [0, 3, 6, 10], symbol: "m7♭5", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
-  { name: "m7b5nat9", intervals: [0, 3, 6, 10, 14], symbol: "m7♭5(9)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
-  { name: "m7b6", intervals: [0, 3, 7, 10, 8], symbol: "m7♭6", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
-  { name: "mMaj7", intervals: [0, 3, 7, 11], symbol: "m(maj7)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
-  { name: "mMaj9", intervals: [0, 3, 7, 11, 14], symbol: "m(maj9)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
-  { name: "mMaj13", intervals: [0, 3, 7, 11, 14, 21], symbol: "m(maj13)", group: "minor7", groupName: "Minor 7th", groupZh: "小七和弦" },
-  
-  // 小九和弦类 (2种)
-  { name: "m9", intervals: [0, 3, 7, 10, 14], symbol: "m9", group: "minor9", groupName: "Minor 9th", groupZh: "小九和弦" },
-  { name: "m9b5", intervals: [0, 3, 6, 10, 14], symbol: "m9♭5", group: "minor9", groupName: "Minor 9th", groupZh: "小九和弦" },
-  
-  // 小十一/十三和弦类 (3种)
-  { name: "m11", intervals: [0, 3, 7, 10, 14, 17], symbol: "m11", group: "minor11", groupName: "Minor 11th/13th", groupZh: "小十一/十三和弦" },
-  { name: "m13", intervals: [0, 3, 7, 10, 14, 21], symbol: "m13", group: "minor11", groupName: "Minor 11th/13th", groupZh: "小十一/十三和弦" },
-  
-  // 挂留和弦类 (5种)
-  { name: "7sus4", intervals: [0, 5, 7, 10], symbol: "7sus4", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
-  { name: "7sus4b9", intervals: [0, 5, 7, 10, 13], symbol: "7sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
-  { name: "sus4b9", intervals: [0, 5, 7, 13], symbol: "sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
-  { name: "13sus4", intervals: [0, 5, 7, 10, 14, 21], symbol: "13sus4", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
-  { name: "13sus4b9", intervals: [0, 5, 7, 10, 13, 21], symbol: "13sus4♭9", group: "sus", groupName: "Suspended", groupZh: "挂留和弦" },
-  
-  // 增和弦类 (1种)
-  { name: "aug7", intervals: [0, 4, 8, 10], symbol: "aug7", group: "aug", groupName: "Augmented", groupZh: "增和弦" },
-]
-
-// Intervals - 完整音程定义，与原SOLO保持一致
-const INTERVALS = [
-  { name: "root", semitones: 0, symbol: "1" },
-  { name: "flat2", semitones: 1, symbol: "b2" },
-  { name: "two", semitones: 2, symbol: "2" },
-  { name: "sharp2", semitones: 3, symbol: "#2" },
-  { name: "flat3", semitones: 3, symbol: "b3" },
-  { name: "three", semitones: 4, symbol: "3" },
-  { name: "four", semitones: 5, symbol: "4" },
-  { name: "sharp4", semitones: 6, symbol: "#4" },
-  { name: "flat5", semitones: 6, symbol: "b5" },
-  { name: "five", semitones: 7, symbol: "5" },
-  { name: "sharp5", semitones: 8, symbol: "#5" },
-  { name: "flat6", semitones: 8, symbol: "b6" },
-  { name: "six", semitones: 9, symbol: "6" },
-  { name: "flat7", semitones: 10, symbol: "b7" },
-  { name: "bb7", semitones: 9, symbol: "bb7" },
-  { name: "seven", semitones: 11, symbol: "7" },
-  { name: "nine", semitones: 14, symbol: "9" },
-  { name: "flat9", semitones: 13, symbol: "b9" },
-  { name: "sharp9", semitones: 15, symbol: "#9" },
-  { name: "eleven", semitones: 17, symbol: "11" },
-  { name: "sharp11", semitones: 18, symbol: "#11" },
-  { name: "thirteen", semitones: 21, symbol: "13" },
-  { name: "flat13", semitones: 20, symbol: "b13" },
-]
-
-// 音阶音程数据类型定义
-interface ScaleInterval {
-  displayString: string
-  formula: number
-  isChordTone?: boolean
-  isBebopPassingNoteChordTone?: boolean
-  isBebopPassingTone?: boolean
-}
-
-interface ScaleDefinition {
-  name: string
-  displayString?: string
-  intervals: ScaleInterval[]
-  notes?: number[]
-  formula?: string
-}
-
-interface ScaleGroup {
-  name: string
-  displayString: string
-  scales: ScaleDefinition[]
-}
-
-// 完整的音阶数据 - 包含isChordTone等属性
-const SCALE_GROUPS: ScaleGroup[] = [
-  {
-    name: "pentatonic",
-    displayString: "五声音阶",
-    scales: [
-      {
-        name: "Major Pentatonic",
-        displayString: "大调五声",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "6", formula: 9, isChordTone: true }
-        ],
-        notes: [0, 2, 4, 7, 9],
-        formula: "1 2 3 5 6"
-      },
-      {
-        name: "Minor Pentatonic",
-        displayString: "小调五声",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "b3", formula: 3, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b7", formula: 10, isChordTone: true }
-        ],
-        notes: [0, 3, 5, 7, 10],
-        formula: "1 b3 4 5 b7"
-      },
-      {
-        name: "Dominant Pentatonic",
-        displayString: "属七五声",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "3", formula: 4 },
-          { displayString: "4", formula: 5, isChordTone: true },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b7", formula: 10, isChordTone: true }
-        ],
-        notes: [0, 4, 5, 7, 10],
-        formula: "1 3 4 5 b7"
-      },
-      {
-        name: "Minor 6 Pentatonic",
-        displayString: "小六五声",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "b3", formula: 3, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "6", formula: 9, isChordTone: true }
-        ],
-        notes: [0, 3, 5, 7, 9],
-        formula: "1 b3 4 5 6"
-      }
-    ]
-  },
-  {
-    name: "majorScaleModes",
-    displayString: "大调音阶调式",
-    scales: [
-      {
-        name: "Ionian",
-        displayString: "伊奥尼亚 (大调)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(b6)", formula: 8, isBebopPassingTone: true },
-          { displayString: "6", formula: 9, isBebopPassingNoteChordTone: true },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 4, 5, 7, 9, 11],
-        formula: "1 2 3 4 5 6 7"
-      },
-      {
-        name: "Dorian",
-        displayString: "多利亚 (调式2)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 3, 5, 7, 9, 10],
-        formula: "1 2 b3 4 5 6 b7"
-      },
-      {
-        name: "Phrygian",
-        displayString: "弗里几亚 (调式3)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b2", formula: 1 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 3, 5, 7, 8, 10],
-        formula: "1 b2 b3 4 5 b6 b7"
-      },
-      {
-        name: "Lydian",
-        displayString: "利底亚 (调式4)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "#4", formula: 6 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(b6)", formula: 8, isBebopPassingTone: true },
-          { displayString: "6", formula: 9, isBebopPassingNoteChordTone: true },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 4, 6, 7, 9, 11],
-        formula: "1 2 3 #4 5 6 7"
-      },
-      {
-        name: "Mixolydian",
-        displayString: "混合利底亚 (调式5)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 4, 5, 7, 9, 10],
-        formula: "1 2 3 4 5 6 b7"
-      },
-      {
-        name: "Aeolian",
-        displayString: "爱奥利亚 (自然小调)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 3, 5, 7, 8, 10],
-        formula: "1 2 b3 4 5 b6 b7"
-      },
-      {
-        name: "Locrian",
-        displayString: "洛克里亚 (调式7)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b2", formula: 1 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "b5", formula: 6, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 3, 5, 6, 8, 10],
-        formula: "1 b2 b3 4 b5 b6 b7"
-      }
-    ]
-  },
-  {
-    name: "melodicMinorModes",
-    displayString: "旋律小调调式",
-    scales: [
-      {
-        name: "Melodic Minor",
-        displayString: "旋律小调 (调式1)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(b6)", formula: 8, isBebopPassingTone: true },
-          { displayString: "6", formula: 9, isBebopPassingNoteChordTone: true },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 3, 5, 7, 9, 11],
-        formula: "1 2 b3 4 5 6 7"
-      },
-      {
-        name: "Dorian b2",
-        displayString: "多利亚b2 (调式2)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b2", formula: 1 },
-          { displayString: "b3", formula: 3 },
-          { displayString: "4", formula: 5, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 3, 5, 7, 9, 10],
-        formula: "1 b2 b3 4 5 6 b7"
-      },
-      {
-        name: "Lydian Augmented",
-        displayString: "利底亚增 (调式3)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "#4", formula: 6 },
-          { displayString: "#5", formula: 8, isChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 4, 6, 8, 9, 11],
-        formula: "1 2 3 #4 #5 6 7"
-      },
-      {
-        name: "Lydian Dominant",
-        displayString: "利底亚属 (调式4)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "#4", formula: 6 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 4, 6, 7, 9, 10],
-        formula: "1 2 3 #4 5 6 b7"
-      },
-      {
-        name: "Mixolydian b6",
-        displayString: "混合利底亚b6 (调式5)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 4, 5, 7, 8, 10],
-        formula: "1 2 3 4 5 b6 b7"
-      },
-      {
-        name: "Locrian Nat 2",
-        displayString: "洛克里亚自然2 (调式6)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "b5", formula: 6, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 3, 5, 6, 8, 10],
-        formula: "1 2 b3 4 b5 b6 b7"
-      },
-      {
-        name: "Altered",
-        displayString: "变化音阶 (调式7)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b9", formula: 1 },
-          { displayString: "#9", formula: 3 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b5", formula: 6 },
-          { displayString: "#5", formula: 8 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true }
-        ],
-        notes: [0, 1, 3, 4, 6, 8, 10],
-        formula: "1 b9 #9 3 b5 #5 b7"
-      }
-    ]
-  },
-  {
-    name: "harmonicMinorModes",
-    displayString: "和声小调调式",
-    scales: [
-      {
-        name: "Harmonic Minor",
-        displayString: "和声小调 (调式1)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 3, 5, 7, 8, 11],
-        formula: "1 2 b3 4 5 b6 7"
-      },
-      {
-        name: "Locrian Nat 6",
-        displayString: "洛克里亚自然6 (调式2)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b2", formula: 1 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "b5", formula: 6, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 3, 5, 6, 9, 10],
-        formula: "1 b2 b3 4 b5 6 b7"
-      },
-      {
-        name: "Ionian Augmented",
-        displayString: "伊奥尼亚增 (调式3)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "#5", formula: 8, isChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 4, 5, 8, 9, 11],
-        formula: "1 2 3 4 #5 6 7"
-      },
-      {
-        name: "Dorian #4",
-        displayString: "多利亚#4 (调式4)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "#4", formula: 6 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 3, 6, 7, 9, 10],
-        formula: "1 2 b3 #4 5 6 b7"
-      },
-      {
-        name: "Phrygian Dominant",
-        displayString: "弗里几亚属 (调式5)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b9", formula: 1 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b13", formula: 8 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 4, 5, 7, 8, 10],
-        formula: "1 b9 3 4 5 b13 b7"
-      },
-      {
-        name: "Lydian #9",
-        displayString: "利底亚#9 (调式6)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "#9", formula: 3 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "#4", formula: 6 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(b6)", formula: 8, isBebopPassingTone: true },
-          { displayString: "6", formula: 9, isBebopPassingNoteChordTone: true },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 3, 4, 6, 7, 9, 11],
-        formula: "1 #9 3 #4 5 6 7"
-      },
-      {
-        name: "Superlocrian bb7",
-        displayString: "超洛克里亚bb7 (调式7)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b2", formula: 1 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b4", formula: 4 },
-          { displayString: "b5", formula: 6, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "bb7", formula: 9, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 3, 4, 6, 8, 9],
-        formula: "1 b2 b3 b4 b5 b6 bb7"
-      }
-    ]
-  },
-  {
-    name: "harmonicMajorModes",
-    displayString: "和声大调调式",
-    scales: [
-      {
-        name: "Harmonic Major",
-        displayString: "和声大调 (调式1)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 4, 5, 7, 8, 11],
-        formula: "1 2 3 4 5 b6 7"
-      },
-      {
-        name: "Dorian b5",
-        displayString: "多利亚b5 (调式2)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "b5", formula: 6, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 3, 5, 6, 9, 10],
-        formula: "1 2 b3 4 b5 6 b7"
-      },
-      {
-        name: "Phrygian b4",
-        displayString: "弗里几亚b4 (调式3)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b2", formula: 1 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b4", formula: 4 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 3, 4, 7, 8, 10],
-        formula: "1 b2 b3 b4 5 b6 b7"
-      },
-      {
-        name: "Lydian b3",
-        displayString: "利底亚b3 (调式4)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "#4", formula: 6 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(b6)", formula: 8, isBebopPassingTone: true },
-          { displayString: "6", formula: 9, isBebopPassingNoteChordTone: true },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 3, 6, 7, 9, 11],
-        formula: "1 2 b3 #4 5 6 7"
-      },
-      {
-        name: "Mixolydian b2",
-        displayString: "混合利底亚b2 (调式5)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b2", formula: 1 },
-          { displayString: "3", formula: 4, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 4, 5, 7, 9, 10],
-        formula: "1 b2 3 4 5 6 b7"
-      },
-      {
-        name: "Lydian Augmented #2",
-        displayString: "利底亚增#2 (调式6)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "#2", formula: 3 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "#4", formula: 6 },
-          { displayString: "#5", formula: 8, isChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 3, 4, 6, 8, 9, 11],
-        formula: "1 #2 3 #4 #5 6 7"
-      },
-      {
-        name: "Locrian bb7",
-        displayString: "洛克里亚bb7 (调式7)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b2", formula: 1 },
-          { displayString: "b3", formula: 3, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "b5", formula: 6, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "b6", formula: 8 },
-          { displayString: "bb7", formula: 9, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "(7)", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 3, 5, 6, 8, 9],
-        formula: "1 b2 b3 4 b5 b6 bb7"
-      }
-    ]
-  },
-  {
-    name: "otherScales",
-    displayString: "其他音阶",
-    scales: [
-      {
-        name: "Blues",
-        displayString: "布鲁斯音阶",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "b3", formula: 3, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "b5", formula: 6 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b7", formula: 10, isChordTone: true }
-        ],
-        notes: [0, 3, 5, 6, 7, 10],
-        formula: "1 b3 4 b5 5 b7"
-      },
-      {
-        name: "Major Blues",
-        displayString: "大调布鲁斯",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "6", formula: 9, isChordTone: true }
-        ],
-        notes: [0, 2, 3, 4, 7, 9],
-        formula: "1 2 b3 3 5 6"
-      },
-      {
-        name: "Diminished Half Whole",
-        displayString: "减音阶 半全",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "b9", formula: 1 },
-          { displayString: "#9", formula: 3 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "b5", formula: 6 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "13", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true }
-        ],
-        notes: [0, 1, 3, 4, 6, 7, 9, 10],
-        formula: "1 b9 #9 3 b5 5 13 b7"
-      },
-      {
-        name: "Diminished Whole Half",
-        displayString: "减音阶 全半",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "b5", formula: 6, isChordTone: true },
-          { displayString: "#5", formula: 8 },
-          { displayString: "6", formula: 9, isChordTone: true },
-          { displayString: "7", formula: 11 }
-        ],
-        notes: [0, 2, 3, 5, 6, 8, 9, 11],
-        formula: "1 2 b3 4 b5 #5 6 7"
-      },
-      {
-        name: "Whole Tone",
-        displayString: "全音音阶",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "#4", formula: 6 },
-          { displayString: "#5", formula: 8, isChordTone: true },
-          { displayString: "b7", formula: 10, isChordTone: true }
-        ],
-        notes: [0, 2, 4, 6, 8, 10],
-        formula: "1 2 3 #4 #5 b7"
-      },
-      {
-        name: "Augmented Scale",
-        displayString: "增音阶",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "#9", formula: 3 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "5", formula: 7 },
-          { displayString: "#5", formula: 8, isChordTone: true },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 3, 4, 7, 8, 11],
-        formula: "1 #9 3 5 #5 7"
-      }
-    ]
-  },
-  {
-    name: "bebopScales",
-    displayString: "Bebop音阶",
-    scales: [
-      {
-        name: "Bebop Dominant",
-        displayString: "Bebop属音阶",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "7", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 4, 5, 7, 9, 10, 11],
-        formula: "1 2 3 4 5 6 b7 7"
-      },
-      {
-        name: "Bebop Major",
-        displayString: "Bebop大调",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b6", formula: 8, isBebopPassingTone: true },
-          { displayString: "6", formula: 9, isChordTone: true },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 4, 5, 7, 8, 9, 11],
-        formula: "1 2 3 4 5 b6 6 7"
-      },
-      {
-        name: "Bebop Dorian",
-        displayString: "Bebop多利亚",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "6", formula: 9 },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "7", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 2, 3, 5, 7, 9, 10, 11],
-        formula: "1 2 b3 4 5 6 b7 7"
-      },
-      {
-        name: "Bebop Tonic Minor",
-        displayString: "Bebop主小调",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b6", formula: 8, isBebopPassingTone: true },
-          { displayString: "6", formula: 9, isChordTone: true },
-          { displayString: "7", formula: 11, isChordTone: true }
-        ],
-        notes: [0, 2, 3, 5, 7, 8, 9, 11],
-        formula: "1 2 b3 4 5 b6 6 7"
-      },
-      {
-        name: "Bebop Dom7b9b13",
-        displayString: "Bebop属7b9b13",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "b9", formula: 1, isBebopPassingTone: true },
-          { displayString: "3", formula: 4, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b13", formula: 8, isBebopPassingTone: true },
-          { displayString: "b7", formula: 10, isChordTone: true, isBebopPassingNoteChordTone: true },
-          { displayString: "7", formula: 11, isBebopPassingTone: true }
-        ],
-        notes: [0, 1, 4, 5, 7, 8, 10, 11],
-        formula: "1 b9 3 4 5 b13 b7 7"
-      },
-      {
-        name: "Bebop Tonic Minor Dorian",
-        displayString: "Bebop主小调(多利亚)",
-        intervals: [
-          { displayString: "1", formula: 0, isChordTone: true },
-          { displayString: "2", formula: 2 },
-          { displayString: "b3", formula: 3, isChordTone: true },
-          { displayString: "4", formula: 5 },
-          { displayString: "5", formula: 7, isChordTone: true },
-          { displayString: "b6", formula: 8, isBebopPassingTone: true },
-          { displayString: "6", formula: 9, isChordTone: true },
-          { displayString: "b7", formula: 10, isChordTone: true }
-        ],
-        notes: [0, 2, 3, 5, 7, 8, 9, 10],
-        formula: "1 2 b3 4 5 b6 6 b7"
-      }
-    ]
-  }
-]
-
-// Scale modes - 包含音程数字和音级字符串 (兼容旧数据结构)
-// 按照 SOLO 的音阶分组结构组织
-const SCALE_MODES = {
-  pentatonic: [
-    { name: "Major Pentatonic", notes: [0, 2, 4, 7, 9], intervals: ["1", "2", "3", "5", "6"], formula: "1 2 3 5 6" },
-    { name: "Minor Pentatonic", notes: [0, 3, 5, 7, 10], intervals: ["1", "b3", "4", "5", "b7"], formula: "1 b3 4 5 b7" },
-    { name: "Dominant Pentatonic", notes: [0, 4, 5, 7, 10], intervals: ["1", "3", "4", "5", "b7"], formula: "1 3 4 5 b7" },
-    { name: "Minor 6 Pentatonic", notes: [0, 3, 5, 7, 9], intervals: ["1", "b3", "4", "5", "6"], formula: "1 b3 4 5 6" },
-  ],
-  majorScaleModes: [
-    { name: "Ionian", notes: [0, 2, 4, 5, 7, 9, 11], intervals: ["1", "2", "3", "4", "5", "6", "7"], formula: "1 2 3 4 5 6 7" },
-    { name: "Dorian", notes: [0, 2, 3, 5, 7, 9, 10], intervals: ["1", "2", "b3", "4", "5", "6", "b7"], formula: "1 2 b3 4 5 6 b7" },
-    { name: "Phrygian", notes: [0, 1, 3, 5, 7, 8, 10], intervals: ["1", "b2", "b3", "4", "5", "b6", "b7"], formula: "1 b2 b3 4 5 b6 b7" },
-    { name: "Lydian", notes: [0, 2, 4, 6, 7, 9, 11], intervals: ["1", "2", "3", "#4", "5", "6", "7"], formula: "1 2 3 #4 5 6 7" },
-    { name: "Mixolydian", notes: [0, 2, 4, 5, 7, 9, 10], intervals: ["1", "2", "3", "4", "5", "6", "b7"], formula: "1 2 3 4 5 6 b7" },
-    { name: "Aeolian", notes: [0, 2, 3, 5, 7, 8, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "b7"], formula: "1 2 b3 4 5 b6 b7" },
-    { name: "Locrian", notes: [0, 1, 3, 5, 6, 8, 10], intervals: ["1", "b2", "b3", "4", "b5", "b6", "b7"], formula: "1 b2 b3 4 b5 b6 b7" },
-  ],
-  melodicMinorScaleModes: [
-    { name: "Melodic Minor", notes: [0, 2, 3, 5, 7, 9, 11], intervals: ["1", "2", "b3", "4", "5", "6", "7"], formula: "1 2 b3 4 5 6 7" },
-    { name: "Dorian b2", notes: [0, 1, 3, 5, 7, 9, 10], intervals: ["1", "b2", "b3", "4", "5", "6", "b7"], formula: "1 b2 b3 4 5 6 b7" },
-    { name: "Lydian Augmented", notes: [0, 2, 4, 6, 8, 9, 11], intervals: ["1", "2", "3", "#4", "#5", "6", "7"], formula: "1 2 3 #4 #5 6 7" },
-    { name: "Lydian Dominant", notes: [0, 2, 4, 6, 7, 9, 10], intervals: ["1", "2", "3", "#4", "5", "6", "b7"], formula: "1 2 3 #4 5 6 b7" },
-    { name: "Mixolydian b6", notes: [0, 2, 4, 5, 7, 8, 10], intervals: ["1", "2", "3", "4", "5", "b6", "b7"], formula: "1 2 3 4 5 b6 b7" },
-    { name: "Locrian Nat 2", notes: [0, 2, 3, 5, 6, 8, 10], intervals: ["1", "2", "b3", "4", "b5", "b6", "b7"], formula: "1 2 b3 4 b5 b6 b7" },
-    { name: "Altered", notes: [0, 1, 3, 4, 6, 8, 10], intervals: ["1", "b2", "#2", "3", "b5", "#5", "b7"], formula: "1 b2 #2 3 b5 #5 b7" },
-  ],
-  harmonicMinorScaleModes: [
-    { name: "Harmonic Minor", notes: [0, 2, 3, 5, 7, 8, 11], intervals: ["1", "2", "b3", "4", "5", "b6", "7"], formula: "1 2 b3 4 5 b6 7" },
-    { name: "Locrian Nat 6", notes: [0, 1, 3, 5, 6, 9, 10], intervals: ["1", "b2", "b3", "4", "b5", "6", "b7"], formula: "1 b2 b3 4 b5 6 b7" },
-    { name: "Ionian Augmented", notes: [0, 2, 4, 5, 8, 9, 11], intervals: ["1", "2", "3", "4", "#5", "6", "7"], formula: "1 2 3 4 #5 6 7" },
-    { name: "Dorian #4", notes: [0, 2, 3, 6, 7, 9, 10], intervals: ["1", "2", "b3", "#4", "5", "6", "b7"], formula: "1 2 b3 #4 5 6 b7" },
-    { name: "Phrygian Dominant", notes: [0, 1, 4, 5, 7, 8, 10], intervals: ["1", "b2", "3", "4", "5", "b6", "b7"], formula: "1 b2 3 4 5 b6 b7" },
-    { name: "Lydian #9", notes: [0, 3, 4, 6, 7, 9, 11], intervals: ["1", "#2", "3", "#4", "5", "6", "7"], formula: "1 #2 3 #4 5 6 7" },
-    { name: "Superlocrian bb7", notes: [0, 1, 3, 4, 6, 8, 9], intervals: ["1", "b2", "b3", "3", "b5", "#5", "6"], formula: "1 b2 b3 3 b5 #5 6" },
-  ],
-  harmonicMajorScaleModes: [
-    { name: "Harmonic Major", notes: [0, 2, 4, 5, 7, 8, 11], intervals: ["1", "2", "3", "4", "5", "b6", "7"], formula: "1 2 3 4 5 b6 7" },
-    { name: "Dorian b5", notes: [0, 2, 3, 5, 6, 9, 10], intervals: ["1", "2", "b3", "4", "b5", "6", "b7"], formula: "1 2 b3 4 b5 6 b7" },
-    { name: "Phrygian b4", notes: [0, 1, 3, 4, 7, 8, 10], intervals: ["1", "b2", "b3", "3", "5", "b6", "b7"], formula: "1 b2 b3 3 5 b6 b7" },
-    { name: "Lydian b3", notes: [0, 2, 3, 6, 7, 9, 11], intervals: ["1", "2", "b3", "#4", "5", "6", "7"], formula: "1 2 b3 #4 5 6 7" },
-    { name: "Mixolydian b2", notes: [0, 1, 4, 5, 7, 9, 10], intervals: ["1", "b2", "3", "4", "5", "6", "b7"], formula: "1 b2 3 4 5 6 b7" },
-    { name: "Lydian Augmented #2", notes: [0, 3, 4, 6, 8, 9, 11], intervals: ["1", "#2", "3", "#4", "#5", "6", "7"], formula: "1 #2 3 #4 #5 6 7" },
-    { name: "Locrian bb7", notes: [0, 1, 3, 5, 6, 8, 9], intervals: ["1", "b2", "b3", "4", "b5", "b6", "6"], formula: "1 b2 b3 4 b5 b6 6" },
-  ],
-  otherScales: [
-    { name: "Blues", notes: [0, 3, 5, 6, 7, 10], intervals: ["1", "b3", "4", "#4", "5", "b7"], formula: "1 b3 4 #4 5 b7" },
-    { name: "Major Blues", notes: [0, 2, 3, 4, 7, 9], intervals: ["1", "2", "b3", "3", "5", "6"], formula: "1 2 b3 3 5 6" },
-    { name: "Diminished Half Whole", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "#2", "3", "b5", "5", "6", "b7"], formula: "1 b2 #2 3 b5 5 6 b7" },
-    { name: "Diminished Whole Half", notes: [0, 2, 3, 5, 6, 8, 9, 11], intervals: ["1", "2", "b3", "4", "b5", "#5", "6", "7"], formula: "1 2 b3 4 b5 #5 6 7" },
-    { name: "Whole Tone", notes: [0, 2, 4, 6, 8, 10], intervals: ["1", "2", "3", "#4", "#5", "#6"], formula: "1 2 3 #4 #5 #6" },
-    { name: "Augmented Scale", notes: [0, 3, 4, 7, 8, 11], intervals: ["1", "#2", "3", "5", "#5", "7"], formula: "1 #2 3 5 #5 7" },
-  ],
-  bebopScales: [
-    { name: "Bebop Dominant", notes: [0, 2, 4, 5, 7, 9, 10, 11], intervals: ["1", "2", "3", "4", "5", "6", "b7", "7"], formula: "1 2 3 4 5 6 b7 7" },
-    { name: "Bebop Major", notes: [0, 2, 4, 5, 7, 8, 9, 11], intervals: ["1", "2", "3", "4", "5", "b6", "6", "7"], formula: "1 2 3 4 5 b6 6 7" },
-    { name: "Bebop Dom7b9b13", notes: [0, 1, 4, 5, 7, 8, 10, 11], intervals: ["1", "b2", "3", "4", "5", "b6", "b7", "7"], formula: "1 b2 3 4 5 b6 b7 7" },
-    { name: "Bebop Tonic Minor Melodic", notes: [0, 2, 3, 5, 7, 8, 9, 11], intervals: ["1", "2", "b3", "4", "5", "b6", "6", "7"], formula: "1 2 b3 4 5 b6 6 7" },
-    { name: "Bebop Tonic Minor Dorian", notes: [0, 2, 3, 5, 7, 8, 9, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "6", "b7"], formula: "1 2 b3 4 5 b6 6 b7" },
-    { name: "Bebop Dorian", notes: [0, 2, 3, 5, 7, 9, 10, 11], intervals: ["1", "2", "b3", "4", "5", "6", "b7", "7"], formula: "1 2 b3 4 5 6 b7 7" },
-  ],
-  exotic: [
-    { name: "Japanese", notes: [0, 1, 5, 7, 10], intervals: ["1", "b2", "4", "5", "b7"], formula: "1 b2 4 5 b7" },
-    { name: "Egyptian", notes: [0, 2, 5, 7, 10], intervals: ["1", "2", "4", "5", "b7"], formula: "1 2 4 5 b7" },
-    { name: "Spanish Phrygian", notes: [0, 1, 4, 5, 7, 8, 10], intervals: ["1", "b2", "3", "4", "5", "b6", "b7"], formula: "1 b2 3 4 5 b6 b7" },
-    { name: "Hijaz", notes: [0, 1, 4, 5, 7, 8, 10], intervals: ["1", "b2", "3", "4", "5", "b6", "b7"], formula: "1 b2 3 4 5 b6 b7" },
-    { name: "Double Harmonic", notes: [0, 1, 4, 5, 7, 8, 11], intervals: ["1", "b2", "3", "4", "5", "b6", "7"], formula: "1 b2 3 4 5 b6 7" },
-  ],
-  symmetrical: [
-    { name: "Chromatic", notes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], intervals: ["1", "b2", "2", "b3", "3", "4", "b5", "5", "b6", "6", "b7", "7"], formula: "1 b2 2 b3 3 4 b5 5 b6 6 b7 7" },
-    { name: "Augmented", notes: [0, 3, 4, 7, 8, 11], intervals: ["1", "b3", "3", "5", "b6", "7"], formula: "1 b3 3 5 b6 7" },
-    { name: "Tritone", notes: [0, 1, 4, 6, 7, 10], intervals: ["1", "b2", "3", "b5", "5", "b7"], formula: "1 b2 3 b5 5 b7" },
-  ],
-  basic: [
-    { name: "Major", notes: [0, 2, 4, 5, 7, 9, 11], intervals: ["1", "2", "3", "4", "5", "6", "7"], formula: "1 2 3 4 5 6 7" },
-    { name: "Minor", notes: [0, 2, 3, 5, 7, 8, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "b7"], formula: "1 2 b3 4 5 b6 b7" },
-  ],
-  church: [
-    { name: "Ionian", notes: [0, 2, 4, 5, 7, 9, 11], intervals: ["1", "2", "3", "4", "5", "6", "7"], formula: "1 2 3 4 5 6 7" },
-    { name: "Dorian", notes: [0, 2, 3, 5, 7, 9, 10], intervals: ["1", "2", "b3", "4", "5", "6", "b7"], formula: "1 2 b3 4 5 6 b7" },
-    { name: "Phrygian", notes: [0, 1, 3, 5, 7, 8, 10], intervals: ["1", "b2", "b3", "4", "5", "b6", "b7"], formula: "1 b2 b3 4 5 b6 b7" },
-    { name: "Lydian", notes: [0, 2, 4, 6, 7, 9, 11], intervals: ["1", "2", "3", "#4", "5", "6", "7"], formula: "1 2 3 #4 5 6 7" },
-    { name: "Mixolydian", notes: [0, 2, 4, 5, 7, 9, 10], intervals: ["1", "2", "3", "4", "5", "6", "b7"], formula: "1 2 3 4 5 6 b7" },
-    { name: "Aeolian", notes: [0, 2, 3, 5, 7, 8, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "b7"], formula: "1 2 b3 4 5 b6 b7" },
-    { name: "Locrian", notes: [0, 1, 3, 5, 6, 8, 10], intervals: ["1", "b2", "b3", "4", "b5", "b6", "b7"], formula: "1 b2 b3 4 b5 b6 b7" },
-  ],
-  minor: [
-    { name: "Harmonic Minor", notes: [0, 2, 3, 5, 7, 8, 11], intervals: ["1", "2", "b3", "4", "5", "b6", "7"], formula: "1 2 b3 4 5 b6 7" },
-    { name: "Melodic Minor", notes: [0, 2, 3, 5, 7, 9, 11], intervals: ["1", "2", "b3", "4", "5", "6", "7"], formula: "1 2 b3 4 5 6 7" },
-  ],
-  other: [
-    { name: "Blues", notes: [0, 3, 5, 6, 7, 10], intervals: ["1", "b3", "4", "#4", "5", "b7"], formula: "1 b3 4 #4 5 b7" },
-    { name: "Whole Tone", notes: [0, 2, 4, 6, 8, 10], intervals: ["1", "2", "3", "#4", "#5", "#6"], formula: "1 2 3 #4 #5 #6" },
-    { name: "Diminished", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "b3", "3", "#4", "5", "6", "b7"], formula: "1 b2 b3 3 #4 5 6 b7" },
-  ],
-  bebop: [
-    { name: "Bebop Major", notes: [0, 2, 4, 5, 7, 8, 9, 11], intervals: ["1", "2", "3", "4", "5", "b6", "6", "7"], formula: "1 2 3 4 5 b6 6 7" },
-    { name: "Bebop Dorian", notes: [0, 2, 3, 4, 5, 7, 9, 10], intervals: ["1", "2", "b3", "3", "4", "5", "6", "b7"], formula: "1 2 b3 3 4 5 6 b7" },
-    { name: "Bebop Mixolydian", notes: [0, 2, 4, 5, 7, 9, 10, 11], intervals: ["1", "2", "3", "4", "5", "6", "b7", "7"], formula: "1 2 3 4 5 6 b7 7" },
-    { name: "Bebop Minor", notes: [0, 2, 3, 5, 7, 8, 9, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "6", "b7"], formula: "1 2 b3 4 5 b6 6 b7" },
-  ],
-  jazz: [
-    { name: "Lydian Dominant", notes: [0, 2, 4, 6, 7, 9, 10], intervals: ["1", "2", "3", "#4", "5", "6", "b7"], formula: "1 2 3 #4 5 6 b7" },
-    { name: "Altered", notes: [0, 1, 3, 4, 6, 8, 10], intervals: ["1", "b2", "b3", "3", "b5", "b6", "b7"], formula: "1 b2 b3 3 b5 b6 b7" },
-    { name: "Half-Whole Diminished", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "b3", "3", "#4", "5", "6", "b7"], formula: "1 b2 b3 3 #4 5 6 b7" },
-    { name: "Whole-Half Diminished", notes: [0, 2, 3, 5, 6, 8, 9, 11], intervals: ["1", "2", "b3", "4", "b5", "b6", "6", "7"], formula: "1 2 b3 4 b5 b6 6 7" },
-    { name: "Harmonic Major", notes: [0, 2, 4, 5, 7, 8, 11], intervals: ["1", "2", "3", "4", "5", "b6", "7"], formula: "1 2 3 4 5 b6 7" },
-    { name: "Hungarian Minor", notes: [0, 2, 3, 6, 7, 8, 11], intervals: ["1", "2", "b3", "#4", "5", "b6", "7"], formula: "1 2 b3 #4 5 b6 7" },
-  ],
-}
-
-// 音阶练习序列类型（琶音类型）
-const SCALE_PRACTICE_SEQUENCES = [
-  { id: "1to1", name: "1→1", nameKey: "scale_seq_1to1", description: "从根音到根音" },
-  { id: "3to3", name: "3→3", nameKey: "scale_seq_3to3", description: "从三音到三音" },
-  { id: "5to5", name: "5→5", nameKey: "scale_seq_5to5", description: "从五音到五音" },
-  { id: "7to7", name: "7→7", nameKey: "scale_seq_7to7", description: "从七音到七音" },
-  { id: "random", name: "随机", nameKey: "random", description: "随机琶音" },
-]
-
-// 和弦/音阶显示方式转换函数
-const DISPLAY_NAMES = {
-  "chinese": {
-    "chordTypes": {
-      "6": "大六和弦",
-      "7": "属七和弦",
-      "9": "属九和弦",
-      "11": "属十一和弦",
-      "13": "属十三和弦",
-      "Major": "大三和弦",
-      "Minor": "小三和弦",
-      "Dim": "减三和弦",
-      "Aug": "增三和弦",
-      "m6": "小六和弦",
-      "Maj7": "大七和弦",
-      "m7": "小七和弦",
-      "m7b5": "半减七和弦",
-      "dim7": "减七和弦",
-      "mMaj7": "小大七和弦",
-      "aug7": "增七和弦",
-      "7b5": "属七降五和弦",
-      "7#5": "属七升五和弦",
-      "maj7#5": "大七升五和弦",
-      "Maj9": "大九和弦",
-      "m9": "小九和弦",
-      "m9b5": "小九降五和弦",
-      "7#9": "属七升九和弦",
-      "7b9": "属七降九和弦",
-      "7#5b9": "属七升五降九和弦",
-      "7#5#9": "属七升五升九和弦",
-      "m11": "小十一和弦",
-      "7#11": "属七升十一和弦",
-      "9#11": "属九升十一和弦",
-      "m13": "小十三和弦",
-      "13b9": "属十三降九和弦",
-      "13#11": "属十三升十一和弦",
-      "sus2": "挂二和弦",
-      "sus4": "挂四和弦",
-      "7sus4": "属七挂四和弦",
-      "9sus4": "属九挂四和弦",
-      "add9": "加九和弦",
-      "madd9": "小加九和弦",
-      "6add9": "大六加九和弦",
-      "m6add9": "小六加九和弦"
-    },
-    "scaleTypes": {
-      "Major": "大调音阶",
-      "Minor": "小调音阶",
-      "Ionian": "伊奥尼亚调式",
-      "Dorian": "多利亚调式",
-      "Phrygian": "弗里几亚调式",
-      "Lydian": "利底亚调式",
-      "Mixolydian": "混合利底亚调式",
-      "Aeolian": "爱奥利亚调式",
-      "Locrian": "洛克里亚调式",
-      "Harmonic Minor": "和声小调",
-      "Melodic Minor": "旋律小调",
-      "Major Pentatonic": "大调五声音阶",
-      "Minor Pentatonic": "小调五声音阶",
-      "Dominant Pentatonic": "属七五声音阶",
-      "Minor 6 Pentatonic": "小六五声音阶",
-      "Blues": "布鲁斯音阶",
-      "Major Blues": "大调布鲁斯",
-      "Whole Tone": "全音音阶",
-      "Lydian Dominant": "利底亚属音阶",
-      "Altered": "变化音阶",
-      "Half-Whole Diminished": "半全减音阶",
-      "Whole-Half Diminished": "全半减音阶",
-      "Diminished Half Whole": "减音阶半全",
-      "Diminished Whole Half": "减音阶全半",
-      "Harmonic Major": "和声大调",
-      "Hungarian Minor": "匈牙利小调",
-      "Japanese": "日本音阶",
-      "Egyptian": "埃及音阶",
-      "Spanish Phrygian": "西班牙弗里几亚",
-      "Hijaz": "希贾兹音阶",
-      "Double Harmonic": "双和声音阶",
-      "Chromatic": "半音阶",
-      "Augmented": "增音阶",
-      "Augmented Scale": "增音阶",
-      "Tritone": "三全音音阶",
-      "Dorian b2": "多利亚b2",
-      "Lydian Augmented": "利底亚增",
-      "Mixolydian b6": "混合利底亚b6",
-      "Locrian Nat 2": "洛克里亚自然2",
-      "Locrian Nat 6": "洛克里亚自然6",
-      "Ionian Augmented": "伊奥尼亚增",
-      "Dorian #4": "多利亚#4",
-      "Phrygian Dominant": "弗里几亚属",
-      "Lydian #9": "利底亚#9",
-      "Superlocrian bb7": "超洛克里亚bb7",
-      "Dorian b5": "多利亚b5",
-      "Phrygian b4": "弗里几亚b4",
-      "Lydian b3": "利底亚b3",
-      "Mixolydian b2": "混合利底亚b2",
-      "Lydian Augmented #2": "利底亚增#2",
-      "Locrian bb7": "洛克里亚bb7",
-      "Bebop Dominant": "Bebop属音阶",
-      "Bebop Major": "Bebop大调",
-      "Bebop Dorian": "Bebop多利亚",
-      "Bebop Tonic Minor": "Bebop主小调",
-      "Bebop Dom7b9b13": "Bebop属7b9b13",
-      "Bebop Tonic Minor Dorian": "Bebop主小调(多利亚)",
-      "Bebop Tonic Minor Melodic": "Bebop主小调(旋律)",
-      "Bebop Mixolydian": "Bebop混合利底亚",
-      "Bebop Minor": "Bebop小调"
-    }
-  },
-  "english": {
-    "chordTypes": {
-      "6": "6",
-      "7": "7",
-      "9": "9",
-      "11": "11",
-      "13": "13",
-      "Major": "Major",
-      "Minor": "Minor",
-      "Dim": "Dim",
-      "Aug": "Aug",
-      "m6": "m6",
-      "Maj7": "Maj7",
-      "m7": "m7",
-      "m7b5": "m7b5",
-      "dim7": "dim7",
-      "mMaj7": "m(maj7)",
-      "aug7": "aug7",
-      "7b5": "7(b5)",
-      "7#5": "7(#5)",
-      "maj7#5": "maj7(#5)",
-      "Maj9": "Maj9",
-      "m9": "m9",
-      "m9b5": "m9(b5)",
-      "7#9": "7(#9)",
-      "7b9": "7(b9)",
-      "7#5b9": "7(#5b9)",
-      "7#5#9": "7(#5#9)",
-      "m11": "m11",
-      "7#11": "7(#11)",
-      "9#11": "9(#11)",
-      "m13": "m13",
-      "13b9": "13(b9)",
-      "13#11": "13(#11)",
-      "sus2": "sus2",
-      "sus4": "sus4",
-      "7sus4": "7sus4",
-      "9sus4": "9sus4",
-      "add9": "add9",
-      "madd9": "m(add9)",
-      "6add9": "6/9",
-      "m6add9": "m6/9"
-    },
-    "scaleTypes": {
-      "Major": "Major Scale",
-      "Minor": "Minor Scale",
-      "Ionian": "Ionian Mode",
-      "Dorian": "Dorian Mode",
-      "Phrygian": "Phrygian Mode",
-      "Lydian": "Lydian Mode",
-      "Mixolydian": "Mixolydian Mode",
-      "Aeolian": "Aeolian Mode",
-      "Locrian": "Locrian Mode",
-      "Harmonic Minor": "Harmonic Minor",
-      "Melodic Minor": "Melodic Minor",
-      "Major Pentatonic": "Major Pentatonic",
-      "Minor Pentatonic": "Minor Pentatonic",
-      "Dominant Pentatonic": "Dominant Pentatonic",
-      "Minor 6 Pentatonic": "Minor 6 Pentatonic",
-      "Blues": "Blues Scale",
-      "Major Blues": "Major Blues",
-      "Whole Tone": "Whole Tone",
-      "Lydian Dominant": "Lydian Dominant",
-      "Altered": "Altered Scale",
-      "Half-Whole Diminished": "Half-Whole Dim",
-      "Whole-Half Diminished": "Whole-Half Dim",
-      "Diminished Half Whole": "Diminished H-W",
-      "Diminished Whole Half": "Diminished W-H",
-      "Harmonic Major": "Harmonic Major",
-      "Hungarian Minor": "Hungarian Minor",
-      "Japanese": "Japanese Scale",
-      "Egyptian": "Egyptian Scale",
-      "Spanish Phrygian": "Spanish Phrygian",
-      "Hijaz": "Hijaz Scale",
-      "Double Harmonic": "Double Harmonic",
-      "Chromatic": "Chromatic Scale",
-      "Augmented": "Augmented Scale",
-      "Augmented Scale": "Augmented Scale",
-      "Tritone": "Tritone Scale",
-      "Dorian b2": "Dorian b2",
-      "Lydian Augmented": "Lydian Augmented",
-      "Mixolydian b6": "Mixolydian b6",
-      "Locrian Nat 2": "Locrian Nat 2",
-      "Locrian Nat 6": "Locrian Nat 6",
-      "Ionian Augmented": "Ionian Augmented",
-      "Dorian #4": "Dorian #4",
-      "Phrygian Dominant": "Phrygian Dominant",
-      "Lydian #9": "Lydian #9",
-      "Superlocrian bb7": "Superlocrian bb7",
-      "Dorian b5": "Dorian b5",
-      "Phrygian b4": "Phrygian b4",
-      "Lydian b3": "Lydian b3",
-      "Mixolydian b2": "Mixolydian b2",
-      "Lydian Augmented #2": "Lydian Aug #2",
-      "Locrian bb7": "Locrian bb7",
-      "Bebop Dominant": "Bebop Dominant",
-      "Bebop Major": "Bebop Major",
-      "Bebop Dorian": "Bebop Dorian",
-      "Bebop Tonic Minor": "Bebop Tonic Minor",
-      "Bebop Dom7b9b13": "Bebop Dom7b9b13",
-      "Bebop Tonic Minor Dorian": "Bebop Tonic Minor (Dorian)"
-    }
-  },
-  "english_short": {
-    "chordTypes": {
-      "6": "6",
-      "7": "7",
-      "9": "9",
-      "11": "11",
-      "13": "13",
-      "Major": "",
-      "Minor": "m",
-      "Dim": "dim",
-      "Aug": "aug",
-      "m6": "m6",
-      "Maj7": "Maj7",
-      "m7": "m7",
-      "m7b5": "m7b5",
-      "dim7": "dim7",
-      "mMaj7": "m(maj7)",
-      "aug7": "aug7",
-      "7b5": "7(b5)",
-      "7#5": "7(#5)",
-      "maj7#5": "maj7(#5)",
-      "Maj9": "Maj9",
-      "m9": "m9",
-      "m9b5": "m9(b5)",
-      "7#9": "7(#9)",
-      "7b9": "7(b9)",
-      "7#5b9": "7(#5b9)",
-      "7#5#9": "7(#5#9)",
-      "m11": "m11",
-      "7#11": "7(#11)",
-      "9#11": "9(#11)",
-      "m13": "m13",
-      "13b9": "13(b9)",
-      "13#11": "13(#11)",
-      "sus2": "sus2",
-      "sus4": "sus4",
-      "7sus4": "7sus4",
-      "9sus4": "9sus4",
-      "add9": "add9",
-      "madd9": "m(add9)",
-      "6add9": "6/9",
-      "m6add9": "m6/9"
-    },
-    "scaleTypes": {
-      "Major": "Major",
-      "Minor": "Minor",
-      "Ionian": "Ionian",
-      "Dorian": "Dorian",
-      "Phrygian": "Phrygian",
-      "Lydian": "Lydian",
-      "Mixolydian": "Mixolydian",
-      "Aeolian": "Aeolian",
-      "Locrian": "Locrian",
-      "Harmonic Minor": "Harm. Minor",
-      "Melodic Minor": "Mel. Minor",
-      "Major Pentatonic": "Maj Pent",
-      "Minor Pentatonic": "Min Pent",
-      "Dominant Pentatonic": "Dom Pent",
-      "Minor 6 Pentatonic": "Min6 Pent",
-      "Blues": "Blues",
-      "Major Blues": "Maj Blues",
-      "Whole Tone": "Whole Tone",
-      "Lydian Dominant": "Lydian Dom",
-      "Altered": "Altered",
-      "Half-Whole Diminished": "H-W Dim",
-      "Whole-Half Diminished": "W-H Dim",
-      "Diminished Half Whole": "Dim H-W",
-      "Diminished Whole Half": "Dim W-H",
-      "Harmonic Major": "Harm. Major",
-      "Hungarian Minor": "Hung. Minor",
-      "Japanese": "Japanese",
-      "Egyptian": "Egyptian",
-      "Spanish Phrygian": "Spanish Phryg",
-      "Hijaz": "Hijaz",
-      "Double Harmonic": "Dbl Harm",
-      "Chromatic": "Chromatic",
-      "Augmented": "Augmented",
-      "Augmented Scale": "Augmented",
-      "Tritone": "Tritone",
-      "Dorian b2": "Dorian b2",
-      "Lydian Augmented": "Lydian Aug",
-      "Mixolydian b6": "Mix b6",
-      "Locrian Nat 2": "Locrian #2",
-      "Locrian Nat 6": "Locrian #6",
-      "Ionian Augmented": "Ionian Aug",
-      "Dorian #4": "Dorian #4",
-      "Phrygian Dominant": "Phryg Dom",
-      "Lydian #9": "Lydian #9",
-      "Superlocrian bb7": "Superloc bb7",
-      "Dorian b5": "Dorian b5",
-      "Phrygian b4": "Phryg b4",
-      "Lydian b3": "Lydian b3",
-      "Mixolydian b2": "Mix b2",
-      "Lydian Augmented #2": "Lyd Aug #2",
-      "Locrian bb7": "Locrian bb7",
-      "Bebop Dominant": "Bebop Dom",
-      "Bebop Major": "Bebop Maj",
-      "Bebop Dorian": "Bebop Dor",
-      "Bebop Tonic Minor": "Bebop Ton Min",
-      "Bebop Dom7b9b13": "Bebop Dom7b9b13",
-      "Bebop Tonic Minor Dorian": "Bebop Ton Min (Dor)"
-    }
-  },
-  "jazz": {
-    "chordTypes": {
-      "6": "6",
-      "7": "7",
-      "9": "9",
-      "11": "11",
-      "13": "13",
-      "Major": "Maj",
-      "Minor": "min",
-      "Dim": "dim",
-      "Aug": "aug",
-      "m6": "min6",
-      "Maj7": "Maj7",
-      "m7": "min7",
-      "m7b5": "m7b5",
-      "dim7": "dim7",
-      "mMaj7": "min(maj7)",
-      "aug7": "aug7",
-      "7b5": "7(b5)",
-      "7#5": "7(#5)",
-      "maj7#5": "Maj7(#5)",
-      "Maj9": "Maj9",
-      "m9": "min9",
-      "m9b5": "m9(b5)",
-      "7#9": "7(#9)",
-      "7b9": "7(b9)",
-      "7#5b9": "7(#5b9)",
-      "7#5#9": "7(#5#9)",
-      "m11": "min11",
-      "7#11": "7(#11)",
-      "9#11": "9(#11)",
-      "m13": "min13",
-      "13b9": "13(b9)",
-      "13#11": "13(#11)",
-      "sus2": "sus2",
-      "sus4": "sus4",
-      "7sus4": "7sus4",
-      "9sus4": "9sus4",
-      "add9": "add9",
-      "madd9": "min(add9)",
-      "6add9": "6/9",
-      "m6add9": "min6/9"
-    },
-    "scaleTypes": {
-      "Major": "Ionian",
-      "Minor": "Aeolian",
-      "Ionian": "Ionian",
-      "Dorian": "Dorian",
-      "Phrygian": "Phrygian",
-      "Lydian": "Lydian",
-      "Mixolydian": "Mixolydian",
-      "Aeolian": "Aeolian",
-      "Locrian": "Locrian",
-      "Harmonic Minor": "Harm. Minor",
-      "Melodic Minor": "Mel. Minor",
-      "Major Pentatonic": "Maj Pent",
-      "Minor Pentatonic": "min Pent",
-      "Dominant Pentatonic": "Dom Pent",
-      "Minor 6 Pentatonic": "min6 Pent",
-      "Blues": "Blues",
-      "Major Blues": "Maj Blues",
-      "Whole Tone": "Whole Tone",
-      "Lydian Dominant": "Lydian Dom",
-      "Altered": "Altered",
-      "Half-Whole Diminished": "H-W Dim",
-      "Whole-Half Diminished": "W-H Dim",
-      "Diminished Half Whole": "Dim H-W",
-      "Diminished Whole Half": "Dim W-H",
-      "Harmonic Major": "Harm. Major",
-      "Hungarian Minor": "Hung. Minor",
-      "Japanese": "Japanese",
-      "Egyptian": "Egyptian",
-      "Spanish Phrygian": "Spanish Phryg",
-      "Hijaz": "Hijaz",
-      "Double Harmonic": "Dbl Harm",
-      "Chromatic": "Chromatic",
-      "Augmented": "Augmented",
-      "Augmented Scale": "Augmented",
-      "Tritone": "Tritone",
-      "Dorian b2": "Dorian b2",
-      "Lydian Augmented": "Lydian Aug",
-      "Mixolydian b6": "Mix b6",
-      "Locrian Nat 2": "Locrian #2",
-      "Locrian Nat 6": "Locrian #6",
-      "Ionian Augmented": "Ionian Aug",
-      "Dorian #4": "Dorian #4",
-      "Phrygian Dominant": "Phryg Dom",
-      "Lydian #9": "Lydian #9",
-      "Superlocrian bb7": "Superloc bb7",
-      "Dorian b5": "Dorian b5",
-      "Phrygian b4": "Phryg b4",
-      "Lydian b3": "Lydian b3",
-      "Mixolydian b2": "Mix b2",
-      "Lydian Augmented #2": "Lyd Aug #2",
-      "Locrian bb7": "Locrian bb7",
-      "Bebop Dominant": "Bebop Dom",
-      "Bebop Major": "Bebop Maj",
-      "Bebop Dorian": "Bebop Dor",
-      "Bebop Tonic Minor": "Bebop Ton Min",
-      "Bebop Dom7b9b13": "Bebop Dom7b9b13",
-      "Bebop Tonic Minor Dorian": "Bebop Ton Min (Dor)"
-    }
-  }
-}
-
-// 获取和弦显示名称
-// chordSymbolOptions: 可选的细粒度符号覆盖（小调/半减七/属七降九）
-function getChordDisplayName(
-  chordType: string,
-  displayMode: 'chinese' | 'english' | 'english_short' | 'jazz',
-  chordSymbolOptions?: {
-    minorSymbol?: 'm' | '-' | 'min'
-    minor7flat5Symbol?: 'm7b5' | 'ø7' | 'half-dim'
-    dominant7flat9Symbol?: '7b9' | '7♭9' | '7-9'
-    useUnicode?: boolean
-  }
-): string {
-  const baseName = DISPLAY_NAMES[displayMode].chordTypes[chordType as keyof typeof DISPLAY_NAMES.chinese.chordTypes] || chordType
-  // 中文模式不应用细粒度覆盖（保持中文术语）
-  if (displayMode === 'chinese') return baseName
-  // 仅对英文/爵士记谱应用覆盖
-  // 半减七（m7b5 / m9b5）优先处理（否则会被小调分支覆盖）
-  if ((chordType === 'm7b5' || chordType === 'm9b5') && chordSymbolOptions?.minor7flat5Symbol) {
-    const sym = chordSymbolOptions.minor7flat5Symbol
-    if (chordType === 'm7b5') {
-      if (sym === 'ø7') return 'ø7'
-      if (sym === 'half-dim') return 'half-dim'
-      return 'm7b5'
-    }
-    if (chordType === 'm9b5') {
-      if (sym === 'ø7') return 'ø9'
-      if (sym === 'half-dim') return 'half-dim9'
-      return 'm9b5'
-    }
-  }
-  // 小调和弦（Minor / m6 / m7 / m9 / m11 / m13 / mMaj7 / madd9 等，不含 m7b5/m9b5）
-  const minorPattern = /^(Minor|m6|m7|m9|m11|m13|mMaj7|madd9|m6add9)$/
-  if (minorPattern.test(chordType) && chordSymbolOptions?.minorSymbol) {
-    const sym = chordSymbolOptions.minorSymbol
-    // 简化：根据 chordType 直接生成对应符号
-    const map: Record<string, string> = {
-      'Minor': sym === 'min' ? 'min' : sym,
-      'm6': `${sym}6`,
-      'm7': `${sym}7`,
-      'm9': `${sym}9`,
-      'm11': `${sym}11`,
-      'm13': `${sym}13`,
-      'mMaj7': `${sym}Maj7`,
-      'madd9': `${sym}add9`,
-      'm6add9': `${sym}6add9`,
-    }
-    if (map[chordType]) return map[chordType]
-  }
-  // 属七降九（7b9）
-  if (chordType === '7b9' && chordSymbolOptions?.dominant7flat9Symbol) {
-    const sym = chordSymbolOptions.dominant7flat9Symbol
-    if (sym === '7♭9') return '7♭9'
-    if (sym === '7-9') return '7-9'
-    return '7b9'
-  }
-  return baseName
-}
-
-// 获取和弦显示名称（带用户设置重载）
-// 优先使用 chordSymbols 中的细粒度偏好；否则回退到 DISPLAY_NAMES 表
-function getChordDisplayNameWithSettings(
-  chordType: string,
-  displayMode: 'chinese' | 'english' | 'english_short' | 'jazz',
-  chordSymbolOptions?: {
-    minorSymbol?: 'm' | '-' | 'min'
-    minor7flat5Symbol?: 'm7b5' | 'ø7' | 'half-dim'
-    dominant7flat9Symbol?: '7b9' | '7♭9' | '7-9'
-    useUnicode?: boolean
-  }
-): string {
-  return getChordDisplayName(chordType, displayMode, chordSymbolOptions)
-}
-
-// 获取音阶显示名称
-function getScaleDisplayName(scaleName: string, displayMode: 'chinese' | 'english' | 'english_short' | 'jazz'): string {
-  const scaleTypes = DISPLAY_NAMES[displayMode].scaleTypes as Record<string, string>
-  return scaleTypes[scaleName] || scaleName
-}
-
-// 将音程度数中的 # 和 b 转换为 ♯ 和 ♭
-function formatDegree(degree: string): string {
-  return degree.replace(/#/g, '♯').replace(/b/g, '♭')
-}
-
-// Song progressions
-const SONG_PROGRESSIONS = [
-  { 
-    name: "Ask Me Now", 
-    composer: "Thelonious Monk",
-    year: "1951",
-    style: "Jazz Modern",
-    tempo: "Slow",
-    key: "Db",
-    chords: ["Gm7", "C7", "F#m7", "B7", "Fm7", "Bb7", "Em7", "A7", "Ebm7", "Ab7#5", "B7#11", "Bb7", "Eb7", "D7", "DbMaj7", "Eb7", "Ebm7", "Ab7", "B7", "Bb7", "A7", "Ab7", "Gm7", "C7", "F#m7", "B7", "Fm7", "Bb7", "Em7", "A7", "Ebm7", "Ab7#5", "B7#11", "Bb7", "Eb7", "D7", "DbMaj7", "Eb7", "Ebm7", "Ab7", "DbMaj7", "Ebm7", "Ab7", "DbMaj7", "Ebm7", "D7#11", "DbMaj7", "Eb7", "Ebm7", "Ab7", "Gb7#11", "Gm7", "C7", "F#m7", "B7", "Fm7", "Bb7", "Em7", "A7", "Ebm7", "Ab7#5", "B7#11", "Bb7", "Eb7", "D7", "DbMaj7", "Eb7", "Ebm7", "Ab7#5", "DbMaj7"] 
-  },
-  { 
-    name: "Very Early", 
-    composer: "Bill Evans",
-    year: "1961",
-    style: "Jazz Waltz",
-    tempo: "Fast",
-    key: "C",
-    chords: ["CMaj7", "Bb7#11", "EbMaj7", "Ab13b9", "DbMaj7", "G7", "CMaj7", "Bb13", "DMaj7", "Am7", "F#m7", "B13b9", "Em7", "Ab7", "DbMaj7", "G7", "CMaj7", "Bb7#11", "EbMaj7", "Ab13b9", "DbMaj7", "G7", "CMaj7", "Bb7#11", "DMaj7", "Am7", "F#m7", "B13b9", "Em7", "Ab7", "DbMaj7", "G7#5", "BMaj7", "Ab13b9", "DbMaj7", "Bb7#11", "BMaj7", "G7", "CMaj7", "Ab7", "DbMaj7", "G7", "CMaj7", "A", "Dm7", "Em7", "FMaj7", "G7", "CMaj7", "G7"] 
-  },
-  { 
-    name: "Footprints", 
-    composer: "Wayne Shorter",
-    year: "1966",
-    style: "Jazz Modern",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["Cm11", "Fm11", "Cm11", "F#m7b5", "F7#11", "E", "A", "Cm11"] 
-  },
-  { 
-    name: "Days of Wine and Roses", 
-    composer: "Henry Mancini",
-    year: "1962",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "F",
-    chords: ["FMaj7", "Eb7#11", "Am7", "D7b9", "Gm7", "Eb9", "Am7", "Dm7", "Gm7", "C7", "Em7b5", "A7b9", "Dm7", "G7", "Gm7", "C7", "FMaj7", "Eb7#11", "Am7", "D7b9", "Gm7", "Eb9", "Am7", "Dm7", "Bm7b5", "Bb7#11", "Am7", "Dm7", "Gm7", "C7", "FMaj7", "Gm7", "C7"] 
-  },
-  { 
-    name: "Anthropology", 
-    composer: "Charlie Parker & Dizzy Gillespie",
-    year: "1946",
-    style: "Jazz Bebop",
-    tempo: "Fast",
-    key: "Bb",
-    chords: ["BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "Fm7", "Bb7", "EbMaj7", "Ab7", "Dm7", "G7b9", "Cm7", "F7", "BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "Fm7", "Bb7", "EbMaj7", "Ab7", "Cm7", "F7", "Bb", "D7", "G7", "C7", "F7", "BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "Fm7", "Bb7", "EbMaj7", "Ab7", "Cm7", "F7", "Bb"] 
-  },
-  { 
-    name: "A Night In Tunisia", 
-    composer: "Dizzy Gillespie",
-    year: "1942",
-    style: "Jazz Latin",
-    tempo: "Fast",
-    key: "Dm",
-    chords: ["Eb7", "Eb7", "Eb7", "Eb7", "Eb7", "Eb7", "Eb7", "Eb7", "Eb7", "DmMaj7", "DmMaj7", "DmMaj7", "Em7b5", "A7b9", "DmMaj7", "DmMaj7", "DmMaj7", "DmMaj7", "Em7b5", "A7b9", "DmMaj7", "Am7b5", "D7b9", "Gm7", "Gm7b5", "C7b9", "FMaj7", "Em7b5", "A7b9", "DmMaj7", "DmMaj7", "DmMaj7", "Em7b5", "A7b9", "DmMaj7"] 
-  },
-  { 
-    name: "All the Things You Are", 
-    composer: "Jerome Kern",
-    year: "1939",
-    style: "Jazz Swing",
-    tempo: "Fast",
-    key: "Ab",
-    chords: ["Fm7", "Bbm7", "Eb7", "AbMaj7", "DbMaj7", "Dm7", "G7", "CMaj7", "Cm7", "Fm7", "Bb7", "EbMaj7", "AbMaj7", "Am7", "D7", "GMaj7", "Am7", "D7", "GMaj7", "F#m7b5", "B", "EMaj7", "C", "Fm7", "Bbm7", "Eb7", "AbMaj7", "DbMaj7", "DbmMaj7", "Cm7", "Bdim", "Bbm7", "Eb7", "AbMaj7", "Gm7b5", "C"] 
-  },
-  { 
-    name: "Confirmation", 
-    composer: "Charlie Parker",
-    year: "1946",
-    style: "Jazz Bebop",
-    tempo: "Fast",
-    key: "F",
-    chords: ["FMaj7", "Em7b5", "A7b9", "Dm7", "G7b9", "Cm7", "F7", "Bb7", "Am7", "D7", "G7", "C7b9", "FMaj7", "Em7b5", "A7b9", "Dm7", "G7b9", "Cm7", "F7", "Bb7", "Am7", "D7", "Gm7", "C7", "FMaj7", "Cm7", "F7", "BbMaj7", "Ebm7", "Ab7", "DbMaj7", "Gm7", "C7", "FMaj7", "Em7b5", "A7b9", "Dm7", "G7b9", "Cm7", "F7", "Bb7", "Am7", "D7b9", "Gm7", "C7", "FMaj7", "C7"] 
-  },
-  { 
-    name: "Beautiful Love", 
-    composer: "Victor Young",
-    year: "1931",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "Dm",
-    chords: ["Em7b5", "A7b9", "Dm7", "D7b9", "Gm7", "C7", "FMaj7", "Em7b5", "A7b9", "Dm7", "Gm7", "Bb7", "A7b9", "Dm7", "G7#11", "Em7b5", "A7b9", "Em7b5", "A7b9", "Dm7", "D7b9", "Gm7", "C7", "FMaj7", "Em7b5", "A7b9", "Dm7", "Gm7", "Bb7", "A7b9", "Dm7", "Bm7b5", "Bb7#11", "A7b9", "Dm7"] 
-  },
-  { 
-    name: "Giant Steps", 
-    composer: "John Coltrane",
-    year: "1959",
-    style: "Jazz Swing",
-    tempo: "Fast",
-    key: "B",
-    chords: ["BMaj7", "D7", "GMaj7", "Bb7", "EbMaj7", "Am7", "D7", "GMaj7", "Bb7", "EbMaj7", "F#7", "BMaj7", "Fm7", "Bb7", "EbMaj7", "Am7", "D7", "GMaj7", "C#m7", "F#7", "BMaj7", "Fm7", "Bb7", "EbMaj7", "C#m7", "F#7"] 
-  },
-  { 
-    name: "Falling Grace", 
-    composer: "Steve Swallow",
-    year: "1967",
-    style: "Jazz Modern",
-    tempo: "Fast",
-    key: "Ab",
-    chords: ["AbMaj7", "D7b9", "Gm7", "Fm7", "Bb7", "EbMaj7", "D7b9", "Gm7", "C7", "FMaj7", "F#m7b5", "B7b9", "Em7", "Am7", "D7", "GMaj7", "Cm7", "C#dim", "BbMaj7", "EbMaj7", "Em7b5", "A7b9", "Dm7", "Db7#11", "Cm7", "F7", "BbMaj7", "EbMaj7"] 
-  },
-  { 
-    name: "Autumn Leaves", 
-    composer: "Joseph Kosma",
-    year: "1945",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "Gm",
-    chords: ["Cm7", "F7", "BbMaj7", "EbMaj7", "Am7b5", "D7b9", "Gm7", "G7b9", "Cm7", "F7", "BbMaj7", "EbMaj7", "Am7b5", "D7b9", "Gm7", "Am7b5", "D7b9", "Gm7", "G7b9", "Cm7", "F7", "BbMaj7", "EbMaj7", "Am7b5", "D7b9", "Gm7", "Gb7", "Fm7", "E7", "Am7b5", "D7b9", "Gm7", "G7b9"] 
-  },
-  { 
-    name: "Someday My Prince Will Come", 
-    composer: "Frank Churchill",
-    year: "1937",
-    style: "Jazz Swing",
-    tempo: "Fast",
-    key: "Bb",
-    chords: ["BbMaj7", "D", "EbMaj7", "G7b9", "Cm7", "G7b9", "Cm7", "F7", "Dm7", "C#dim", "Cm7", "F7", "Dm7", "C#dim", "Cm7", "F7", "BbMaj7", "D7#5", "EbMaj7", "G7b9", "Cm7", "G7b9", "Cm7", "F7", "Fm7", "Bb7", "EbMaj7", "Edim", "BbMaj7", "G7b9", "Cm7", "F7"] 
-  },
-  { 
-    name: "26-2", 
-    composer: "John Coltrane",
-    year: "1958",
-    style: "Jazz Swing",
-    tempo: "Fast",
-    key: "F",
-    chords: ["FMaj7", "Ab7", "DbMaj7", "E7", "AMaj7", "C7", "Cm7", "F7", "BbMaj7", "Db7", "GbMaj7", "A7", "Dm7", "G7", "Gm7", "C7", "FMaj7", "Ab7", "DbMaj7", "E7", "AMaj7", "C7", "Cm7", "F7", "BbMaj7", "Ab7", "DbMaj7", "E7", "AMaj7", "C7", "FMaj7", "Cm7", "F7", "Em7", "A7", "DMaj7", "F7", "BbMaj7", "Ebm7", "Ab7", "DbMaj7", "Gm7", "C7", "FMaj7", "Ab7", "DbMaj7", "E7", "AMaj7", "C7", "Cm7", "F7", "BbMaj7", "Ab7", "DbMaj7", "E7", "AMaj7", "C7", "FMaj7"] 
-  },
-  { 
-    name: "Countdown", 
-    composer: "John Coltrane",
-    year: "1959",
-    style: "Jazz Swing",
-    tempo: "Fast",
-    key: "Bb",
-    chords: ["EMaj7", "Em7", "F7", "BbMaj7", "Db7", "GbMaj7", "A7", "DMaj7", "Dm7", "Eb7", "AbMaj7", "B7", "G7", "CMaj7", "Cm7", "Db7", "GbMaj7", "A7", "DMaj7", "F7", "BbMaj7", "Em7", "F7", "BbMaj7", "A7"] 
-  },
-  { 
-    name: "Alone Together", 
-    composer: "Arthur Schwartz",
-    year: "1932",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "Dm",
-    chords: ["DMaj7", "Dm6", "Em7b5", "A7b9", "Dm6", "Em7b5", "A7b9", "Dm6", "Am7b5", "D7b9", "Gm7", "Bm7", "E7", "Gm7", "C7", "FMaj7", "Em7b5", "A7b9", "DMaj7", "Em7b5", "A7b9", "Dm6", "Em7b5", "A7b9", "Dm6", "Em7b5", "A7b9", "Dm6", "Am7b5", "D7b9", "Gm7", "Bm7", "E7", "Gm7", "C7", "FMaj7", "Em7b5", "A7b9", "Am7b5", "D7b9", "Gm6", "Gm7b5", "C7b9", "FMaj7", "Em7b5", "A7b9", "Dm6", "Em7b5", "A7b9", "Dm6", "Em7b5", "A7b9", "Dm6", "Bm7b5", "Bb7", "A7b9", "Dm6", "Em7b5", "A7b9"] 
-  },
-  { 
-    name: "Blue in Green", 
-    composer: "Miles Davis",
-    year: "1959",
-    style: "Jazz Modal",
-    tempo: "Slow",
-    key: "Gm",
-    chords: ["Gm13", "A", "Dm7", "Db7#11", "Cm7", "F13b9", "BbMaj7#11", "A", "Dm7", "E", "Am7", "Dm7"] 
-  },
-  { 
-    name: "Stella By Starlight", 
-    composer: "Victor Young",
-    year: "1944",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "Bb",
-    chords: ["Em7b5", "A7b9", "Cm7", "F7", "Fm7", "Bb7", "EbMaj7", "Ab7", "BbMaj7", "Em7b5", "A7b9", "Dm7", "Bbm7", "Eb7", "FMaj7", "Em7b5", "A7b9", "Am7b5", "D7b9", "G7#5", "Cm7", "Ab7#11", "BbMaj7", "Em7b5", "A7b9", "Dm7b5", "G7b9", "Cm7b5", "F7b9", "BbMaj7"] 
-  },
-  { 
-    name: "Lady Bird", 
-    composer: "Tadd Dameron",
-    year: "1947",
-    style: "Jazz Swing",
-    tempo: "Fast",
-    key: "C",
-    chords: ["CMaj7", "Fm7", "Bb7", "CMaj7", "Bbm7", "Eb7", "AbMaj7", "Am7", "D7", "Dm7", "G7", "CMaj7", "EbMaj7", "AbMaj7", "DbMaj7"] 
-  },
-  { 
-    name: "My Funny Valentine", 
-    composer: "Richard Rodgers",
-    year: "1937",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "Cm",
-    chords: ["Cm6", "Dm7b5", "G7b9", "Cm7", "F7", "AbMaj7", "Fm7", "Dm7b5", "G7b9", "Cm6", "Dm7b5", "G7b9", "Cm7", "F7", "AbMaj7", "Fm7", "Fm7b5", "B13b9", "EbMaj7", "Fm7", "Gm7", "Fm7", "EbMaj7", "Fm7", "Gm7", "Fm7", "EbMaj7", "G7b9", "Cm7", "B7", "Bbm7", "A7", "AbMaj7", "Dm7b5", "G7b9", "Cm6", "Dm7b5", "G7b9", "Cm7", "F7", "AbMaj7", "Dm7b5", "G7b9", "Cm7", "B7", "Bbm7", "Eb7", "AbMaj7", "Fm7", "Bb7", "Eb", "Dm7b5", "G7b9"] 
-  },
-  { 
-    name: "Fall", 
-    composer: "Wayne Shorter",
-    year: "1967",
-    style: "Jazz Modern",
-    tempo: "Slow",
-    key: "Em",
-    chords: ["F#", "B13b9", "E", "EbMaj7#11", "F#", "B13b9", "E", "EbMaj7#11", "DMaj7", "D13b9", "Gm7", "Bm7", "AbMaj7#11", "F#", "B13b9", "Em7", "B"] 
-  },
-  { 
-    name: "The Girl From Ipanema", 
-    composer: "Antônio Carlos Jobim",
-    year: "1962",
-    style: "Jazz Bossa",
-    tempo: "Fast",
-    key: "F",
-    chords: ["FMaj7", "G7#11", "Gm7", "Gb7#11", "FMaj7", "Gb7", "FMaj7", "G7#11", "Gm7", "Gb7#11", "FMaj7", "GbMaj7", "B7", "F#m7", "D7", "Gm7", "Eb7", "Am7", "D", "Gm7", "C", "FMaj7", "G7#11", "Gm7", "Gb7#11", "FMaj7", "Gb7#11"] 
-  },
-  { 
-    name: "Infant Eyes", 
-    composer: "Wayne Shorter",
-    year: "1964",
-    style: "Jazz Modern",
-    tempo: "Slow",
-    key: "Eb",
-    chords: ["Gm7", "Fm7", "EbMaj7", "A13b9", "GbMaj7", "F", "Ebm7", "Bb", "Bb", "EbMaj7", "Eb", "EbMaj7#11", "EMaj7", "BMaj7", "Bb", "Abm7", "Eb", "D", "Gm7", "Fm7", "EbMaj7", "A13b9", "GbMaj7", "F", "Ebm7", "Bb"] 
-  },
-  { 
-    name: "500 Miles High", 
-    composer: "Chick Corea",
-    year: "1973",
-    style: "Jazz Latin",
-    tempo: "Fast",
-    key: "Em",
-    chords: ["Em7", "Gm7", "BbMaj7", "Bm7b5", "E7#9", "Am7", "F#m7b5", "Fm7", "Cm7", "B7#9"] 
-  },
-  { 
-    name: "Lakes (solo section)", 
-    composer: "Pat Metheny",
-    year: "1999",
-    style: "Jazz Modern",
-    tempo: "Fast",
-    key: "D",
-    chords: ["DMaj7", "C", "FMaj7", "Ab", "DbMaj7", "B", "EMaj7", "D", "GMaj7", "F", "BbMaj7", "Db", "GbMaj7", "G", "CMaj7", "A"] 
-  },
-  { 
-    name: "Donna Lee", 
-    composer: "Charlie Parker",
-    year: "1947",
-    style: "Bebop",
-    tempo: "Fast",
-    key: "Ab",
-    chords: ["AbMaj7", "F7b9", "Bb7", "Bbm7", "Eb7", "AbMaj7", "Ebm7", "Ab7", "DbMaj7", "Gb7", "AbMaj7", "F7b9", "Bb7", "Bbm7", "Eb7", "AbMaj7", "F7b9", "Bb7", "Gm7b5", "C7b9", "Fm6", "C7b9", "Fm6", "C7b9", "Fm6", "Bdim", "Cm7", "F7b9", "Bbm7", "Eb7", "AbMaj7", "Bbm7", "Eb7"] 
-  },
-  { 
-    name: "Corcovado", 
-    composer: "Antônio Carlos Jobim",
-    year: "1960",
-    style: "Jazz Bossa",
-    tempo: "Fast",
-    key: "C",
-    chords: ["Am6", "Abdim", "Gm7", "C7", "Fdim", "FMaj7", "Fm7", "Bb7", "Em7", "A", "D7", "Dm7", "Abdim", "Am6", "Abdim", "Gm7", "C", "Fdim", "FMaj7", "Fm7", "Fm6", "Em7", "Am7", "Dm7", "G", "Em7", "A", "Dm7", "G7"] 
-  },
-  { 
-    name: "Virgo", 
-    composer: "Wayne Shorter",
-    year: "1969",
-    style: "Jazz Modern",
-    tempo: "Slow",
-    key: "F",
-    chords: ["FMaj7", "Bbm7", "Eb7", "Dm7b5", "Bb13", "AMaj7", "Am7", "Fm7", "Bb7", "Em7b5", "Eb13", "DMaj7", "Dm7", "Cm7", "F7", "Eb7", "D", "Am7", "Gm7", "A7", "DbMaj7", "Dm7", "G7", "Gm7", "C#m7", "F#7", "FMaj7", "Bbm7", "Eb7", "Dm7b5", "Bb13", "AMaj7", "Am7", "Fm7", "Bb7", "Em7b5", "Dm7", "Db", "Cm7", "F7", "BbMaj7", "E", "A", "Dm7", "Gm7", "C7"] 
-  },
-  { 
-    name: "Sunny", 
-    composer: "Bobby Hebb",
-    year: "1966",
-    style: "Pop RnB",
-    tempo: "Medium",
-    key: "Am",
-    chords: ["Am9", "Gm7", "C7", "FMaj7", "Bm7b5", "E", "Am9", "Gm7", "C7", "FMaj7", "Bm7b5", "E", "Am9", "Gm7", "C7", "FMaj7", "Bb7#11", "Bm7b5", "E", "Am9", "Bm7b5", "E"] 
-  },
-  { 
-    name: "Blues for Alice", 
-    composer: "Charlie Parker",
-    year: "1951",
-    style: "Jazz Bebop",
-    tempo: "Fast",
-    key: "F",
-    chords: ["FMaj7", "Em7b5", "A7b9", "Dm7", "G7", "Cm7", "F7", "Bb7", "Bbm7", "Eb7", "Am7", "D7", "Abm7", "Db7", "Gm7", "C7", "FMaj7", "D7b9", "Gm7", "C7"] 
-  },
-  { 
-    name: "Ambleside", 
-    composer: "John Taylor",
-    year: "1979",
-    style: "Jazz Modern",
-    tempo: "Fast",
-    key: "Ab",
-    chords: ["AbMaj9", "EbMaj9", "F#m11", "B", "EMaj9", "Ab", "Db", "G", "CMaj9", "GMaj9", "Bbm7", "Eb", "AbMaj9", "C", "FMaj9", "B", "EMaj9", "BMaj9", "Dm7", "G13", "CMaj9", "E", "A", "Eb", "AbMaj7#5", "G", "CMaj7#5", "B", "EMaj7#5", "Eb"] 
-  },
-  { 
-    name: "Time Remembered", 
-    composer: "Bill Evans",
-    year: "1962",
-    style: "Jazz Modal",
-    tempo: "Slow",
-    key: "Bm",
-    chords: ["Bm9", "CMaj7#11", "FMaj7#11", "Em9", "Am9", "Dm9", "Gm9", "EbMaj7#11", "AbMaj7#11", "Am9", "Dm9", "Gm9", "Cm9", "Fm11", "Em9", "Bm9", "Ebm9", "Am9", "Cm9", "F#m9", "Bm9", "Gm9", "EbMaj7#11", "Dm9", "Cm9"] 
-  },
-  { 
-    name: "Coral", 
-    composer: "Keith Jarrett",
-    year: "1983",
-    style: "Jazz Modern",
-    tempo: "Slow",
-    key: "Cm",
-    chords: ["Cm7", "F7", "BbMaj7#5", "Am7b5", "D7b9", "Gm7", "C7", "G#m7", "BMaj7", "Gb", "BbMaj7", "Dm7b5", "G7b9", "BMaj7", "GbMaj7", "GbMaj7#11", "Fm11"] 
-  },
-  { 
-    name: "Spain", 
-    composer: "Chick Corea",
-    year: "1971",
-    style: "Jazz Latin",
-    tempo: "Fast",
-    key: "Bm",
-    chords: ["GMaj7#11", "F#", "Em7", "A7", "DMaj7", "GMaj7#11", "C#", "F#", "Bm7", "B"] 
-  },
-  { 
-    name: "Inner Urge", 
-    composer: "Joe Henderson",
-    year: "1964",
-    style: "Jazz Modal",
-    tempo: "Fast",
-    key: "G",
-    chords: ["F#m7b5", "FMaj7#11", "EbMaj7#11", "DbMaj7#11", "EMaj7#11", "DbMaj7#11", "DMaj7#11", "BMaj7#11", "CMaj7", "AMaj7", "Bb7", "GMaj7"] 
-  },
-  { 
-    name: "Have You Met Miss Jones?", 
-    composer: "Richard Rodgers",
-    year: "1937",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "F",
-    chords: ["FMaj7", "D7b9", "Gm7", "C7", "Am7", "Dm7", "Gm7", "C7", "FMaj7", "D7b9", "Gm7", "C7", "Am7", "Dm7", "Cm7", "F7", "BbMaj7", "Abm7", "Db7", "GbMaj7", "Em7", "A7", "DMaj7", "Abm7", "Db7", "GbMaj7", "Gm7", "C7", "FMaj7", "Bb7", "Am7", "D7b9", "Gm7", "C7", "Am7", "D7b9", "Gm7", "C7", "FMaj7", "Gm7", "C7"] 
-  },
-  { 
-    name: "Solar", 
-    composer: "Miles Davis",
-    year: "1954",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["CmMaj7", "Gm7", "C7", "FMaj7", "Fm7", "Bb7", "EbMaj7", "Ebm7", "Ab7", "DbMaj7", "Dm7b5", "G7b9"] 
-  },
-  { 
-    name: "Oleo", 
-    composer: "Sonny Rollins",
-    year: "1954",
-    style: "Bebop",
-    tempo: "Fast",
-    key: "Bb",
-    chords: ["BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "Fm7", "Bb7", "Eb7", "Ab7", "Dm7", "G7b9", "Cm7", "F7", "BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "Fm7", "Bb7", "Eb7", "Ab7", "Cm7", "F7", "BbMaj7", "D7", "G7", "C7", "F7", "BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "Fm7", "Bb7", "Eb7", "Ab7", "Cm7", "F7", "BbMaj7"] 
-  },
-  { 
-    name: "Ex.14 - Major II-V-I Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["Dm7", "G7", "CMaj7"] 
-  },
-  { 
-    name: "Ex.15 - Minor II-V-I Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["Dm7b5", "G", "Cm7"] 
-  },
-  { 
-    name: "Ex.25 - Major Key Diatonic 7th Chords", 
-    composer: "Diatonic Major Scale Chords",
-    year: "",
-    style: "Diatonic Major Scale Chords",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7", "Dm7", "Em7", "FMaj7", "G7", "Am7", "Bm7b5"] 
-  },
-  { 
-    name: "Ex.29 - Tadd Dameron Progression", 
-    composer: "Standard Chord Progressions",
-    year: "",
-    style: "Standard Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7", "EbMaj7", "AbMaj7", "DbMaj7", "CMaj7"] 
-  },
-  { 
-    name: "Ex.30 - Modal Progression 1", 
-    composer: "Modal Progressions",
-    year: "",
-    style: "Modal Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C", "B", "AMaj7#11", "Am11", "Abm11", "GMaj7#11", "F#", "F#", "Em9", "DMaj7#11", "Abm11", "GMaj7#11"] 
-  },
-  { 
-    name: "Ex.31 - Modal Progression 2", 
-    composer: "Modal Progressions",
-    year: "",
-    style: "Modal Progressions",
-    tempo: "Slow",
-    key: "Ebm",
-    chords: ["Eb", "DMaj7#11", "B", "G#Maj7#5", "Gm13", "Db", "Cm9", "B13#11"] 
-  },
-  { 
-    name: "Ex.32 - Jimi Progression", 
-    composer: "Pop/Rock Progressions",
-    year: "",
-    style: "Pop/Rock Progressions",
-    tempo: "Medium",
-    key: "Em",
-    chords: ["Em9", "GMaj7", "Am7", "Em9", "Bm7", "Bbm7", "Am7", "CMaj7", "GMaj7", "FMaj7", "CMaj7", "D"] 
-  },
-  { 
-    name: "Ex.33 - Jimi With Secondary Dominants", 
-    composer: "Pop/Rock Progressions",
-    year: "",
-    style: "Pop/Rock Progressions",
-    tempo: "Medium",
-    key: "Em",
-    chords: ["Em9", "D7b9", "GMaj7", "E7b9", "Am7", "B7#5", "Em9", "Bm7", "Bbm7", "Am7", "CMaj7", "GMaj7", "F13", "CMaj7", "D"] 
-  },
-  { 
-    name: "Ex.35 - Bop Passing Note Progression 2", 
-    composer: "Passing Note Scale Exercises",
-    year: "",
-    style: "Passing Note Scale Exercises",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["C", "F7b9", "Bb", "Eb7b9", "Ab", "Db7b9", "Gb", "B7b9", "E", "A7b9", "D", "G7b9"] 
-  },
-  { 
-    name: "Ex.36 - Bop Passing Note Progression 3", 
-    composer: "Passing Note Scale Exercises",
-    year: "",
-    style: "Passing Note Scale Exercises",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["C", "F7b9", "Bb", "Eb7b9", "Ab", "Db7b9", "Gb", "B7b9", "E", "A7b9", "D", "G7b9"] 
-  },
-  { 
-    name: "Take the A-Train", 
-    composer: "Billy Strayhorn",
-    year: "1941",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C", "D9#11", "Dm7", "G7", "C", "Dm7", "G7", "C", "D9#11", "Dm7", "G7", "C", "Gm7", "C7", "FMaj7", "D9", "Dm9", "G7", "G7b9", "C", "D9#11", "Dm7", "G7", "C", "Dm7", "G7"] 
-  },
-  { 
-    name: "All of Me", 
-    composer: "Gerald Marks & Seymour Simons",
-    year: "1931",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C", "E7", "A7", "Dm7", "E7", "Am7", "D7", "Dm7", "G7", "C", "E7", "A7", "Dm7", "FMaj7", "Fm6", "Em7", "Am9", "Dm7", "G7", "C", "Dm7", "G7"] 
-  },
-  { 
-    name: "All of You", 
-    composer: "Cole Porter",
-    year: "1954",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "Eb",
-    chords: ["Abm6", "EbMaj7", "Abm6", "EbMaj7", "Abm6", "Gm7", "C7", "Fm7", "Bb7", "EbMaj7", "D7b9", "Db7", "C7b9", "Fm7", "Bb7", "Abm6", "EbMaj7", "Abm6", "EbMaj7", "Gm7", "C7", "AbMaj7", "Am7b5", "D7b9", "Gm7", "C7", "Fm7", "C7b9", "Fm7", "Bb7", "EbMaj7"] 
-  },
-  { 
-    name: "Ex.01 - Maj7 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7"] 
-  },
-  { 
-    name: "Ex.02 - Min7 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["Cm7"] 
-  },
-  { 
-    name: "Ex.05 - 7sus4 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C"] 
-  },
-  { 
-    name: "Ex.06 - Dom7 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C7"] 
-  },
-  { 
-    name: "Ex.08 - MinMaj7 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["CmMaj7"] 
-  },
-  { 
-    name: "Ex.16 - Major II-V-I (altered V) Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["Dm7", "G", "CMaj7"] 
-  },
-  { 
-    name: "Ex.17 - Major II-V-I w/Tritone Subs", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["Dm7", "Db9", "CMaj7"] 
-  },
-  { 
-    name: "Ex.18 - Minor II-V-I w/Tritone Subs", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["Dm7b5", "Db9", "Cm7"] 
-  },
-  { 
-    name: "Ex.19 - Major Key I-IV-V-I Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7", "FMaj7", "G7", "CMaj7"] 
-  },
-  { 
-    name: "Ex.20 - Major Key I-VI-IV-V Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7", "Am7", "FMaj7", "CMaj7"] 
-  },
-  { 
-    name: "Ex.21 - Major Key I-VI-II-V Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7", "Am7", "Dm7", "G7"] 
-  },
-  { 
-    name: "Ex.22 - Minor I-VI-II-V Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["Cm7", "Am7b5", "Dm7b5", "G7b9"] 
-  },
-  { 
-    name: "Ex.23 - I Dim - I Maj7 Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["Cdim", "CMaj7"] 
-  },
-  { 
-    name: "Ex.24 - VII Dim - IMaj7 Progression", 
-    composer: "Basic Chord Progressions",
-    year: "",
-    style: "Basic Chord Progressions",
-    tempo: "Medium",
-    key: "C",
-    chords: ["Bdim", "CMaj7"] 
-  },
-  { 
-    name: "Ex.26 - Basic Blues Progression (Quick IV)", 
-    composer: "Standard Chord Progressions",
-    year: "",
-    style: "Standard Chord Progressions",
-    tempo: "Slow",
-    key: "E",
-    chords: ["E7", "A7", "E7", "A7", "E7", "B7", "A7", "E7", "B7"] 
-  },
-  { 
-    name: "Ex.28 - Rhythm Changes", 
-    composer: "Standard Chord Progressions",
-    year: "",
-    style: "Standard Chord Progressions",
-    tempo: "Medium",
-    key: "Bb",
-    chords: ["BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "BbMaj7", "Bb7", "EbMaj7", "Edim", "BbMaj7", "G7b9", "Cm7", "F7", "BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "BbMaj7", "Bb7", "EbMaj7", "Edim", "Cm7", "F7", "BbMaj7", "D7", "G7", "C7", "F7", "BbMaj7", "G7b9", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7", "BbMaj7", "Bb7", "EbMaj7", "Edim", "Cm7", "F7", "BbMaj7"] 
-  },
-  { 
-    name: "Blue Bossa", 
-    composer: "Kenny Dorham",
-    year: "1961",
-    style: "Jazz Latin",
-    tempo: "Fast",
-    key: "Cm",
-    chords: ["Cm7", "Fm7", "Dm7b5", "G", "Cm7", "Ebm7", "Ab7", "DbMaj7", "Dm7b5", "G", "Cm7", "Dm7b5", "G"] 
-  },
-  { 
-    name: "Ex.27 - Jazz Blues", 
-    composer: "Standard Chord Progressions",
-    year: "",
-    style: "Standard Chord Progressions",
-    tempo: "Medium",
-    key: "Bb",
-    chords: ["Bb7", "Eb7", "Bb7", "Fm7", "Bb", "Eb7", "Edim", "Bb7", "Eb7", "Dm7b5", "G", "Cm7", "F7", "Bb7", "G", "Cm7", "F7"] 
-  },
-  { 
-    name: "Ex.34 - Bop Passing Note Progression 1", 
-    composer: "Passing Note Scale Exercises",
-    year: "",
-    style: "Passing Note Scale Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C", "F7", "Bb", "Eb7", "Ab", "Db7", "Gb", "B7", "E", "A7", "D", "G7"] 
-  },
-  { 
-    name: "Ex.12 - Min7♭5♮9 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "Cm",
-    chords: ["C"] 
-  },
-  { 
-    name: "Ex.09 - 13sus4♭9 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C"] 
-  },
-  { 
-    name: "Ex.07 - Min7♭5 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["Cm7b5"] 
-  },
-  { 
-    name: "Ex.03 - Sus4♭9 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C"] 
-  },
-  { 
-    name: "Ex.11 - 7♯11 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C7#11"] 
-  },
-  { 
-    name: "Ex.10 - Maj7♯5 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7#5"] 
-  },
-  { 
-    name: "Ex.04 - Maj7♯11 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7#11"] 
-  },
-  { 
-    name: "Ex.13 - 13♭9 Chord", 
-    composer: "Single Chord Exercises",
-    year: "",
-    style: "Single Chord Exercises",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C13b9"] 
-  },
-  { 
-    name: "Summertime", 
-    composer: "George Gershwin",
-    year: "1934",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "Am",
-    chords: ["Am7", "E7#5", "Am7", "A7b9", "Dm7", "F7", "B7#5", "E7b9", "Am7", "E7#5", "Am7", "D7b9", "G7b9", "CMaj7", "Am7", "Bm7b5", "E7#5", "Am7", "Bm7b5", "E7#5"] 
-  },
-  { 
-    name: "Watermelon Man", 
-    composer: "Herbie Hancock",
-    year: "1962",
-    style: "Jazz Funk",
-    tempo: "Fast",
-    key: "F",
-    chords: ["F7", "Bb9", "F7", "C9", "Bb9", "C9", "Bb9", "C9", "Bb9", "Ab"] 
-  },
-  { 
-    name: "My Favourite Things", 
-    composer: "Richard Rodgers",
-    year: "1959",
-    style: "Jazz Waltz",
-    tempo: "Medium",
-    key: "Em",
-    chords: ["Em7", "F#m7", "Em7", "F#m7", "CMaj7", "Am7", "D7", "GMaj7", "CMaj7", "GMaj7", "CMaj7", "F#m7b5", "B7b9", "Em7", "F#m7", "Em7", "F#m7", "CMaj7", "Am7", "D7", "GMaj7", "CMaj7", "GMaj7", "CMaj7", "F#m7b5", "B7b9", "EMaj7", "F#m7", "EMaj7", "F#m7", "AMaj7", "Am7", "D7", "GMaj7", "CMaj7", "GMaj7", "CMaj7", "F#m7b5", "B7b9", "Em7", "F#m7b5", "B7b9", "Em7", "CMaj7", "A7", "GMaj7", "CMaj7", "D7", "GMaj7", "CMaj7", "GMaj7", "CMaj7", "GMaj7", "CMaj7", "F#m7b5", "B7b9"] 
-  },
-  { 
-    name: "Ex.37 - Jazz Minor Blues", 
-    composer: "Standard Chord Progressions",
-    year: "",
-    style: "Standard Chord Progressions",
-    tempo: "Medium",
-    key: "Am",
-    chords: ["Am7", "Am9", "Am7", "A", "Dm7", "Dm9", "Am7", "Am9", "F9", "E", "Am7", "E"] 
-  },
-  { 
-    name: "Fly Me Too The Moon", 
-    composer: "Bart Howard",
-    year: "1954",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "Am",
-    chords: ["Am7", "Dm7", "G7", "CMaj7", "FMaj7", "Bm7b5", "E7b9", "Am7", "A7b9", "Dm7", "G7", "CMaj7", "F7", "Em7", "A7b9", "Dm7", "G7", "CMaj7", "Bm7b5", "E7b9", "Am7", "Dm7", "G7", "CMaj7", "FMaj7", "Bm7b5", "E7b9", "Am7", "A7b9", "Dm7", "G7", "Em7", "A7b9", "Dm7", "G7", "CMaj7", "Bm7b5", "E7b9"] 
-  },
-  { 
-    name: "A Child is Born", 
-    composer: "Thad Jones",
-    year: "1969",
-    style: "Jazz Waltz",
-    tempo: "Medium",
-    key: "Bb",
-    chords: ["BbMaj7", "Ebm6", "BbMaj7", "Ebm6", "BbMaj7", "Ebm6", "Am7b5", "D7#9", "Gm7", "D7#5", "Gm7", "D7#5", "Gm7", "C7", "F", "F7", "BbMaj7", "Ebm6", "BbMaj7", "Ebm6", "BbMaj7", "D", "EbMaj7", "Ab7", "BbMaj7", "GbMaj7", "Gm7", "C7", "F", "F7"] 
-  },
-  { 
-    name: "Out of Nowhere", 
-    composer: "Johnny Green",
-    year: "1931",
-    style: "Jazz Swing",
-    tempo: "Slow",
-    key: "G",
-    chords: ["GMaj7", "Bbm7", "Eb7", "GMaj7", "Bm7", "E7b9", "Am7", "E7b9", "Am7", "Eb7", "Am7", "D7", "GMaj7", "Bbm7", "Eb7", "GMaj7", "Bm7", "E7b9", "Am7", "E7b9", "Am7", "Cm6", "Bm7", "Bbdim", "Am7", "D7", "G", "Am7", "D7"] 
-  },
-  { 
-    name: "Bluesette", 
-    composer: "Toots Thielemans",
-    year: "1964",
-    style: "Jazz Waltz",
-    tempo: "Medium",
-    key: "Bb",
-    chords: ["BbMaj7", "Am7b5", "D7b9", "Gm7", "C7b9", "Fm7", "Bb7", "EbMaj7", "Ebm7", "Ab7", "DbMaj7", "C#m7", "F#7", "BMaj7", "Cm7", "F7", "Dm7", "G7b9", "Cm7", "F7"] 
-  },
-  { 
-    name: "In Your Own Sweet Way", 
-    composer: "Dave Brubeck",
-    year: "1956",
-    style: "Medium Swing",
-    tempo: "Fast",
-    key: "Eb",
-    chords: ["Am7b5", "D7b9", "Gm7", "C7", "Cm7", "F7", "Bb7", "EbMaj7", "Abm7", "Db7", "GbMaj7", "BMaj7", "F", "B7", "Bb7", "Eb", "Am7b5", "D7b9", "Gm7", "C7", "Cm7", "F7", "Bb7", "EbMaj7", "Abm7", "Db7", "GbMaj7", "BMaj7", "F", "B7", "Bb7", "Eb", "Em7", "A7", "DMaj7", "Em7", "A7", "DMaj7", "Dm7", "G7", "Em7", "A7", "Dm7b5", "Ab7", "G7", "Cm7", "Am7b5", "D7b9", "Gm7", "C7", "Cm7", "F7", "Bb7", "EbMaj7", "Abm7", "Db7", "GbMaj7", "BMaj7", "F", "B7", "Bb7", "Eb", "Ab"] 
-  },
-  { 
-    name: "One Note Samba", 
-    composer: "Antônio Carlos Jobim",
-    year: "1960",
-    style: "Bossa Nova",
-    tempo: "Fast",
-    key: "Bb",
-    chords: ["Dm7", "Db7", "Cm7", "B7#11", "Dm7", "Db7", "Cm7", "B7#11", "Fm7", "Bb7", "EbMaj7", "Ab7", "Dm7", "Db7", "Cm7", "B7#11", "Bb", "Ebm7", "Ab7", "DbMaj7", "C#m7", "F#7", "BMaj7", "Cm7b5", "F7b9", "Dm7", "Db7", "Cm7", "B7#11", "Dm7", "Db7", "Cm7", "B7#11", "Fm7", "Bb7", "EbMaj7", "Ab7", "Db", "C7", "BMaj7", "Bb"] 
-  },
-  { 
-    name: "Black Narcissus", 
-    composer: "Joe Henderson",
-    year: "1969",
-    style: "Jazz Waltz",
-    tempo: "Medium",
-    key: "G#m",
-    chords: ["Abm7", "Bbm7", "Abm7", "Bbm7", "Abm7", "Bbm7", "Abm7", "CbMaj7#11", "F#m7", "G#m7", "F#m7", "G#m7", "F#m7", "G#m7", "F#m7", "AMaj7#11", "EbMaj7#11", "FMaj7#11", "BbMaj7#11", "CMaj7#11", "EbMaj7#11", "FMaj7#11", "BbMaj7#11", "GMaj7#11", "AbMaj7#11", "BbMaj7#11", "CMaj7#11"] 
-  },
-  { 
-    name: "Bye Bye Blackbird", 
-    composer: "Ray Henderson",
-    year: "1926",
-    style: "Jazz Swing",
-    tempo: "Slow",
-    key: "F",
-    chords: ["FMaj7", "Gm7", "C7", "FMaj7", "Gm7", "C7", "FMaj7", "Am7b5", "D7b9", "Gm7", "C7", "Gm7", "D7b9", "Gm7", "C7", "Gm7", "C7", "F", "F7", "Am7b5", "D7b9", "Gm7", "Bbm7", "Eb7", "Gm7", "C7", "FMaj7", "Gm7", "C7", "FMaj7", "Am7b5", "D7b9", "Gm7", "C7", "FMaj7", "Gm7", "C7"] 
-  },
-  { 
-    name: "Armando's Rhumba", 
-    composer: "Chick Corea",
-    year: "1980",
-    style: "Latin",
-    tempo: "Fast",
-    key: "Cm",
-    chords: ["Cm7", "D7b9", "G7#5", "Cm7", "Cm9", "D7b9", "G7#5", "Cm7", "C7b9", "Fm7", "D7b9", "Gm7", "Abdim", "D7b9", "Bb", "Bb", "Eb", "G7#5"] 
-  },
-  { 
-    name: "April in Paris", 
-    composer: "Vernon Duke",
-    year: "1932",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "C",
-    chords: ["G", "CMaj7", "Dm7b5", "G7b9", "CMaj7", "CMaj9", "Gm7", "C7", "FMaj7", "FMaj9", "Bm7b5", "E7b9", "Am7", "F#m7b5", "B7b9", "Bm7", "E7b9", "Em7b5", "A7b9", "F#m7b5", "Fdim", "Em7", "Ebdim", "Dm7b5", "G7b9", "C", "Bm7b5", "E7b9", "Am7", "F#m7b5", "B7b9", "EMaj7", "Dm7", "G7", "G", "CMaj7", "Em7b5", "A7b9", "D7", "Dm7b5", "G7b9", "C"] 
-  },
-  { 
-    name: "Joy Spring", 
-    composer: "Clifford Brown",
-    year: "1954",
-    style: "Up Tempo Swing",
-    tempo: "Fast",
-    key: "F",
-    chords: ["FMaj7", "Gm7", "C7", "FMaj7", "Bbm7", "Eb7", "Am7", "Ab7", "Gm7", "C7", "FMaj7", "Abm7", "Db7", "GbMaj7", "Abm7", "Db7", "GbMaj7", "Bm7", "E7", "Bbm7", "A7", "Abm7", "Db7", "GbMaj7", "Am7", "D7", "GMaj7", "Gm7", "C7", "FMaj7", "Fm7", "Bb7", "EbMaj7", "Abm7", "Db7", "GbMaj7", "Gm7", "C7", "FMaj7", "Gm7", "C7", "FMaj7", "Bbm7", "Eb7", "Am7", "Ab7", "Gm7", "C7", "FMaj7", "Gm7", "C7"] 
-  },
-  { 
-    name: "Alice in Wonderland", 
-    composer: "Sammy Fain",
-    year: "1951",
-    style: "Jazz Waltz",
-    tempo: "Medium",
-    key: "C",
-    chords: ["Dm7", "G7", "CMaj7", "FMaj7", "Bm7b5", "E7b9", "Am7", "Eb7#11", "Dm7", "G7", "Em7", "Am7", "Dm7", "G7", "Em7", "A7b9", "Dm7", "G7", "CMaj7", "FMaj7", "Bm7b5", "E7b9", "Am7", "Eb7#11", "Dm7", "G7", "Em7", "Am7", "Dm7", "G7", "CMaj7", "CMaj9", "D7", "G7", "Em7", "Am7", "Dm7", "G7", "CMaj7", "FMaj7", "F#m7b5", "B7b9", "Em7", "A7b9", "Dm7", "A7b9", "Dm7", "G7"] 
-  },
-  { 
-    name: "I Hear A Rhapsody", 
-    composer: "George Fragos",
-    year: "1941",
-    style: "Medium Swing",
-    tempo: "Medium",
-    key: "Eb",
-    chords: ["Cm7", "Fm7", "Bb7", "EbMaj7", "Ab7", "Gm7b5", "C7b9", "Fm7", "Abm7", "Bbm7", "Bb7", "EbMaj7", "Dm7b5", "G7#5", "Cm7", "Fm7", "Bb7", "EbMaj7", "Ab7", "Gm7b5", "C7b9", "Fm7", "Abm7", "Bbm7", "Bb7", "EbMaj7", "Am7b5", "D7b9", "Gm7", "Am7b5", "D7b9", "Gm7", "Cm7", "F7", "BbMaj7", "Fm7", "Dm7b5", "G7b9", "G7#5", "Cm7", "Fm7", "Bb7", "EbMaj7", "Ab7", "Gm7b5", "C7b9", "Fm7", "Abm7", "Bbm7", "Bb7", "EbMaj7", "Dm7b5", "G7#5"] 
-  },
-  { 
-    name: "Ladies In Mercedes", 
-    composer: "Pat Metheny",
-    year: "1997",
-    style: "Bossa",
-    tempo: "Medium",
-    key: "G",
-    chords: ["GMaj7", "GMaj7", "C7#11", "C7#11", "Bm7", "Bm7", "E7", "E7", "C#", "C#", "F#mMaj7", "F#mMaj7", "D#m7b5", "D#m7b5", "G#7", "G#7", "DbMaj7", "DbMaj7", "Gb7#11", "Gb7#11", "Fm7", "Fm7", "Bb7", "Bb7", "G", "G", "CmMaj7", "CmMaj7", "Am7b5", "Am7b5", "D7", "D7"] 
-  },
-  { 
-    name: "Laurie", 
-    composer: "Bill Evans",
-    year: "1962",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "Bb",
-    chords: ["BbMaj7", "E", "E7#5#9", "Am7", "Am7", "D7#5", "Gm7b5", "C7#5#9", "Cm7", "Cm7", "F7#5", "Fm7", "Bb7#5#9", "Ebm7", "Ab7#9", "Dm7b5", "Db", "Db7", "C", "C7", "B9", "BbMaj7", "E", "E7#5#9", "Am7", "Am7", "D7#5", "Gm7b5", "C7#5", "Cm7", "Cm7", "F7#5", "Fm7", "Bb7#5#9", "Ebm7", "Ab7#9", "Gm7", "Am7", "Bm7", "C#m7", "Cm7b5", "F7#5#9", "Bb", "Ab", "Gb", "F", "F7"] 
-  },
-  { 
-    name: "Pannonica", 
-    composer: "Thelonious Monk",
-    year: "1956",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "C",
-    chords: ["CMaj7", "Ebm7", "A", "Ab7", "Dm7", "Bb7", "EbMaj7", "A7#11", "Ab7", "Db7", "GbMaj7", "F7#5", "Ebm7", "Ab7", "G7", "DbMaj7", "CMaj7", "Ebm7", "Ab", "Ab7", "Dm7", "Bb7", "EbMaj7", "A7#11", "Ab7", "Db7", "GbMaj7", "F", "Ebm7", "Ab7", "G7", "DbMaj7", "Gm7", "C7", "Cm7", "F7", "F#7", "BMaj7", "Dm7", "G7", "CMaj7", "Bm7", "E7", "A7", "D7", "G7"] 
-  },
-  { 
-    name: "I Fall In Love Too Easily", 
-    composer: "Jule Styne",
-    year: "1944",
-    style: "Ballad",
-    tempo: "Slow",
-    key: "Eb",
-    chords: ["Fm7", "Bb7", "EbMaj7", "AbMaj7", "Dm7b5", "G7#9", "Cm7", "A7b5", "Dm7b5", "G7#9", "Cm7", "Am7b5", "D7b9", "Dm7b5", "G7b9", "Am7b5", "D", "G7b9", "Gm7b5", "C7b9", "Fm7", "C7b9", "Fm7", "Abm7", "Db7", "G", "C7b9", "Fm7", "Bb7", "Eb", "C7b9"] 
-  },
-  { 
-    name: "Here's That Rainy Day", 
-    composer: "Jimmy Van Heusen",
-    year: "1953",
-    style: "Ballad",
-    tempo: "Slow",
-    key: "G",
-    chords: ["GMaj7", "Bb7", "EbMaj7", "AbMaj7", "Am7", "D7", "GMaj7", "Dm7", "G7", "Cm7", "F7", "BbMaj7", "EbMaj7", "Am7", "D7", "GMaj7", "Em7", "Am7", "D7", "GMaj7", "Bb7", "EbMaj7", "AbMaj7", "Am7", "D7", "GMaj7", "Dm7", "G7", "CMaj7", "Am7", "D13", "Bm7", "Em7", "A13", "Am7", "D7", "G", "Em7", "Am7", "D7"] 
-  },
-  { 
-    name: "Peace", 
-    composer: "Horace Silver",
-    year: "1959",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "Bb",
-    chords: ["Am7b5", "D7b9", "Gm7", "C7", "BbMaj7", "Cm7b5", "F7", "BbMaj7", "Bm7", "E7", "AMaj7", "F#m7", "Ebm7b5", "Ab7", "DbMaj7", "C", "B7#11", "BbMaj7"] 
-  },
-  { 
-    name: "The Girl From Ipanema", 
-    composer: "Antônio Carlos Jobim",
-    year: "1962",
-    style: "Bossa",
-    tempo: "Fast",
-    key: "F",
-    chords: ["FMaj7", "F", "G7#11", "G9#11", "Gm7", "Gb7#11", "FMaj7", "Gb7", "FMaj7", "F", "G7#11", "G9#11", "Gm7", "Gb7#11", "FMaj7", "FMaj9", "F#Maj7", "F#Maj7", "B7", "B7", "F#m7", "D7", "Gm7", "Gm7", "Eb7", "Eb7", "Am7", "D", "Gm7", "C", "FMaj7", "FMaj9", "G7#11", "G9#11", "Gm7", "G7#11", "FMaj7", "Gb7"] 
-  },
-  { 
-    name: "Evidence", 
-    composer: "Thelonious Monk",
-    year: "1948",
-    style: "Medium Swing",
-    tempo: "Medium",
-    key: "Eb",
-    chords: ["EbMaj7", "Gm7", "C7#11", "Fm7", "Bb7#11", "A7", "Am7", "Db7", "Fm7", "F", "EbMaj7", "Gm7", "C7#11", "Fm7", "Bb7#11", "A7", "Abm7", "Db7", "Fm7", "F", "Bbm7", "Eb7#11", "AbMaj7", "Db7", "Cm7", "G7#11", "F7", "Bb7#11", "EbMaj7", "Gm7", "C7#11", "Fm7", "Bb7#11", "A7", "Abm7", "Db7", "Fm7", "F"] 
-  },
-  { 
-    name: "Emily", 
-    composer: "Johnny Mandel",
-    year: "1964",
-    style: "Waltz",
-    tempo: "Fast",
-    key: "A",
-    chords: ["AMaj7", "F#m7", "Bm7", "E7", "AMaj7", "A7", "DMaj7", "G7", "F#Maj7", "D#m7", "G#m7", "C#7b9", "F#m7", "B7", "Bm7", "E7#5", "AMaj7", "F#m7", "Bm7", "E7", "AMaj7", "A7", "DMaj7", "C#7", "F#m7", "G#7#5", "C#m7", "F#7", "Bm7", "E7", "C#m7b5", "F#7b9", "D#m7b5", "Dm6", "C#m7", "F#7b9", "Bm7", "E7", "AMaj7", "E7"] 
-  },
-  { 
-    name: "There Will Never Be Another You", 
-    composer: "Harry Warren",
-    year: "1942",
-    style: "Medium Jazz",
-    tempo: "Medium",
-    key: "Eb",
-    chords: ["EbMaj7", "EbMaj7", "Dm7b5", "G7b9", "Cm7", "Cm7", "Bbm7", "Eb7", "AbMaj7", "Db7#11", "EbMaj7", "Cm7", "F7", "F7", "Fm7", "Bb7", "EbMaj7", "EbMaj7", "Dm7b5", "G7b9", "Cm7", "Cm7", "Bbm7", "Eb7", "AbMaj7", "Db7#11", "EbMaj7", "Am7b5", "D7", "EbMaj7", "Ab7", "Gm7", "C7", "Fm7", "Bb7", "Eb", "Bb7"] 
-  },
-  { 
-    name: "Up Jumped Spring", 
-    composer: "Freddie Hubbard",
-    year: "1960",
-    style: "Jazz Waltz",
-    tempo: "Medium",
-    key: "Bb",
-    chords: ["BbMaj7", "G7#5", "Cm7", "F7", "F#dim", "Gm7", "Fm7", "Em7b5", "A7b9", "Dm7", "Ebm7", "Dm7", "Ebm7", "Bm7b5", "E7", "Cm7b5", "F7", "F7", "BbMaj7", "G7#5", "Cm7", "F7", "F#dim", "Gm7", "Fm7", "Em7b5", "A7b9", "Dm7", "Ebm7", "Dm7", "Ebm7", "Cm7", "F7", "Bb", "Am7b5", "D7b9", "Gm7", "C7", "FMaj7", "Dm7", "Abm7", "Db7", "Cm7", "F7", "BbMaj7", "G7#5b9", "Cm7", "F7", "F#dim", "Gm7", "Fm7", "Em7b5", "A7b9", "Dm7", "Ebm7", "Dm7", "Ebm7", "Cm7", "F7", "BbMaj7", "BbMaj7"] 
-  },
-  { 
-    name: "Early Autumn", 
-    composer: "Ralph Burns & Woody Herman",
-    year: "1949",
-    style: "Ballad",
-    tempo: "Slow",
-    key: "C",
-    chords: ["CMaj7", "B7b9", "BbMaj7", "A7#9", "AbMaj7", "G7#9", "CMaj7", "A7#9", "Dm7", "G7", "CMaj7", "B7b9", "BbMaj7", "A7#9", "AbMaj7", "G7#9", "C", "C", "Dm7", "G7", "CMaj7", "Ebdim", "Dm7", "G7", "CMaj7", "Cm7", "F7", "BbMaj7", "Eb7", "DMaj7", "Db7", "C7", "B7", "Bb7", "AMaj7", "Ab7", "G7", "CMaj7", "Bb7b9", "BbMaj7", "A7#9", "AbMaj7", "G7#9", "C", "Am7", "Dm7", "G7"] 
-  },
-  { 
-    name: "The Duke", 
-    composer: "Dave Brubeck",
-    year: "1955",
-    style: "Medium Swing",
-    tempo: "Fast",
-    key: "C",
-    chords: ["CMaj7", "FMaj7", "Em7", "Am7", "B7", "Am7", "Am7", "Dm7", "Fm7", "Bb7", "EbMaj7", "DbMaj7", "Cm7", "Bm7", "Bbm7", "Eb7", "AbMaj7", "D7", "Db7", "CMaj7", "CMaj7", "FMaj7", "Em7", "Am7", "B7", "Em7", "Am7", "Dm7", "Fm7", "Bb7", "EbMaj7", "DbMaj7", "Cm7", "Bm7", "Bbm7", "Eb7", "AbMaj7", "D7", "Db7", "CMaj7", "FMaj7", "E7", "D7", "CMaj7", "Bbm7", "AbMaj7", "G7b9", "Fm7", "Dm7b5", "G7", "Cm7", "Cm7b5", "F7", "Bbm7", "AbMaj7", "Bbm7", "Ab", "Gm7b5", "Fm7", "Eb", "Db7#11", "CMaj7", "FMaj7", "Em7", "Am7", "B7", "Em7", "Am7", "Dm7", "Fm7", "Bb7", "EbMaj7", "DbMaj7", "Cm7", "Bm7", "Bbm7", "Eb7", "AbMaj7", "D7", "Db7", "CMaj7"] 
-  },
-  { 
-    name: "Cherokee", 
-    composer: "Ray Noble",
-    year: "1938",
-    style: "Jazz Swing",
-    tempo: "Fast",
-    key: "Bb",
-    chords: ["Bb", "Fm7", "Bb7", "EbMaj7", "Ab7", "Bb", "C7", "Cm7", "G7b9", "Cm7", "F7#5", "Bb", "Fm7", "Bb7", "EbMaj7", "Ab7", "Bb", "C7", "Cm7", "F7", "Bb", "C#m7", "F#7", "BMaj7", "Bm7", "E7", "AMaj7", "Am7", "D7", "GMaj7", "Gm7", "C7", "Cm7", "F7#5", "Bb", "Fm7", "Bb7", "EbMaj7", "Ab7", "Bb", "C7", "Cm7", "F7", "Bb"] 
-  },
-  { 
-    name: "Dewey Square", 
-    composer: "Charlie Parker",
-    year: "1947",
-    style: "Medium Up Swing",
-    tempo: "Fast",
-    key: "Eb",
-    chords: ["EbMaj7", "Abm7", "Db7", "Gm7", "C7", "F7", "Bb7", "Gm7", "C7", "Fm7", "Bb7", "EbMaj7", "Abm7", "Db7", "Gm7", "C7", "F7", "Bb7", "EbMaj7", "Bbm7", "Eb7", "AbMaj7", "Abm7", "Db7", "EbMaj7", "EbMaj9", "C7", "F7", "F7", "Fm7", "Bb7", "EbMaj7", "Abm7", "Db7", "Gm7", "C7", "F7", "Fm7", "Bb7", "EbMaj7", "C7", "Fm7", "Bb7"] 
-  },
-  { 
-    name: "Beatrice", 
-    composer: "Sam Rivers",
-    year: "1966",
-    style: "Medium Swing",
-    tempo: "Medium",
-    key: "F",
-    chords: ["FMaj7", "GbMaj7#11", "FMaj7", "EbMaj7#11", "Dm7", "Eb", "Dm7", "Cm7", "Bbm7", "Am7", "BbMaj7", "Em7b5", "A7b9", "Dm7", "Gm7", "Gb", "Fm7", "Gb"] 
-  },
-  { 
-    name: "A Fine Romance", 
-    composer: "Jerome Kern",
-    year: "1936",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "C",
-    chords: ["C", "C#dim", "Dm6", "D#dim", "Em7", "Am7", "Dm7", "G7", "C", "Ebdim", "Dm7", "G7", "Em7", "A7b9", "D7", "G7", "C", "C#dim", "Dm6", "D#dim", "Em7", "Am7", "Dm7", "G7", "C", "C7", "FMaj7", "F#m7b5", "B7b9", "Em7", "A7b9", "Dm7", "G7", "C", "Dm7", "G7"] 
-  },
-  { 
-    name: "Afternoon in Paris", 
-    composer: "Jazz Swing",
-    year: "",
-    style: "Jazz Swing",
-    tempo: "Medium",
-    key: "C",
-    chords: ["CMaj7", "Cm7", "F7", "BbMaj7", "Bbm7", "Eb7", "AbMaj7", "Dm7", "G7#9", "CMaj7", "Dm7", "G7", "CMaj7", "Cm7", "F7", "BbMaj7", "Bbm7", "Eb7", "AbMaj7", "Dm7", "G7#9", "CMaj7", "CMaj9", "Dm7", "G7", "CMaj7", "A7b9", "Dm7", "G7", "C#m7", "F#7", "Dm7", "G7", "CMaj7", "Cm7", "F7", "BbMaj7", "Bbm7", "Eb7", "AbMaj7", "Dm7", "G7#9", "CMaj7", "Dm7", "G7"] 
-  },
-  { 
-    name: "Chelsea Bridge", 
-    composer: "Jazz Ballad",
-    year: "",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "Bbm",
-    chords: ["BbmMaj7", "AbmMaj7", "BbmMaj7", "AbmMaj7", "Bb7", "Ebm7", "Ab7", "Db", "C7", "B7", "BbmMaj7", "AbmMaj7", "BbmMaj7", "AbmMaj7", "Bb7", "Ebm7", "Ab7", "Db", "C7", "B7", "F#m7", "B7", "EMaj7", "C#m7", "F#m7", "B", "Bm7", "E7", "AMaj7", "Am7", "D7", "GMaj7", "Gm7", "C7", "Db7", "C7", "B7", "BbmMaj7", "AbmMaj7", "BbmMaj7", "AbmMaj7", "Bb7", "Ebm7", "Ab7", "Db", "C7", "B7"] 
-  },
-  { 
-    name: "Ceora", 
-    composer: "Bossa Nova",
-    year: "",
-    style: "Bossa Nova",
-    tempo: "Fast",
-    key: "Ab",
-    chords: ["AbMaj7", "Bbm7", "Eb7", "AbMaj7", "Ebm7", "Ab7", "DbMaj7", "Dm7", "G7", "Cm7", "F7", "Bbm7", "Eb7", "Cm7", "F7", "Dm7", "G7", "Cm7", "F7", "Bbm7", "Eb7", "AbMaj7", "Bbm7", "Eb7", "AbMaj7", "Ebm7", "Ab7", "DbMaj7", "Dm7", "G7", "Cm7", "F", "Bbm7", "Eb7", "Cm7b5", "F", "Bbm7", "Eb7", "AbMaj7", "Bbm7", "Eb7"] 
-  },
-  { 
-    name: "I Should Care", 
-    composer: "Medium Swing",
-    year: "",
-    style: "Medium Swing",
-    tempo: "Medium",
-    key: "C",
-    chords: ["Dm7", "G7", "Em7", "A7", "Dm7", "G7", "CMaj7", "Em7b5", "A7", "Dm7", "Fm7", "Bb7", "CMaj7", "Bm7b5", "E7b9", "Gm7", "C7", "FMaj7", "Bm7b5", "E7b9", "Am7", "Am7", "D7", "Dm7", "G7", "F#m7b5", "B7b9", "Em7", "A7", "Dm7", "G7", "CMaj7", "Em7b5", "A7", "Dm7", "Fm7", "Bb7", "CMaj7", "Bm7b5", "E7b9", "Am7", "D7", "Dm7", "G7", "C", "F7", "Em7", "A7"] 
-  },
-  { 
-    name: "In A Sentimental Mood", 
-    composer: "Ballad",
-    year: "",
-    style: "Ballad",
-    tempo: "Slow",
-    key: "Dm",
-    chords: ["Dm7", "DmMaj7", "Dm7", "Dm6", "Gm7", "GmMaj7", "Gm7", "A7", "Dm7", "D7#5", "Gm7", "C7b9", "F", "Em7b5", "A7", "Dm7", "DmMaj7", "Dm6", "Gm7", "GmMaj7", "Gm7", "Gm7", "A7", "Dm7", "D7#5", "Gm7", "C7b9", "F", "Ebm7", "Ab7", "DbMaj7", "Bbm7", "Ebm7", "Ab7", "Db", "Bb7#5", "Ebm7", "Ab7", "DbMaj7", "Bbm7", "Ebm7", "Ab7", "Gm7", "C7", "Dm7", "DmMaj7", "Dm7", "Dm6", "Gm7", "GmMaj7", "Gm7", "Gm7", "A7", "Dm7", "D7#5", "Gm7", "C7b9", "F", "Em7b5", "A7"] 
-  },
-  { 
-    name: "I'll Remember April", 
-    composer: "Medium Swing",
-    year: "",
-    style: "Medium Swing",
-    tempo: "Medium",
-    key: "G",
-    chords: ["GMaj7", "G", "GMaj7", "G", "Gm7", "Gm6", "Gm7", "Gm6", "Am7b5", "D7b9", "Bm7b5", "E7b9", "Am7", "D7", "GMaj7", "GMaj7", "Cm7", "F7", "BbMaj7", "Gm7", "Cm7", "F7", "BbMaj7", "BbMaj7", "Am7", "D7", "GMaj7", "GMaj7", "F#m7", "B7", "EMaj7", "Am7", "D7"] 
-  },
-  { 
-    name: "But Beautiful", 
-    composer: "Jazz Ballad",
-    year: "",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "G",
-    chords: ["GMaj7", "Bm7b5", "E7b9", "Am7", "C#m7b5", "F#7b9", "GMaj7", "Bm7b5", "E7b9", "A7", "D7", "Bm7", "Em7", "Am7", "D7", "GMaj7", "Em7", "A7", "Am7", "D7", "GMaj7", "Bm7b5", "E7b9", "Am7", "C#m7b5", "F#7b9", "GMaj7", "Bm7b5", "E7b9", "A7", "D7", "Bm7", "Em7", "Am7", "F#m7b5", "B7#5", "Em7", "F7", "Bm7", "E7b9", "Am7", "D7", "G", "Em7", "Am7", "D7"] 
-  },
-  { 
-    name: "When I Fall In Love", 
-    composer: "Jazz Ballad",
-    year: "",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "Eb",
-    chords: ["EbMaj7", "C7", "Fm7", "Bb7", "EbMaj7", "C7", "Fm7", "Bb7", "EbMaj7", "Ab7", "G7b9", "C7b9", "F7", "Bb7", "EbMaj7", "C7", "Fm7", "Bb7", "EbMaj7", "Ab7", "Gm7b5", "C7", "Fm7", "D", "Gm7b5", "C7b9", "Fm7", "C7b9", "Fm7", "Bb7", "EbMaj7", "C7", "Fm7", "Bb7", "EbMaj7", "C7", "Fm7", "Bb7", "EbMaj7", "Ab7", "G7b9", "C7b9", "F7", "Bb7", "EbMaj7", "A7#11", "AbMaj7", "D7", "Gm7", "C7#9", "Fm7", "Bb7", "EbMaj7", "C7", "Fm7", "Bb7", "Eb", "Fm7", "Bb7"] 
-  },
-  { 
-    name: "When Sunny Gets Blue", 
-    composer: "Jazz Ballad",
-    year: "",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "F",
-    chords: ["Gm7", "C7", "Bbm7", "Eb7", "FMaj7", "Gm7", "Am7", "D7b9", "Bm7b5", "Bbm7", "Eb7", "FMaj7", "Abm7", "Db7", "Gm7", "C7", "Bb7", "Am7", "D7b9", "Gm7", "C7", "Bbm7", "Eb7", "FMaj7", "Gm7", "Am7", "D7b9", "Bm7b5", "Bbm7", "Eb7", "FMaj7", "Abm7", "D7", "Gm7", "C7", "Bb7", "Em7", "A7b9", "DMaj7", "Em7", "F#m7", "B7#9", "Em7", "A7b9", "DMaj7", "Dm7", "G7", "CMaj7", "Am7", "FMaj7", "Dm7", "G7", "Gm7", "C7", "Gm7", "C7", "Bbm7", "Eb7", "FMaj7", "Gm7", "Am7", "D7b9", "Bm7b5", "Bbm7", "Eb7", "FMaj7", "Abm7", "Db7", "Gm7", "C7", "FMaj7"] 
-  },
-  { 
-    name: "Central Park West", 
-    composer: "Jazz Ballad",
-    year: "",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "B",
-    chords: ["BMaj7", "Em7", "A7", "DMaj7", "Bbm7", "Eb7", "AbMaj7", "Gm7", "C7", "FMaj7", "C#m7", "F#7", "BMaj7", "Em7", "A7", "DMaj7", "C#m7", "F#7", "BMaj7", "C#m7", "BMaj7", "C#m7", "F#7"] 
-  },
-  { 
-    name: "Body and Soul", 
-    composer: "Jazz Ballad",
-    year: "",
-    style: "Jazz Ballad",
-    tempo: "Slow",
-    key: "Db",
-    chords: ["Ebm7", "Bb7#5", "Ebm7", "Ab7", "DbMaj7", "Gb7", "Fm7", "Edim", "Ebm7", "Cm7b5", "F7b9", "Bbm7", "Ebm7", "Ab7", "DbMaj7", "Gb7", "Fm7b5", "Bb7#5", "Ebm7", "Bb7#5", "Ebm7", "Ab7", "DbMaj7", "Gb7", "Fm7", "Edim", "Ebm7", "Cm7b5", "F7b9", "Bbm7", "Ebm7", "Ab7", "Db", "Em7", "A7", "DMaj7", "Em7", "F#m7", "Gm7", "C7", "F#m7", "Bm7", "Em7", "A7", "DMaj7", "Dm7", "G7", "Em7", "Ebdim", "Dm7", "G7", "C7", "B7", "Bb7", "Ebm7", "Bb7#5", "Ebm7", "Ab7", "DbMaj7", "Gb7", "Fm7", "Edim", "Ebm7", "Cm7b5", "F7b9", "Bbm7", "Ebm7", "Ab7", "Db", "Gb7", "Fm7b5", "Bb7#5"] 
-  },
-  { 
-    name: "Bossa Antigua", 
-    composer: "Bossa Nova",
-    year: "",
-    style: "Bossa Nova",
-    tempo: "Fast",
-    key: "Ab",
-    chords: ["Bbm7", "Eb7", "Cm7", "Fm7", "Bbm7", "Eb7", "Cm7", "F7b9", "Bbm7", "Eb7", "Cm7", "Fm7", "Bbm7", "Dm11", "G7", "CMaj7", "Am7", "Dm7", "G7", "Em7", "Am7", "Dm7", "G7", "Cm7", "F7b9", "Bbm7", "Eb7", "Cm7", "Fm7", "Bbm7", "Eb7", "AbMaj7"] 
-  },
-  { 
-    name: "How Hight The Moon", 
-    composer: "Medium Swing",
-    year: "",
-    style: "Medium Swing",
-    tempo: "Medium",
-    key: "G",
-    chords: ["GMaj7", "GMaj9", "Gm7", "C7", "FMaj7", "FMaj7", "Fm7", "Bb7", "EbMaj7", "Am7b5", "D7b9", "Gm7", "Am7b5", "D7b9", "GMaj7", "Em7", "Am7", "D7", "GMaj7", "GMaj9", "Gm7", "C7", "FMaj7", "FMaj9", "Fm7", "Bb7", "EbMaj7", "Am7b5", "D7b9", "GMaj7", "Am7", "D7", "Bm7", "E7", "Am7", "D7", "G", "Am7", "D7"] 
-  },
-  { 
-    name: "Song For My Father", 
-    composer: "Latin",
-    year: "",
-    style: "Latin",
-    tempo: "Fast",
-    key: "Fm",
-    chords: ["Fm7", "Eb7", "Db7", "C", "Fm7", "Fm7", "Eb7", "Db7", "C", "Fm7", "Eb7", "Fm7", "Eb7", "Db7", "C7b9", "Fm7"] 
-  },
-  { 
-    name: "The Dolphin", 
-    composer: "Bossa Nova",
-    year: "",
-    style: "Bossa Nova",
-    tempo: "Fast",
-    key: "A",
-    chords: ["AMaj7", "B7", "Ab", "Db", "CMaj7", "F#m7b5", "B7b9", "Em7", "A", "DMaj7", "F7#5", "Bbm9", "Bbm7", "BbmMaj7", "Bbm7", "Bbm6", "A", "DMaj7", "Em7", "A7", "C#m7b5", "F#", "Bm7b5", "E7b9", "Dm7", "G7", "Bm7", "E", "C#m7b5", "F#", "B", "E", "AMaj7", "B7", "G#", "C#", "F#", "B", "EMaj7", "C7", "EMaj7", "C7", "BMaj7", "EMaj7"] 
-  }
-]
-
-// ==================== 统计模块类型定义 ====================
-
-// 练习类型
-type PracticeType = 'pitch_finding' | 'scale' | 'chord_exercise' | 'interval' | 'chord_progression'
-
-// 练习详情记录
-interface PracticeDetail {
-  name: string        // 练习名称（如：大七和弦、多里安音阶）
-  count: number       // 练习次数
-}
-
-// 每日统计
-interface DailyStats {
-  date: string        // 日期 YYYY-MM-DD
-  totalCount: number  // 当日总练习次数
-  byType: Record<PracticeType, number>  // 按练习类型统计
-  byDetail: Record<PracticeType, PracticeDetail[]>  // 按详细类型统计
-}
-
-// 统计数据结构
-interface PracticeStats {
-  daily: DailyStats[]     // 每日统计（保留最近30天）
-  total: {
-    count: number
-    byType: Record<PracticeType, number>
-    byDetail: Record<PracticeType, PracticeDetail[]>
-  }
-}
-
-// 统计时间范围
-type StatsTimeRange = 'today' | 'week' | 'month' | 'total'
-
-// Practice modes - 基础练习模式 (与源HTML文件保持一致)
-// ==================== SOLO风格练习模式系统 ====================
-
-// 练习模式类型定义
-interface PracticeLevel {
-  id: string
-  nameKey: string
-  description: string
-  groupName: string
-  sequences: {
-    dominant?: number[]
-    major?: number[]
-    minor?: number[]
-    sus?: number[]
-    sus2?: number[]
-    diminished?: number[]
-    diminishedDominant?: number[]
-    six?: number[]
-    augmented?: number[]
-    diminishedMajorSeven?: number[]
-    altered?: number[]
-  }
-  startingIntervalOption: "any" | "first" | "chordTone"
-  takeStartingIntervalBeforeOrder: boolean
-  orderOption: boolean
-  randomOption: boolean
-  forceNaturalFive: boolean
-  notesPerChord: number
-  endOnStartingInterval?: boolean
-  usePassingNoteBebopScale?: boolean
-}
-
-// Single Chord Tones
-const SINGLE_CHORD_TONES_LEVELS: PracticeLevel[] = [
-  {
-    id: "single_chord_tones_root",
-    nameKey: "level_root",
-    description: "Single chord tones    Root notes only",
-    groupName: "Single Chord Tones",
-    sequences: {
-      dominant: [1],
-      major: [1],
-      minor: [1],
-      sus: [1],
-      diminished: [1],
-      diminishedDominant: [1],
-      six: [1],
-    },
-    startingIntervalOption: "any",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 1,
-  },
-  {
-    id: "single_chord_tones_3rd",
-    nameKey: "level_3rd",
-    description: "Single chord tones    3rd only  2nd or 4th on sus chords",
-    groupName: "Single Chord Tones",
-    sequences: {
-      dominant: [3],
-      major: [3],
-      minor: [3],
-      sus: [4],
-      sus2: [2],
-      diminished: [3],
-      diminishedDominant: [4],
-      six: [3],
-    },
-    startingIntervalOption: "any",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 1,
-  },
-  {
-    id: "single_chord_tones_5th",
-    nameKey: "level_5th",
-    description: "Single chord tones    5th only    (No altered 5ths on dominant chords)",
-    groupName: "Single Chord Tones",
-    sequences: {
-      dominant: [5],
-      major: [5],
-      minor: [5],
-      sus: [5],
-      diminished: [5],
-      diminishedDominant: [6],
-      six: [5],
-      augmented: [6],
-    },
-    startingIntervalOption: "any",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 1,
-  },
-  {
-    id: "single_chord_tones_7th",
-    nameKey: "level_7th",
-    description: "Single chord tones    7th only    (6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Single Chord Tones",
-    sequences: {
-      dominant: [7],
-      major: [7],
-      minor: [7],
-      sus: [7],
-      diminished: [7],
-      diminishedDominant: [8],
-      six: [6],
-      diminishedMajorSeven: [8],
-    },
-    startingIntervalOption: "any",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 1,
-  },
-]
-
-// Two Chord Tones
-const TWO_CHORD_TONES_LEVELS: PracticeLevel[] = [
-  {
-    id: "two_chord_tones_root_3rd",
-    nameKey: "level_root_3rd",
-    description: "Two chord tones    Root & 3rd    (2nd or 4th on sus chords)",
-    groupName: "Two Chord Tones",
-    sequences: {
-      dominant: [1, 3],
-      major: [1, 3],
-      minor: [1, 3],
-      sus: [1, 4],
-      sus2: [1, 2],
-      diminished: [1, 3],
-      diminishedDominant: [1, 4],
-      six: [1, 3],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 2,
-  },
-  {
-    id: "two_chord_tones_root_5th",
-    nameKey: "level_root_5th",
-    description: "Two chord tones    Root & 5th    (No altered 5ths on dominant chords)",
-    groupName: "Two Chord Tones",
-    sequences: {
-      dominant: [1, 5],
-      major: [1, 5],
-      minor: [1, 5],
-      sus: [1, 5],
-      diminished: [1, 5],
-      diminishedDominant: [1, 6],
-      six: [1, 5],
-      augmented: [1, 6],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 2,
-  },
-  {
-    id: "two_chord_tones_root_7th",
-    nameKey: "level_root_7th",
-    description: "Two chord tones    Root & 7th    (6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Two Chord Tones",
-    sequences: {
-      dominant: [1, 7],
-      major: [1, 7],
-      minor: [1, 7],
-      sus: [1, 7],
-      diminished: [1, 7],
-      diminishedDominant: [1, 8],
-      six: [1, 6],
-      diminishedMajorSeven: [1, 8],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 2,
-  },
-  {
-    id: "two_chord_tones_3rd_5th",
-    nameKey: "level_3rd_5th",
-    description: "Two chord tones    3rd & 5th    (2nd or 4th on sus chords  No altered 5ths on dominant chords)",
-    groupName: "Two Chord Tones",
-    sequences: {
-      dominant: [3, 5],
-      major: [3, 5],
-      minor: [3, 5],
-      sus: [4, 5],
-      sus2: [2, 5],
-      diminished: [3, 5],
-      diminishedDominant: [4, 6],
-      six: [3, 5],
-      augmented: [4, 6],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 2,
-  },
-  {
-    id: "two_chord_tones_3rd_7th",
-    nameKey: "level_3rd_7th",
-    description: "Two chord tones    3rd & 7th    (2nd or 4th on sus chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Two Chord Tones",
-    sequences: {
-      dominant: [3, 7],
-      major: [3, 7],
-      minor: [3, 7],
-      sus: [4, 7],
-      sus2: [2, 7],
-      diminished: [3, 7],
-      diminishedDominant: [4, 8],
-      six: [3, 6],
-      diminishedMajorSeven: [3, 8],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 2,
-  },
-]
-
-// Three Chord Tones
-const THREE_CHORD_TONES_LEVELS: PracticeLevel[] = [
-  {
-    id: "three_chord_tones_root_3rd_5th",
-    nameKey: "level_root_3rd_5th",
-    description: "Three chord tones    Root, 3rd & 5th    (2nd or 4th on sus chords  No altered 5ths on dominant chords)",
-    groupName: "Three Chord Tones",
-    sequences: {
-      dominant: [1, 3, 5],
-      major: [1, 3, 5],
-      minor: [1, 3, 5],
-      sus: [1, 4, 5],
-      sus2: [1, 2, 5],
-      diminished: [1, 3, 5],
-      diminishedDominant: [1, 4, 6],
-      six: [1, 3, 5],
-      augmented: [1, 4, 6],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 3,
-  },
-  {
-    id: "three_chord_tones_root_3rd_7th",
-    nameKey: "level_root_3rd_7th",
-    description: "Three chord tones    Root, 3rd & 7th    (2nd or 4th on sus chords",
-    groupName: "Three Chord Tones",
-    sequences: {
-      dominant: [1, 3, 7],
-      major: [1, 3, 7],
-      minor: [1, 3, 7],
-      sus: [1, 4, 7],
-      sus2: [1, 2, 7],
-      diminished: [1, 3, 7],
-      diminishedDominant: [1, 4, 8],
-      six: [1, 3, 7],
-      diminishedMajorSeven: [1, 3, 8],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 3,
-  },
-  {
-    id: "three_chord_tones_3rd_5th_7th",
-    nameKey: "level_3rd_5th_7th",
-    description: "Three chord tones    3rd, 5th & 7th    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Three Chord Tones",
-    sequences: {
-      dominant: [3, 5, 7],
-      major: [3, 5, 7],
-      minor: [3, 5, 7],
-      sus: [4, 5, 7],
-      sus2: [2, 5, 7],
-      diminished: [3, 5, 7],
-      diminishedDominant: [4, 6, 8],
-      six: [3, 5, 6],
-      augmented: [4, 6, 7],
-      diminishedMajorSeven: [3, 5, 8],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 3,
-  },
-  {
-    id: "three_chord_tones_root_3rd_5th_random_inversions",
-    nameKey: "level_root_3rd_5th_random_inversions",
-    description: "Three chord tones    This level randomises between:-  Root, 3rd & 5th  3rd, 5th, Root  5th, Root, 3rd    (2nd or 4th on sus chords  No altered 5ths on dominant chords)",
-    groupName: "Three Chord Tones",
-    sequences: {
-      dominant: [1, 3, 5],
-      major: [1, 3, 5],
-      minor: [1, 3, 5],
-      sus: [1, 4, 5],
-      sus2: [1, 2, 5],
-      diminished: [1, 3, 5],
-      diminishedDominant: [1, 4, 6],
-      six: [1, 3, 5],
-      augmented: [1, 4, 6],
-    },
-    startingIntervalOption: "any",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 3,
-  },
-]
-
-// Four Chord Tones
-const FOUR_CHORD_TONES_LEVELS: PracticeLevel[] = [
-  {
-    id: "four_chord_tones_root_3rd_5th_7th",
-    nameKey: "level_root_3rd_5th_7th",
-    description: "Four chord tones    Root, 3rd, 5th & 7th    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [1, 3, 5, 7],
-      major: [1, 3, 5, 7],
-      minor: [1, 3, 5, 7],
-      sus: [1, 4, 5, 7],
-      sus2: [1, 2, 5, 7],
-      diminished: [1, 3, 5, 7],
-      diminishedDominant: [1, 4, 6, 8],
-      six: [1, 3, 5, 6],
-      augmented: [1, 4, 6, 7],
-      diminishedMajorSeven: [1, 3, 5, 8],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "four_chord_tones_3rd_5th_7th_root",
-    nameKey: "level_3rd_5th_7th_root",
-    description: "Four chord tones    3rd, 5th, 7th, Root    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [3, 5, 7, 1],
-      major: [3, 5, 7, 1],
-      minor: [3, 5, 7, 1],
-      sus: [4, 5, 7, 1],
-      sus2: [2, 5, 7, 1],
-      diminished: [3, 5, 7, 1],
-      diminishedDominant: [4, 6, 8, 1],
-      six: [3, 5, 6, 1],
-      augmented: [4, 6, 7, 1],
-      diminishedMajorSeven: [3, 5, 8, 1],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "four_chord_tones_5th_7th_root_3rd",
-    nameKey: "level_5th_7th_root_3rd",
-    description: "Four chord tones    5th, 7th, Root, 3rd    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6thh & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [5, 7, 1, 3],
-      major: [5, 7, 1, 3],
-      minor: [5, 7, 1, 3],
-      sus: [5, 7, 1, 4],
-      sus2: [5, 7, 1, 2],
-      diminished: [5, 7, 1, 3],
-      diminishedDominant: [6, 8, 1, 4],
-      six: [5, 6, 1, 3],
-      augmented: [6, 7, 1, 4],
-      diminishedMajorSeven: [5, 8, 1, 3],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "four_chord_tones_7th_root_3rd_5th",
-    nameKey: "level_7th_root_3rd_5th",
-    description: "Four chord tones    7th, Root, 3rd, 5th    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [7, 1, 3, 5],
-      major: [7, 1, 3, 5],
-      minor: [7, 1, 3, 5],
-      sus: [7, 1, 4, 5],
-      sus2: [7, 1, 2, 5],
-      diminished: [7, 1, 3, 5],
-      diminishedDominant: [8, 1, 4, 6],
-      six: [6, 1, 3, 5],
-      augmented: [7, 1, 4, 6],
-      diminishedMajorSeven: [8, 1, 3, 5],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "four_chord_tones_root_3rd_5th_7th_random_inversions",
-    nameKey: "level_root_3rd_5th_7th_random_inversions",
-    description: "Four chord tones    This level randomises between:-  Root, 3rd, 5th & 7th  3rd, 5th, 7th & Root  5th, 7th, Root & 3rd  7th, Root, 3rd & 5th    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [1, 3, 5, 7],
-      major: [1, 3, 5, 7],
-      minor: [1, 3, 5, 7],
-      sus: [1, 4, 5, 7],
-      sus2: [1, 2, 5, 7],
-      diminished: [1, 3, 5, 7],
-      diminishedDominant: [1, 4, 6, 8],
-      six: [1, 3, 5, 6],
-      augmented: [1, 4, 6, 7],
-      diminishedMajorSeven: [1, 3, 5, 8],
-    },
-    startingIntervalOption: "any",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "four_chord_tones_root_3rd_5th_7th_root",
-    nameKey: "level_root_3rd_5th_7th_root",
-    description: "Four chord tones    Root, 3rd, 5th, 7th & Root    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [1, 3, 5, 7],
-      major: [1, 3, 5, 7],
-      minor: [1, 3, 5, 7],
-      sus: [1, 4, 5, 7],
-      sus2: [1, 2, 5, 7],
-      diminished: [1, 3, 5, 7],
-      diminishedDominant: [1, 4, 6, 8],
-      six: [1, 3, 5, 6],
-      augmented: [1, 4, 6, 7],
-      diminishedMajorSeven: [1, 3, 5, 8],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 5,
-    endOnStartingInterval: true,
-  },
-  {
-    id: "four_chord_tones_3rd_5th_7th_root_3rd",
-    nameKey: "level_3rd_5th_7th_root_3rd",
-    description: "Four chord tones    3rd, 5th, 7th, Root & 3rd    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [3, 5, 7, 1],
-      major: [3, 5, 7, 1],
-      minor: [3, 5, 7, 1],
-      sus: [4, 5, 7, 1],
-      sus2: [2, 5, 7, 1],
-      diminished: [3, 5, 7, 1],
-      diminishedDominant: [4, 6, 8, 1],
-      six: [3, 5, 6, 1],
-      augmented: [4, 6, 7, 1],
-      diminishedMajorSeven: [3, 5, 8, 1],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-    endOnStartingInterval: true,
-  },
-  {
-    id: "four_chord_tones_5th_7th_root_3rd_5th",
-    nameKey: "level_5th_7th_root_3rd_5th",
-    description: "Four chord tones    5th, 7th, Root, 3rd & 5th    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6thh & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [5, 7, 1, 3],
-      major: [5, 7, 1, 3],
-      minor: [5, 7, 1, 3],
-      sus: [5, 7, 1, 4],
-      sus2: [5, 7, 1, 2],
-      diminished: [5, 7, 1, 3],
-      diminishedDominant: [6, 8, 1, 4],
-      six: [5, 6, 1, 3],
-      augmented: [6, 7, 1, 4],
-      diminishedMajorSeven: [5, 8, 1, 3],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-    endOnStartingInterval: true,
-  },
-  {
-    id: "four_chord_tones_7th_root_3rd_5th_7th",
-    nameKey: "level_7th_root_3rd_5th_7th",
-    description: "Four chord tones    7th, Root, 3rd, 5th & 7th    (2nd or 4th on sus chords  No altered 5ths on dominant chords  6th/♭♭7 on 6th & diminished chords)",
-    groupName: "Four Chord Tones",
-    sequences: {
-      dominant: [7, 1, 3, 5],
-      major: [7, 1, 3, 5],
-      minor: [7, 1, 3, 5],
-      sus: [7, 1, 4, 5],
-      sus2: [7, 1, 2, 5],
-      diminished: [7, 1, 3, 5],
-      diminishedDominant: [8, 1, 4, 6],
-      six: [6, 1, 3, 5],
-      augmented: [7, 1, 4, 6],
-      diminishedMajorSeven: [8, 1, 3, 5],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-    endOnStartingInterval: true,
-  },
-]
-
-// Melodic Structures - Root to 5th
-const MELODIC_ROOT_TO_5TH_LEVELS: PracticeLevel[] = [
-  {
-    id: "melodic_root_to_5th_melodic_structure_1",
-    nameKey: "level_melodic_structure_1",
-    description: "Melodic structures - Root to 5th    1, 2, 3, 5 on major/dominant chords    1, 3, 4, 5 on minor chords    1, 2, 4, 5 on sus chords    1, 2, 3, 5 on diminished chords    (No altered 5ths on dominant chords)",
-    groupName: "Melodic Structures - Root to 5th",
-    sequences: {
-      dominant: [1, 2, 3, 5],
-      major: [1, 2, 3, 5],
-      minor: [1, 3, 4, 5],
-      sus: [1, 2, 4, 5],
-      diminished: [1, 2, 3, 5],
-      diminishedDominant: [1, 2, 4, 6],
-      six: [1, 2, 3, 5],
-      augmented: [1, 2, 4, 6],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "melodic_root_to_5th_melodic_structure_2",
-    nameKey: "level_melodic_structure_2",
-    description: "Melodic structures - Root to 5th    2, 1, 5, 3 on major/dominant chords    3, 1, 5, 4 on minor chords    2, 1, 5, 4 on sus chords    2, 1, 5, 3 on diminished chords    (No altered 5ths on dominant chords)",
-    groupName: "Melodic Structures - Root to 5th",
-    sequences: {
-      dominant: [2, 1, 5, 3],
-      major: [2, 1, 5, 3],
-      minor: [3, 1, 5, 4],
-      sus: [2, 1, 5, 4],
-      diminished: [2, 1, 5, 3],
-      diminishedDominant: [2, 1, 6, 4],
-      six: [2, 1, 5, 3],
-      augmented: [2, 1, 6, 4],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "melodic_root_to_5th_melodic_structure_3",
-    nameKey: "level_melodic_structure_3",
-    description: "Melodic structures - Root to 5th    3, 5, 2, 1 on major/dominant chords    4, 5, 3, 1 on minor chords    4, 5, 2, 1 on sus chords    3, 5, 2, 1 on diminished chords    (No altered 5ths on dominant chords)",
-    groupName: "Melodic Structures - Root to 5th",
-    sequences: {
-      dominant: [3, 5, 2, 1],
-      major: [3, 5, 2, 1],
-      minor: [4, 5, 3, 1],
-      sus: [4, 5, 2, 1],
-      diminished: [3, 5, 2, 1],
-      diminishedDominant: [4, 6, 2, 1],
-      six: [3, 5, 2, 1],
-      augmented: [4, 6, 2, 1],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "melodic_root_to_5th_melodic_structure_4",
-    nameKey: "level_melodic_structure_4",
-    description: "Melodic structures - Root to 5th    5, 1, 2, 3 on major/dominant chords    5, 1, 3, 4 on minor chords    5, 1, 2, 4 on sus chords    5, 1, 2, 3 on diminished chords    (No altered 5ths on dominant chords)",
-    groupName: "Melodic Structures - Root to 5th",
-    sequences: {
-      dominant: [5, 1, 2, 3],
-      major: [5, 1, 2, 3],
-      minor: [5, 1, 3, 4],
-      sus: [5, 1, 2, 4],
-      diminished: [5, 1, 2, 3],
-      diminishedDominant: [6, 1, 2, 4],
-      six: [5, 1, 2, 3],
-      augmented: [6, 1, 2, 4],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "melodic_root_to_5th_melodic_structure_5_random_inversions",
-    nameKey: "level_melodic_structure_5_random_inversions",
-    description: "Melodic structures - Root to 5th    This level creates random inversions of the following structures:-    1, 2, 3, 5 on major/dominant chords    1, 3, 4, 5 on minor chords    1, 2, 4, 5 on sus chords    1, 2, 3, 5 on diminished chords    (No altered 5ths on dominant chords)",
-    groupName: "Melodic Structures - Root to 5th",
-    sequences: {
-      dominant: [1, 2, 3, 5],
-      major: [1, 2, 3, 5],
-      minor: [1, 3, 4, 5],
-      sus: [1, 2, 4, 5],
-      diminished: [1, 2, 3, 5],
-      diminishedDominant: [1, 2, 4, 6],
-      six: [1, 2, 3, 5],
-      augmented: [1, 2, 4, 6],
-    },
-    startingIntervalOption: "chordTone",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-]
-
-// Melodic Structures - 5th to 9th
-const MELODIC_5TH_TO_9TH_LEVELS: PracticeLevel[] = [
-  {
-    id: "melodic_5th_to_9th_melodic_structure_6",
-    nameKey: "level_melodic_structure_6",
-    description: "Melodic structures - 5th to 9th    5, 6, 7, 2 on major/dominant chords    5, 7, 1, 2 on minor chords    5, 6, 7, 1 on diminished chords",
-    groupName: "Melodic Structures - 5th to 9th",
-    sequences: {
-      dominant: [5, 6, 7, 2],
-      major: [5, 6, 7, 2],
-      minor: [5, 7, 1, 2],
-      sus: [5, 6, 7, 2],
-      diminished: [5, 7, 8, 1],
-      diminishedDominant: [6, 7, 8, 2],
-      six: [5, 6, 7, 2],
-      augmented: [6, 7, 1, 2],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 4,
-  },
-  {
-    id: "melodic_5th_to_9th_melodic_structure_7",
-    nameKey: "level_melodic_structure_7",
-    description: "Melodic structures - 5th to 9th    6, 5, 2, 7 on major/dominant chords    7, 5, 2, 1 on minor chords    6, 5, 1, 7 on diminished chords",
-    groupName: "Melodic Structures - 5th to 9th",
-    sequences: {
-      dominant: [6, 5, 2, 7],
-      major: [6, 5, 2, 7],
-      minor: [7, 5, 2, 1],
-      sus: [6, 5, 2, 7],
-      diminished: [7, 5, 1, 8],
-      diminishedDominant: [7, 6, 2, 8],
-      six: [6, 5, 2, 7],
-      augmented: [7, 6, 2, 1],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 4,
-  },
-  {
-    id: "melodic_5th_to_9th_melodic_structure_8",
-    nameKey: "level_melodic_structure_8",
-    description: "Melodic structures - 5th to 9th    7, 2, 6, 5 on major/dominant chords    1, 2, 7, 5 on minor chords    6, 1, 7, 5 on diminished chords",
-    groupName: "Melodic Structures - 5th to 9th",
-    sequences: {
-      dominant: [7, 2, 6, 5],
-      major: [7, 2, 6, 5],
-      minor: [1, 2, 7, 5],
-      sus: [7, 2, 6, 5],
-      diminished: [7, 1, 8, 5],
-      diminishedDominant: [8, 2, 7, 6],
-      six: [7, 2, 6, 5],
-      augmented: [1, 2, 7, 6],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 4,
-  },
-  {
-    id: "melodic_5th_to_9th_melodic_structure_9",
-    nameKey: "level_melodic_structure_9",
-    description: "Melodic structures - 5th to 9th    2, 7, 6, 5 on major/dominant chords    2, 1, 7, 5 on minor chords    2, 7, 1, 6 on diminished chords",
-    groupName: "Melodic Structures - 5th to 9th",
-    sequences: {
-      dominant: [2, 7, 6, 5],
-      major: [2, 7, 6, 5],
-      minor: [2, 1, 7, 5],
-      sus: [2, 7, 6, 5],
-      diminished: [2, 8, 1, 7],
-      diminishedDominant: [2, 8, 7, 6],
-      six: [2, 7, 6, 5],
-      augmented: [2, 1, 7, 6],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 4,
-  },
-  {
-    id: "melodic_5th_to_9th_melodic_structure_10_random_inversions",
-    nameKey: "level_melodic_structure_10_random_inversions",
-    description: "Melodic structures - 5th to 9th    This level creates random inversions of the following structures:-    5, 6, 7, 2 on major/dominant chords    5, 7, 1, 2 on minor chords    5, 6, 7, 1 on diminished chords",
-    groupName: "Melodic Structures - 5th to 9th",
-    sequences: {
-      dominant: [5, 6, 7, 2],
-      major: [5, 6, 7, 2],
-      minor: [5, 7, 1, 2],
-      sus: [5, 6, 7, 2],
-      diminished: [5, 7, 8, 1],
-      diminishedDominant: [6, 7, 8, 2],
-      six: [5, 6, 7, 2],
-      augmented: [6, 7, 1, 2],
-    },
-    startingIntervalOption: "chordTone",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 4,
-  },
-]
-
-// Voice Led Structures
-const VOICE_LED_LEVELS: PracticeLevel[] = [
-  {
-    id: "voice_led_voice_led_structure_1",
-    nameKey: "level_voice_led_structure_1",
-    description: "Voice led structures    3, 2, 1, 7 on minor chords    3, 2, 1, 7 on dominant chords    3, 2, 1, 7 on major chords    4, 2, 1, 7 on sus chords    3, 2, 1, 6 on diminished chords    (Works best with cyclical progression e.g II-V-I)",
-    groupName: "Voice Led Structures",
-    sequences: {
-      dominant: [3, 2, 1, 7],
-      major: [3, 2, 1, 7],
-      minor: [3, 2, 1, 7],
-      sus: [4, 2, 1, 7],
-      diminished: [3, 2, 1, 7],
-      diminishedDominant: [4, 2, 1, 8],
-      six: [3, 2, 1, 7],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "voice_led_voice_led_structure_2",
-    nameKey: "level_voice_led_structure_2",
-    description: "Voice led structures    3, 2, 1, 7 on minor chords    3, 5, 7, 2 on dominant chords    5, 1, 2, 3 on major chords    4, 5, 7, 2 on sus chords    3, 2, 1, 6 on diminished chords    (Works best with cyclical progression e.g II-V-I)",
-    groupName: "Voice Led Structures",
-    sequences: {
-      dominant: [3, 5, 7, 2],
-      major: [5, 1, 2, 3],
-      minor: [3, 2, 1, 7],
-      sus: [4, 5, 7, 2],
-      diminished: [3, 2, 1, 7],
-      diminishedDominant: [4, 6, 8, 2],
-      six: [3, 5, 7, 2],
-      augmented: [4, 6, 7, 2],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "voice_led_voice_led_structure_3",
-    nameKey: "level_voice_led_structure_3",
-    description: "Voice led structures    1, 3, 5, 7 on minor chords    3, 2, 1, 7 on dominant chords    3, 2, 1, 7 on major chords    4, 2, 1, 7 on sus chords    3, 2, 1, 6 on diminished chords    (Works best with cyclical progression e.g II-V-I)",
-    groupName: "Voice Led Structures",
-    sequences: {
-      dominant: [3, 2, 1, 7],
-      major: [3, 2, 1, 7],
-      minor: [1, 3, 5, 7],
-      sus: [4, 2, 1, 7],
-      diminished: [3, 2, 1, 7],
-      diminishedDominant: [4, 2, 1, 7],
-      six: [3, 2, 1, 7],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "voice_led_voice_led_structure_4",
-    nameKey: "level_voice_led_structure_4",
-    description: "Voice led structures    1, 3, 5, 7 on minor chords    3, 5, 7, 2 on dominant chords    3, 2, 1, 7 on major chords    4, 5, 7, 2 on sus chords    3, 2, 1, 6 on diminished chords    (Works best with cyclical progression e.g II-V-I)",
-    groupName: "Voice Led Structures",
-    sequences: {
-      dominant: [3, 5, 7, 2],
-      major: [3, 2, 1, 7],
-      minor: [1, 3, 5, 7],
-      sus: [4, 5, 7, 2],
-      diminished: [3, 2, 1, 7],
-      diminishedDominant: [4, 6, 8, 2],
-      six: [3, 5, 7, 2],
-      augmented: [4, 6, 7, 2],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-  {
-    id: "voice_led_voice_led_structure_5",
-    nameKey: "level_voice_led_structure_5",
-    description: "Voice led structures    5, 3, 1, 7 on minor chords    3, 5, 7, 2 on dominant chords    3, 2, 1, 7 on major chords    4, 5, 7, 2 on sus chords    3, 2, 1, 6 on diminished chords    (Works best with cyclical progression e.g II-V-I)",
-    groupName: "Voice Led Structures",
-    sequences: {
-      dominant: [3, 5, 7, 2],
-      major: [3, 2, 1, 7],
-      minor: [5, 3, 1, 7],
-      sus: [4, 5, 7, 2],
-      diminished: [3, 2, 1, 7],
-      diminishedDominant: [4, 6, 8, 2],
-      six: [3, 5, 7, 2],
-      augmented: [4, 6, 7, 2],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 4,
-  },
-]
-
-// Suspended Structures
-const SUSPENDED_LEVELS: PracticeLevel[] = [
-  {
-    id: "suspended_suspended_2_resolution",
-    nameKey: "level_suspended_2_resolution",
-    description: "Suspended Structures    Suspended 2 resolving to 3 then 1",
-    groupName: "Suspended Structures",
-    sequences: {
-      dominant: [2, 3, 1],
-      major: [2, 3, 1],
-      minor: [2, 3, 1],
-      sus: [2, 3, 1],
-      diminished: [2, 3, 1],
-      diminishedDominant: [2, 4, 1],
-      six: [2, 3, 1],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 3,
-  },
-  {
-    id: "suspended_suspended_4_resolution",
-    nameKey: "level_suspended_4_resolution",
-    description: "Suspended Structures    Suspended 4 resolving to 3 then 1",
-    groupName: "Suspended Structures",
-    sequences: {
-      dominant: [4, 3, 1],
-      major: [4, 3, 1],
-      minor: [4, 3, 1],
-      sus: [4, 3, 1],
-      diminished: [4, 3, 1],
-      diminishedDominant: [5, 4, 1],
-      six: [4, 3, 1],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: false,
-    orderOption: false,
-    randomOption: false,
-    forceNaturalFive: true,
-    notesPerChord: 3,
-  },
-]
-
-// Chord Scales
-const CHORD_SCALES_LEVELS: PracticeLevel[] = [
-  {
-    id: "chord_scales_chord_scale",
-    nameKey: "level_chord_scale",
-    description: "All notes of the relevant chord scale played from the root note through one octave",
-    groupName: "Chord Scales",
-    sequences: {
-      dominant: [1, 2, 3, 4, 5, 6, 7],
-      major: [1, 2, 3, 4, 5, 6, 7],
-      minor: [1, 2, 3, 4, 5, 6, 7],
-      sus: [1, 2, 3, 4, 5, 6, 7],
-      diminished: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminishedDominant: [1, 2, 3, 4, 5, 6, 7, 8],
-      six: [1, 2, 3, 4, 5, 6, 7],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-  },
-  {
-    id: "chord_scales_chord_scale_3rd_to_3rd",
-    nameKey: "level_chord_scale_3rd_to_3rd",
-    description: "All notes of the relevant chord scale played from the 3rd through one octave",
-    groupName: "Chord Scales",
-    sequences: {
-      dominant: [3, 4, 5, 6, 7, 1, 2],
-      major: [3, 4, 5, 6, 7, 1, 2],
-      minor: [3, 4, 5, 6, 7, 1, 2],
-      sus: [4, 5, 6, 7, 1, 2, 3],
-      diminished: [3, 4, 5, 6, 7, 8, 1, 2],
-      diminishedDominant: [4, 5, 6, 7, 8, 1, 2, 3],
-      six: [3, 4, 5, 6, 7, 1, 2],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-  },
-  {
-    id: "chord_scales_chord_scale_5th_to_5th",
-    nameKey: "level_chord_scale_5th_to_5th",
-    description: "All notes of the relevant chord scale played from the 5th through one octave",
-    groupName: "Chord Scales",
-    sequences: {
-      dominant: [5, 6, 7, 1, 2, 3, 4],
-      major: [5, 6, 7, 1, 2, 3, 4],
-      minor: [5, 6, 7, 1, 2, 3, 4],
-      sus: [5, 6, 7, 1, 2, 3, 4],
-      diminished: [5, 6, 7, 8, 1, 2, 3, 4],
-      diminishedDominant: [6, 7, 8, 1, 2, 3, 4, 5],
-      six: [5, 6, 7, 1, 2, 3, 4],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-  },
-  {
-    id: "chord_scales_chord_scale_7th_to_7th",
-    nameKey: "level_chord_scale_7th_to_7th",
-    description: "All notes of the relevant chord scale played from the 7th through one octave",
-    groupName: "Chord Scales",
-    sequences: {
-      dominant: [7, 1, 2, 3, 4, 5, 6],
-      major: [7, 1, 2, 3, 4, 5, 6],
-      minor: [7, 1, 2, 3, 4, 5, 6],
-      sus: [7, 1, 2, 3, 4, 5, 6],
-      diminished: [8, 1, 2, 3, 4, 5, 6, 7],
-      diminishedDominant: [8, 1, 2, 3, 4, 5, 6, 7],
-      six: [7, 1, 2, 3, 4, 5, 6],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-  },
-  {
-    id: "chord_scales_chord_scale_random_starting_chord_tone",
-    nameKey: "level_chord_scale_random_starting_chord_tone",
-    description: "All notes of the relevant chord scale starting from a randomised chord tone",
-    groupName: "Chord Scales",
-    sequences: {
-      dominant: [1, 2, 3, 4, 5, 6, 7],
-      major: [1, 2, 3, 4, 5, 6, 7],
-      minor: [1, 2, 3, 4, 5, 6, 7],
-      sus: [1, 2, 3, 4, 5, 6, 7],
-      diminished: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminishedDominant: [1, 2, 3, 4, 5, 6, 7, 8],
-      six: [1, 2, 3, 4, 5, 6, 7],
-    },
-    startingIntervalOption: "chordTone",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-  },
-  {
-    id: "chord_scales_chord_scale_random_starting_scale_tone",
-    nameKey: "level_chord_scale_random_starting_scale_tone",
-    description: "All notes of the relevant chord scale starting from a randomised scale tone",
-    groupName: "Chord Scales",
-    sequences: {
-      dominant: [1, 2, 3, 4, 5, 6, 7],
-      major: [1, 2, 3, 4, 5, 6, 7],
-      minor: [1, 2, 3, 4, 5, 6, 7],
-      sus: [1, 2, 3, 4, 5, 6, 7],
-      diminished: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminishedDominant: [1, 2, 3, 4, 5, 6, 7, 8],
-      six: [1, 2, 3, 4, 5, 6, 7],
-    },
-    startingIntervalOption: "any",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: true,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-  },
-]
-
-// Passing Note Chord Scales
-const PASSING_NOTE_SCALES_LEVELS: PracticeLevel[] = [
-  {
-    id: "passing_note_scales_passing_note_scale",
-    nameKey: "level_passing_note_scale",
-    description: "All notes of the relevant chord scale with appropriate passing notes, played from root note to root note. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.",
-    groupName: "Passing Note Chord Scales",
-    sequences: {
-      dominant: [1, 2, 3, 4, 5, 6, 7, 8],
-      major: [1, 2, 3, 4, 5, 6, 7, 8],
-      minor: [1, 2, 3, 4, 5, 6, 7, 8],
-      sus: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminished: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminishedDominant: [1, 2, 3, 4, 5, 6, 7, 8],
-      six: [1, 2, 3, 4, 5, 6, 7, 8],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-    usePassingNoteBebopScale: true,
-  },
-  {
-    id: "passing_note_scales_passing_note_scale_3rd_to_3rd",
-    nameKey: "level_passing_note_scale_3rd_to_3rd",
-    description: "All notes of the relevant chord scale with appropriate passing notes, played from 3rd to 3rd. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.",
-    groupName: "Passing Note Chord Scales",
-    sequences: {
-      dominant: [3, 4, 5, 6, 7, 8, 1, 2],
-      major: [3, 4, 5, 6, 7, 8, 1, 2],
-      minor: [3, 4, 5, 6, 7, 8, 1, 2],
-      sus: [4, 5, 6, 7, 8, 1, 2, 3],
-      diminished: [3, 4, 5, 6, 7, 8, 1, 2],
-      diminishedDominant: [4, 5, 6, 7, 8, 1, 2, 3],
-      six: [3, 4, 5, 6, 7, 8, 1, 2],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-    usePassingNoteBebopScale: true,
-  },
-  {
-    id: "passing_note_scales_passing_note_scale_5th_to_5th",
-    nameKey: "level_passing_note_scale_5th_to_5th",
-    description: "All notes of the relevant chord scale with appropriate passing notes, played from 5th to 5th. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.",
-    groupName: "Passing Note Chord Scales",
-    sequences: {
-      dominant: [5, 6, 7, 8, 1, 2, 3, 4],
-      major: [5, 6, 7, 8, 1, 2, 3, 4],
-      minor: [5, 6, 7, 8, 1, 2, 3, 4],
-      sus: [5, 6, 7, 8, 1, 2, 3, 4],
-      diminished: [5, 6, 7, 8, 1, 2, 3, 4],
-      diminishedDominant: [6, 7, 8, 1, 2, 3, 4, 5],
-      six: [5, 6, 7, 8, 1, 2, 3, 4],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-    usePassingNoteBebopScale: true,
-  },
-  {
-    id: "passing_note_scales_passing_note_scale_6th7th_to_6th7th",
-    nameKey: "level_passing_note_scale_6th7th_to_6th7th",
-    description: "All notes of the relevant chord scale with passing notes, played from 6th to 6th or 7th to 7th, as harmonicaly appopriate. If played starting on a downbeat all of the subsequent chord tones will also fall on downbeats.",
-    groupName: "Passing Note Chord Scales",
-    sequences: {
-      dominant: [7, 8, 1, 2, 3, 4, 5, 6],
-      major: [7, 8, 1, 2, 3, 4, 5, 6],
-      minor: [7, 8, 1, 2, 3, 4, 5, 6],
-      sus: [7, 8, 1, 2, 3, 4, 5, 6],
-      diminished: [7, 8, 1, 2, 3, 4, 5, 6],
-      diminishedDominant: [8, 1, 2, 3, 4, 5, 6, 7],
-      six: [7, 8, 1, 2, 3, 4, 5, 6],
-    },
-    startingIntervalOption: "first",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-    usePassingNoteBebopScale: true,
-  },
-  {
-    id: "passing_note_scales_passing_note_scale_random_starting_chord_tone",
-    nameKey: "level_passing_note_scale_random_starting_chord_tone",
-    description: "All notes of the relevant chord scale with appropriate passing notes, from a randomised starting chord tone. If played starting on a downbeat, all of the subsequent chord tones will also fall on downbeats.",
-    groupName: "Passing Note Chord Scales",
-    sequences: {
-      dominant: [1, 2, 3, 4, 5, 6, 7, 8],
-      major: [1, 2, 3, 4, 5, 6, 7, 8],
-      minor: [1, 2, 3, 4, 5, 6, 7, 8],
-      sus: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminished: [1, 2, 3, 4, 5, 6, 7, 8],
-      diminishedDominant: [1, 2, 3, 4, 5, 6, 7, 8],
-      six: [1, 2, 3, 4, 5, 6, 7, 8],
-    },
-    startingIntervalOption: "chordTone",
-    takeStartingIntervalBeforeOrder: true,
-    orderOption: true,
-    randomOption: false,
-    forceNaturalFive: false,
-    notesPerChord: 8,
-    endOnStartingInterval: true,
-    usePassingNoteBebopScale: true,
-  },
-]
-
-// 所有练习模式合集
-const ALL_SOLO_LEVELS: PracticeLevel[] = [
-  ...SINGLE_CHORD_TONES_LEVELS,
-  ...TWO_CHORD_TONES_LEVELS,
-  ...THREE_CHORD_TONES_LEVELS,
-  ...FOUR_CHORD_TONES_LEVELS,
-  ...MELODIC_ROOT_TO_5TH_LEVELS,
-  ...MELODIC_5TH_TO_9TH_LEVELS,
-  ...VOICE_LED_LEVELS,
-  ...SUSPENDED_LEVELS,
-  ...CHORD_SCALES_LEVELS,
-  ...PASSING_NOTE_SCALES_LEVELS,
-  ...ALTERED_LEVELS,
-  ...DIMINISHED_SCALES_LEVELS,
-]
-
-// UI渲染所需的别名变量
-const ALL_PRACTICE_LEVELS = ALL_SOLO_LEVELS
-
-const LOCAL_PRACTICE_MODE_GROUPS = [
-  { id: 'single_chord_tones', name: 'Single Chord Tones', nameZh: '单和弦音', levels: SINGLE_CHORD_TONES_LEVELS },
-  { id: 'two_chord_tones', name: 'Two Chord Tones', nameZh: '双和弦音', levels: TWO_CHORD_TONES_LEVELS },
-  { id: 'three_chord_tones', name: 'Three Chord Tones', nameZh: '三和弦音', levels: THREE_CHORD_TONES_LEVELS },
-  { id: 'four_chord_tones', name: 'Four Chord Tones', nameZh: '四和弦音', levels: FOUR_CHORD_TONES_LEVELS },
-  { id: 'melodic_root_to_5th', name: 'Melodic Structures - Root to 5th', nameZh: '旋律结构 - 根音到五音', levels: MELODIC_ROOT_TO_5TH_LEVELS },
-  { id: 'melodic_5th_to_9th', name: 'Melodic Structures - 5th to 9th', nameZh: '旋律结构 - 五音到九音', levels: MELODIC_5TH_TO_9TH_LEVELS },
-  { id: 'voice_led', name: 'Voice Led Structures', nameZh: 'Voice Led 声部连接', levels: VOICE_LED_LEVELS },
-  { id: 'suspended', name: 'Suspended Structures', nameZh: '挂留结构', levels: SUSPENDED_LEVELS },
-  { id: 'chord_scales', name: 'Chord Scales', nameZh: '和弦音阶', levels: CHORD_SCALES_LEVELS },
-  { id: 'passing_note_chord_scales', name: 'Passing Note Chord Scales', nameZh: '经过音和弦音阶', levels: PASSING_NOTE_SCALES_LEVELS },
-  { id: 'altered', name: 'Altered Dominant Structures', nameZh: '变化属和弦结构', levels: ALTERED_LEVELS },
-  { id: 'diminished_scales', name: 'Diminished Scales', nameZh: '减音阶', levels: DIMINISHED_SCALES_LEVELS },
-]
-
-// 基础练习模式 (单和弦音 + 双和弦音 + 三和弦音)
-const PRACTICE_LEVELS = [
-  ...SINGLE_CHORD_TONES_LEVELS,
-  ...TWO_CHORD_TONES_LEVELS,
-  ...THREE_CHORD_TONES_LEVELS,
-]
-
-// 旋律结构 - 根音到五音
-const MELODIC_STRUCTURE_R_TO_5TH = MELODIC_ROOT_TO_5TH_LEVELS
-
-// 旋律结构 - 五音到九音
-const MELODIC_STRUCTURE_5TH_TO_9TH = MELODIC_5TH_TO_9TH_LEVELS
-
-// Voice Led结构
-const VOICE_LED_STRUCTURES = VOICE_LED_LEVELS
-
-// 经过音技巧 (挂留结构 + 和弦音阶 + 经过音音阶)
-const PASSING_TONE_TECHNIQUES = [
-  ...SUSPENDED_LEVELS,
-  ...CHORD_SCALES_LEVELS,
-  ...PASSING_NOTE_SCALES_LEVELS,
-]
-
-// 四和弦音等级
-const FOUR_CHORD_TONES = FOUR_CHORD_TONES_LEVELS
-
-
-// 和弦练习模式
-const CHORD_EXERCISE_LEVELS = [
-  { id: "root-third-fifth", nameKey: "level_root_third_fifth", intervals: ["1", "3", "5"] },
-  { id: "third-fifth-seventh", nameKey: "level_third_fifth_seventh", intervals: ["3", "5", "7"] },
-  { id: "random-inversion-triad", nameKey: "level_random_inversion_triad", intervals: ["1", "3", "5"] },
-  { id: "root-third-fifth-seventh", nameKey: "level_root_third_fifth_seventh", intervals: ["1", "3", "5", "7"] },
-  { id: "third-fifth-seventh-root", nameKey: "level_third_fifth_seventh_root", intervals: ["3", "5", "7", "1"] },
-  { id: "fifth-seventh-root-third", nameKey: "level_fifth_seventh_root_third", intervals: ["5", "7", "1", "3"] },
-  { id: "seventh-root-third-fifth", nameKey: "level_seventh_root_third_fifth", intervals: ["7", "1", "3", "5"] },
-  { id: "random-inversion-seventh", nameKey: "level_random_inversion_seventh", intervals: ["1", "3", "5", "7"] },
-  { id: "root-third-fifth-seventh-root", nameKey: "level_root_third_fifth_seventh_root", intervals: ["1", "3", "5", "7", "1"] },
-]
-
-// ==================== YIN 音高检测算法 ====================
-// YIN (Yet Another Implementation of the YIN Algorithm) 是一种自相关算法的改进版本
-// 用于从音频信号中检测基频（音高）
-
-const intervalToSemitones: Record<string, number> = {
-  "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8,
-  "b6": 8, "6": 9, "bb7": 9, "#6": 10, "b7": 10, "7": 11,
-  "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
-}
-
-const noteToSemitones: Record<string, number> = {
-  "C": 0, "C#": 1, "C♯": 1, "Cb": 11, "C♭": 11, "Db": 1, "D♭": 1, "D": 2, "D#": 3, "D♯": 3, "Eb": 3, "E♭": 3, "E": 4, "F": 5,
-  "F#": 6, "F♯": 6, "Gb": 6, "G♭": 6, "G": 7, "G#": 8, "G♯": 8, "Ab": 8, "A♭": 8, "A": 9, "A#": 10, "A♯": 10, "Bb": 10, "B♭": 10, "B": 11
-}
-
-// 检查两个音符是否为等音（如 C♯ = D♭） 标准化后比较
-function isEquivalentNote(note1: string, note2: string): boolean {
-  if (note1 === note2) return true
-
-  // 分离音符名和八度，并标准化为 ♯/♭ 形式
-  const extractNoteName = (fullNote: string): string => {
-    const match = fullNote.match(/^([CDEFGAB][#♯b♭]?\d*)/)
-    return match ? normalizeNoteName(match[1]) : normalizeNoteName(fullNote)
-  }
-
-  const note1Name = extractNoteName(note1)
-  const note2Name = extractNoteName(note2)
-
-  if (note1Name === note2Name) return true
-
-  // 定义等价的音符对（使用 ♯/♭ 统一形式）
-  const equivalentPairs = [
-    ['C♯', 'D♭'], ['D♯', 'E♭'], ['F♯', 'G♭'],
-    ['G♯', 'A♭'], ['A♯', 'B♭'],
-    ['C♯', 'D♭'], ['D♯', 'E♭'], ['F♯', 'G♭'],
-    ['G♯', 'A♭'], ['A♯', 'B♭']
-  ]
-
-  for (const pair of equivalentPairs) {
-    if ((note1Name === pair[0] && note2Name === pair[1]) ||
-        (note1Name === pair[1] && note2Name === pair[0])) {
-      return true
-    }
-  }
-
-  return false
-}
-
-// ==================== 工具函数 ====================
-function getNoteAtPosition(stringIndex: number, fret: number): string {
-  const openNote = STRING_TUNING[stringIndex]
-  return NOTES[(openNote + fret) % 12]
-}
-
-function getNoteIndex(note: string): number {
-  if (!note) return -1
-  const normalized = normalizeNoteName(note)
-  const idx = NOTES.indexOf(normalized)
-  if (idx !== -1) return idx
-  return NOTES_FLAT.indexOf(normalized)
-}
-
-function getNoteColor(semitones: number): string {
-  const colors: Record<number, string> = {
-    0: "bg-red-500",
-    1: "bg-orange-400",
-    2: "bg-yellow-400",
-    3: "bg-green-400",
-    4: "bg-emerald-400",
-    5: "bg-cyan-400",
-    6: "bg-blue-400",
-    7: "bg-indigo-400",
-    8: "bg-violet-400",
-    9: "bg-purple-400",
-    10: "bg-fuchsia-400",
-    11: "bg-pink-400",
-  }
-  return colors[semitones] || "bg-gray-400"
-}
-
-function transposeChord(chord: string, fromKey: string, toKey: string): string {
-  const fromIndex = getNoteIndex(fromKey)
-  const toIndex = getNoteIndex(toKey)
-  if (fromIndex === -1 || toIndex === -1) return chord
-
-  const diff = (toIndex - fromIndex + 12) % 12
-
-  // Extract root note（兼容 #/♯ 和 b/♭）
-  const rootMatch = chord.match(/^([A-G][#♯b♭]?)/)
-  if (!rootMatch) return chord
-
-  const root = rootMatch[1]
-  const rootIndex = getNoteIndex(root)
-  if (rootIndex === -1) return chord
-
-  const newRootIndex = (rootIndex + diff) % 12
-  const newRoot = NOTES[newRootIndex]
-
-  return chord.replace(/^([A-G][#♯b♭]?)/, newRoot)
-}
-
-function parseChord(chord: string): { root: string; type: string; bass?: string } {
-  const match = chord.match(/^([A-G][#♯b♭]?)(.*)$/)
-  if (!match) return { root: "C", type: "Major" }
-
-  const root = match[1]
-  const rest = match[2]
-
-  // Check for bass note
-  const bassMatch = rest.match(/\/([A-G][#♯b♭]?)$/)
-  const type = bassMatch ? rest.replace(bassMatch[0], "") : rest
-  const bass = bassMatch ? bassMatch[1] : undefined
-
-  return { root, type: type || "Major", bass }
-}
-
-// 规范化和弦类型符号 - 支持多种格式识别
-function normalizeChordType(type: string): string {
-  const normalizedMap: Record<string, string> = {
-    'm7b5': 'm7b5',
-    'm7♭5': 'm7b5',
-    'min7b5': 'm7b5',
-    'minor7b5': 'm7b5',
-    '-7b5': 'm7b5',
-    'ø': 'm7b5',
-    '7#9': '7#9',
-    '7♯9': '7#9',
-    '7b9': '7b9',
-    '7♭9': '7b9',
-    '7#11': '7#11',
-    '7♯11': '7#11',
-    'maj7': 'Maj7',
-    'M7': 'Maj7',
-    'Δ7': 'Maj7',
-    'Δ': 'Maj7',
-    'm7': 'm7',
-    'min7': 'm7',
-    '-7': 'm7',
-    'dim7': 'dim7',
-    'o7': 'dim7',
-    'dim': 'Dim',
-    'o': 'Dim',
-    'aug': 'Aug',
-    '+': 'Aug',
-    'm': 'Minor',
-    'min': 'Minor',
-    '-': 'Minor',
-    '': 'Major',
-  }
-  return normalizedMap[type] || type
-}
-
-function formatChordName(chord: { root: string; type: string; bass?: string }, t: (key: string) => string): string {
-  const normalizedType = normalizeChordType(chord.type)
-  const chordType = CHORD_TYPES.find(ct => ct.symbol === normalizedType || ct.name === normalizedType || ct.symbol === chord.type || ct.name === chord.type)
-  const typeSymbol = chordType ? chordType.symbol : chord.type
-
-  let result = `${normalizeNoteName(chord.root)}${normalizeNoteName(typeSymbol)}`
-  if (chord.bass) {
-    result += `/${normalizeNoteName(chord.bass)}`
-  }
-  return result
-}
-
-// 判断和弦类型是否为变化属和弦
-function isAlteredChord(type: string): boolean {
-  const alteredTypes = ['7alt', '7#5', '7b5', '7#5b9', '7#5#9', '7b5b9', '7b5#9', '7b9b13', 'aug7']
-  const normalizedType = normalizeChordType(type)
-  return alteredTypes.some(t => type.includes(t) || normalizedType.includes(t))
-}
-
-function getBebopScaleForChordType(type: string): { name: string; intervals: string[]; passingToneIndices: number[] } | null {
-  const normalizedType = normalizeChordType(type)
-  
-  if (type.includes('m7b5') || type.includes('m9b5') || normalizedType.includes('minorSevenFlatFive')) {
-    return {
-      name: 'Bebop Dorian',
-      intervals: ['1', '2', 'b3', '4', '5', '6', 'b7', '7'],
-      passingToneIndices: [7]
-    }
-  }
-  
-  if (type.startsWith('m') || type.includes('min') || normalizedType.includes('minor')) {
-    if (type.includes('Maj7') || type.includes('maj7') || type.includes('(maj7)')) {
-      return {
-        name: 'Bebop Tonic Minor',
-        intervals: ['1', '2', 'b3', '4', '5', 'b6', '6', '7'],
-        passingToneIndices: [5]
-      }
-    }
-    return {
-      name: 'Bebop Dorian',
-      intervals: ['1', '2', 'b3', '4', '5', '6', 'b7', '7'],
-      passingToneIndices: [7]
-    }
-  }
-  
-  if (type.includes('Maj') || type.includes('maj') || type === 'M7' || normalizedType.includes('majorSeven') || normalizedType.includes('majorNine') || normalizedType.includes('majorThirteen')) {
-    return {
-      name: 'Bebop Major',
-      intervals: ['1', '2', '3', '4', '5', 'b6', '6', '7'],
-      passingToneIndices: [5]
-    }
-  }
-  
-  if (type.includes('b9') && type.includes('b13')) {
-    return {
-      name: 'Bebop Dom7b9b13',
-      intervals: ['1', 'b9', '3', '4', '5', 'b13', 'b7', '7'],
-      passingToneIndices: [1, 5, 7]
-    }
-  }
-  
-  if (type.includes('7') || type.includes('9') || type.includes('11') || type.includes('13') || type.includes('dominant')) {
-    return {
-      name: 'Bebop Dominant',
-      intervals: ['1', '2', '3', '4', '5', '6', 'b7', '7'],
-      passingToneIndices: [7]
-    }
-  }
-  
-  if (type.includes('6') || type.includes('6/9')) {
-    return {
-      name: 'Bebop Major',
-      intervals: ['1', '2', '3', '4', '5', 'b6', '6', '7'],
-      passingToneIndices: [5]
-    }
-  }
-  
-  return {
-    name: 'Bebop Dominant',
-    intervals: ['1', '2', '3', '4', '5', '6', 'b7', '7'],
-    passingToneIndices: [7]
-  }
-}
-
-// Scale intervals 定义（与 Solo ScaleLibrary/scales_v2.json 一致，不含 bebop passing tones）
-// sequence 数字作为 1-indexed 索引访问对应 scale 的 intervals
-const SCALE_INTERVALS: Record<string, string[]> = {
-  major:           ['1', '2', '3', '4', '5', '6', '7'],
-  dorian:          ['1', '2', 'b3', '4', '5', '6', 'b7'],
-  phrygian:        ['1', 'b2', 'b3', '4', '5', 'b6', 'b7'],
-  lydian:          ['1', '2', '3', '#4', '5', '6', '7'],
-  mixolydian:      ['1', '2', '3', '4', '5', '6', 'b7'],
-  aeolian:         ['1', '2', 'b3', '4', '5', 'b6', 'b7'],
-  locrian:         ['1', 'b2', 'b3', '4', 'b5', 'b6', 'b7'],
-  locrianNat2:     ['1', '2', 'b3', '4', 'b5', 'b6', 'b7'],
-  locrianNat6:     ['1', 'b2', 'b3', '4', 'b5', '6', 'b7'],
-  melodicMinor:    ['1', '2', 'b3', '4', '5', '6', '7'],
-  dorianFlat2:     ['1', 'b2', 'b3', '4', '5', '6', 'b7'],
-  lydianAugmented: ['1', '2', '3', '#4', '#5', '6', '7'],
-  lydianDominant:  ['1', '2', '3', '#4', '5', '6', 'b7'],
-  mixolydianFlat6: ['1', '2', '3', '4', '5', 'b6', 'b7'],
-  altered:         ['1', 'b9', '#9', '3', 'b5', 'b13', 'b7'],
-  harmonicMinor:   ['1', '2', 'b3', '4', '5', 'b6', '7'],
-  phrygianDominant:['1', 'b9', '3', '4', '5', 'b13', 'b7'],
-  lydianSharp9:    ['1', '#9', '3', '#4', '5', '6', '7'],
-  harmonicMajor:   ['1', '2', '3', '4', '5', 'b6', '7'],
-  ionianAugmented: ['1', '2', '3', '4', '#5', '6', '7'],
-  diminishedHalfWhole: ['1', 'b9', '#9', '3', 'b5', '5', '13', 'b7'],
-  diminishedWholeHalf: ['1', '2', 'b3', '4', 'b5', '#5', '6', '7'],
-  wholeTone:       ['1', '2', '3', '#4', '#5', 'b7'],
-}
-
-// 根据 chord type 返回对应的 scale（与 Solo ScaleLibraryData.scaleNameForChordFunction 一致）
-// forceNaturalFive: 关卡是否强制自然 5 音。变化属和弦在 false 时用 altered，true 时用 phrygianDominant
-// sevenFlatNineScaleChoice: 用户偏好的 7b9 音阶（覆盖 forceNaturalFive 的默认行为）
-// 注意：TS 不区分 function，这里取最常用的 function（如 m7→dorian，Maj7→major）
-function getScaleForChord(type: string, forceNaturalFive?: boolean, sevenFlatNineScaleChoice?: 'altered' | 'diminishedWholeHalf' | 'diminishedHalfWhole'): string {
-  // 7b9b13 固定用 phrygianDominant（Solo 所有 function 一致）
-  if (type === '7b9b13') return 'phrygianDominant'
-  // 7b9 优先使用用户偏好（SevenFlatNineScaleChoice），其次用 forceNaturalFive 默认行为
-  if (type === '7b9') {
-    if (sevenFlatNineScaleChoice === 'diminishedWholeHalf') return 'diminishedWholeHalf'
-    if (sevenFlatNineScaleChoice === 'diminishedHalfWhole') return 'diminishedHalfWhole'
-    // 默认 altered vs phrygianDominant 由 forceNaturalFive 决定
-    return forceNaturalFive === false ? 'altered' : 'phrygianDominant'
-  }
-  // 其他 altered dominants：forceNaturalFive=false→altered，true→phrygianDominant
-  const alteredDominants = ['7alt', '7b5', '7#5', '7#9', '7#5b9', '7#5#9', '7b5b9', '7b5#9', 'aug7']
-  if (alteredDominants.includes(type)) {
-    return forceNaturalFive === false ? 'altered' : 'phrygianDominant'
-  }
-  // 普通属和弦（V function → mixolydian）
-  if (['7', '9', '13'].includes(type)) return 'mixolydian'
-  if (['7#11', '9#11', '13#11'].includes(type)) return 'lydianDominant'
-  if (['9b13'].includes(type)) return 'mixolydianFlat6'
-  if (['7b13'].includes(type)) return 'phrygianDominant'
-  // 13b9/13#9 用 diminishedHalfWhole（Solo 所有 function 一致）
-  if (['13b9', '13#9'].includes(type)) return 'diminishedHalfWhole'
-  // 大和弦（I function → major）
-  if (['Maj7', 'Maj9', 'maj13'].includes(type)) return 'major'
-  if (['maj7#11', 'maj9#11', 'maj13#11'].includes(type)) return 'lydian'
-  if (['maj7#5', 'maj9#5', 'maj13#5'].includes(type)) return 'lydianAugmented'
-  if (['maj7b6', 'maj9b6'].includes(type)) return 'harmonicMajor'
-  if (['maj7#9'].includes(type)) return 'lydian' // Solo: line 295-297 (不是 lydianSharp9)
-  if (['add9', '6', '6add9'].includes(type)) return 'major'
-  // 小和弦（I/II function → dorian）
-  if (['m7', 'm9', 'm11', 'm13'].includes(type)) return 'dorian'
-  if (['m7b5', 'm9b5'].includes(type)) return 'locrian'
-  if (['m7b5nat9'].includes(type)) return 'locrianNat2'
-  if (['m7b6'].includes(type)) return 'dorian' // Solo: line 298-300 (不是 aeolian)
-  if (['m6', 'm6add9'].includes(type)) return 'melodicMinor' // Solo: line 274 否定检查 → line 328 (不是 dorian)
-  if (['mMaj7', 'mMaj9', 'mMaj13'].includes(type)) return 'melodicMinor'
-  if (['madd9'].includes(type)) return 'dorian'
-  // 减和弦
-  if (['Dim', 'dim', 'dim7'].includes(type)) return 'diminishedWholeHalf'
-  if (['dimMaj7'].includes(type)) return 'harmonicMinor' // Solo 算法选择
-  // 增和弦
-  if (['Aug', 'aug'].includes(type)) return 'wholeTone'
-  // 挂留和弦
-  if (['sus4', 'sus2'].includes(type)) return 'major'
-  if (['7sus4', '9sus4', '13sus4'].includes(type)) return 'mixolydian'
-  if (['7sus4b9', '13sus4b9'].includes(type)) return 'dorianFlat2' // Solo: line 317-320 (V function)
-  if (['sus4b9'].includes(type)) return 'phrygian' // Solo: line 314-316
-  // 三和弦
-  if (['Major', ''].includes(type)) return 'major'
-  if (['Minor', 'm', 'min', '-'].includes(type)) return 'dorian' // Solo 算法选择
-  return 'major'
-}
-
-// 根据和弦类型返回对应的 sequence 类型（与 Solo 原版 Level.sequence() 一致）
-// forceNaturalFive: 关卡是否强制自然 5 音。变化属和弦在 true 时用 dominant，false 时用 altered
-// 此函数是 getChordDegrees 和 generateChordSequence 共用的唯一权威实现
-function getSequenceTypeForChord(type: string, forceNaturalFive?: boolean): string {
-  // 变化属和弦系列（forceNaturalFive=true → dominant，false → altered）
-  // 注意：aug7 与 7#5 等音等音程，Solo 中视为同一个 ChordType
-  // 注意：7b9b13 不在此列 - Solo case 12 始终用 dominantSequence（不是 altered/dominant 二选一）
-  const alteredDominants = ['7alt', '7b5', '7#5', '7b9', '7#9', '7#5b9', '7#5#9', '7b5b9', '7b5#9', 'aug7']
-  if (alteredDominants.includes(type)) {
-    return forceNaturalFive === false ? 'altered' : 'dominant'
-  }
-  // 普通属和弦系列（包含 7b9b13，Solo case 12 → dominantSequence）
-  if (['7', '7#11', '7b13', '9', '9b13', '9#11', '13', '13#11', '7b9b13'].includes(type)) return 'dominant'
-  // 13b9、13#9 在 Solo 中使用 diminishedDominantSequence（case 52, 53）
-  if (['13b9', '13#9'].includes(type)) return 'diminishedDominant'
-  // 大和弦系列（包含大七、大九、大十三、add9）
-  if (['Maj7', 'maj7#5', 'maj7#11', 'maj7b6', 'maj7#9', 'Maj9', 'maj9#11', 'maj9#5', 'maj9b6', 'maj13', 'maj13#11', 'maj13#5', 'add9'].includes(type)) return 'major'
-  // 小和弦系列（包含小七、小九、小十一、小十三、m7b5、m7b6、mMaj7、madd9）
-  if (['m7', 'm7b5', 'm7b5nat9', 'm7b6', 'mMaj7', 'mMaj9', 'mMaj13', 'm9', 'm9b5', 'm11', 'm13', 'madd9'].includes(type)) return 'minor'
-  // 减和弦系列
-  if (['Dim', 'dim', 'dim7'].includes(type)) return 'diminished'
-  // 减大七和弦
-  if (['dimMaj7'].includes(type)) return 'diminishedMajorSeven'
-  // 增和弦系列（aug7 已在 altered dominants 中处理）
-  if (['Aug', 'aug'].includes(type)) return 'augmented'
-  // 挂留和弦系列（Solo case 40-46：susFourTriad, susFourFlatNine, nineSusFour, sevenSusFour, sevenSusFourFlatNine, thirteenSusFour, thirteenSusFourFlatNine）
-  if (['sus4', '7sus4', '7sus4b9', 'sus4b9', '9sus4', '13sus4', '13sus4b9'].includes(type)) return 'sus'
-  // 挂二和弦
-  if (['sus2'].includes(type)) return 'sus2'
-  // 六和弦系列（6add9 和 m6add9 在 Solo 中都属于 sixSequence，case 49 和 51）
-  if (['6', '6add9', 'm6', 'm6add9'].includes(type)) return 'six'
-  // 大三/小三三和弦（注意 normalizeChordType 会把 'm'、'min'、'-' 转为 'Minor'）
-  if (type === 'Minor' || type === 'm' || type === 'min' || type === '-') return 'minor'
-  if (type === 'Major' || type === '') return 'major'
-  // 默认大调
-  return 'major'
-}
-
-// 根据 sequence 类型获取实际序列，应用与 Solo 一致的回退逻辑：
-// diminishedMajorSeven → diminished；sus2/augmented/altered → sus；最终回退到 major
-function getSequenceWithFallback(sequences: PracticeLevel['sequences'], seqType: string): number[] {
-  const direct = sequences[seqType as keyof typeof sequences]
-  if (direct) return direct
-  const fallbackMap: Record<string, string> = {
-    diminishedMajorSeven: 'diminished',
-    sus2: 'sus',
-    augmented: 'sus',
-    altered: 'sus',
-  }
-  const fallbackKey = fallbackMap[seqType]
-  if (fallbackKey && sequences[fallbackKey as keyof typeof sequences]) {
-    return sequences[fallbackKey as keyof typeof sequences]!
-  }
-  return sequences.major || [1, 3, 5, 7]
-}
-
-function getChordDegrees(type: string, level?: string, options?: {
-  forceNaturalFive?: boolean,
-  endOnStartingInterval?: boolean,
-  usePassingNoteBebopScale?: boolean,
-  sevenFlatNineScaleChoice?: 'altered' | 'diminishedWholeHalf' | 'diminishedHalfWhole'
-}): string[] {
-  const normalizedType = normalizeChordType(type)
-  let chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === type || ct.symbol === type)
-  if (!chordType) return ["1"]
-  
-  if (level && level !== 'all') {
-    const practiceLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level)
-    
-    if (practiceLevel) {
-      const seqType = getSequenceTypeForChord(type, options?.forceNaturalFive) as keyof typeof practiceLevel.sequences
-      const degreeNumbers = getSequenceWithFallback(practiceLevel.sequences, seqType)
-
-      // Solo 架构：sequence 数字作为 1-indexed 索引访问 chord type 对应 scale 的 intervals
-      // 越界时跳过（与 Solo ChangesWorkoutStepBuilder 一致）
-      const scaleName = getScaleForChord(type, options?.forceNaturalFive, options?.sevenFlatNineScaleChoice)
-      const scaleIntervals = SCALE_INTERVALS[scaleName] || SCALE_INTERVALS.major
-      const chordIntervals = chordType.intervals
-      let intervals: string[] = degreeNumbers
-        .filter(deg => deg >= 1 && deg <= scaleIntervals.length)
-        .map(deg => scaleIntervals[deg - 1])
-
-      // forceNaturalFive 已通过 scale 选择实现（phrygianDominant 包含自然 5），无需额外替换
-      
-      if (options?.usePassingNoteBebopScale) {
-        const bebopScale = getBebopScaleForChordType(type)
-        if (bebopScale) {
-          const levelSequence = intervals
-          const bebopIntervals: string[] = []
-          
-          for (const interval of levelSequence) {
-            bebopIntervals.push(interval)
-            
-            const currentIdx = bebopScale.intervals.indexOf(interval)
-            if (currentIdx !== -1 && currentIdx < bebopScale.intervals.length - 1) {
-              const nextInterval = bebopScale.intervals[currentIdx + 1]
-              if (bebopScale.passingToneIndices.includes(currentIdx + 1)) {
-                bebopIntervals.push(nextInterval)
-              }
-            }
-          }
-          
-          intervals = bebopIntervals
-        }
-      }
-
-      const startingOption = practiceLevel.startingIntervalOption || 'first'
-      const takeBeforeOrder = practiceLevel.takeStartingIntervalBeforeOrder
-
-      if (startingOption === 'chordTone' && intervals.length > 0) {
-        const chordToneSet = new Set(chordIntervals.map(s => semitonesToDegree(s, type)))
-        const chordToneInSequence = intervals.filter(i => chordToneSet.has(i))
-        if (chordToneInSequence.length > 0) {
-          const startInterval = chordToneInSequence[Math.floor(Math.random() * chordToneInSequence.length)]
-          if (takeBeforeOrder) {
-            const idx = intervals.indexOf(startInterval)
-            if (idx > 0) {
-              intervals = [...intervals.slice(idx), ...intervals.slice(0, idx)]
-            }
-          }
-        }
-      } else if (startingOption === 'any' && intervals.length > 0) {
-        const startIdx = Math.floor(Math.random() * intervals.length)
-        if (takeBeforeOrder && startIdx > 0) {
-          intervals = [...intervals.slice(startIdx), ...intervals.slice(0, startIdx)]
-        }
-      }
-      
-      if ((options?.endOnStartingInterval || practiceLevel.endOnStartingInterval) && intervals.length > 0) {
-        intervals = [...intervals, intervals[0]]
-      }
-      
-      return intervals
-    }
-    
-    let intervals = getIntervalsForLevel(level, type)
-    
-    if (options?.forceNaturalFive && isAlteredChord(type)) {
-      intervals = intervals.map(degree => {
-        if (degree === '#5' || degree === 'b5' || degree === 'b13' || degree === '#11') {
-          return '5'
-        }
-        return degree
-      })
-    }
-    
-    if (options?.usePassingNoteBebopScale) {
-      const bebopScale = getBebopScaleForChordType(type)
-      if (bebopScale) {
-        const levelSequence = intervals
-        const bebopIntervals: string[] = []
-        
-        for (const interval of levelSequence) {
-          bebopIntervals.push(interval)
-          
-          const currentIdx = bebopScale.intervals.indexOf(interval)
-          if (currentIdx !== -1 && currentIdx < bebopScale.intervals.length - 1) {
-            const nextInterval = bebopScale.intervals[currentIdx + 1]
-            if (bebopScale.passingToneIndices.includes(currentIdx + 1)) {
-              bebopIntervals.push(nextInterval)
-            }
-          }
-        }
-        
-        intervals = bebopIntervals
-      }
-    }
-    
-    if (options?.endOnStartingInterval && intervals.length > 0) {
-      intervals = [...intervals, intervals[0]]
-    }
-    
-    return intervals
-  }
-  
-  if (type === 'dim7' || type === 'diminished7') {
-    return ["1", "b3", "b5", "bb7"]
-  }
-  
-  if (type === 'm7b5' || type === 'half-diminished') {
-    return ["1", "b3", "b5", "b7"]
-  }
-  
-  const extendedChordMap: Record<string, string[]> = {
-    '9': ['1', '3', '5', 'b7', '9'],
-    'Maj9': ['1', '3', '5', '7', '9'],
-    'm9': ['1', 'b3', '5', 'b7', '9'],
-    '7#9': ['1', '3', '5', 'b7', '#9'],
-    '7b9': ['1', '3', '5', 'b7', 'b9'],
-    '11': ['1', '3', '5', 'b7', '9', '11'],
-    'm11': ['1', 'b3', '5', 'b7', '9', '11'],
-    '7#11': ['1', '3', '5', 'b7', '9', '#11'],
-    '13': ['1', '3', '5', 'b7', '9', '11', '13'],
-    'm13': ['1', 'b3', '5', 'b7', '9', '11', '13'],
-  }
-  
-  if (extendedChordMap[type]) {
-    return extendedChordMap[type]
-  }
-  
-  return chordType.intervals.map(interval => {
-    return semitonesToDegree(interval, type)
-  })
-}
-
-// 根据练习模式获取音级 - 与源HTML文件保持一致
-function getIntervalsForLevel(level: string, chordType?: string): string[] {
-  let intervals: string[] = []
-  
-  // 获取和弦类型的实际音级
-  const getChordTypeIntervals = (type?: string): string[] => {
-    if (!type) return ['1', '3', '5', '7']
-    const normalizedType = normalizeChordType(type)
-    const ct = CHORD_TYPES.find(c => c.name === normalizedType || c.symbol === normalizedType || c.name === type || c.symbol === type)
-    if (!ct) return ['1', '3', '5', '7']
-    return ct.intervals.map(i => semitonesToDegree(i, type))
-  }
-  
-  const chordIntervals = getChordTypeIntervals(chordType)
-  
-  // 辅助函数：查找包含特定数字的音级
-  const findInterval = (num: string): string | undefined => {
-    return chordIntervals.find(i => {
-      const numericPart = i.replace(/[^0-9]/g, '')
-      return numericPart === num
-    })
-  }
-
-  switch (level) {
-    // 单和弦音
-    case 'single-root':
-      intervals = ['1']
-      break
-    case 'single-3':
-      intervals = [findInterval('3') || '3']
-      break
-    case 'single-5':
-      intervals = [findInterval('5') || '5']
-      break
-    case 'single-7':
-      intervals = [findInterval('7') || '7']
-      break
-    
-    // 双和弦音
-    case 'double-root-3':
-      intervals = ['1', findInterval('3') || '3']
-      break
-    case 'double-root-5':
-      intervals = ['1', findInterval('5') || '5']
-      break
-    case 'double-root-7':
-      intervals = ['1', findInterval('7') || '7']
-      break
-    case 'double-3-5':
-      intervals = [findInterval('3') || '3', findInterval('5') || '5']
-      break
-    case 'double-3-7':
-      intervals = [findInterval('3') || '3', findInterval('7') || '7']
-      break
-    case 'double-5-7':
-      intervals = [findInterval('5') || '5', findInterval('7') || '7']
-      break
-    
-    // 三和弦音
-    case 'triple-root-3-5':
-      // 对于七和弦类型，需要包含7音
-      if (chordType && (chordType.includes('7') || chordType.includes('9') || chordType.includes('11') || chordType.includes('13'))) {
-        intervals = chordIntervals
-      } else if (chordType && chordType.includes('6')) {
-        intervals = chordIntervals
-      } else if (chordType === 'dim' || chordType === 'diminished') {
-        intervals = ['1', 'b3', 'b5', 'bb7']
-      } else {
-        intervals = ['1', findInterval('3') || '3', findInterval('5') || '5']
-      }
-      break
-    case 'triple-3-5-7':
-      const third = findInterval('3')
-      const fifth = findInterval('5')
-      const seventh = findInterval('7')
-      if (seventh) {
-        intervals = [third || '3', fifth || '5', seventh]
-      } else if (chordType && chordType.includes('6')) {
-        const sixth = findInterval('6')
-        intervals = [third || '3', fifth || '5', sixth || '6']
-      } else {
-        intervals = [third || '3', fifth || '5']
-      }
-      break
-    case 'triple-random-inversion':
-      // 根据和弦类型选择转位
-      if (chordType && (chordType.includes('7') || chordType.includes('9') || chordType.includes('11') || chordType.includes('13'))) {
-        const inversions = [
-          [...chordIntervals],
-          [...chordIntervals.slice(1), chordIntervals[0]],
-          [...chordIntervals.slice(2), ...chordIntervals.slice(0, 2)],
-          [...chordIntervals.slice(3), ...chordIntervals.slice(0, 3)]
-        ]
-        intervals = inversions[Math.floor(Math.random() * inversions.length)]
-      } else if (chordType && chordType.includes('6')) {
-        const inversions = [
-          [...chordIntervals],
-          [...chordIntervals.slice(1), chordIntervals[0]],
-          [...chordIntervals.slice(2), ...chordIntervals.slice(0, 2)],
-          [...chordIntervals.slice(3), ...chordIntervals.slice(0, 3)]
-        ]
-        intervals = inversions[Math.floor(Math.random() * inversions.length)]
-      } else if (chordType === 'dim' || chordType === 'diminished') {
-        const dimInversions = [
-          ['1', 'b3', 'b5', 'bb7'],
-          ['b3', 'b5', 'bb7', '1'],
-          ['b5', 'bb7', '1', 'b3'],
-          ['bb7', '1', 'b3', 'b5']
-        ]
-        intervals = dimInversions[Math.floor(Math.random() * dimInversions.length)]
-      } else {
-        const triadIntervals = ['1', findInterval('3') || '3', findInterval('5') || '5']
-        const triadInversions = [
-          [...triadIntervals],
-          [...triadIntervals.slice(1), triadIntervals[0]],
-          [...triadIntervals.slice(2), triadIntervals[0], triadIntervals[1]]
-        ]
-        intervals = triadInversions[Math.floor(Math.random() * triadInversions.length)]
-      }
-      break
-    
-    // 四和弦音
-    case 'quad-root-3-5-7':
-      intervals = chordIntervals
-      break
-    case 'quad-3-5-7-root':
-      intervals = [...chordIntervals.slice(1), chordIntervals[0]]
-      break
-    case 'quad-5-7-root-3':
-      intervals = [...chordIntervals.slice(2), ...chordIntervals.slice(0, 2)]
-      break
-    case 'quad-7-root-3-5':
-      intervals = [...chordIntervals.slice(3), ...chordIntervals.slice(0, 3)]
-      break
-    case 'quad-random-inversion':
-      const quadInversions = [
-        [...chordIntervals],
-        [...chordIntervals.slice(1), chordIntervals[0]],
-        [...chordIntervals.slice(2), ...chordIntervals.slice(0, 2)],
-        [...chordIntervals.slice(3), ...chordIntervals.slice(0, 3)]
-      ]
-      intervals = quadInversions[Math.floor(Math.random() * quadInversions.length)]
-      break
-    case 'quad-root-3-5-7-root':
-      intervals = [...chordIntervals, '1']
-      break
-    
-    // 默认返回所有音级
-    default:
-      intervals = chordIntervals
-  }
-  
-  return intervals
-}
-
-// 获取音阶的音级（如 1, 2, b3, 4, 5, 6, 7）
-function getScaleDegrees(scale: { notes: number[] }): string[] {
-  return scale.notes.map(note => {
-    return semitonesToDegree(note)
-  })
-}
-
-// Voice Leading: 找到与目标音最近的音级并重新排列
-function applyVoiceLeading(degrees: string[], chordRoot: string, previousNote: string | null): string[] {
-  if (!previousNote || degrees.length === 0) return degrees
-  
-  const prevNoteIdx = getNoteIndex(previousNote)
-  if (prevNoteIdx === -1) return degrees
-  
-  const rootIdx = getNoteIndex(chordRoot)
-  if (rootIdx === -1) return degrees
-  
-  // 计算每个音级到前一个音的距离（考虑八度）
-  let minDistance = Infinity
-  let bestStartIdx = 0
-  
-  for (let i = 0; i < degrees.length; i++) {
-    const semitone = intervalToSemitones[degrees[i]]
-    if (semitone === undefined) continue
-    
-    // 计算音级对应的音高（半音值）
-    const noteSemitone = (rootIdx + semitone) % 12
-    
-    // 计算距离（考虑最近的八度）
-    const distanceUp = (noteSemitone - prevNoteIdx + 12) % 12
-    const distanceDown = (prevNoteIdx - noteSemitone + 12) % 12
-    const distance = Math.min(distanceUp, distanceDown)
-    
-    if (distance < minDistance) {
-      minDistance = distance
-      bestStartIdx = i
-    }
-  }
-  
-  // 从最近的音级开始重新排列
-  if (bestStartIdx === 0) return degrees
-  
-  const reordered = [
-    ...degrees.slice(bestStartIdx),
-    ...degrees.slice(0, bestStartIdx)
-  ]
-  
-  return reordered
-}
-
-// 将半音数转换为音级表示
-function semitonesToDegree(semitones: number, chordContext?: string): string {
-  const isDiminished = chordContext === 'diminished' || chordContext === 'dim7' || chordContext === 'dim' || chordContext === 'dimMaj7'
-  const hasFlatFive = isDiminished || chordContext === 'm7b5' || chordContext === 'm9b5' || chordContext === 'm7b5nat9' || 
-    chordContext === '7b5' || chordContext === '7b5b9' || chordContext === '7b5#9'
-  const isMinor = chordContext?.startsWith('m') || chordContext?.startsWith('min') || chordContext?.startsWith('-') || 
-    chordContext === 'minor' || chordContext === 'm7' || chordContext === 'm9' || chordContext === 'm11' || chordContext === 'm13' || 
-    chordContext === 'mMaj7' || chordContext === 'm6' || chordContext === 'm7b5' || chordContext === 'm7b6' || 
-    chordContext === 'm9b5' || chordContext === 'm7b5nat9' || chordContext === 'mMaj9' || chordContext === 'mMaj13' || 
-    chordContext === 'madd9' || chordContext === 'm6/9'
-  const hasSharpFive = chordContext === '7#5' || chordContext === '7#5b9' || chordContext === '7#5#9' || chordContext === '7alt' ||
-    chordContext === 'aug' || chordContext === 'Aug' || chordContext === 'aug7' ||
-    chordContext === 'maj7#5' || chordContext === 'maj9#5' || chordContext === 'maj13#5'
-  const degreeMap: Record<number, string> = {
-    0: "1",
-    1: "b2",
-    2: "2",
-    3: "b3",
-    4: "3",
-    5: "4",
-    6: hasFlatFive ? "b5" : "#4",
-    7: "5",
-    8: hasSharpFive ? "#5" : isMinor ? "b6" : "#5",
-    9: isDiminished ? "bb7" : "6",
-    10: "b7",
-    11: "7",
-    12: "1",
-    13: "b9",
-    14: "9",
-    15: "#9",
-    16: "#9",
-    17: "11",
-    18: "#11",
-    19: "b5",
-    20: "b13",
-    21: "13",
-  }
-  return degreeMap[semitones] || `${semitones}`
-}
-
-// 获取音符在和弦中的音级
-function getNoteDegreeInChord(note: string, chordRoot: string, chordType: string): string | null {
-  const normalizedType = normalizeChordType(chordType)
-  const chordTypeData = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === chordType || ct.symbol === chordType)
-  if (!chordTypeData) return null
-
-  const rootIdx = getNoteIndex(chordRoot)
-  const noteIdx = getNoteIndex(note)
-  const interval = (noteIdx - rootIdx + 12) % 12
-
-  // 检查这个音程是否在和弦中
-  if (!chordTypeData.intervals.includes(interval)) return null
-
-  return semitonesToDegree(interval, chordType)
-}
-
-// 根据音级和根音生成正确的音名
-// 例如：D Phrygian (1 b2 b3 4 5 b6 b7) 应该显示为 D, Eb, F, G, A, Bb, C 而不是 D, D#, F, G, A, A#, C
-function getScaleNoteNames(rootNote: string, intervals: string[]): string[] {
-  const rootIdx = getNoteIndex(rootNote)
-  const rootBaseName = rootNote.charAt(0) // 'C', 'D', 'E', 'F', 'G', 'A', 'B'
-  const baseNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
-  const rootBaseIdx = baseNotes.indexOf(rootBaseName)
-  
-  return intervals.map(interval => {
-    // 解析音级，如 "b3", "#4", "5"
-    const match = interval.match(/^(b|#)?(\d+)$/)
-    if (!match) return ''
-    
-    const accidental = match[1] || '' // 'b', '#', or ''
-    const degree = parseInt(match[2]) // 1, 2, 3, 4, 5, 6, 7, etc.
-    
-    // 计算音级对应的基本音名（不考虑升降号）
-    // 1=C, 2=D, 3=E, 4=F, 5=G, 6=A, 7=B
-    const degreeToBaseIdx: Record<number, number> = {
-      1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6,
-      8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5
-    }
-    
-    const baseNoteIdx = (rootBaseIdx + (degreeToBaseIdx[degree % 7 || 7] || 0)) % 7
-    const baseNoteName = baseNotes[baseNoteIdx]
-    
-    // 计算目标音的半音数
-    const semitoneOffset = degreeToSemitone(interval)
-    if (semitoneOffset === undefined) return ''
-    
-    const targetSemitone = (rootIdx + semitoneOffset) % 12
-    
-    // 计算基本音名的自然半音数
-    const naturalSemitones: Record<string, number> = {
-      'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11
-    }
-    const naturalSemitone = naturalSemitones[baseNoteName]
-    
-    // 计算需要的升降
-    let diff = (targetSemitone - naturalSemitone + 12) % 12
-    
-    // 将 diff 转换为 -6 到 +6 范围
-    if (diff > 6) diff -= 12
-    
-    // 生成音名
-    let accidentalStr = ''
-    if (diff === 1) accidentalStr = '#'
-    else if (diff === 2) accidentalStr = '##'
-    else if (diff === -1) accidentalStr = 'b'
-    else if (diff === -2) accidentalStr = 'bb'
-    else if (diff > 2) {
-      // 如果差值太大，尝试从另一个方向计算
-      diff = diff - 12
-      if (diff === -1) accidentalStr = 'b'
-    }
-    
-    return baseNoteName + accidentalStr
-  })
-}
-
-// 音级到半音数的映射
-function degreeToSemitone(degree: string): number | undefined {
-  const degreeMap: Record<string, number> = {
-    '1': 0, 'b2': 1, '2': 2, 'b3': 3, '3': 4, '4': 5,
-    'b5': 6, '#4': 6, '5': 7, '#5': 8, 'b6': 8,
-    '6': 9, 'bb7': 9, '#6': 10, 'b7': 10, '7': 11,
-    'b9': 13, '9': 14, '#9': 15, '11': 17, '#11': 18,
-    'b13': 20, '13': 21
-  }
-  return degreeMap[degree]
-}
-
-// 和弦练习下一题预览组件 - 使用useMemo避免频繁重新渲染
-function ChordExerciseNextChordPreview({ 
-  chordExerciseRoot, 
-  chordExerciseTypes 
-}: { 
-  chordExerciseRoot: string
-  chordExerciseTypes: string[]
-}) {
-  const preview = useMemo(() => {
-    const nextRoot = chordExerciseRoot === "random"
-      ? NOTES[Math.floor(Math.random() * NOTES.length)]
-      : chordExerciseRoot
-    const nextType = chordExerciseTypes[Math.floor(Math.random() * chordExerciseTypes.length)]
-    const normalizedType = normalizeChordType(nextType)
-    const nextTypeData = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === nextType)
-    const nextDegrees = getChordDegrees(nextType)
-    return {
-      root: nextRoot,
-      type: nextTypeData?.symbol || nextType,
-      degrees: nextDegrees
-    }
-  }, [chordExerciseRoot, chordExerciseTypes])
-
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-sm font-medium text-muted-foreground">
-        {preview.root} {preview.type}
-      </span>
-      <span className="text-xs text-muted-foreground/70">
-        {preview.degrees.join(' ')}
-      </span>
-    </div>
-  )
-}
-
-// ==================== 乐曲选择弹窗辅助函数 ====================
-
-// 获取歌曲分组键名
-function getSongGroupKey(song: typeof SONG_PROGRESSIONS[0], sortBy: string): string {
-  switch (sortBy) {
-    case 'title-asc':
-    case 'title-desc':
-      // 按标题首字母分组
-      const firstChar = song.name.charAt(0).toUpperCase()
-      if (/[\u4e00-\u9fff]/.test(song.name)) return '中文'
-      if (/^[0-9]/.test(song.name)) return '#'
-      return firstChar
-    case 'style-asc':
-    case 'style-desc':
-      // 按风格分组
-      return song.style || '其他'
-    case 'composer-asc':
-    case 'composer-desc':
-      // 按作曲家分组
-      const composer = song.composer || '未知'
-      const composerFirstChar = composer.charAt(0).toUpperCase()
-      if (/[\u4e00-\u9fff]/.test(composer)) return '中文'
-      if (/^[0-9]/.test(composer)) return '#'
-      return composerFirstChar
-    case 'year-asc':
-    case 'year-desc':
-      // 按年代分组（每十年一组）
-      const year = parseInt(song.year) || 0
-      if (year === 0) return '未知'
-      const decade = Math.floor(year / 10) * 10
-      return `${decade}s`
-    default:
-      return '其他'
-  }
-}
-
-// 排序歌曲
-function sortSongs(songs: typeof SONG_PROGRESSIONS, sortBy: string): typeof SONG_PROGRESSIONS {
-  const sorted = [...songs]
-  switch (sortBy) {
-    case 'title-asc':
-      return sorted.sort((a, b) => {
-        // 定义分组优先级：数字 < 字母 < 中文
-        const getPriority = (text: string) => {
-          if (/[\u4e00-\u9fff]/.test(text)) return 3
-          if (/^[0-9]/.test(text)) return 1
-          return 2
-        }
-        const aPriority = getPriority(a.name)
-        const bPriority = getPriority(b.name)
-        if (aPriority !== bPriority) return aPriority - bPriority
-        return a.name.localeCompare(b.name, 'zh-CN')
-      })
-    case 'title-desc':
-      return sorted.sort((a, b) => {
-        const getPriority = (text: string) => {
-          if (/[\u4e00-\u9fff]/.test(text)) return 3
-          if (/^[0-9]/.test(text)) return 1
-          return 2
-        }
-        const aPriority = getPriority(a.name)
-        const bPriority = getPriority(b.name)
-        if (aPriority !== bPriority) return aPriority - bPriority
-        return b.name.localeCompare(a.name, 'zh-CN')
-      })
-    case 'style-asc':
-      return sorted.sort((a, b) => {
-        const styleCompare = (a.style || '').localeCompare(b.style || '', 'zh-CN')
-        if (styleCompare !== 0) return styleCompare
-        return a.name.localeCompare(b.name, 'zh-CN')
-      })
-    case 'style-desc':
-      return sorted.sort((a, b) => {
-        const styleCompare = (b.style || '').localeCompare(a.style || '', 'zh-CN')
-        if (styleCompare !== 0) return styleCompare
-        return a.name.localeCompare(b.name, 'zh-CN')
-      })
-    case 'composer-asc':
-      return sorted.sort((a, b) => {
-        const composerCompare = (a.composer || '').localeCompare(b.composer || '', 'zh-CN')
-        if (composerCompare !== 0) return composerCompare
-        return a.name.localeCompare(b.name, 'zh-CN')
-      })
-    case 'composer-desc':
-      return sorted.sort((a, b) => {
-        const composerCompare = (b.composer || '').localeCompare(a.composer || '', 'zh-CN')
-        if (composerCompare !== 0) return composerCompare
-        return a.name.localeCompare(b.name, 'zh-CN')
-      })
-    case 'year-asc':
-      return sorted.sort((a, b) => {
-        const yearA = parseInt(a.year) || 0
-        const yearB = parseInt(b.year) || 0
-        if (yearA !== yearB) return yearA - yearB
-        return a.name.localeCompare(b.name, 'zh-CN')
-      })
-    case 'year-desc':
-      return sorted.sort((a, b) => {
-        const yearA = parseInt(a.year) || 0
-        const yearB = parseInt(b.year) || 0
-        if (yearA !== yearB) return yearB - yearA
-        return a.name.localeCompare(b.name, 'zh-CN')
-      })
-    default:
-      return sorted
-  }
-}
-
-// 过滤和分组歌曲
-function filterAndGroupSongs(
-  songs: typeof SONG_PROGRESSIONS,
-  searchQuery: string,
-  sortBy: string
-): { group: string; songs: typeof SONG_PROGRESSIONS }[] {
-  // 先过滤
-  let filtered = songs
-  if (searchQuery.trim()) {
-    const query = searchQuery.toLowerCase().trim()
-    filtered = songs.filter(song =>
-      song.name.toLowerCase().includes(query) ||
-      (song.style && song.style.toLowerCase().includes(query)) ||
-      (song.composer && song.composer.toLowerCase().includes(query)) ||
-      (song.year && song.year.includes(query))
-    )
-  }
-
-  // 再排序
-  const sorted = sortSongs(filtered, sortBy)
-
-  // 最后分组
-  const groups: { group: string; songs: typeof SONG_PROGRESSIONS }[] = []
-  let currentGroup = ''
-  let currentSongs: typeof SONG_PROGRESSIONS = []
-
-  sorted.forEach(song => {
-    const groupKey = getSongGroupKey(song, sortBy)
-    if (groupKey !== currentGroup) {
-      if (currentSongs.length > 0) {
-        groups.push({ group: currentGroup, songs: currentSongs })
-      }
-      currentGroup = groupKey
-      currentSongs = [song]
-    } else {
-      currentSongs.push(song)
-    }
-  })
-
-  if (currentSongs.length > 0) {
-    groups.push({ group: currentGroup, songs: currentSongs })
-  }
-
-  return groups
-}
 
 // ==================== 主组件 ====================
+
+/**
+ * ScriptProcessor 回退路径的起音门限**不再写死**。
+ *
+ * 此前这里是 `const SCRIPT_PROCESSOR_ONSET_GATE = 0.001`，而 worklet / Tauri 两条路径
+ * 的门限都跟着各自跟踪的环境底噪走（`max(0.0008, 底噪 × 1.5)`）。校准出高底噪
+ * （上界 0.025 ⇒ 门限 0.0375）后，回退路径的门限低了 37 倍 ⇒ 环境噪声的起伏被当成
+ * 「一次新的拨弦」⇒ 多帧一致的确认记忆被反复清空 ⇒ 嘈杂房间里永不确认。
+ * 现在统一走 `updateOnsetGate(energy)`：它与另两处**同规则**（见 lib/pitch-detection.ts
+ * 的「起音门限」段），并且吃的是同一帧的**原始** RMS。
+ */
+
+// ==================== 各收音路径的帧长度（多帧一致按时间换算要用） ====================
+// 🚨 三条路径的帧间隔差 17 倍，而 lib/note-confirm.ts 的多帧一致是按**时间**定的目标
+// （NOTE_CONFIRM_TARGET_MS = 32ms）。所以每条路径都必须把自己的帧间隔报上去，
+// 否则会按 worklet 口径算，回退路径上确认延迟被放大成 ~0.5s。
+// 这三个常量与各自的实际用法**同源**（下面都直接引用它们），不要写第二份字面量。
+
+/** AudioWorklet 的 hop 长度（与 public/js/audio-worklet-processor.js 的 hopSize 默认值一致）。 */
+const AUDIO_WORKLET_HOP_SIZE = 512
+/** ScriptProcessor 回退的缓冲区长度（createScriptProcessor 的第一个参数）。 */
+const SCRIPT_PROCESSOR_BUFFER_SIZE = 8192
+/** Tauri 原生流的出帧间隔（startPitchStream 的实参；Rust 侧据此 sleep）。 */
+const NATIVE_PITCH_INTERVAL_MS = 50
+
+/** 由「每帧采样数 + 采样率」算出该路径的帧间隔（ms）。采样率非法时返回 0（调用方回落 worklet 口径）。 */
+const frameMsOf = (samplesPerFrame: number, sampleRate: number): number =>
+  sampleRate > 0 ? (samplesPerFrame / sampleRate) * 1000 : 0
+
+// 根据运行环境获取 AudioWorklet 模块的正确路径
+// Tauri: 从根路径加载; Web子路径部署: 自动检测前缀
+const getAudioWorkletModulePath = (): string => {
+  if (typeof window === 'undefined') return '/js/audio-worklet-processor.js'
+  if (isTauriEnv()) return '/js/audio-worklet-processor.js'
+  const path = window.location.pathname
+  const match = path.match(/^(\/[^/]+)\//)
+  if (match) return match[1] + '/js/audio-worklet-processor.js'
+  return '/js/audio-worklet-processor.js'
+}
+
+// tab → PracticeType 映射（chord tab 对应 chord_progression 类型）
+const tabToPracticeType = (tab: string): PracticeType | null => {
+  switch (tab) {
+    case 'practice': return 'pitch_finding'
+    case 'interval': return 'interval'
+    case 'scale': return 'scale'
+    case 'chord_exercise': return 'chord_exercise'
+    case 'chord': return 'chord_progression'
+    default: return null
+  }
+}
+
+/**
+ * 一次音高检测结果 —— 练习匹配器的输入。
+ * 用对象参数而非位置参数：历史上这里有两份重复实现，签名分别是
+ * (frequency, detectedNote, probability) 与 (detectedFreq, probability, detectedNote)，
+ * 顺序相反、极易传错（现已统一为此接口，并只保留一份实现）。
+ */
+interface DetectedPitchForMatch {
+  frequency: number
+  note: string
+  probability: number
+  /**
+   * 本帧是否为一次新的起音。三条收音路径都会提供：
+   * worklet 用 data.isNoteOnset、Tauri 用 result.isNoteOnset、
+   * ScriptProcessor 回退在页面内用 detectOnset() 现算。
+   * 缺省 false —— 退化成「每个音只计一次分」，见 lib/note-confirm.ts 顶部说明。
+   */
+  isNoteOnset?: boolean
+  /**
+   * 未经平滑的原始频率，供多帧一致判定使用。
+   * 平滑频率（frequency 字段）只用于显示，判定用它会把上一个音带进下一个音的起始帧。
+   * worklet 路径在消息里已带 rawFrequency；没有时回退到 frequency。
+   */
+  rawFrequency?: number
+  /**
+   * 本路径的帧间隔（ms），交给多帧一致按**时间**换算帧数（见 lib/note-confirm.ts 的
+   * `NOTE_CONFIRM_TARGET_MS`）。三条路径帧率差 17 倍（worklet 10.7ms / Tauri 50ms /
+   * ScriptProcessor ~186ms），不报就会按 worklet 口径算，回退路径上确认延迟会放大成 ~0.5s。
+   */
+  frameMs?: number
+}
+
 export default function FretMasterPage() {
   // ==================== Zustand Store 状态 ====================
-  const store = useAppStore()
+  // ⚠️ store 仅用于读取 actions 与挂载期初值（actions 引用在 store 生命周期内稳定）。
+  // 不要通过 store.xxx 读取需要响应式更新的状态——那不会触发重渲染。
+  // 需要响应式的状态必须用下方 selector 单独订阅。
+  const store = useAppStore.getState()
+  // 响应式订阅：仅以下字段变化才会重渲染主组件
+  const activeTab = useAppStore((s) => s.activeTab)
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
+  const settingsOpen = useAppStore((s) => s.settingsOpen)
+  const focusMode = useAppStore((s) => s.focusMode)
   const audioSettings = useAudioSettings()
   const practiceSettings = usePracticeSettings()
   const metronomeSettings = useMetronomeSettings()
-  const feedbackSoundSettings = useFeedbackSoundSettings()
   const storeScore = useScore()
   const storeIsPlaying = useIsPlaying()
-  const storeVersion = useVersion()
   const user = useUser()
   const chordSymbols = useChordSymbols()
 
   // 根据所选乐器派生指板配置（弦数/调弦/品数）
-  const instrumentConfig = INSTRUMENT_CONFIG[user.instrument] || INSTRUMENT_CONFIG.six_string_guitar
+  const instrumentConfig = resolveInstrumentConfig(user.instrument)
   const STRING_COUNT = instrumentConfig.stringCount
 
   const language = user.language
@@ -5198,22 +303,6 @@ export default function FretMasterPage() {
   const theme = user.theme
   const setTheme = store.setTheme
   
-  const getInstrumentTranspose = useCallback((instrument: string): number => {
-    switch (instrument) {
-      case 'b_flat_horn': return 2
-      case 'e_flat_horn': return 9
-      case 'concert_pitch_minus_one': return 1
-      default: return 0
-    }
-  }, [])
-  
-  const transposeNoteForInstrument = useCallback((note: string, instrument: string): string => {
-    const offset = getInstrumentTranspose(instrument)
-    if (offset === 0) return normalizeNoteName(note)
-    const noteIndex = NOTES.indexOf(normalizeNoteName(note))
-    if (noteIndex === -1) return normalizeNoteName(note)
-    return NOTES[(noteIndex + offset) % 12]
-  }, [getInstrumentTranspose])
   const chordScaleDisplay = user.chordScaleDisplay
   const noteAccidentalDisplay = user.noteAccidentalDisplay
   const setChordScaleDisplay = store.setChordScaleDisplay
@@ -5232,6 +321,7 @@ export default function FretMasterPage() {
     { id: "chord_exercise", label: t('nav_chord_exercise'), Icon: Guitar },
     { id: "chord", label: t('nav_chord'), Icon: ListMusic },
     { id: "scale", label: t('nav_scale'), Icon: Music },
+    { id: "theory", label: t('nav_theory'), Icon: BookOpen },
     { id: "stats", label: t('nav_stats'), Icon: BarChart3 },
   ], [t])
 
@@ -5242,6 +332,7 @@ export default function FretMasterPage() {
     { id: "chord_exercise", label: t('nav_chord_exercise'), Icon: Guitar, shortLabel: t('nav_short_chord_exercise') },
     { id: "chord", label: t('nav_chord'), Icon: ListMusic, shortLabel: t('nav_short_chord') },
     { id: "scale", label: t('nav_scale'), Icon: Music, shortLabel: t('nav_short_scale') },
+    { id: "theory", label: t('nav_theory'), Icon: BookOpen, shortLabel: t('nav_short_theory') },
     { id: "stats", label: t('nav_stats'), Icon: BarChart3, shortLabel: t('nav_short_stats') },
   ], [t])
 
@@ -5294,55 +385,37 @@ export default function FretMasterPage() {
         { duration: 8000 }
       )
     }
-  }, [])
+  }, [language])
 
   // 核心状态 - 从 Store 获取
-  const activeTab = store.activeTab
   const setActiveTab = store.setActiveTab
-  const sidebarCollapsed = store.sidebarCollapsed
   const setSidebarCollapsed = store.toggleSidebar
-  const settingsOpen = store.settingsOpen
   const setSettingsOpen = store.setSettingsOpen
-  const isFullscreen = store.isFullscreen
-  const toggleFullscreenState = store.toggleFullscreen
-  const setFullscreenState = store.setFullscreen
+  // 全屏：响应式订阅与切换处理由 useFullscreen 提供（传入 isTauri 决定是否走原生全屏）
+  const {
+    isFullscreen,
+    handleToggleFullscreen,
+    setFullscreenMode,
+  } = useFullscreen(isTauri)
   const displayScale = useDisplayScale()
-  const setDisplayScale = store.setDisplayScale
-  const focusMode = store.focusMode
-  const favorites = store.favorites
-  const toggleLevelFavorite = store.toggleLevelFavorite
-  const toggleSongFavorite = store.toggleSongFavorite
-  const isLevelFavorite = store.isLevelFavorite
-  const isSongFavorite = store.isSongFavorite
 
-  // 全屏切换处理函数
-  const handleToggleFullscreen = useCallback(async (enable?: boolean) => {
-    const newState = enable !== undefined ? enable : !isFullscreen
-    
-    if (isTauri) {
-      try {
-        const { setTrueFullscreen } = await import('@/lib/native-window')
-        await setTrueFullscreen(newState)
-      } catch (e) {
-        console.error('Failed to set fullscreen:', e)
-      }
-    }
-    
-    toggleFullscreenState()
-  }, [isFullscreen, toggleFullscreenState])
-  
-  const setFullscreenMode = handleToggleFullscreen
-
-  // 专注模式启用时不再自动进入全屏，改为浮动侧边面板
+  // 专注模式：面板为浮动侧边形态（a3815f9a2）；「自动全屏」由 enableFullscreen 控制 ——
+  // 进入 / 退出两侧都只在开关打开时动作（成对；关掉开关 = 完全不碰全屏状态，
+  // 不打扰用户手动切换的全屏）。进入侧带 !isFullscreen 守卫防重复调用；
+  // 全屏方向（窗口全屏 / 真全屏）由 useFullscreen 按 focusMode.fullscreenMode 分派。
   const prevFocusModeEnabled = useRef(focusMode?.enabled)
   useEffect(() => {
     if (focusMode?.enabled !== prevFocusModeEnabled.current) {
       prevFocusModeEnabled.current = focusMode?.enabled
-      if (!focusMode?.enabled && isFullscreen) {
-        handleToggleFullscreen(false)
+      if (focusMode?.enableFullscreen) {
+        if (focusMode?.enabled) {
+          if (!isFullscreen) handleToggleFullscreen(true)
+        } else if (isFullscreen) {
+          handleToggleFullscreen(false)
+        }
       }
     }
-  }, [focusMode?.enabled, isFullscreen, handleToggleFullscreen])
+  }, [focusMode?.enabled, focusMode?.enableFullscreen, isFullscreen, handleToggleFullscreen])
 
   // html.fullscreen-mode 类的同步统一由 LayoutShell 负责（同时处理 body 样式），
   // 此处不再重复操作，避免三处维护同一状态导致不一致。
@@ -5358,9 +431,9 @@ export default function FretMasterPage() {
   const [showAllNotes, setShowAllNotes] = useState(false)
   const [selectedStrings, setSelectedStrings] = useState<number[]>([1, 2, 3, 4, 5, 6]) // 默认选中所有弦（切换乐器时由 effect 重置）
 
-  // 切换乐器时同步：更新模块级 STRING_TUNING（供 getNoteAtPosition 读取），并校正 selectedStrings
-  // 注意：STRING_TUNING 需在渲染期间同步更新，确保本次渲染的指板即使用新调弦
-  STRING_TUNING = instrumentConfig.tuning
+  // 切换乐器时同步调弦（供 getNoteAtPosition 读取），并校正 selectedStrings
+  // 注意：需在渲染期间同步更新，确保本次渲染的指板即使用新调弦
+  setStringTuning(instrumentConfig.tuning)
   useEffect(() => {
     setSelectedStrings(prev => {
       const filtered = prev.filter(n => n <= STRING_COUNT)
@@ -5374,32 +447,43 @@ export default function FretMasterPage() {
   const [practiceAnswerMode, setPracticeAnswerMode] = useState<"fretboard" | "buttons">("fretboard") // 答题模式：指板点击或按钮选择
   const practiceAnswerModeRef = useRef<"fretboard" | "buttons">("fretboard") // 答题模式 ref，供音频检测回调使用
   const [highlightedTargetPosition, setHighlightedTargetPosition] = useState<{stringIndex: number, fret: number} | null>(null) // 高亮的目标位置
+  const highlightedTargetPositionRef = useRef<{ stringIndex: number; fret: number } | null>(null) // 目标位置 ref，供音频/MIDI 回调读取
+  // 指板点击路径暂存的位置（handleMIDINoteInput 消费后清除；音频/MIDI 直发时为 null，回退到目标位置）
+  const lastFretClickPositionRef = useRef<{ stringIndex: number; fret: number } | null>(null)
+  useEffect(() => {
+    highlightedTargetPositionRef.current = highlightedTargetPosition
+  }, [highlightedTargetPosition])
+
+  // 逐位置掌握度统计：记录一次判定（找音练习三路径共用：指板点击 / 音频 / MIDI / 按钮）
+  const recordPositionStat = useCallback((isCorrect: boolean) => {
+    const pos = lastFretClickPositionRef.current ?? highlightedTargetPositionRef.current
+    lastFretClickPositionRef.current = null
+    if (!pos) return
+    recordPositionResult(user.instrument, pos.stringIndex, pos.fret, isCorrect)
+  }, [user.instrument])
+
+  // 切换乐器时加载该乐器的位置统计（幂等）；同时预取当前乐器
+  useEffect(() => {
+    loadPositionStats(user.instrument).catch(e => logger.error('加载位置统计失败', e))
+  }, [user.instrument])
   
   // 找音练习建议
   const [showPracticeSuggestions, setShowPracticeSuggestions] = useState(false)
   const [currentPracticeSuggestion, setCurrentPracticeSuggestion] = useState<string>("")
 
   // ==================== 统计模块状态 ====================
-  const [practiceStats, setPracticeStats] = useState<PracticeStats>({
-    daily: [],
-    total: {
-      count: 0,
-      byType: {
-        pitch_finding: 0,
-        scale: 0,
-        chord_exercise: 0,
-        interval: 0,
-        chord_progression: 0
-      },
-      byDetail: {
-        pitch_finding: [],
-        scale: [],
-        chord_exercise: [],
-        interval: [],
-        chord_progression: []
-      }
-    }
-  })
+  // 练习统计：状态与记录逻辑由 usePracticeStats 提供（同名解构，正文用法不变）
+  const {
+    practiceStats,
+    setPracticeStats,
+    practiceSessionStartTime,
+    setPracticeSessionStartTime,
+    practiceElapsedTime,
+    setPracticeElapsedTime,
+    scoreRef,
+    pendingSaveRef,
+    recordPractice,
+  } = usePracticeStats()
   const [statsTimeRange, setStatsTimeRange] = useState<StatsTimeRange>('today')
   const [highlightedFrets, setHighlightedFrets] = useState<Map<string, boolean>>(new Map())
   const practiceTime = practiceSettings.practiceTime
@@ -5408,35 +492,51 @@ export default function FretMasterPage() {
   const fretCount = practiceSettings.fretCount
   const setFretCount = store.setFretCount
   const fretZoneEnabled = practiceSettings.fretZoneEnabled
-  const setFretZoneEnabled = store.setFretZoneEnabled
   const fretZoneStart = practiceSettings.fretZoneStart
-  const setFretZoneStart = store.setFretZoneStart
   const fretZoneSize = practiceSettings.fretZoneSize
-  const setFretZoneSize = store.setFretZoneSize
   const octaveShiftEnabled = practiceSettings.octaveShiftEnabled
-  const setOctaveShiftEnabled = store.setOctaveShiftEnabled
   const octaveShiftMode = practiceSettings.octaveShiftMode
-  const setOctaveShiftMode = store.setOctaveShiftMode
-  const autoNextDelay = practiceSettings.autoNextDelay
-  const setAutoNextDelay = store.setAutoNextDelay
+  const weaknessWeightedEnabled = practiceSettings.weaknessWeightedEnabled
   const [pitchFindingTime, setPitchFindingTime] = useState(5) // 找音练习时长（分钟）
 
-  // 音程状态
-  const [rootNote, setRootNote] = useState(normalizeNoteName(store.intervalPractice.rootNote))
-  const [selectedIntervals, setSelectedIntervals] = useState<number[]>(store.intervalPractice.selectedIntervals)
-  const [intervalRootMode, setIntervalRootMode] = useState<"fixed" | "random">(store.intervalPractice.rootMode)
-  const [findRootFirst, setFindRootFirst] = useState(store.intervalPractice.findRootFirst)
-  const [addRootBack, setAddRootBack] = useState(store.intervalPractice.addRootBack)
-  const [intervalPracticeStep, setIntervalPracticeStep] = useState<"root" | "interval">("root")
-  const [currentIntervalExercise, setCurrentIntervalExercise] = useState<{
-    rootNote: string;
-    interval: { name: string; symbol: string; semitones: number };
-    targetNote: string;
-    allIntervals: { name: string; symbol: string; semitones: number }[];
-    currentIntervalDisplay: string;
-    completedIntervals: number[];
-    answered: boolean;
-  } | null>(null)
+  // 音程练习：state/ref 与出题回调均由 useIntervalExercise 提供（同名解构，正文用法不变）
+  const {
+    rootNote,
+    setRootNote,
+    selectedIntervals,
+    intervalRootMode,
+    setIntervalRootMode,
+    findRootFirst,
+    setFindRootFirst,
+    addRootBack,
+    setAddRootBack,
+    setIntervalPracticeStep,
+    currentIntervalExercise,
+    setCurrentIntervalExercise,
+    showIntervalFretboard,
+    setShowIntervalFretboard,
+    intervalPracticeDuration,
+    setIntervalPracticeDuration,
+    intervalRandomizeOrder,
+    setIntervalRandomizeOrder,
+    intervalDirection,
+    setIntervalDirection,
+    intervalFretboardDuration,
+    setIntervalFretboardDuration,
+    intervalAutoAdvance,
+    setIntervalAutoAdvance,
+    intervalTimeLeft,
+    setIntervalTimeLeft,
+    intervalExerciseQueue,
+    setIntervalExerciseQueue,
+    intervalCurrentQueueIndex,
+    setIntervalCurrentQueueIndex,
+    generateIntervalExerciseRef,
+    currentIntervalExerciseRef,
+    prevIntervalTimeLeftRef,
+    generateIntervalExercise,
+    toggleInterval,
+  } = useIntervalExercise()
   
   // 和弦进行状态
   const [selectedSong, setSelectedSong] = useState(SONG_PROGRESSIONS[0])
@@ -5445,35 +545,22 @@ export default function FretMasterPage() {
   const [chordPlayOrder, setChordPlayOrder] = useState<"asc" | "desc" | "random">(store.chordProgression.playOrder)
   const [practiceLevel, setPracticeLevel] = useState(store.chordProgression.selectedLevelId)
   // 调性状态：存储音名（如 "E"），小调状态单独存储
-  const getKeyNote = (key: string): string => {
-    // 提取音名部分（去掉小调标记 'm'），并标准化为 ♯/♭
-    const rawNotePart = key.endsWith('m') ? key.slice(0, -1) : key
-    const notePart = normalizeNoteName(rawNotePart)
-
-    // 处理降号调性 (如 D♭ -> C♯, B♭ -> A♯)
-    if (notePart.includes('♭')) {
-      const flatIndex = findNoteIndexInArray(notePart, NOTES_FLAT)
-      if (flatIndex !== -1) {
-        return NOTES[flatIndex]
-      }
-    }
-
-    return notePart
-  }
   const isKeyMinor = (key: string): boolean => key.endsWith('m')
   const [progressionKey, setProgressionKey] = useState(normalizeNoteName(store.chordProgression.progressionKey || getKeyNote(SONG_PROGRESSIONS[0]?.key || "C")))
   const [isMinor, setIsMinor] = useState(isKeyMinor(SONG_PROGRESSIONS[0]?.key || "C"))
   const [progressionRepeat, setProgressionRepeat] = useState(store.chordProgression.shouldRepeat)
   const [shouldVoiceLead, setShouldVoiceLead] = useState(store.chordProgression.shouldVoiceLead)
   const [shouldRandomizeKeyOnRepeat, setShouldRandomizeKeyOnRepeat] = useState(store.chordProgression.randomizeKeyOnRepeat)
-  const [songSortOption, setSongSortOption] = useState<'titleAsc' | 'titleDesc' | 'styleAsc' | 'styleDesc'>(store.chordProgression.songSortOption)
-  const [lastChordNote, setLastChordNote] = useState<string | null>(null) // 用于 voice leading
+  const [songSortOption] = useState<'titleAsc' | 'titleDesc' | 'styleAsc' | 'styleDesc'>(store.chordProgression.songSortOption)
   
-  const [levelOrderOption, setLevelOrderOption] = useState(false)
-  const [levelRandomOption, setLevelRandomOption] = useState(false)
-  const [levelStartingInterval, setLevelStartingInterval] = useState<"any" | "first" | "chordTone">("any")
+  // 获取转调后的和弦列表 - 使用useMemo缓存
+  // 获取转调后的和弦列表 - 使用useMemo缓存（转调实现见 lib/song-chords.ts）
+  const transposedChords = useMemo(
+    () => transposeSongChords(customChords, selectedSong, progressionKey),
+    [customChords, selectedSong, progressionKey]
+  )
+  
   const [levelForceNaturalFive, setLevelForceNaturalFive] = useState(true)
-  const [levelNotesPerChord, setLevelNotesPerChord] = useState(1)
   const [levelEndOnStartingInterval, setLevelEndOnStartingInterval] = useState(false)
   const [levelUsePassingNoteBebopScale, setLevelUsePassingNoteBebopScale] = useState(false)
 
@@ -5484,14 +571,11 @@ export default function FretMasterPage() {
     sevenFlatNineScaleChoice: chordSymbols.sevenFlatNineScaleChoice,
   }), [levelForceNaturalFive, levelEndOnStartingInterval, levelUsePassingNoteBebopScale, chordSymbols.sevenFlatNineScaleChoice])
   const [isPracticePaused, setIsPracticePaused] = useState(false)
-  const [practiceSessionStartTime, setPracticeSessionStartTime] = useState<number | null>(null)
-  const [practiceElapsedTime, setPracticeElapsedTime] = useState(0)
   const [irealInput, setIrealInput] = useState("")
   const [newChordRoot, setNewChordRoot] = useState("C")
   const [newChordType, setNewChordType] = useState("Major")
-  const [newChordBass, setNewChordBass] = useState<string | undefined>(undefined)
+  const [newChordBass] = useState<string | undefined>(undefined)
   const [customChordName, setCustomChordName] = useState("")
-  const [showCustomChordDialog, setShowCustomChordDialog] = useState(false)
   
   // 音阶状态
   const [scaleKey, setScaleKey] = useState("C")
@@ -5507,35 +591,91 @@ export default function FretMasterPage() {
   const [scaleExerciseCurrentStep, setScaleExerciseCurrentStep] = useState(0)
   const [showScaleStructure, setShowScaleStructure] = useState(false)
   const [showScaleKeyboard, setShowScaleKeyboard] = useState(false)
-  const [nextScaleExerciseInfo, setNextScaleExerciseInfo] = useState<{key: string, scaleName: string, sequence: string[]} | null>(null)
+  const [nextScaleExerciseInfo, setNextScaleExerciseInfo] = useState<NextScaleExerciseInfo | null>(null)
+  // 一弦三音（3NPS）：当前把位指型 / 把位下标 / 连击。
+  // 序列本身仍走 scaleExerciseSequence（音级标签），这样匹配路径不用改。
+  const [threeNpsPositions, setThreeNpsPositions] = useState<ThreeNpsPosition[]>([])
+  const [threeNpsPositionIndex, setThreeNpsPositionIndex] = useState(0)
+  const [threeNpsSteps, setThreeNpsSteps] = useState<ThreeNpsStep[]>([])
+  const [scaleCombo, setScaleCombo] = useState(0)
+  const [scaleMaxCombo, setScaleMaxCombo] = useState(0)
   
   // 和弦转换练习状态
   const [showFretboard, setShowFretboard] = useState(false)
-  const [showChordFretboard, setShowChordFretboard] = useState(store.chordProgression.showFretboard)
-  const [showChordStructure, setShowChordStructure] = useState(store.chordProgression.showStructure)
+  // 「显示指板 / 结构」都是**辅助**开关（铁律 18：先用它辅助、再关掉凭记忆找音）：
+  // 初值必须是 false —— 从 store 取会让「上次会话按过 ↑」在下次进来时把答案直接摆出来
+  // （2026-10-02 真机确证：reload 后仍 checked）。
+  const [showChordFretboard, setShowChordFretboard] = useState(false)
+  const [showChordStructure, setShowChordStructure] = useState(false)
   const [nextChordInfo, setNextChordInfo] = useState<{index: number, root: string, type: string, bass?: string, degrees: string[]} | null>(null)
   const [chordDegreeCurrentStep, setChordDegreeCurrentStep] = useState(0)
 
   // 和弦练习状态
-  const [chordExerciseRoot, setChordExerciseRoot] = useState<string>("C")
-  const [chordExerciseTypes, setChordExerciseTypes] = useState<string[]>(["Major"])
-  const [chordExerciseLevel, setChordExerciseLevel] = useState<string>("single_chord_tones_root")
-  const [chordExerciseOrder, setChordExerciseOrder] = useState<"asc" | "desc" | "random">("asc")
-  const [chordExerciseBass, setChordExerciseBass] = useState<string>("root")
-  const [showChordExerciseFretboard, setShowChordExerciseFretboard] = useState(false)
-  const [chordExerciseCurrentStep, setChordExerciseCurrentStep] = useState(0)
-  const [chordExerciseSequence, setChordExerciseSequence] = useState<string[]>([])
-  const [chordExerciseTargetChord, setChordExerciseTargetChord] = useState<{root: string, type: string} | null>(null)
-  const [chordExerciseIsAnswered, setChordExerciseIsAnswered] = useState(false)
-  const [nextChordExerciseInfo, setNextChordExerciseInfo] = useState<{root: string, type: string, sequence: string[]} | null>(null)
-  const [showChordExerciseStructure, setShowChordExerciseStructure] = useState(false)
-  const [showChordExerciseLevelSelector, setShowChordExerciseLevelSelector] = useState(false)
+  // 和弦练习：state/ref 与出题回调均由 useChordExercise 提供（同名解构，正文用法不变）
+  const {
+    chordExerciseRoot,
+    setChordExerciseRoot,
+    chordExerciseTypes,
+    setChordExerciseTypes,
+    chordExerciseLevel,
+    setChordExerciseLevel,
+    chordExerciseOrder,
+    setChordExerciseOrder,
+    chordExerciseBass,
+    setChordExerciseBass,
+    showChordExerciseFretboard,
+    setShowChordExerciseFretboard,
+    chordExerciseCurrentStep,
+    setChordExerciseCurrentStep,
+    chordExerciseSequence,
+    setChordExerciseSequence,
+    chordExerciseTargetChord,
+    setChordExerciseTargetChord,
+    chordExerciseIsAnswered,
+    setChordExerciseIsAnswered,
+    nextChordExerciseInfo,
+    setNextChordExerciseInfo,
+    showChordExerciseStructure,
+    setShowChordExerciseStructure,
+    showChordExerciseLevelSelector,
+    setShowChordExerciseLevelSelector,
+    showChordExerciseKeyboard,
+    setShowChordExerciseKeyboard,
+    nextChordExerciseRef,
+    chordExerciseIsAnsweredRef,
+    chordExerciseTargetChordRef,
+    chordExerciseSequenceRef,
+    chordExerciseCurrentStepRef,
+    generateChordExercise,
+    nextChordExercise,
+  } = useChordExercise()
+
+  /**
+   * 开关名 → setter 的对照表（**只写一次**）。
+   *
+   * 键必须是 `lib/tab-fretboard-toggle.ts` 的 `TAB_FRETBOARD_FLAG` 里的名字，
+   * 由 `Record<TabFretboardFlag, …>` 在类型层钉住 —— 真相源加了一个 tab、这里漏了 setter，
+   * `tsc` 当场报错，不会静默变成「那个 tab 按 ↑ 没反应」。
+   */
+  const SET_TAB_FRETBOARD = useMemo<Record<TabFretboardFlag, (v: boolean) => void>>(() => ({
+    showFretboard: setShowFretboard,
+    showIntervalFretboard: setShowIntervalFretboard,
+    showChordExerciseFretboard: setShowChordExerciseFretboard,
+    showChordFretboard: setShowChordFretboard,
+    showScaleFretboard: setShowScaleFretboard,
+  }), [setShowFretboard, setShowIntervalFretboard, setShowChordExerciseFretboard, setShowChordFretboard, setShowScaleFretboard])
 
   // 正确答案反馈状态
-  const [showCorrectFeedback, setShowCorrectFeedback] = useState(false)
-  const [correctFeedbackNote, setCorrectFeedbackNote] = useState<string | null>(null)
-  const [showWrongFeedback, setShowWrongFeedback] = useState(false)
-  const [wrongFeedbackNote, setWrongFeedbackNote] = useState<string | null>(null)
+  // 反馈音与正误提示：由 useFeedbackSound 提供（同名解构，正文用法不变）
+  const {
+    showCorrectFeedback,
+    correctFeedbackNote,
+    showWrongFeedback,
+    wrongFeedbackNote,
+    playFeedbackSound,
+    triggerCorrectFeedback,
+    triggerWrongFeedback,
+  } = useFeedbackSound()
   const [showPracticeSummary, setShowPracticeSummary] = useState(false)
   const [practiceSummaryData, setPracticeSummaryData] = useState<{correct: number, total: number, duration: number}>({correct: 0, total: 0, duration: 0})
 
@@ -5555,23 +695,10 @@ export default function FretMasterPage() {
     }
   }, [])
 
-  // 音程练习状态
-  const [showIntervalFretboard, setShowIntervalFretboard] = useState(store.intervalPractice.showFretboard)
-  const [showIntervalKeyboard, setShowIntervalKeyboard] = useState(false)
-  const [intervalPracticeDuration, setIntervalPracticeDuration] = useState(store.intervalPractice.practiceDuration)
-  const [intervalRandomizeOrder, setIntervalRandomizeOrder] = useState(store.intervalPractice.randomizeOrder)
-  const [intervalDirection, setIntervalDirection] = useState<"up" | "down" | "random" | "either">(store.intervalPractice.direction)
-  const [intervalFretboardDuration, setIntervalFretboardDuration] = useState(store.intervalPractice.fretboardDuration)
-  const [intervalAutoAdvance, setIntervalAutoAdvance] = useState(store.intervalPractice.autoAdvance)
-  const [intervalTimeLeft, setIntervalTimeLeft] = useState(0) // 剩余时间（秒）
-  const [intervalExerciseQueue, setIntervalExerciseQueue] = useState<number[]>([]) // 音程练习队列
-  const [intervalCurrentQueueIndex, setIntervalCurrentQueueIndex] = useState(0) // 当前队列索引
-
   // 和弦练习状态
-  const [showChordExerciseKeyboard, setShowChordExerciseKeyboard] = useState(false)
 
   // 和弦转换练习状态
-  const [showChordKeyboard, setShowChordKeyboard] = useState(store.chordProgression.showKeyboard)
+  const [showChordKeyboard, setShowChordKeyboard] = useState(false)
 
   // 乐曲选择弹窗状态
   const [showSongSelector, setShowSongSelector] = useState(false)
@@ -5587,27 +714,6 @@ export default function FretMasterPage() {
     [songSearchQuery, songSortBy]
   )
 
-  // 扁平化歌曲列表用于虚拟滚动
-  const flattenedSongs = useMemo(() => {
-    const result: Array<{ type: 'header'; group: string } | { type: 'song'; song: typeof SONG_PROGRESSIONS[0]; group: string }> = []
-    groupedSongs.forEach(({ group, songs }) => {
-      result.push({ type: 'header', group })
-      songs.forEach(song => {
-        result.push({ type: 'song', song, group })
-      })
-    })
-    return result
-  }, [groupedSongs])
-
-  // 虚拟滚动列表 ref
-  const songListRef = useRef<List>(null)
-
-  // 获取歌曲列表项高度
-  const getSongItemSize = useCallback((index: number) => {
-    const item = flattenedSongs[index]
-    return item?.type === 'header' ? 28 : 64
-  }, [flattenedSongs])
-
   // 练习模式选择弹窗状态
   const [showLevelSelector, setShowLevelSelector] = useState(false)
   const [selectedLevelInfo, setSelectedLevelInfo] = useState<typeof ALL_PRACTICE_LEVELS[0] | null>(null)
@@ -5618,42 +724,41 @@ export default function FretMasterPage() {
   
   // 节拍器状态 - 从 Store 获取
   const metronomeEnabled = metronomeSettings.enabled
-  const setMetronomeEnabled = store.setMetronomeEnabled
   const metronomeBpm = metronomeSettings.bpm
   const setMetronomeBpm = store.setMetronomeBpm
   const metronomeSound = metronomeSettings.sound
-  const setMetronomeSound = store.setMetronomeSound
   const metronomeFlash = metronomeSettings.flash
-  const setMetronomeFlash = store.setMetronomeFlash
   
   // 音频输入状态 - 从 Store 获取
   const micEnabled = audioSettings.micEnabled
   const setMicEnabled = store.setMicEnabled
-  const audioDevices = store.audioDevice.devices
-  const setAudioDevices = store.setAudioDevices
-  const audioInitializing = store.audioDevice.initializing
+  const setMicUserPreference = store.setMicUserPreference
   const setAudioInitializing = store.setAudioInitializing
-  const audioError = store.audioDevice.error
   const setAudioError = store.setAudioError
   const selectedAudioDevice = audioSettings.selectedAudioDevice
-  const setSelectedAudioDevice = store.setSelectedAudioDevice
-  const detectedPitch = store.detectedPitch
   const setDetectedPitch = store.setDetectedPitch
-  const detectedCents = store.detectedCents
   const setDetectedCents = store.setDetectedCents
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null)
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null)
   const inputGain = audioSettings.inputGain
   const setInputGain = store.setInputGain
-  
-  // 音高检测调试信息
-  const [pitchDebugInfo, setPitchDebugInfo] = useState<{
-    rms: number
-    threshold: number
-    frequency: number | null
-    probability: number | null
-    isRunning: boolean
-  }>({ rms: 0, threshold: 0, frequency: null, probability: null, isRunning: false })
+
+  // ---- 环境噪声校准（P1）----
+  // 「量一次房间」的用户触发流程，测量口径见 lib/noise-calibration.ts。
+  // 结果写进 store 的 audio.noiseFloor（会随其它音频设置一起持久化），并在当下立刻
+  // 下发给 worklet / TS 两条收音路径 —— 校准的意义就是「现在这间屋子」，
+  // 等到下次重开麦克风才生效等于没校。
+  const noiseFloor = audioSettings.noiseFloor
+  const setNoiseFloor = store.setNoiseFloor
+  const [noiseCalibrating, setNoiseCalibrating] = useState(false)
+  /** 倒计时剩余秒数；null = 不在倒计时（未开始 / 已进入采样 / 已结束） */
+  const [noiseCalibrationCountdown, setNoiseCalibrationCountdown] = useState<number | null>(null)
+  /** 采样进度（已采轮数），仅采样阶段非 null */
+  const [noiseCalibrationProgress, setNoiseCalibrationProgress] = useState<number | null>(null)
+  /** 同一时刻只允许一次校准（重复点击 / 关麦竞态） */
+  const noiseCalibratingRef = useRef(false)
+  /** 校准的中止开关：关掉麦克风、离开页面时置 true */
+  const noiseCalibrationAbortRef = useRef(false)
   
   // MIDI状态
   const [midiEnabled, setMidiEnabled] = useState(false)
@@ -5682,34 +787,26 @@ export default function FretMasterPage() {
   const tunerAudioContextRef = useRef<AudioContext | null>(null)
   const tunerAnalyserRef = useRef<AnalyserNode | null>(null)
   const tunerStreamRef = useRef<MediaStream | null>(null)
-  // 反馈音共享 AudioContext，避免每次播放都创建新实例导致内存泄漏和配额耗尽
-  // （浏览器/WebView 通常限制约 6 个 AudioContext 实例）
-  const feedbackAudioCtxRef = useRef<AudioContext | null>(null)
   const tunerGainNodeRef = useRef<GainNode | null>(null)
   const tunerAnimationRef = useRef<number | null>(null)
   const tunerHistoryRef = useRef<{ frequency: number; note: string; cents: number }[]>([])
+  // Tauri 调音器：pitch-detected 事件监听与 Rust 检测线程的拆除句柄（stopTuner 需要）
+  const tunerUnlistenRef = useRef<(() => void) | null>(null)
+  const tunerStreamRunningRef = useRef(false)
 
-  // 浮动窗口拖动位置状态
-  const [chordStructurePosition, setChordStructurePosition] = useState({ x: 0, y: 0 })
-  const [scaleStructurePosition, setScaleStructurePosition] = useState({ x: 0, y: 0 })
-  const [chordExerciseStructurePosition, setChordExerciseStructurePosition] = useState({ x: 0, y: 0 })
-  const dragRef = useRef<{
-    isDragging: boolean;
-    startX: number;
-    startY: number;
-    initialX: number;
-    initialY: number;
-    target: 'chord' | 'scale' | 'chordExercise' | null;
-  }>({
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-    initialX: 0,
-    initialY: 0,
-    target: null
-  })
-  const rafRef = useRef<number | null>(null)
-  const pendingPositionRef = useRef<{ x: number; y: number; target: 'chord' | 'scale' | 'chordExercise' } | null>(null)
+  // 浮动窗口拖动：state/ref 与拖拽回调均由 useStructureWindowDrag 提供（同名解构，正文用法不变）
+  const {
+    chordStructurePosition,
+    setChordStructurePosition,
+    scaleStructurePosition,
+    setScaleStructurePosition,
+    chordExerciseStructurePosition,
+    setChordExerciseStructurePosition,
+    dragRef,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+  } = useStructureWindowDrag()
 
   // Refs
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -5718,13 +815,18 @@ export default function FretMasterPage() {
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const cooldownRef = useRef<NodeJS.Timeout | null>(null)
   const isCoolingDownRef = useRef(false)
+  // 收音两级前置滤波的状态（详见 lib/note-confirm.ts）。
+  // - onsetState 仅 ScriptProcessor 回退路径需要：另两条路径的起音由 worklet / Rust 算好发过来。
+  // - confirmState 三条路径共用（都在 processPracticeMatch 里过这道门）。
+  const onsetStateRef = useRef<OnsetState | null>(null)
+  if (onsetStateRef.current === null) onsetStateRef.current = createOnsetState()
+  const noteConfirmStateRef = useRef<NoteConfirmState | null>(null)
+  if (noteConfirmStateRef.current === null) noteConfirmStateRef.current = createNoteConfirmState()
   const handleMIDINoteInputRef = useRef<((note: string) => void) | null>(null)
-  const nextChordExerciseRef = useRef<(() => void) | null>(null)
   const nextScaleExerciseRef = useRef<(() => void) | null>(null)
   const generateNewTargetRef = useRef<(() => void) | null>(null)
-  const generateIntervalExerciseRef = useRef<(() => void) | null>(null)
+  const togglePracticeRef = useRef<(() => void) | null>(null)
   const nextChordRef = useRef<(() => void) | null>(null)
-  const chordExerciseIsAnsweredRef = useRef(false)
   const practiceCardRef = useRef<HTMLDivElement | null>(null)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null)
@@ -5733,16 +835,6 @@ export default function FretMasterPage() {
   const handleAudioWorkletMessageRef = useRef<((message: { type: string; data: unknown }) => void) | null>(null)
   const [useAudioWorklet, setUseAudioWorklet] = useState(true)
   
-  // 根据运行环境获取 AudioWorklet 模块的正确路径
-  // Tauri: 从根路径加载; Web子路径部署: 自动检测前缀
-  const getAudioWorkletModulePath = (): string => {
-    if (typeof window === 'undefined') return '/js/audio-worklet-processor.js'
-    if (isTauriEnv()) return '/js/audio-worklet-processor.js'
-    const path = window.location.pathname
-    const match = path.match(/^(\/[^/]+)\//)
-    if (match) return match[1] + '/js/audio-worklet-processor.js'
-    return '/js/audio-worklet-processor.js'
-  }
   
   // 状态refs - 用于音高检测回调中获取最新状态
   const isPlayingRef = useRef(isPlaying)
@@ -5750,15 +842,14 @@ export default function FretMasterPage() {
   const sensitivityRef = useRef(sensitivity)
   const confidenceThresholdRef = useRef(confidenceThreshold)
   const pitchAlgorithmRef = useRef(audioSettings.pitchAlgorithm)
-  const scoreRef = useRef(score)
   const targetNoteRef = useRef(targetNote)
   const scaleKeyRef = useRef(scaleKey)
   const scaleExerciseSequenceRef = useRef(scaleExerciseSequence)
   const scaleExerciseCurrentStepRef = useRef(scaleExerciseCurrentStep)
-  const chordExerciseTargetChordRef = useRef(chordExerciseTargetChord)
-  const chordExerciseSequenceRef = useRef(chordExerciseSequence)
-  const chordExerciseCurrentStepRef = useRef(chordExerciseCurrentStep)
-  const currentIntervalExerciseRef = useRef(currentIntervalExercise)
+  // 一弦三音连击：用 ref 记账再同步进 state。
+  // 不能在 setState updater 里更新 maxCombo —— updater 必须是纯函数（StrictMode 会双调用）。
+  const scaleComboRef = useRef(0)
+  const scaleMaxComboRef = useRef(0)
   const currentChordIndexRef = useRef(currentChordIndex)
   const chordDegreeCurrentStepRef = useRef(chordDegreeCurrentStep)
   const practiceLevelRef = useRef(practiceLevel)
@@ -5800,14 +891,11 @@ export default function FretMasterPage() {
     shouldRandomizeKeyOnRepeatRef.current = shouldRandomizeKeyOnRepeat
     progressionRepeatRef.current = progressionRepeat
     levelOptionsRef.current = getLevelOptions()
-  }, [isPlaying, activeTab, sensitivity, confidenceThreshold, targetNote, scaleKey,
-      scaleExerciseSequence, scaleExerciseCurrentStep, chordExerciseTargetChord,
-      chordExerciseSequence, chordExerciseCurrentStep, currentIntervalExercise,
-      currentChordIndex, chordDegreeCurrentStep, practiceLevel, findRootFirst, nextChordInfo,
-      shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat, getLevelOptions, audioSettings.pitchAlgorithm, chordSymbols.sevenFlatNineScaleChoice])
+  }, [isPlaying, activeTab, sensitivity, confidenceThreshold, targetNote, scaleKey, scaleExerciseSequence, scaleExerciseCurrentStep, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, currentIntervalExercise, currentChordIndex, chordDegreeCurrentStep, practiceLevel, findRootFirst, nextChordInfo, shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat, getLevelOptions, audioSettings.pitchAlgorithm, chordSymbols.sevenFlatNineScaleChoice, score, scoreRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, currentIntervalExerciseRef, addRootBack])
 
+  const setIntervalPracticeSettings = store.setIntervalPracticeSettings
   useEffect(() => {
-    store.setIntervalPracticeSettings({
+    setIntervalPracticeSettings({
       selectedIntervals,
       rootMode: intervalRootMode,
       rootNote,
@@ -5816,26 +904,23 @@ export default function FretMasterPage() {
       direction: intervalDirection,
       randomizeOrder: intervalRandomizeOrder,
       practiceDuration: intervalPracticeDuration,
-      showFretboard: showIntervalFretboard,
       fretboardDuration: intervalFretboardDuration,
       autoAdvance: intervalAutoAdvance,
     })
-  }, [selectedIntervals, intervalRootMode, rootNote, findRootFirst, addRootBack, intervalDirection, intervalRandomizeOrder, intervalPracticeDuration, showIntervalFretboard, intervalFretboardDuration, intervalAutoAdvance])
+  }, [selectedIntervals, intervalRootMode, rootNote, findRootFirst, addRootBack, intervalDirection, intervalRandomizeOrder, intervalPracticeDuration, intervalFretboardDuration, intervalAutoAdvance, setIntervalPracticeSettings])
 
+  const setChordProgressionSettings = store.setChordProgressionSettings
   useEffect(() => {
-    store.setChordProgressionSettings({
+    setChordProgressionSettings({
       selectedLevelId: practiceLevel,
       progressionKey,
       playOrder: chordPlayOrder,
       shouldRepeat: progressionRepeat,
       shouldVoiceLead,
       randomizeKeyOnRepeat: shouldRandomizeKeyOnRepeat,
-      showFretboard: showChordFretboard,
-      showKeyboard: showChordKeyboard,
-      showStructure: showChordStructure,
       songSortOption,
     })
-  }, [practiceLevel, progressionKey, chordPlayOrder, progressionRepeat, shouldVoiceLead, shouldRandomizeKeyOnRepeat, showChordFretboard, showChordKeyboard, showChordStructure, songSortOption])
+  }, [practiceLevel, progressionKey, chordPlayOrder, progressionRepeat, shouldVoiceLead, shouldRandomizeKeyOnRepeat, songSortOption, setChordProgressionSettings])
 
   // 从服务器/SQLite加载统计数据
   useEffect(() => {
@@ -5995,7 +1080,7 @@ export default function FretMasterPage() {
     }
     
     loadStatsFromServer()
-  }, [isTauri])
+  }, [isTauri, setPracticeStats])
 
   const savePracticeState = useCallback(() => {
     if (typeof window === 'undefined' || !isPlaying) return
@@ -6006,7 +1091,11 @@ export default function FretMasterPage() {
       isPracticePaused,
       timestamp: Date.now(),
     }
-    localStorage.setItem('fretmaster-practice-state', JSON.stringify(state))
+    try {
+      localStorage.setItem('fretmaster-practice-state', JSON.stringify(state))
+    } catch (e) {
+      logger.error('保存练习状态快照失败:', e)
+    }
   }, [isPlaying, activeTab, storeScore, timeLeft, isPracticePaused])
 
   useEffect(() => {
@@ -6018,13 +1107,16 @@ export default function FretMasterPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [savePracticeState])
 
+  // 清理过期的练习状态快照（超过 30 分钟视为失效）。
+  // 原实现判断反了：删掉的是 30 分钟内的有效快照、反而留下过期数据。
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
       const saved = localStorage.getItem('fretmaster-practice-state')
       if (saved) {
         const state = JSON.parse(saved)
-        if (Date.now() - state.timestamp < 30 * 60 * 1000) {
+        const age = Date.now() - (state?.timestamp ?? 0)
+        if (age > 30 * 60 * 1000) {
           localStorage.removeItem('fretmaster-practice-state')
         }
       }
@@ -6033,116 +1125,33 @@ export default function FretMasterPage() {
     }
   }, [])
 
-  // 记录练习统计
-  // 所有练习 tab 统一为"会话级"记录：会话结束时调用一次，score/duration/accuracy 全部基于真实数据
-  // - score: 本次会话得分（0-100），= round(correct/total * 100)，未答题时记 0
-  // - duration: 本次会话耗时（秒），= 会话开始至今的时间
-  // - accuracy: 准确率（0-100），与 score 同源
-  const recordPractice = useCallback((type: PracticeType, detailName: string, opts?: { score?: number; duration?: number; accuracy?: number }) => {
-    // 使用本地时区日期，避免 UTC+8 凌晨 0-8 点时今天被记为昨天
-    const today = getLocalDateString(new Date())
-    
-    // 计算真实数据（若未显式传入）
-    const currentScore = scoreRef.current
-    // score 与 accuracy 同源：答对率 * 100。未答题（total=0）记 0 分，不再硬编码 100
-    const realScore = currentScore.total > 0
-      ? Math.round((currentScore.correct / currentScore.total) * 100)
-      : 0
-    const realAccuracy = realScore
-    const realDuration = practiceSessionStartTime
-      ? Math.max(1, Math.round((Date.now() - practiceSessionStartTime + practiceElapsedTime * 1000) / 1000))
-      : 60
-    const finalScore = opts?.score ?? realScore
-    const finalDuration = opts?.duration ?? realDuration
-    const finalAccuracy = opts?.accuracy ?? realAccuracy
-    
-    // 先计算 newStats（updater 必须是纯函数，副作用移出以避免 StrictMode 重复保存）
-    setPracticeStats(prevStats => {
-      const newStats = { ...prevStats }
+  // 待持久化的统计载荷。放在 ref 中，由 [practiceStats] 的 effect 统一落库，
+  // 使 recordPractice 的 state updater 保持纯函数（并发渲染下不会重复保存）。
 
-      // 更新总计
-      newStats.total.count += 1
-      newStats.total.byType[type] = (newStats.total.byType[type] || 0) + 1
+  // 练习统计持久化（副作用集中在此 effect）：
+  // - 移出 state updater，避免并发渲染下 updater 重复执行导致重复保存
+  // - localStorage 写入加 try-catch，避免配额超限抛异常中断后续的 saveToServer
+  useEffect(() => {
+    const payload = pendingSaveRef.current
+    if (!payload || typeof window === 'undefined') return
+    pendingSaveRef.current = null
 
-      // 更新详细统计
-      const detailList = newStats.total.byDetail[type] || []
-      const existingDetail = detailList.find(d => d.name === detailName)
-      if (existingDetail) {
-        existingDetail.count += 1
-      } else {
-        detailList.push({ name: detailName, count: 1 })
+    if (!isTauri) {
+      try {
+        localStorage.setItem('fretmaster-stats', JSON.stringify(practiceStats))
+      } catch (e) {
+        logger.error('保存练习统计到 localStorage 失败（可能超出配额）:', e)
       }
-      newStats.total.byDetail[type] = detailList
+    }
 
-      // 更新每日统计
-      let todayStats = newStats.daily.find(d => d.date === today)
-      if (!todayStats) {
-        todayStats = {
-          date: today,
-          totalCount: 0,
-          byType: {
-            pitch_finding: 0,
-            scale: 0,
-            chord_exercise: 0,
-            interval: 0,
-            chord_progression: 0
-          },
-          byDetail: {
-            pitch_finding: [],
-            scale: [],
-            chord_exercise: [],
-            interval: [],
-            chord_progression: []
-          }
-        }
-        newStats.daily.push(todayStats)
-      }
-
-      todayStats.totalCount += 1
-      todayStats.byType[type] = (todayStats.byType[type] || 0) + 1
-
-      const todayDetailList = todayStats.byDetail[type] || []
-      const todayExistingDetail = todayDetailList.find(d => d.name === detailName)
-      if (todayExistingDetail) {
-        todayExistingDetail.count += 1
-      } else {
-        todayDetailList.push({ name: detailName, count: 1 })
-      }
-      todayStats.byDetail[type] = todayDetailList
-
-      // 只保留最近90天的数据
-      newStats.daily = newStats.daily
-        .filter(d => {
-          // 使用本地时区解析日期
-          const parts = d.date.split('-')
-          if (parts.length !== 3) return false
-          const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-          const ninetyDaysAgo = getLocalDaysAgoStart(90)
-          return date >= ninetyDaysAgo
-        })
-        .sort((a, b) => b.date.localeCompare(a.date))
-
-      // 副作用移出 updater：在新状态计算完成后，于下一个微任务执行持久化
-      // 避免在 React StrictMode 下 updater 被调用两次导致重复保存
-      queueMicrotask(() => {
-        // Tauri 环境使用 SQLite 作为唯一统计源，不写 localStorage（遵循项目约定）
-        if (typeof window !== 'undefined' && !isTauri) {
-          localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
-        }
-
-        // 保存到服务器（SQLite/CGI）。detailName 已是白名单允许的中文短词（如"找音练习"）
-        saveToServer({
-          exercise_type: detailName,
-          score: finalScore,
-          duration: finalDuration,
-          accuracy: finalAccuracy,
-          notes: `练习项目: ${detailName}`
-        }).catch(err => console.error('保存到服务器失败:', err))
-      })
-
-      return newStats
-    })
-  }, [practiceSessionStartTime, practiceElapsedTime, isTauri])
+    saveToServer({
+      exercise_type: payload.detailName,
+      score: payload.score,
+      duration: payload.duration,
+      accuracy: payload.accuracy,
+      notes: `练习项目: ${payload.detailName}`
+    }).catch(err => console.error('保存到服务器失败:', err))
+  }, [practiceStats, isTauri, pendingSaveRef])
 
   // ==================== 练习会话统计（统一会话级记录） ====================
   // 所有练习 tab 统一按"会话"统计：从开始练习到结束练习（停止/时间到/切Tab）记为一次。
@@ -6152,17 +1161,6 @@ export default function FretMasterPage() {
   const sessionScoreRef = useRef<{ correct: number; total: number }>({ correct: 0, total: 0 })
   const sessionTabRef = useRef<PracticeType | null>(null)
 
-  // tab → PracticeType 映射（chord tab 对应 chord_progression 类型）
-  const tabToPracticeType = (tab: string): PracticeType | null => {
-    switch (tab) {
-      case 'practice': return 'pitch_finding'
-      case 'interval': return 'interval'
-      case 'scale': return 'scale'
-      case 'chord_exercise': return 'chord_exercise'
-      case 'chord': return 'chord_progression'
-      default: return null
-    }
-  }
 
   useEffect(() => {
     const currentType = tabToPracticeType(activeTab)
@@ -6193,7 +1191,11 @@ export default function FretMasterPage() {
       // 仅在用户实际有答题时才记录，避免"开始后立即停止"也被计入
       if (sessionType && sessionScore.total > 0) {
         const accuracy = Math.round((sessionScore.correct / sessionScore.total) * 100)
-        const duration = Math.max(1, Math.round((Date.now() - startTime!) / 1000))
+        // 扣除暂停时间：practiceElapsedTime 是已累计的暂停秒数；
+        // 若当前正处于暂停中，还要再减去本次暂停已持续的时间。
+        const pausedSec = practiceElapsedTime +
+          (isPracticePaused && practiceSessionStartTime ? (Date.now() - practiceSessionStartTime) / 1000 : 0)
+        const duration = Math.max(1, Math.round((Date.now() - startTime!) / 1000 - pausedSec))
         // detailName 用类型对应的中文名
         const detailNames: Record<PracticeType, string> = {
           pitch_finding: '找音练习',
@@ -6205,162 +1207,18 @@ export default function FretMasterPage() {
         recordPractice(sessionType, detailNames[sessionType], { score: accuracy, duration, accuracy })
       }
     }
-  }, [isPlaying, activeTab, score, recordPractice])
+  }, [isPlaying, activeTab, score, recordPractice, practiceElapsedTime, isPracticePaused, practiceSessionStartTime])
 
-  // 获取指定时间范围的统计数据
-  const getStatsByTimeRange = useCallback((range: StatsTimeRange): { count: number; byType: Record<PracticeType, number>; byDetail: Record<PracticeType, PracticeDetail[]> } => {
-    // 使用本地时区的日期范围边界，避免 UTC 偏移导致"今天/本周/本月"判断错误
-    // 旧代码使用 new Date().toISOString().split('T')[0] 得到的是 UTC 日期，
-    // 在 UTC+8 时区凌晨 0-8 点会返回前一天，导致"今天"显示错误。
-    const todayLocal = getLocalDateString(new Date())
-
-    let startDate: Date
-    switch (range) {
-      case 'today':
-        // 今天的本地 0 点
-        startDate = getLocalDayStart(todayLocal)
-        break
-      case 'week':
-        // 7 天前的本地 0 点（滑动窗口）
-        startDate = getLocalDaysAgoStart(7)
-        break
-      case 'month':
-        // 1 个月前的本地 0 点
-        startDate = getLocalMonthsAgoStart(1)
-        break
-      case 'total':
-      default:
-        return practiceStats.total
-    }
-
-    // daily 中的 date 是 YYYY-MM-DD 格式（本地日期），需要按本地时区解析
-    const filtered = practiceStats.daily.filter(d => {
-      const parts = d.date.split('-')
-      if (parts.length !== 3) return false
-      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-      return date >= startDate
-    })
-    
-    interface StatsResult {
-      count: number
-      byType: Record<PracticeType, number>
-      byDetail: Record<PracticeType, Array<{ name: string; count: number }>>
-    }
-    
-    const result: StatsResult = {
-      count: 0,
-      byType: {
-        pitch_finding: 0,
-        scale: 0,
-        chord_exercise: 0,
-        interval: 0,
-        chord_progression: 0
-      },
-      byDetail: {
-        pitch_finding: [],
-        scale: [],
-        chord_exercise: [],
-        interval: [],
-        chord_progression: []
-      }
-    }
-    
-    filtered.forEach(day => {
-      // 确保 totalCount 是数字
-      const count = typeof day.totalCount === 'number' ? day.totalCount : 0
-      result.count += count
-      
-      // 确保 byType 存在
-      if (day.byType && typeof day.byType === 'object') {
-        (Object.keys(day.byType) as PracticeType[]).forEach(type => {
-          const typeCount = typeof day.byType[type] === 'number' ? day.byType[type] : 0
-          result.byType[type] += typeCount
-        })
-      }
-      
-      // 确保 byDetail 存在
-      if (day.byDetail && typeof day.byDetail === 'object') {
-        (Object.keys(day.byDetail) as PracticeType[]).forEach(type => {
-          const details = day.byDetail[type]
-          if (Array.isArray(details)) {
-            details.forEach(detail => {
-              if (detail && typeof detail === 'object' && typeof detail.count === 'number') {
-                const existing = result.byDetail[type].find(d => d.name === detail.name)
-                if (existing) {
-                  existing.count += detail.count
-                } else {
-                  result.byDetail[type].push({ name: detail.name, count: detail.count })
-                }
-              }
-            })
-          }
-        })
-      }
-    })
-    
-    return result
-  }, [practiceStats])
+  // 按时间范围取统计（实现已搬到 lib/stats-range.ts，这里只做 practiceStats 绑定，
+  // 保持对下游组件的 prop 签名不变：组件仍只传 range）
+  const getStatsByTimeRange = useCallback(
+    (range: StatsTimeRange) => computeStatsByTimeRange(practiceStats, range),
+    [practiceStats]
+  )
 
   // ==================== 浮动窗口拖动功能 ====================
-  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, target: 'chord' | 'scale' | 'chordExercise') => {
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-    
-    let initialPos = { x: 0, y: 0 }
-    if (target === 'chord') initialPos = chordStructurePosition
-    else if (target === 'scale') initialPos = scaleStructurePosition
-    else if (target === 'chordExercise') initialPos = chordExerciseStructurePosition
-    
-    dragRef.current = {
-      isDragging: true,
-      startX: clientX,
-      startY: clientY,
-      initialX: initialPos.x,
-      initialY: initialPos.y,
-      target
-    }
-  }, [chordStructurePosition, scaleStructurePosition, chordExerciseStructurePosition])
 
   // 使用 requestAnimationFrame 节流状态更新
-  const updatePosition = useCallback(() => {
-    if (pendingPositionRef.current) {
-      const { x, y, target } = pendingPositionRef.current
-      if (target === 'chord') setChordStructurePosition({ x, y })
-      else if (target === 'scale') setScaleStructurePosition({ x, y })
-      else if (target === 'chordExercise') setChordExerciseStructurePosition({ x, y })
-      pendingPositionRef.current = null
-    }
-    rafRef.current = null
-  }, [])
-
-  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!dragRef.current.isDragging || !dragRef.current.target) return
-
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-
-    const deltaX = clientX - dragRef.current.startX
-    const deltaY = clientY - dragRef.current.startY
-
-    const newX = dragRef.current.initialX + deltaX
-    const newY = dragRef.current.initialY + deltaY
-
-    pendingPositionRef.current = { x: newX, y: newY, target: dragRef.current.target }
-
-    if (!rafRef.current) {
-      rafRef.current = requestAnimationFrame(updatePosition)
-    }
-  }, [updatePosition])
-
-  const handleDragEnd = useCallback(() => {
-    dragRef.current.isDragging = false
-    dragRef.current.target = null
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
-    pendingPositionRef.current = null
-  }, [])
 
   // 添加全局拖动事件监听
   useEffect(() => {
@@ -6385,56 +1243,69 @@ export default function FretMasterPage() {
   // ==================== 调音器功能 ====================
   // 启动调音器
   const startTuner = useCallback(async () => {
-    if (micEnabled) {
+    // 若已有检测循环在跑（快速连点的情况），先取消，避免并存多条 rAF 检测链 / 事件监听
+    if (tunerAnimationRef.current) {
+      cancelAnimationFrame(tunerAnimationRef.current)
+      tunerAnimationRef.current = null
+    }
+    if (tunerUnlistenRef.current) {
+      tunerUnlistenRef.current()
+      tunerUnlistenRef.current = null
+    }
+    tunerStreamRunningRef.current = false
+    // 🚨 Web 路径才需要停掉「练习用的」MediaStream —— 调音器和练习共用同一个 AudioContext
+    //    时会出现两条检测链抢同一个流。Tauri 路径**不能**在这里关 micEnabled：
+    //    它是设置页「启用音频输入」的全局开关，调音器只是复用同一个 Rust 采集后端
+    //    （下面 startAudioCapture 会重建采集，stopTuner 再停）。
+    //    旧实现在这里无差别 `setMicEnabled(false)` ⇒ 用户从设置页开启音频后，
+    //    只要碰过一次调音器，全局开关就被悄悄关掉，回练习/调音页完全没反应
+    //    （Rust 采集已停、pipeline 守卫判定未采集而静默空转）。
+    if (!isTauri && micEnabled) {
       await stopAudioInput()
       setMicEnabled(false)
     }
     if (isTauri) {
-      // Tauri环境：使用Rust原生音频
+      // Tauri环境：Rust 原生音频 + 事件流（pitch-detected 每 50ms 一帧，替代每帧一次 IPC 的 rAF 轮询）
       try {
-        const { startAudioCapture, detectPitch: nativeDetectPitch, stopAudioCapture } = await import('@/lib/native-audio')
-        
+        const { startAudioCapture, listenPitchDetected, startPitchStream } = await import('@/lib/native-audio')
+
         await startAudioCapture(selectedAudioDevice || undefined)
         setTunerActive(true)
         toast.success(t('tuner_start'))
-        
-        let isActive = true
-        
-        const detectLoop = async () => {
-          if (!isActive) return
-          
+
+        const off = await listenPitchDetected((event) => {
           try {
-            const result = await nativeDetectPitch()
-            
+            const result = event.pitch
+
             if (result && result.frequency > 0 && (result.confidence?.yin ?? 0) > confidenceThresholdRef.current) {
               const noteName = frequencyToNoteName(result.frequency)
               const noteResult = frequencyToNote(result.frequency, referenceFrequency)
-              
+
               tunerHistoryRef.current.push({
                 frequency: result.frequency,
                 note: noteName || "-",
                 cents: noteResult.cents
               })
-              
+
               if (tunerHistoryRef.current.length > 5) {
                 tunerHistoryRef.current.shift()
               }
-              
+
               if (tunerHistoryRef.current.length >= 3) {
                 const weights = [0.1, 0.2, 0.3, 0.4]
                 let weightedFreq = 0
                 let totalWeight = 0
-                
+
                 tunerHistoryRef.current.forEach((item, index) => {
                   const weight = weights[Math.min(index, weights.length - 1)]
                   weightedFreq += item.frequency * weight
                   totalWeight += weight
                 })
-                
+
                 const smoothedFreq = weightedFreq / totalWeight
                 const smoothedNote = frequencyToNoteName(smoothedFreq)
                 const smoothedResult = frequencyToNote(smoothedFreq, referenceFrequency)
-                
+
                 setDetectedNote(smoothedNote || "-")
                 setDetectedFrequency(Math.round(smoothedFreq))
                 setCents(smoothedResult.cents)
@@ -6445,20 +1316,13 @@ export default function FretMasterPage() {
               }
             }
           } catch (e) {
-            console.error('Native pitch detection error:', e)
+            console.error('Native pitch event error:', e)
           }
-          
-          if (isActive) {
-            tunerAnimationRef.current = requestAnimationFrame(detectLoop)
-          }
-        }
-        
-        tunerAnimationRef.current = requestAnimationFrame(detectLoop)
-        
-        return () => {
-          isActive = false
-          stopAudioCapture()
-        }
+        })
+
+        tunerUnlistenRef.current = off
+        await startPitchStream(NATIVE_PITCH_INTERVAL_MS)
+        tunerStreamRunningRef.current = true
       } catch (err) {
         console.error('Failed to start native tuner:', err)
         toast.error(t('tuner_need_mic'))
@@ -6520,11 +1384,13 @@ export default function FretMasterPage() {
           analyser.getFloatTimeDomainData(buffer)
 
           const currentAlgorithm = pitchAlgorithmRef.current
+          // YIN 门限与练习路径同源（见 lib/pitch-detection 的 resolveYinThreshold）
+          const yinThreshold = resolveYinThreshold(instrumentConfig.lowestStringHz)
           let yinResult: { frequency: number; probability: number } | null = null
 
           // 使用完整缓冲区（与练习模式一致），低频需要更多周期才能准确检测
           if (currentAlgorithm === 'solo') {
-            const soloAnalyser = getSOLOYinAnalyser(buffer.length, audioContext.sampleRate)
+            const soloAnalyser = getSOLOYinAnalyser(buffer.length, audioContext.sampleRate, yinThreshold)
             const soloResult = soloAnalyser.analyze(buffer)
             if (soloResult && soloResult.valid) {
               yinResult = {
@@ -6533,7 +1399,7 @@ export default function FretMasterPage() {
               }
             }
           } else {
-            yinResult = YINPitchDetection(buffer, audioContext.sampleRate, 0.1, 0.1)
+            yinResult = YINPitchDetection(buffer, audioContext.sampleRate, yinThreshold, 0.1)
           }
 
           if (!yinResult || !yinResult.frequency) {
@@ -6541,7 +1407,10 @@ export default function FretMasterPage() {
             return
           }
 
-          // 动态能量检测 - 低频使用更低阈值（与练习模式一致）
+          // 调音表是**独立**的收音路径：自己的 AudioContext + MediaStream + rAF 轮询，
+          // 既不经过 worklet/ScriptProcessor，也没有环境噪声校准（底噪只有本模块级的初值）。
+          // 所以这里保留固定阈值，**不要**照搬练习路径的 `getOnsetGate()` —— 那条门限
+          // 反映的是练习流的环境底噪，与调音表这条流的房间噪声无关。
           const rms = calculateRMS(buffer)
           const energyThreshold = yinResult.frequency < 110 ? 0.001 : 0.002
           if (rms < energyThreshold) {
@@ -6556,7 +1425,7 @@ export default function FretMasterPage() {
             let fundamentalResult: { frequency: number; probability: number } | null = null
 
             if (currentAlgorithm === 'solo') {
-              const soloAnalyser2 = getSOLOYinAnalyser(buffer.length, audioContext.sampleRate)
+              const soloAnalyser2 = getSOLOYinAnalyser(buffer.length, audioContext.sampleRate, yinThreshold)
               const soloResult2 = soloAnalyser2.analyze(buffer)
               if (soloResult2 && soloResult2.valid) {
                 fundamentalResult = {
@@ -6565,7 +1434,7 @@ export default function FretMasterPage() {
                 }
               }
             } else {
-              fundamentalResult = YINPitchDetection(buffer, audioContext.sampleRate, 0.05, 0.05)
+              fundamentalResult = YINPitchDetection(buffer, audioContext.sampleRate, yinThreshold, 0.1)
             }
 
             if (fundamentalResult && fundamentalResult.frequency &&
@@ -6626,7 +1495,11 @@ export default function FretMasterPage() {
         toast.error(t('tuner_need_mic'))
       }
     }
-  }, [t, referenceFrequency, selectedAudioDevice, inputGain, confidenceThreshold])
+    // stopAudioInput 声明在本 hook 之后（TDZ）：deps 数组是立即求值的，加进来会在
+    // 渲染期抛 "used before declaration"。而本函数体延迟执行（点调音器才跑），调用时
+    // 它早已初始化，故省略该依赖是安全的。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTauri, micEnabled, setMicEnabled, selectedAudioDevice, t, referenceFrequency, inputGain, instrumentConfig.lowestStringHz])
 
   // 停止调音器
   const stopTuner = useCallback(async () => {
@@ -6636,11 +1509,33 @@ export default function FretMasterPage() {
     }
 
     if (isTauri) {
-      try {
-        const { stopAudioCapture } = await import('@/lib/native-audio')
-        await stopAudioCapture()
-      } catch (e) {
-        console.error('Failed to stop native audio:', e)
+      // 拆除事件监听与 Rust 检测线程（事件驱动改造新增）
+      if (tunerUnlistenRef.current) {
+        tunerUnlistenRef.current()
+        tunerUnlistenRef.current = null
+      }
+      if (tunerStreamRunningRef.current) {
+        tunerStreamRunningRef.current = false
+        try {
+          const { stopPitchStream } = await import('@/lib/native-audio')
+          await stopPitchStream()
+        } catch (e) {
+          console.error('Failed to stop pitch stream:', e)
+        }
+      }
+      // 🚨 只在「设置里也没开音频输入」时才拆掉 Rust 采集。
+      //    stopTuner 是「退出调音」，不是「关闭音频输入」—— 两者是不同层级的意图。
+      //    旧实现无条件 stopAudioCapture() ⇒ 调音器一关，练习模式的收音也一起死，
+      //    且 `pipeline.rs` 的 `if !is_capturing()` 守卫会让后续检测**静默空转**
+      //    （不报错、只是没反应），正是用户看到的现象。
+      //    调音器复用的是同一个采集后端，退出时把它留着交给练习模式继续用。
+      if (!useAppStore.getState().audio.micEnabled) {
+        try {
+          const { stopAudioCapture } = await import('@/lib/native-audio')
+          await stopAudioCapture()
+        } catch (e) {
+          console.error('Failed to stop native audio:', e)
+        }
       }
     }
 
@@ -6661,7 +1556,7 @@ export default function FretMasterPage() {
     setDetectedFrequency(0)
     setCents(0)
     toast.success(t('tuner_stop'))
-  }, [t])
+  }, [t, isTauri])
 
   // 切换调音器状态
   const toggleTuner = useCallback(() => {
@@ -6683,10 +1578,23 @@ export default function FretMasterPage() {
     toast.success(t('save_success'))
   }, [t])
 
+  // 单取 action：`store` 是 useAppStore.getState() 快照，引用会随 state 变化，
+  // 放进 deps 会让本回调每次渲染都重建（并可能连锁触发下游）。
+  const resetSettingsAction = useAppStore((s) => s.resetSettings)
   const resetSettings = useCallback(() => {
-    store.resetSettings()
+    resetSettingsAction()
+    // 校准记录是 audio slice 的字段，会跟着一起回默认 ⇒ 运行中的收音链路也要回默认，
+    // 否则会出现「设置已重置，门限却还按着之前那间屋子的底噪走」。
+    // worklet 侧传 null 表示**清除**（内部回落到 0.0005，之后照常 EMA 跟踪）；
+    // TS 侧 resetPitchDetectionState() 把模块级噪声底与 SOLO 单例一起复位
+    // （它同时清掉 pendingSoloNoiseFloor 那笔账）。
+    const node = audioWorkletNodeRef.current
+    if (node) {
+      node.port.postMessage({ type: 'updateParams', data: { noiseFloor: null } })
+    }
+    resetPitchDetectionState()
     toast.success(t('reset_settings_hint'))
-  }, [store, t])
+  }, [resetSettingsAction, t])
 
   // 导出设置
   const exportSettings = useCallback(() => {
@@ -6734,79 +1642,38 @@ export default function FretMasterPage() {
         setSensitivity(settings.sensitivity || 0.5)
         if (settings.customChords) setCustomChords(settings.customChords)
         toast.success(t('import_success'))
-      } catch (e) {
+      } catch {
         toast.error(t('error_occurred'))
       }
     }
     reader.readAsText(file)
-  }, [t])
+  }, [setChordScaleDisplay, setConfidenceThreshold, setCooldownDuration, setCooldownEnabled, setFretCount, setInputGain, setLanguage, setMetronomeBpm, setNoteAccidentalDisplay, setPracticeTime, setSensitivity, setTheme, t])
 
-  const playFeedbackSound = useCallback((isCorrect: boolean) => {
-    if (!feedbackSoundSettings.enabled) return
-    if (isCorrect && !feedbackSoundSettings.correctSound) return
-    if (!isCorrect && !feedbackSoundSettings.wrongSound) return
-    
-    try {
-      // 复用共享 AudioContext，避免每次调用都创建新实例导致配额耗尽
-      // （Chromium 限制约 6 个 AudioContext，超过后新创建会抛异常导致反馈音静默失效）
-      const AudioCtx = getAudioContextClass()
-      if (!feedbackAudioCtxRef.current || feedbackAudioCtxRef.current.state === 'closed') {
-        feedbackAudioCtxRef.current = new AudioCtx()
-      }
-      const ctx = feedbackAudioCtxRef.current
-      // Tauri WebView2 / autoplay policy 下 AudioContext 可能处于挂起状态，需显式 resume
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {})
-      }
-      const oscillator = ctx.createOscillator()
-      const gainNode = ctx.createGain()
-      oscillator.connect(gainNode)
-      gainNode.connect(ctx.destination)
-      
-      if (isCorrect) {
-        oscillator.frequency.value = 880
-        oscillator.type = "sine"
-        gainNode.gain.setValueAtTime(0.2, ctx.currentTime)
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15)
-        oscillator.start(ctx.currentTime)
-        oscillator.stop(ctx.currentTime + 0.15)
-      } else {
-        oscillator.frequency.value = 220
-        oscillator.type = "sawtooth"
-        gainNode.gain.setValueAtTime(0.15, ctx.currentTime)
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2)
-        oscillator.start(ctx.currentTime)
-        oscillator.stop(ctx.currentTime + 0.2)
-      }
-    } catch (e) {
-      logger.debug('播放反馈音失败', e)
-    }
-  }, [feedbackSoundSettings])
-
-  // 计时器效果
+  // 计时器效果：仅负责递减 timeLeft；暂停时挂起（原实现未把 isPracticePaused 纳入依赖）
   useEffect(() => {
-    if (isPlaying && practiceTime > 0) {
+    if (isPlaying && practiceTime > 0 && !isPracticePaused) {
       timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            setIsPlaying(false)
-            const elapsed = practiceTime - (timeLeft - 1)
-            setPracticeSummaryData({
-              correct: scoreRef.current.correct,
-              total: scoreRef.current.total,
-              duration: elapsed,
-            })
-            setShowPracticeSummary(true)
-            return 0
-          }
-          return prev - 1
-        })
+        setTimeLeft(prev => (prev <= 1 ? 0 : prev - 1))
       }, 1000)
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [isPlaying, practiceTime])
+  }, [isPlaying, practiceTime, isPracticePaused])
+
+  // 倒计时归零时结束会话。副作用独立成 effect、移出 state updater（并发渲染下不会被重复执行）。
+  // 时长直接用 practiceTime：原实现用闭包里的 timeLeft 计算 elapsed，恒等于 1 秒。
+  useEffect(() => {
+    if (isPlaying && practiceTime > 0 && timeLeft === 0) {
+      setIsPlaying(false)
+      setPracticeSummaryData({
+        correct: scoreRef.current.correct,
+        total: scoreRef.current.total,
+        duration: practiceTime,
+      })
+      setShowPracticeSummary(true)
+    }
+  }, [isPlaying, practiceTime, scoreRef, setIsPlaying, timeLeft])
 
   const metronomeAudioCtxRef = useRef<AudioContext | null>(null)
 
@@ -6877,67 +1744,28 @@ export default function FretMasterPage() {
       setIntervalTimeLeft(intervalFretboardDuration)
       
       const countdownInterval = setInterval(() => {
-        setIntervalTimeLeft(prev => {
-          if (prev <= 1) {
-            // 时间到，自动进入下一题
-            clearInterval(countdownInterval)
-            generateIntervalExerciseRef.current?.()
-            return 0
-          }
-          return prev - 1
-        })
+        setIntervalTimeLeft(prev => (prev <= 1 ? 0 : prev - 1))
       }, 1000)
-      
+
       return () => {
         clearInterval(countdownInterval)
       }
     }
-  }, [activeTab, isPlaying, showIntervalFretboard, intervalAutoAdvance, intervalFretboardDuration, currentIntervalExercise])
+  }, [activeTab, isPlaying, showIntervalFretboard, intervalAutoAdvance, intervalFretboardDuration, currentIntervalExercise, setIntervalTimeLeft])
 
-  // 获取音频设备
-  const audioDevicesRef = useRef(audioDevices)
-  const selectedAudioDeviceRef = useRef(selectedAudioDevice)
-  audioDevicesRef.current = audioDevices
-  selectedAudioDeviceRef.current = selectedAudioDevice
-
-  const enumerateAudioDevices = useCallback(async (showNotification = false) => {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices) return
-    
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices()
-      const audioInputs = devices.filter(d => d.kind === 'audioinput' && d.deviceId)
-      logger.debug('枚举到的音频输入设备:', audioInputs.length, audioInputs.map(d => d.label || '未命名设备'))
-      const currentDeviceIds = audioDevicesRef.current.map(d => d.deviceId).sort().join(',')
-      const newDeviceIds = audioInputs.map(d => d.deviceId).sort().join(',')
-      const hasChanged = currentDeviceIds !== newDeviceIds
-      
-      if (hasChanged || audioDevicesRef.current.length === 0) {
-        setAudioDevices(audioInputs)
-        
-        if (audioInputs.length > 0) {
-          const currentDeviceExists = audioInputs.some(d => d.deviceId === selectedAudioDeviceRef.current)
-          if (!selectedAudioDeviceRef.current || !currentDeviceExists) {
-            setSelectedAudioDevice(audioInputs[0].deviceId)
-            logger.debug('自动选择设备:', audioInputs[0].label || audioInputs[0].deviceId)
-          }
-        }
-        
-        if (showNotification && hasChanged) {
-          const addedCount = audioInputs.filter(d => !audioDevicesRef.current.some(old => old.deviceId === d.deviceId)).length
-          const removedCount = audioDevicesRef.current.filter(d => !audioInputs.some(new_ => new_.deviceId === d.deviceId)).length
-          
-          if (addedCount > 0) {
-            logger.debug(`🔌 检测到 ${addedCount} 个新音频设备`)
-          }
-          if (removedCount > 0) {
-            logger.debug(`🔌 移除了 ${removedCount} 个音频设备`)
-          }
-        }
-      }
-    } catch (err) {
-      console.error('枚举设备失败:', err)
+  // 指板倒计时归零 → 自动进入下一题（副作用独立于 updater；只认从 >0 落到 0 的边沿，
+  // 因为 intervalTimeLeft 初值为 0，若只看 ===0 会在启动瞬间误触发一次生成）
+  useEffect(() => {
+    const prev = prevIntervalTimeLeftRef.current
+    prevIntervalTimeLeftRef.current = intervalTimeLeft
+    if (prev > 0 && intervalTimeLeft === 0 &&
+        activeTab === "interval" && isPlaying && showIntervalFretboard && intervalAutoAdvance) {
+      generateIntervalExerciseRef.current?.()
     }
-  }, [])
+  }, [activeTab, isPlaying, showIntervalFretboard, intervalAutoAdvance, intervalTimeLeft, prevIntervalTimeLeftRef, generateIntervalExerciseRef])
+
+  // 音频输入设备的枚举与自动选择（实现见 hooks/use-audio-device-enumeration.ts）
+  const { enumerateAudioDevices } = useAudioDeviceEnumeration()
 
   // 初始加载和监听设备变化（仅限 Web 版本）
   useEffect(() => {
@@ -6976,8 +1804,7 @@ export default function FretMasterPage() {
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-  }, [])
+  }, [enumerateAudioDevices, isTauri])
 
   // 当设置面板打开时，刷新设备列表
   useEffect(() => {
@@ -6985,7 +1812,7 @@ export default function FretMasterPage() {
     if (settingsOpen && typeof navigator !== 'undefined' && navigator.mediaDevices) {
       enumerateAudioDevices(false)
     }
-  }, [settingsOpen, enumerateAudioDevices])
+  }, [settingsOpen, enumerateAudioDevices, isTauri])
 
   // 初始化MIDI - 当开启开关时才申请权限
   useEffect(() => {
@@ -7042,14 +1869,151 @@ export default function FretMasterPage() {
         device.onmidimessage = null
       })
     }
-  }, [midiEnabled, midiAccess, midiDevices, selectedMidiDevice])
+  }, [midiEnabled, midiAccess, midiDevices, selectedMidiDevice, setDetectedPitch])
 
   // 音频输入处理
+
+  /**
+   * 把与 ScriptProcessor 路径一致的动态 YIN 参数推送给 worklet
+   * （低频目标 threshold/cliff 0.05，其余 0.1）。带变更守卫，参数没变就不发消息。
+   * #23：此前 worklet 的门限一直是硬编码默认值（threshold 0.15），低音弦的检测质量与
+   * ScriptProcessor 路径不一致。
+   */
+  const workletYinParamsKeyRef = useRef('')
+  // 音高检测下限随乐器变化：吉他族保持 70Hz 级（搜索下限本身就是工频哼声护栏），
+  // 只有贝斯/七弦这类真有 30~62Hz 音的乐器才下探。TS 路径（ScriptProcessor 回退）与
+  // worklet 共用这个值 —— 前者读模块级设置，后者由 syncWorkletYinParams 推送。
+  useEffect(() => {
+    const floor = detectFloorForLowestHz(instrumentConfig.lowestStringHz)
+    setMinDetectFreq(floor)
+    logger.debug('音高检测下限已按乐器设置', 'instrument:', user.instrument, 'lowestStringHz:', instrumentConfig.lowestStringHz, 'floor(Hz):', floor.toFixed(2))
+    // 桌面端还要同步 YIN 门限（与 web 三条路径同源，见 lib/pitch-detection 的 resolveYinThreshold）：
+    // Rust detector 默认 0.15，跨会话从不自动调整（只受 set_pitch_threshold 影响，此前零调用）
+    // ⇒ 贝斯/七弦低 B 用户永远拿不到放宽后的 0.2（低频段 CMND 天然偏高，门限越紧越检不出）。
+    // 本 effect 是唯一同步点（挂载 + 每次换乐器都跑）；detector 常驻 pipeline，与是否在采集无关。
+    if (isTauri) {
+      void import('@/lib/native-audio').then(({ setPitchThreshold }) =>
+        setPitchThreshold(resolveYinThreshold(instrumentConfig.lowestStringHz))
+      )
+    }
+  }, [instrumentConfig.lowestStringHz, user.instrument, isTauri])
+
+  const syncWorkletYinParams = useCallback(() => {
+    const node = audioWorkletNodeRef.current
+    // 门限按乐器音域解析，与 TS 两条路径同源（见 lib/pitch-detection 的 resolveYinThreshold）
+    const threshold = resolveYinThreshold(instrumentConfig.lowestStringHz)
+    const probabilityCliff = 0.1
+    const floor = getMinDetectFreq()
+    const key = `${threshold}/${probabilityCliff}/${floor.toFixed(2)}`
+    if (key === workletYinParamsKeyRef.current) return
+    workletYinParamsKeyRef.current = key
+    if (!node) return
+    node.port.postMessage({ type: 'updateParams', data: { threshold, probabilityCliff, minDetectFreq: floor } })
+  }, [instrumentConfig.lowestStringHz])
+
+  /**
+   * 把校准结果**立刻**下发给当前在跑的两条收音路径。
+   *
+   * - worklet：`updateParams.noiseFloor` 是一次性覆盖（之后 worklet 照常 EMA 跟踪）。
+   *   页面**不会**每帧下发 —— 那会把 EMA 钉死，换房间 / 关空调后门限再也不能自适应。
+   * - TS 路径（ScriptProcessor 回退）：`lib/pitch-detection` 的噪声底是**模块级/进程级**状态。
+   *   只下发 worklet 会复现「开 worklet 测得到、关掉测不到」的双路径分叉（本项目踩过）。
+   */
+  const applyNoiseFloor = useCallback((floor: number) => {
+    seedPitchDetectionNoiseFloor(floor)
+    const node = audioWorkletNodeRef.current
+    if (node) {
+      node.port.postMessage({ type: 'updateParams', data: { noiseFloor: floor } })
+    }
+  }, [])
+
+  /**
+   * 用户主动校准环境噪声底：倒计时 3 秒 → 采样 1 秒（50 帧）→ 取 85 百分位。
+   * 测量口径见 `lib/noise-calibration.ts`（只借竞品 GuitarRun 的**测量方法**，
+   * 门限仍用本项目的 `max(0.0008, 底噪 × 1.5)`，不是它的 ×3.2）。
+   *
+   * 采样点选在 `analyser`：链路是 `source → gain → analyser → worklet/scriptProcessor`，
+   * 与检测器看到的是**同一条链路、同一个增益**，所以量出来的值可以和门限直接比较。
+   *
+   * 失败一律「如实报错 + 让用户重试」，**不悄悄回落默认值** —— 那会让用户以为量准了。
+   */
+  const calibrateNoiseFloor = useCallback(async () => {
+    if (noiseCalibratingRef.current) return
+    if (isTauriEnv()) {
+      // 桌面版走 Rust cpal，Web Audio 的 analyser 不在链路上，量不到真实底噪
+      toast.info(t('noise_calib_tauri_unsupported'))
+      return
+    }
+    const analyser = analyserNode
+    if (!analyser) {
+      toast.error(t('noise_calib_need_mic'))
+      return
+    }
+
+    noiseCalibratingRef.current = true
+    noiseCalibrationAbortRef.current = false
+    setNoiseCalibrating(true)
+    try {
+      let frame = new Float32Array(analyser.fftSize)
+      const result = await runNoiseFloorCalibration({
+        readFrame: () => {
+          // fftSize 理论上不变，但切设备后可能重建 analyser；长度不符就重取，避免抛错
+          if (frame.length !== analyser.fftSize) frame = new Float32Array(analyser.fftSize)
+          analyser.getFloatTimeDomainData(frame)
+          return calculateRMS(frame)
+        },
+        sleep: (ms) => new Promise<void>((resolve) => { window.setTimeout(resolve, ms) }),
+        // 倒计时阶段报 3/2/1，进入采样时报 0（UI 用它切换成「采样中」）
+        onCountdown: (s) => setNoiseCalibrationCountdown(s > 0 ? s : null),
+        onProgress: (sampled) => setNoiseCalibrationProgress(sampled),
+        isCancelled: () => noiseCalibrationAbortRef.current,
+      })
+
+      if (!result) {
+        toast.error(t('noise_calib_failed'))
+        return
+      }
+
+      setNoiseFloor(result.noiseFloor)
+      applyNoiseFloor(result.noiseFloor)
+      logger.debug(
+        '[噪声校准] 完成',
+        `noiseFloor=${result.noiseFloor.toFixed(6)}`,
+        `raw=${result.raw.toFixed(6)}`,
+        `samples=${result.sampleCount}`,
+        `gate=${onsetGateFromNoiseFloor(result.noiseFloor).toFixed(6)}`
+      )
+      toast.success(
+        t('noise_calib_done')
+          .replace('{noise}', formatNoisePercent(result.noiseFloor))
+          .replace('{gate}', formatNoisePercent(onsetGateFromNoiseFloor(result.noiseFloor)))
+      )
+    } catch (err) {
+      console.error('噪声校准失败:', err)
+      toast.error(t('noise_calib_failed'))
+    } finally {
+      setNoiseCalibrating(false)
+      setNoiseCalibrationCountdown(null)
+      setNoiseCalibrationProgress(null)
+      noiseCalibratingRef.current = false
+    }
+  }, [analyserNode, setNoiseFloor, applyNoiseFloor, t])
+
+  // 卸载时中止未完成的校准（否则定时器会在组件消失后继续跑，最后 setState 到已卸载组件）
+  useEffect(() => () => { noiseCalibrationAbortRef.current = true }, [])
+
   const startAudioInput = useCallback(async () => {
     // Tauri 环境使用 Rust cpal 直接采集，不走 getUserMedia（避免 WebView2 权限弹窗）
     if (isTauriEnv()) {
       logger.warn('Tauri 环境应使用 native audio，startAudioInput 已阻止')
       return
+    }
+    // 复位检测器的自适应状态（噪声底跨帧累积，且 TS 路径是模块级/进程级状态）
+    resetPitchDetectionState()
+    // 复位后如果用户之前校准过房间，就把它当作本次会话的起点，而不是让 EMA 从 0.0005
+    // 慢慢爬（上升 alpha 是 0.0005，约需 20 秒）—— 那 20 秒正是换房间后误检最多的时候。
+    if (noiseFloor !== undefined) {
+      seedPitchDetectionNoiseFloor(noiseFloor)
     }
     if (tunerActive) {
       stopTuner()
@@ -7080,22 +2044,24 @@ export default function FretMasterPage() {
         if (needsUserInteractionForAudio()) {
           await handleIOSAudioUnlock()
         }
-      } catch (e) {
+      } catch {
         // iOS compat not available, continue
       }
       // 音频约束 - 与原HTML文件一致
-      const constraints: MediaStreamConstraints = {
-        audio: {
-          deviceId: selectedAudioDevice ? { ideal: selectedAudioDevice } : undefined,
-          sampleRate: 48000,
-          channelCount: 1,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          // @ts-ignore - latency 属性在某些浏览器类型定义中不存在
-          latency: 0.01
-        }
+      //
+      // `latency` 是 Chrome 的实验性约束，不在标准 `MediaTrackConstraints` 里。
+      // 用交叉类型补齐，而不是 `@ts-ignore` —— 后者会连这一整段里**其它真正的类型错误**
+      // 一起吞掉（比如哪天 `sampleRate` 拼错也不会报错）。
+      const audioConstraints: MediaTrackConstraints & { latency?: number } = {
+        deviceId: selectedAudioDevice ? { ideal: selectedAudioDevice } : undefined,
+        sampleRate: 48000,
+        channelCount: 1,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        latency: 0.01
       }
+      const constraints: MediaStreamConstraints = { audio: audioConstraints }
       let stream: MediaStream
       logger.debug('startAudioInput: 正在调用 getUserMedia...')
       try {
@@ -7157,11 +2123,20 @@ export default function FretMasterPage() {
           const workletNode = new AudioWorkletNode(ctx, 'pitch-detection-processor', {
             processorOptions: {
               sampleRate: ctx.sampleRate,
-              bufferSize: 2048,
-              hopSize: 512
+              // 4096（原 2048）：YIN 可解析的最长周期是 halfBufferSize 个采样，
+              // 2048 只能到 ~46.9Hz，贝斯 E1(41.2)/B0(30.9) 与七弦低 B(61.7，tau=777>684 上限) 都够不到。
+              // hopSize 不变，因此检测刷新率/延迟不变（仍是 512/48000 ≈ 10.7ms 一帧）。
+              bufferSize: 4096,
+              hopSize: 512,
+              // 用户主动校准过的环境噪声底，作为 worklet 的初值。
+              // undefined 时 worklet 自己回落到 0.0005 并由 EMA 慢慢爬 —— 那是「没校准过」的正常路径。
+              noiseFloor,
             }
           })
           audioWorkletNodeRef.current = workletNode
+          
+          // 推送初始动态 YIN 参数（低频目标判定），此后由消息处理器在目标变化时同步
+          syncWorkletYinParams()
           
           // 设置消息处理 - 使用 ref 确保始终调用最新的回调
           workletNode.port.onmessage = (event) => {
@@ -7186,7 +2161,9 @@ export default function FretMasterPage() {
       // 如果不使用 AudioWorklet，使用 ScriptProcessorNode
       if (!useWorklet) {
         // 性能优化：增大缓冲区减少回调频率（从4096增加到8192）
-        const scriptProcessor = ctx.createScriptProcessor(8192, 1, 1)
+        // ⚠️ 这个长度决定了本路径的帧间隔（~186ms @44.1k），多帧一致的帧数由它换算
+        //    （见 frameMsOf(SCRIPT_PROCESSOR_BUFFER_SIZE, …)）。改动此处会让确认延迟跟着变。
+        const scriptProcessor = ctx.createScriptProcessor(SCRIPT_PROCESSOR_BUFFER_SIZE, 1, 1)
         scriptProcessorRef.current = scriptProcessor
         
         source.connect(gainNode)
@@ -7220,251 +2197,21 @@ export default function FretMasterPage() {
     } finally {
       setAudioInitializing(false)
     }
-  }, [selectedAudioDevice, inputGain, language, useAudioWorklet, tunerActive, stopTuner])
-
-  // 触发正确答案反馈
-  const triggerCorrectFeedback = useCallback((note: string) => {
-    setCorrectFeedbackNote(note)
-    setShowCorrectFeedback(true)
-    
-    setTimeout(() => {
-      setShowCorrectFeedback(false)
-      setCorrectFeedbackNote(null)
-    }, 500)
-  }, [])
-
-  const triggerWrongFeedback = useCallback((note: string) => {
-    setWrongFeedbackNote(note)
-    setShowWrongFeedback(true)
-
-    setTimeout(() => {
-      setShowWrongFeedback(false)
-      setWrongFeedbackNote(null)
-    }, 600)
-  }, [])
-
-  // 音高匹配处理（供 AudioWorklet 或 ScriptProcessorNode 共用）
-  const processPitchMatch = useCallback((frequency: number, detectedNote: string, probability: number) => {
-    const currentActiveTab = activeTabRef.current
-    const currentSensitivity = sensitivityRef.current || 0.5
-    const currentConfidenceThreshold = confidenceThresholdRef.current || 0.8
-    
-    if (currentActiveTab === 'practice') {
-      // 找音练习 - 辨音模式下通过按钮答题，不自动匹配
-      if (practiceAnswerModeRef.current === 'buttons') return
-      if (isCoolingDownRef.current) return
-      const currentTargetNote = targetNoteRef.current
-      if (!currentTargetNote) return
-      
-      const targetSemitone = noteToSemitones[currentTargetNote] || 0
-      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-      
-      const adjustedCents = getAdjustedCents(frequency, targetFrequency)
-      
-      const baseThreshold = frequency < 110 ? 35 : 25
-      const matchThreshold = baseThreshold * (2 - currentSensitivity)
-      
-      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
-        logger.debug('找音练习匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1))
-        isCoolingDownRef.current = true
-        triggerCorrectFeedback(detectedNote)
-        setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-        if (generateNewTargetRef.current) {
-          generateNewTargetRef.current()
-        }
-        cooldownRef.current = setTimeout(() => {
-          isCoolingDownRef.current = false
-          cooldownRef.current = null
-        }, 800)
-      }
-    } else if (currentActiveTab === 'interval') {
-      // 音程练习
-      const exercise = currentIntervalExerciseRef.current
-      if (!exercise || exercise.answered) return
-      
-      const rootNoteValue = exercise.rootNote
-      
-      // 使用 currentIntervalDisplay（先找根音模式包含 '1'）以与点击/MIDI 路径一致
-      const intervals = exercise.currentIntervalDisplay.split(' ')
-      let matchedIndex: number | null = null
-      let minCents = Infinity
-
-      for (let idx = 0; idx < intervals.length; idx++) {
-        const interval = intervals[idx]
-        // 跳过已经完成的音级（按索引）
-        if (exercise.completedIntervals.includes(idx)) continue
-        // 先找根音模式：根音未完成时只接受根音
-        const rootCompleted = intervals.some((intv, i) => intv === '1' && exercise.completedIntervals.includes(i))
-        if (findRootFirstRef.current && !rootCompleted && interval !== '1') continue
-        
-        const intervalSemitone = intervalToSemitones[interval]
-        if (intervalSemitone === undefined) continue
-        
-        const rootValue = noteToSemitones[rootNoteValue] || 0
-        const targetSemitone = (rootValue + intervalSemitone) % 12
-        const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-        
-        const adjustedCents = getAdjustedCents(frequency, targetFrequency)
-        
-        const baseThreshold = frequency < 110 ? 35 : interval === '1' ? 25 : 15
-        const matchThreshold = baseThreshold * (2 - currentSensitivity)
-        
-        if (adjustedCents <= matchThreshold && adjustedCents < minCents && probability > currentConfidenceThreshold) {
-          minCents = adjustedCents
-          matchedIndex = idx
-        }
-      }
-      
-      if (matchedIndex !== null) {
-        const matchedInterval = intervals[matchedIndex]
-        logger.debug('音程练习匹配成功:', matchedInterval, '音分差:', minCents.toFixed(1))
-        triggerCorrectFeedback(detectedNote)
-        const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
-        
-        if (newCompletedIntervals.length >= intervals.length) {
-          setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals, answered: true })
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          if (addRootBackRef.current && matchedInterval !== '1') {
-            setIntervalPracticeStep('root')
-          } else if (generateIntervalExerciseRef.current) {
-            generateIntervalExerciseRef.current()
-          }
-        } else {
-          setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals })
-          if (findRootFirstRef.current && matchedInterval === '1') {
-            setIntervalPracticeStep('interval')
-          } else if (addRootBackRef.current && matchedInterval !== '1') {
-            setIntervalPracticeStep('root')
-          }
-        }
-      }
-    } else if (currentActiveTab === 'scale') {
-      // 音阶练习
-      const sequence = scaleExerciseSequenceRef.current
-      const step = scaleExerciseCurrentStepRef.current
-      const key = scaleKeyRef.current
-      
-      if (sequence.length === 0 || step >= sequence.length) return
-      
-      const currentDegree = sequence[step]
-      const semitone = intervalToSemitones[currentDegree]
-      if (semitone === undefined) return
-      
-      const keyValue = noteToSemitones[key] || 0
-      const targetSemitone = (keyValue + semitone) % 12
-      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-      
-      const adjustedCents = getAdjustedCents(frequency, targetFrequency)
-      
-      const baseThreshold = frequency < 110 ? 35 : currentDegree === '1' ? 25 : 15
-      const matchThreshold = baseThreshold * (2 - currentSensitivity)
-      
-      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
-        logger.debug('音阶练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
-        triggerCorrectFeedback(detectedNote)
-        const nextStep = step + 1
-        if (nextStep >= sequence.length) {
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          if (nextScaleExerciseRef.current) {
-            nextScaleExerciseRef.current()
-          }
-        } else {
-          setScaleExerciseCurrentStep(nextStep)
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-        }
-      }
-    } else if (currentActiveTab === 'chord_exercise') {
-      // 和弦练习
-      const targetChord = chordExerciseTargetChordRef.current
-      const sequence = chordExerciseSequenceRef.current
-      const step = chordExerciseCurrentStepRef.current
-      
-      if (!targetChord || sequence.length === 0 || step >= sequence.length) return
-      if (chordExerciseIsAnsweredRef.current) return
-      
-      const currentDegree = sequence[step]
-      const semitone = intervalToSemitones[currentDegree]
-      if (semitone === undefined) return
-      
-      const rootValue = noteToSemitones[targetChord.root] || 0
-      const targetSemitone = (rootValue + semitone) % 12
-      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-      
-      const adjustedCents = getAdjustedCents(frequency, targetFrequency)
-      
-      const baseThreshold = frequency < 110 ? 35 : currentDegree === '1' ? 25 : 15
-      const matchThreshold = baseThreshold * (2 - currentSensitivity)
-      
-      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
-        logger.debug('和弦练习音高匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1))
-        triggerCorrectFeedback(detectedNote)
-        
-        const nextStep = step + 1
-        if (nextStep >= sequence.length) {
-          setChordExerciseIsAnswered(true)
-          chordExerciseIsAnsweredRef.current = true
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          if (nextChordExerciseRef.current) {
-            nextChordExerciseRef.current()
-          }
-        } else {
-          setChordExerciseCurrentStep(nextStep)
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-        }
-      }
-    } else if (currentActiveTab === 'chord') {
-      // 和弦转换练习
-      const chords = getTransposedChordsRef.current ? getTransposedChordsRef.current() : []
-      const currentChord = chords[currentChordIndexRef.current]
-      if (!currentChord) return
-      
-      // 获取和弦音级，如果开启 voice leading 则应用
-      let degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
-      if (shouldVoiceLeadRef.current && lastChordNoteRef.current) {
-        degrees = applyVoiceLeading(degrees, currentChord.root, lastChordNoteRef.current)
-      }
-      
-      const currentStep = chordDegreeCurrentStepRef.current
-      if (currentStep >= degrees.length) return
-      
-      const currentDegree = degrees[currentStep]
-      if (!currentDegree) return
-      
-      const semitone = intervalToSemitones[currentDegree]
-      if (semitone === undefined) return
-      
-      const rootValue = noteToSemitones[currentChord.root] || 0
-      const targetSemitone = (rootValue + semitone) % 12
-      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-      
-      const adjustedCents = getAdjustedCents(frequency, targetFrequency)
-      
-      const baseThreshold = frequency < 110 ? 35 : currentDegree === '1' ? 25 : 15
-      const matchThreshold = baseThreshold * (2 - currentSensitivity)
-      
-      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
-        logger.debug('和弦转换练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
-        triggerCorrectFeedback(detectedNote)
-        const nextStep = currentStep + 1
-        if (nextStep >= degrees.length) {
-          // 完成当前和弦，记录最后一个音用于 voice leading
-          lastChordNoteRef.current = detectedNote
-          setLastChordNote(detectedNote)
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          if (nextChordInfoRef.current && nextChordRef.current) {
-            nextChordRef.current()
-          }
-        } else {
-          setChordDegreeCurrentStep(nextStep)
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-        }
-      }
-    }
-  }, [getTransposedChordsRef, practiceLevelRef, findRootFirstRef, targetNoteRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, currentIntervalExerciseRef, currentChordIndexRef, chordDegreeCurrentStepRef, nextChordRef, nextChordInfoRef, nextScaleExerciseRef, nextChordExerciseRef, generateNewTargetRef, generateIntervalExerciseRef, setCurrentIntervalExercise, setScaleExerciseCurrentStep, setChordExerciseIsAnswered, setChordExerciseCurrentStep, setChordDegreeCurrentStep, setScore, setIntervalPracticeStep, triggerCorrectFeedback])
+    // startPitchDetectionWithNodes 声明在本 hook 之后（TDZ）：deps 数组是立即求值的，
+    // 加进来会在渲染期抛 "used before declaration"。而本函数体延迟执行（点麦才跑），
+    // 调用时它早已初始化，故省略该依赖是安全的。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noiseFloor, tunerActive, audioContext, setAudioInitializing, setAudioError, stopTuner, selectedAudioDevice, inputGain, useAudioWorklet, language, syncWorkletYinParams, setMicEnabled])
 
   // 处理 AudioWorklet 消息
+
+
+  // 更新 AudioWorklet 消息处理函数的 ref
   const handleAudioWorkletMessage = useCallback((message: { type: string; data: unknown }) => {
     const { type, data } = message
+
+    // 练习目标变化时同步动态 YIN 参数到 worklet（低频目标用更宽松的门限）
+    syncWorkletYinParams()
     
     if (type === 'pitchDetected') {
       const pitchData = data as { 
@@ -7473,16 +2220,12 @@ export default function FretMasterPage() {
         clarity: number
         energy: number
         hasSignal: boolean
+        /** YIN 原始频率（未经 smoothFrequency 平滑）；判定用它、显示用 frequency */
+        rawFrequency?: number | null
+        /** worklet 的 _detectAmplitudeDiff 结果，作为多帧一致的起音信号 */
+        isNoteOnset?: boolean
       }
       
-      // 更新调试信息
-      setPitchDebugInfo(prev => ({
-        ...prev,
-        rms: pitchData.energy,
-        frequency: pitchData.frequency,
-        probability: pitchData.probability,
-        isRunning: true
-      }))
       
       // 处理音高检测结果 - 使用与 ScriptProcessorNode 相同的逻辑
       if (pitchData.frequency && pitchData.hasSignal && pitchData.probability > (confidenceThresholdRef.current || 0.8)) {
@@ -7492,14 +2235,21 @@ export default function FretMasterPage() {
           
           // 如果正在练习，处理匹配逻辑
           if (isPlayingRef.current && !isCoolingDownRef.current) {
-            processPitchMatch(pitchData.frequency, detectedNote, pitchData.probability)
+            processPracticeMatchRef.current({
+              frequency: pitchData.frequency,
+              note: detectedNote,
+              probability: pitchData.probability,
+              isNoteOnset: pitchData.isNoteOnset,
+              rawFrequency: pitchData.rawFrequency ?? undefined,
+              frameMs: frameMsOf(AUDIO_WORKLET_HOP_SIZE, audioContextRef.current?.sampleRate ?? 0)
+            })
           }
         }
       }
     } else if (type === 'debug') {
       logger.debug('AudioWorklet Debug:', data)
     }
-  }, [processPitchMatch])
+  }, [setDetectedPitch, syncWorkletYinParams])
 
   // 更新 AudioWorklet 消息处理函数的 ref
   useEffect(() => {
@@ -7507,6 +2257,10 @@ export default function FretMasterPage() {
   }, [handleAudioWorkletMessage])
 
   const stopAudioInput = useCallback(() => {
+    // 关麦会拆掉 analyser 所在的链路 ⇒ 正在跑的校准必须中止，否则它会在静默中
+    // 采到一堆「读不到帧」的无效样本，最后报一个假的「环境很安静」结果。
+    // （中止后 runNoiseFloorCalibration 返回 null，UI 提示重试。）
+    noiseCalibrationAbortRef.current = true
     // 停止 AudioWorkletNode
     if (audioWorkletNodeRef.current) {
       audioWorkletNodeRef.current.port.onmessage = null
@@ -7547,8 +2301,64 @@ export default function FretMasterPage() {
     setMicEnabled(false)
     setDetectedPitch(null)
     setDetectedCents(null)
-    setPitchDebugInfo(prev => ({ ...prev, isRunning: false }))
+  }, [audioContext, setDetectedCents, setDetectedPitch, setMicEnabled])
+
+  // 组件卸载时释放全部音频资源。
+  // 原实现只在用户主动停止/关面板时释放，切换路由或 HMR 会导致麦克风持续被占用
+  // （录音指示灯常亮）以及 AudioContext 泄漏。
+  const audioContextRef = useRef<AudioContext | null>(null)
+  useEffect(() => {
+    audioContextRef.current = audioContext
   }, [audioContext])
+
+  useEffect(() => {
+    return () => {
+      // 主音频链路
+      if (pitchDetectionRef.current) {
+        cancelAnimationFrame(pitchDetectionRef.current)
+        pitchDetectionRef.current = null
+      }
+      if (cooldownRef.current) {
+        clearTimeout(cooldownRef.current)
+        cooldownRef.current = null
+      }
+      if (audioWorkletNodeRef.current) {
+        audioWorkletNodeRef.current.port.onmessage = null
+        audioWorkletNodeRef.current.disconnect()
+        audioWorkletNodeRef.current = null
+      }
+      if (scriptProcessorRef.current) {
+        scriptProcessorRef.current.onaudioprocess = null
+        scriptProcessorRef.current.disconnect()
+        scriptProcessorRef.current = null
+      }
+      if (gainNodeRef.current) {
+        gainNodeRef.current.disconnect()
+        gainNodeRef.current = null
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+        mediaStreamRef.current = null
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {})
+        audioContextRef.current = null
+      }
+      // 调音器链路
+      if (tunerAnimationRef.current) {
+        cancelAnimationFrame(tunerAnimationRef.current)
+        tunerAnimationRef.current = null
+      }
+      if (tunerStreamRef.current) {
+        tunerStreamRef.current.getTracks().forEach(track => track.stop())
+        tunerStreamRef.current = null
+      }
+      if (tunerAudioContextRef.current) {
+        tunerAudioContextRef.current.close().catch(() => {})
+        tunerAudioContextRef.current = null
+      }
+    }
+  }, [])
 
   // 当 micEnabled 为 true 时自动启动音频输入（仅限 Web 版本）
   useEffect(() => {
@@ -7561,17 +2371,27 @@ export default function FretMasterPage() {
         setMicEnabled(false)
       })
     }
-  }, [micEnabled, audioContext, startAudioInput, language])
+  }, [micEnabled, audioContext, startAudioInput, language, isTauri, setMicEnabled])
 
-  // 练习模式音高匹配逻辑（从 runPitchDetection 抽取，供 Web 和 Tauri 两条路径共用）
-  const processPracticeMatch = useCallback((detectedFreq: number, probability: number, detectedNote: string) => {
+  // 练习模式音高匹配 —— **唯一实现**，三条收音路径共用：
+  // AudioWorklet（默认）/ ScriptProcessor 回退 / Tauri 原生。
+  // 页面通过 processPracticeMatchRef 调用，避免长生命周期的音频回调捕获旧闭包。
+  const processPracticeMatch = useCallback(({ frequency, note, probability, isNoteOnset, rawFrequency, frameMs }: DetectedPitchForMatch) => {
     const currentIsPlaying = isPlayingRef.current
     const currentActiveTab = activeTabRef.current
-    const currentSensitivity = sensitivityRef.current
-    const currentConfidenceThreshold = confidenceThresholdRef.current
+    const currentSensitivity = sensitivityRef.current || 0.5
+    const currentConfidenceThreshold = confidenceThresholdRef.current || 0.8
 
-    if (!currentIsPlaying || !detectedNote) return
+    if (!currentIsPlaying || !note) return
     if (isCoolingDownRef.current) return
+
+    // 两级前置滤波：起音清空记忆 + 连续 N 帧同音才放行（见 lib/note-confirm.ts）。
+    // 位置很关键 —— 必须排在冷却检查**之后**：confirmNote 一旦放行就会写入 firedNote，
+    // 若此时才因冷却被挡掉，这次放行就被白白吃掉，同一个音要等到换音或下次起音才能再放行。
+    if (!confirmNote(
+      { frequency: rawFrequency ?? frequency, isNoteOnset: !!isNoteOnset, frameMs },
+      noteConfirmStateRef.current!
+    )) return
 
     // 根据练习模式处理 - 完全按照原HTML的processAudio逻辑
     if (currentActiveTab === 'practice') {
@@ -7582,18 +2402,24 @@ export default function FretMasterPage() {
       if (!currentTargetNote) return
 
       const targetSemitone = noteToSemitones[currentTargetNote] || 0
-      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
 
-      const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+      // 判定逻辑见 lib/pitch-match.ts（行为等价矩阵见 __tests__/pitch-match.test.ts）
+      const { matched, adjustedCents } = evaluatePitchMatch({
+        frequency,
+        probability,
+        targetSemitone,
+        // 找音练习只需命中"这个音"，没有根音/其他音级之分 → degree 传 null（门限 25）
+        degree: null,
+        sensitivity: currentSensitivity,
+        confidenceThreshold: currentConfidenceThreshold,
+      })
 
-      const baseThreshold = detectedFreq < 110 ? 35 : 25
-      const matchThreshold = baseThreshold * (2 - currentSensitivity)
-
-      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
-        logger.debug('找音练习匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1))
+      if (matched) {
+        logger.debug('找音练习匹配成功:', note, '音分差:', adjustedCents.toFixed(1))
         isCoolingDownRef.current = true
-        triggerCorrectFeedback(detectedNote)
+        triggerCorrectFeedback(note)
         setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+        recordPositionStat(true)
         if (generateNewTargetRef.current) {
           generateNewTargetRef.current()
         }
@@ -7611,39 +2437,23 @@ export default function FretMasterPage() {
 
       // 使用 currentIntervalDisplay（先找根音模式包含 '1'）以与点击/MIDI 路径一致
       const intervals = exercise.currentIntervalDisplay.split(' ')
-      let matchedIndex: number | null = null
-      let minCents = Infinity
 
-      for (let idx = 0; idx < intervals.length; idx++) {
-        const interval = intervals[idx]
-        // 跳过已经完成的音级（按索引）
-        if (exercise.completedIntervals.includes(idx)) continue
-        // 先找根音模式：根音未完成时只接受根音
-        const rootCompleted = intervals.some((intv, i) => intv === '1' && exercise.completedIntervals.includes(i))
-        if (findRootFirstRef.current && !rootCompleted && interval !== '1') continue
-
-        const intervalSemitone = intervalToSemitones[interval]
-        if (intervalSemitone === undefined) continue
-
-        const rootValue = noteToSemitones[rootNoteValue] || 0
-        const targetSemitone = (rootValue + intervalSemitone) % 12
-        const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
-
-        const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
-
-        const baseThreshold = detectedFreq < 110 ? 35 : interval === '1' ? 25 : 15
-        const matchThreshold = baseThreshold * (2 - currentSensitivity)
-
-        if (adjustedCents <= matchThreshold && adjustedCents < minCents && probability > currentConfidenceThreshold) {
-          minCents = adjustedCents
-          matchedIndex = idx
-        }
-      }
+      // 候选里挑"最准的一个"的逻辑见 lib/pitch-match.ts 的 findBestIntervalMatch
+      const { matchedIndex, bestCents: minCents } = findBestIntervalMatch({
+        frequency,
+        probability,
+        rootSemitone: noteToSemitones[rootNoteValue] || 0,
+        degrees: intervals,
+        completedIndexes: exercise.completedIntervals,
+        findRootFirst: findRootFirstRef.current,
+        sensitivity: currentSensitivity,
+        confidenceThreshold: currentConfidenceThreshold,
+      })
 
       if (matchedIndex !== null) {
         const matchedInterval = intervals[matchedIndex]
         logger.debug('音程练习匹配成功:', matchedInterval, '音分差:', minCents.toFixed(1))
-        triggerCorrectFeedback(detectedNote)
+        triggerCorrectFeedback(note)
         const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
 
         if (newCompletedIntervals.length >= intervals.length) {
@@ -7675,18 +2485,20 @@ export default function FretMasterPage() {
       const semitone = intervalToSemitones[currentDegree]
       if (semitone === undefined) return
 
-      const keyValue = noteToSemitones[key] || 0
-      const targetSemitone = (keyValue + semitone) % 12
-      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
+      const targetSemitone = targetSemitoneOf(noteToSemitones[key] || 0, semitone)
 
-      const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+      const { matched, adjustedCents } = evaluatePitchMatch({
+        frequency,
+        probability,
+        targetSemitone,
+        degree: currentDegree,
+        sensitivity: currentSensitivity,
+        confidenceThreshold: currentConfidenceThreshold,
+      })
 
-      const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
-      const matchThreshold = baseThreshold * (2 - currentSensitivity)
-
-      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
-        logger.debug('音阶练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
-        triggerCorrectFeedback(detectedNote)
+      if (matched) {
+        logger.debug('音阶练习匹配成功:', note, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
+        triggerCorrectFeedback(note)
         const nextStep = step + 1
         if (nextStep >= sequence.length) {
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
@@ -7711,18 +2523,20 @@ export default function FretMasterPage() {
       const semitone = intervalToSemitones[currentDegree]
       if (semitone === undefined) return
 
-      const rootValue = noteToSemitones[targetChord.root] || 0
-      const targetSemitone = (rootValue + semitone) % 12
-      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
+      const targetSemitone = targetSemitoneOf(noteToSemitones[targetChord.root] || 0, semitone)
 
-      const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+      const { matched, adjustedCents, matchThreshold } = evaluatePitchMatch({
+        frequency,
+        probability,
+        targetSemitone,
+        degree: currentDegree,
+        sensitivity: currentSensitivity,
+        confidenceThreshold: currentConfidenceThreshold,
+      })
 
-      const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
-      const matchThreshold = baseThreshold * (2 - currentSensitivity)
-
-      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
-        logger.debug('和弦练习音高匹配成功:', detectedNote, '音分差:', adjustedCents.toFixed(1), '阈值:', matchThreshold.toFixed(1))
-        triggerCorrectFeedback(detectedNote)
+      if (matched) {
+        logger.debug('和弦练习音高匹配成功:', note, '音分差:', adjustedCents.toFixed(1), '阈值:', matchThreshold.toFixed(1))
+        triggerCorrectFeedback(note)
 
         const nextStep = step + 1
         if (nextStep >= sequence.length) {
@@ -7759,24 +2573,25 @@ export default function FretMasterPage() {
       const semitone = intervalToSemitones[currentDegree]
       if (semitone === undefined) return
 
-      const rootValue = noteToSemitones[currentChord.root] || 0
-      const targetSemitone = (rootValue + semitone) % 12
-      const targetFrequency = 440 * Math.pow(2, (targetSemitone - 9) / 12)
+      const targetSemitone = targetSemitoneOf(noteToSemitones[currentChord.root] || 0, semitone)
 
-      const adjustedCents = getAdjustedCents(detectedFreq, targetFrequency)
+      const { matched, adjustedCents } = evaluatePitchMatch({
+        frequency,
+        probability,
+        targetSemitone,
+        degree: currentDegree,
+        sensitivity: currentSensitivity,
+        confidenceThreshold: currentConfidenceThreshold,
+      })
 
-      const baseThreshold = detectedFreq < 110 ? 35 : currentDegree === '1' ? 25 : 15
-      const matchThreshold = baseThreshold * (2 - currentSensitivity)
-
-      if (adjustedCents <= matchThreshold && probability > currentConfidenceThreshold) {
-        logger.debug('和弦转换练习匹配成功:', detectedNote, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
+      if (matched) {
+        logger.debug('和弦转换练习匹配成功:', note, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
         isCoolingDownRef.current = true
-        triggerCorrectFeedback(detectedNote)
+        triggerCorrectFeedback(note)
         const nextStep = currentStep + 1
         if (nextStep >= degrees.length) {
           // 完成当前和弦，记录最后一个音用于 voice leading（与 Web 路径一致）
-          lastChordNoteRef.current = detectedNote
-          setLastChordNote(detectedNote)
+          lastChordNoteRef.current = note
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
           if (nextChordInfoRef.current && nextChordRef.current) {
             nextChordRef.current()
@@ -7793,75 +2608,158 @@ export default function FretMasterPage() {
     } else if (currentActiveTab === 'tuner') {
       // 调音表模式 - 只显示音高，不需要答题逻辑
     }
-  }, [getTransposedChordsRef, practiceLevelRef, findRootFirstRef, targetNoteRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, currentIntervalExerciseRef, currentChordIndexRef, chordDegreeCurrentStepRef, nextChordRef, nextChordInfoRef, nextScaleExerciseRef, nextChordExerciseRef, generateNewTargetRef, generateIntervalExerciseRef, isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef, practiceAnswerModeRef, shouldVoiceLeadRef, lastChordNoteRef, triggerCorrectFeedback, setLastChordNote])
+  }, [triggerCorrectFeedback, setScore, recordPositionStat, currentIntervalExerciseRef, setCurrentIntervalExercise, generateIntervalExerciseRef, setIntervalPracticeStep, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, setChordExerciseIsAnswered, nextChordExerciseRef, setChordExerciseCurrentStep])
 
   const processPracticeMatchRef = useRef(processPracticeMatch)
   useEffect(() => { processPracticeMatchRef.current = processPracticeMatch }, [processPracticeMatch])
 
-  // Tauri 环境：应用启动时自动启用默认音频设备
-  // 避免用户手动启用时遇到的竞态问题，开箱即用
+  // Tauri 环境：应用启动时把「音频输入」恢复到用户偏好对应的状态
+  //
+  // 产品语义（2026-10-02 用户确认）：**默认开** —— 「应该直接启用音频输入，
+  // 不需要我每次开启，关闭才需要每次关闭」，且选择「跨会话记住」。
+  // ⇒ 有效意图 = `micEnabled || micUserDisabled !== true`
+  //    （`micUserDisabled` 只有用户在设置页/M 键**显式关**才会置 true；
+  //      从没碰过开关 = 默认开。关了的跨会话记住，不会再默认开。）
+  //
+  // 🚨 这里曾经是一个**静默失效**的根因（用户报「启用音频输入后点开始练习，
+  //    弹任何音都没反应，调音也无效」）：
+  //
+  //    旧实现 `if (micEnabled) return // 已启用则跳过` 把两个不同层级的东西当成一个：
+  //      · `micEnabled`      = **持久化的用户意图**（写在 store 里，跨会话保留）
+  //      · Rust 采集在不在跑 = **进程级运行时状态**（每次启动应用都归零）
+  //    于是：用户开过一次音频 → `micEnabled=true` 被持久化 →
+  //    下次启动应用时 store 恢复 true ⇒ 这里直接 return ⇒ **采集从未启动**，
+  //    但界面与练习检测都以为「已启用」（`micEnabled` 为 true、练习 effect 照常
+  //    startPitchStream）⇒ Rust 侧 `is_capturing()` 为 false ⇒ `pipeline.rs` 的
+  //    `if !pipeline.is_capturing()` 守卫让检测线程静默空转（不报错、只是没反应）。
+  //
+  //    正确判据必须是**真实运行状态**：先问 Rust「你现在在采集吗」，
+  //    只有它说没在采集、而用户意图是「开」时，才去启动采集。
   useEffect(() => {
     if (!isTauri) return
-    if (micEnabled) return // 已启用则跳过
 
     let cancelled = false
-    const autoStartAudio = async () => {
+    const restoreAudio = async () => {
       try {
-        const { getAudioDevices, startAudioCaptureWithSampleRate } = await import('@/lib/native-audio')
-        const deviceList = await getAudioDevices()
-        if (cancelled || deviceList.length === 0) return
+        const { getAudioStatus, stopAudioCapture, ensureCaptureRunning, setNoiseSuppression, setFilters, setGain, setBufferSize } = await import('@/lib/native-audio')
 
-        // 优先使用已保存的设备，其次用默认设备
-        const savedDevice = audioSettings.selectedAudioDevice
-        const device = savedDevice
-          ? deviceList.find(d => d.name === savedDevice)
-          : null
-        const targetDevice = device || deviceList.find(d => d.isDefault) || deviceList[0]
-
+        // ① 先读**真实状态**（不要相信 micEnabled 这个意图标志）
+        let actuallyCapturing = false
+        try {
+          const status = await getAudioStatus()
+          actuallyCapturing = !!status.isCapturing
+        } catch {
+          // 读不到状态时按「未采集」处理：宁可多启动一次（start 是幂等的），
+          // 也不要因为读失败就永远不启动采集。
+          actuallyCapturing = false
+        }
         if (cancelled) return
-        await startAudioCaptureWithSampleRate(targetDevice.name, audioSettings.sampleRate || 48000)
+
+        // ①.5 把**落盘的音频设置**同步到后端（preprocessor / capture gain 都是**进程级状态**）：
+        //      Rust 每次启动一律回到编译期默认值（例如 60Hz 陷波默认**开**、噪声门倍数默认
+        //      1.5），而设置页显示的是 store 落盘值（默认 60Hz 陷波**关**）⇒ 不主动对齐就是
+        //      「界面显示 A、后端实际跑 B」，用户拖过控件才偶然一致。
+        //      同步与「采集开没开」无关（preprocessor 常驻 pipeline），所以放在意图分支
+        //      **之前**：哪怕这次意图是「关」，下次开采集时设置也已经是正确的。
+        //      `bufferSize` 同属此列：它是 capture 的配置字段，起流时按它设置固定缓冲
+        //      （Rust 每次启动回到 DEFAULT_BUFFER_SIZE），不同步就是「设置页显示 2048、
+        //      流实际用别的」（此前的真机实测是设 4096 用 1024）。
+        //      独立 try/catch：同步失败最坏只是设置晚一次生效，绝不能让采集恢复陪葬。
+        try {
+          const effAudio = getEffectiveAudioSettings(useAppStore.getState().audio)
+          await setNoiseSuppression(effAudio.noiseSuppression)
+          await setFilters({
+            highPass: effAudio.highPass,
+            lowPass: effAudio.lowPass,
+            notch50: effAudio.notch50,
+            notch60: effAudio.notch60,
+          })
+          await setGain(effAudio.inputGain)
+          await setBufferSize(effAudio.bufferSize)
+        } catch (syncErr) {
+          console.error('[Tauri] 同步音频设置失败:', syncErr)
+        }
+
+        // ② 有效意图：显式开过，或从未主动关过（默认开）。
+        //    首次默认开生效时把 UI 开关也对齐成「开」（setMicEnabled 不动 micUserDisabled，
+        //    那不是用户选择）。
+        const micWanted = micEnabled || audioSettings.micUserDisabled !== true
+        if (micWanted && !micEnabled) {
+          store.setMicEnabled(true)
+        }
+
+        // ③ 有效意图是「关」（用户显式关过，跨会话记住）⇒ 若 Rust 侧还在采集
+        //    （例如异常遗留），把它停掉对齐。
+        if (!micWanted) {
+          if (actuallyCapturing) {
+            await stopAudioCapture()
+          }
+          return
+        }
+
+        // ④ 意图是「开」且真的还没在采集 ⇒ 恢复采集（这正是旧实现漏掉的一步）。
+        //    设备挑选（已保存 → 系统默认 → 第一个）收敛在 ensureCaptureRunning 唯一一份。
+        const r = await ensureCaptureRunning({
+          selectedDevice: audioSettings.selectedAudioDevice || undefined,
+          sampleRate: audioSettings.sampleRate || 48000,
+          backend: audioSettings.audioBackend || 'wasapi_shared',
+        })
         if (cancelled) {
           // 如果已被取消（用户手动停止），立即停止捕获
-          const { stopAudioCapture } = await import('@/lib/native-audio')
           await stopAudioCapture()
           return
         }
-        store.setSelectedAudioDevice(targetDevice.name)
-        store.setMicEnabled(true)
-        logger.info('[Tauri] 自动启用音频设备:', targetDevice.name)
+        if (r.started && r.device) {
+          store.setSelectedAudioDevice(r.device)
+          logger.info('[Tauri] 已按保存的意图恢复音频输入:', r.device)
+        }
       } catch (err) {
-        console.error('[Tauri] 自动启用音频失败:', err)
+        console.error('[Tauri] 恢复音频输入失败:', err)
       }
     }
-    autoStartAudio()
+    restoreAudio()
     return () => { cancelled = true }
-  }, [isTauri]) // 仅在 isTauri 变化时执行一次
+    // 🚨 依赖数组刻意只放 [isTauri]：
+    //    本 effect 的职责是「启动时对齐一次」。若把 micEnabled 放进依赖，
+    //    用户在设置页开关一次就会触发这里重新读状态并与设置页自己的启停竞态
+    //    （设置页 startAudio 已经负责启动采集了）。
+    //    首帧的 micEnabled 值是 store 恢复后的持久化值，正是我们要用的那个。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTauri])
 
-  // Tauri 环境：练习模式音高检测轮询
-  // WindowsAudioSettings 启用音频后，Rust 后端会持续采集；这里在练习进行时轮询 detectPitch 并复用同一套匹配逻辑
+  // Tauri 环境：练习模式音高检测 —— 事件驱动
+  // WindowsAudioSettings 启用音频后，Rust 后端持续采集；练习进行时启动 Rust 检测线程，
+  // 由它按 interval 检测并 emit「pitch-detected」事件，前端订阅处理。
+  // （替代原 50ms × async IPC 轮询：省去每秒 ~20 次 Tauri invoke 往返，CPU 与延迟双降）
   useEffect(() => {
     if (!isTauri) return
     if (!micEnabled || !isPlaying || tunerActive) return
 
     let isActive = true
-    let intervalId: ReturnType<typeof setInterval> | null = null
+    let unlisten: (() => void) | null = null
+    let stopStream: (() => Promise<void>) | null = null
     let lastDisplayedNote: string | null = null
     let lastDisplayUpdateTime = 0
     const DISPLAY_THROTTLE_MS = 50
 
-    const startPolling = async () => {
-      const { detectPitch } = await import('@/lib/native-audio')
+    const start = async () => {
+      const { listenPitchDetected, startPitchStream, stopPitchStream } = await import('@/lib/native-audio')
 
-      intervalId = setInterval(async () => {
+      // 动态 import 是异步的：若在等待期间 effect 已被清理（isActive=false），
+      // 就不能再订阅/启动流——那时 cleanup 早已执行完，会留下无法回收的监听器与 Rust 线程。
+      if (!isActive) return
+      stopStream = stopPitchStream
+
+      const off = await listenPitchDetected((event) => {
         if (!isActive) return
 
         try {
-          const result = await detectPitch()
+          const result = event.pitch
           if (!result || result.frequency <= 0) return
 
           // 与 Web 路径对齐：使用 YIN probability（confidence.yin）而非 overall
           // overall = 0.5*yin + 0.25*harmonic + 0.25*temporal，前 ~400ms temporal 未累积会偏低
-          // yin probability 单次好检测即可达 0.85-0.99，与 Web ScriptProcessorNode 路径行为一致
+          // yin probability 单次好检测即可达 0.85-0.99，与 Web AudioWorklet 路径行为一致
           const prob = result.confidence?.yin ?? 0
           const currentConfidenceThreshold = confidenceThresholdRef.current
           if (prob <= currentConfidenceThreshold) return
@@ -7879,42 +2777,61 @@ export default function FretMasterPage() {
           }
 
           // 复用 Web 版的练习匹配逻辑
-          processPracticeMatchRef.current(detectedFreq, prob, detectedNote)
+          // isNoteOnset 是 PitchStreamEvent 的兄弟字段（不在 pitch 里），由 Rust 的
+          // detect_amplitude_diff 算出 —— 此前前端从未读取过它。
+          processPracticeMatchRef.current({
+            frequency: detectedFreq,
+            note: detectedNote,
+            probability: prob,
+            isNoteOnset: event.isNoteOnset,
+            rawFrequency: detectedFreq,
+            frameMs: NATIVE_PITCH_INTERVAL_MS
+          })
         } catch (e) {
-          console.error('Tauri 练习模式音高检测错误:', e)
+          console.error('Tauri 练习模式音高事件处理错误:', e)
         }
-      }, 50)
+      })
+
+      if (!isActive) {
+        off?.()
+        return
+      }
+      unlisten = off
+
+      await startPitchStream(NATIVE_PITCH_INTERVAL_MS)
+      // startPitchStream 期间被清理：立即停掉，避免孤儿线程
+      if (!isActive) {
+        await stopPitchStream().catch(() => {})
+      }
     }
 
-    startPolling()
+    start()
 
     return () => {
       isActive = false
-      if (intervalId) {
-        clearInterval(intervalId)
-        intervalId = null
+      if (unlisten) {
+        unlisten()
+        unlisten = null
       }
+      // 停止 Rust 检测线程（捕获不停，由 WindowsAudioSettings 管理）
+      stopStream?.()
     }
-  }, [isTauri, micEnabled, isPlaying, tunerActive])
+  }, [isTauri, micEnabled, isPlaying, tunerActive, setDetectedPitch])
 
   // 实际的音高检测逻辑 - 完全按照原HTML文件的processAudio实现
   const runPitchDetection = useCallback((analyser: AnalyserNode, ctx: AudioContext, scriptProcessor: ScriptProcessorNode) => {
     logger.debug('音高检测已启动，使用 ScriptProcessorNode，sampleRate:', ctx.sampleRate)
-    setPitchDebugInfo(prev => ({ ...prev, isRunning: true }))
     
     // 性能优化：防抖和节流变量
     let lastPitchUpdateTime = 0
-    let lastDebugUpdateTime = 0
     let lastDetectedPitch: string | null = null
     const PITCH_UPDATE_INTERVAL = 50 // 音高更新间隔 50ms
-    const DEBUG_UPDATE_INTERVAL = 100 // 调试信息更新间隔 100ms
     
     // 使用 ScriptProcessorNode 的 onaudioprocess 事件处理音频
     scriptProcessor.onaudioprocess = (event) => {
       // 检查是否需要停止
       if (!scriptProcessorRef.current) {
         logger.debug('音高检测已停止')
-        setPitchDebugInfo(prev => ({ ...prev, isRunning: false }))
         return
       }
       
@@ -7924,66 +2841,39 @@ export default function FretMasterPage() {
       // 获取输入音频数据
       const inputData = event.inputBuffer.getChannelData(0)
       const sampleRate = ctx.sampleRate
+
+      // 起音检测必须跑在下面两个提前 return **之前**：
+      // 门限以下的帧也要更新 prevRms，否则「从门限下升上来」的那一帧永远判不出起音
+      // （worklet 侧同样把它放在噪声门之前，见 audio-worklet-processor.js 的 process()）。
+      //
+      // 门限由 `updateOnsetGate(energy)` 从本帧**原始** RMS 推进的环境底噪算出，与
+      // worklet / Rust 同规则（`max(0.0008, 底噪 × 1.5)`），所以同一间屋子三条路径
+      // 的门限一致。此前这里写死 0.001，与校准后的底噪脱钩（见文件上方注释）。
+      const energy = calculateRMS(inputData)
+      const isNoteOnset = detectOnset(
+        energy,
+        updateOnsetGate(energy),
+        performance.now(),
+        onsetStateRef.current!
+      )
       
       // 获取当前状态
-      const currentIsPlaying = isPlayingRef.current
-      const currentActiveTab = activeTabRef.current
-      const currentSensitivity = sensitivityRef.current
-      const currentConfidenceThreshold = confidenceThresholdRef.current
       const currentPitchAlgorithm = pitchAlgorithmRef.current
       
-      // 根据当前练习模式确定目标频率，用于动态调整YIN参数
-      let isLowFrequencyTarget = false
-      let currentSequence: string[] = []
-      let currentStep = 0
-      let rootNote = 'C'
-      
-      if (currentActiveTab === 'scale' && scaleExerciseSequenceRef.current.length > 0) {
-        currentSequence = scaleExerciseSequenceRef.current
-        currentStep = scaleExerciseCurrentStepRef.current
-        rootNote = scaleKeyRef.current
-      } else if (currentActiveTab === 'chord_exercise' && chordExerciseSequenceRef.current.length > 0) {
-        currentSequence = chordExerciseSequenceRef.current
-        currentStep = chordExerciseCurrentStepRef.current
-        rootNote = chordExerciseTargetChordRef.current?.root || 'C'
-      } else if (currentActiveTab === 'chord') {
-        const chords = getTransposedChordsRef.current ? getTransposedChordsRef.current() : []
-        const currentChord = chords[currentChordIndexRef.current]
-        if (currentChord) {
-          const degrees = getChordDegrees(currentChord.type, practiceLevelRef.current, levelOptionsRef.current)
-          currentSequence = degrees
-          currentStep = chordDegreeCurrentStepRef.current
-          rootNote = currentChord.root
-        }
-      } else if (currentActiveTab === 'interval' && currentIntervalExerciseRef.current) {
-        const exercise = currentIntervalExerciseRef.current
-        if (!exercise.answered && exercise.interval?.symbol) {
-          currentSequence = exercise.interval.symbol.split('_')
-          currentStep = exercise.completedIntervals.length
-          rootNote = exercise.rootNote
-        }
+      // YIN 门限：按乐器音域解析（低频乐器 0.2 / 其余 0.15），与 worklet 路径同源。
+      // 此前这里按「目标音是否 <110Hz」判定并给低频下发 0.05 —— 该判定恒为 false，
+      // 且方向相反（threshold 越小越严格），从未生效。
+      const yinParams = {
+        threshold: resolveYinThreshold(instrumentConfig.lowestStringHz),
+        probabilityCliff: 0.1,
       }
-      
-      // 检查是否有低频目标
-      if (currentSequence.length > 0 && currentStep < currentSequence.length) {
-        const currentInterval = currentSequence[currentStep]
-        const rootValue = noteToSemitones[rootNote] || 0
-        const semitone = (rootValue + (intervalToSemitones[currentInterval] || 0)) % 12
-        const freq = 440 * Math.pow(2, (semitone - 9) / 12)
-        isLowFrequencyTarget = freq < 110
-      }
-      
-      // 动态调整YIN算法参数 - 低频使用更高灵敏度（与原文件一致）
-      const yinParams = isLowFrequencyTarget ?
-        { threshold: 0.05, probabilityCliff: 0.05 } :
-        { threshold: 0.1, probabilityCliff: 0.1 }
       
       // 根据设置选择算法
       let yinResult: { frequency: number; probability: number } | null = null
       
       if (currentPitchAlgorithm === 'solo') {
         // 使用SOLO FFT加速算法
-        const soloAnalyser = getSOLOYinAnalyser(inputData.length, sampleRate)
+        const soloAnalyser = getSOLOYinAnalyser(inputData.length, sampleRate, yinParams.threshold)
         const soloResult = soloAnalyser.analyze(inputData)
         if (soloResult && soloResult.valid) {
           yinResult = {
@@ -7997,15 +2887,20 @@ export default function FretMasterPage() {
       }
       
       if (!yinResult || !yinResult.frequency) {
-        setPitchDebugInfo(prev => ({ ...prev, rms: 0, frequency: null, probability: null }))
         return
       }
       
-      // 动态能量检测 - 低频使用更低阈值
-      const energy = calculateRMS(inputData)
-      const energyThreshold = yinResult.frequency < 110 ? 0.001 : 0.002
-      if (energy < energyThreshold) {
-        setPitchDebugInfo(prev => ({ ...prev, rms: energy, frequency: null, probability: null }))
+      // 噪声门：与 worklet 的 `adaptiveThreshold` 是**同一个值、同一个量**。
+      // worklet 用这一个值同时干两件事 —— 起音判定与噪声门（`if (energy < adaptiveThreshold) return`），
+      // 两者都吃本帧的**原始** RMS；所以这里也必须用 `getOnsetGate()`（上面起音检测刚推进过的那个门限），
+      // 而不是另立一个阈值 —— 那条老写法是按**检测频率**分档的两个字面量，worklet 侧没有这个分档：
+      //       const energyThreshold = yinResult.frequency < 110 ? 0.001 : 0.002
+      //       if (energy < energyThreshold) {
+      // 于是两条 Web 路径的灵敏度不一致，且方向随底噪翻转：
+      //   · 底噪低（未校准 ⇒ 门限 0.0008）时这个字面量更严格 ⇒ 轻弹「开着 worklet 测得到、关掉测不到」；
+      //   · 底噪高（校准到 0.02 ⇒ 门限 0.03）时它更宽松 ⇒ 纯环境抖动被当成有信号送进匹配。
+      // 护栏见 __tests__/onset-gate.test.ts 的 ④（双向缝隙证明 + 源码解析）。
+      if (energy < getOnsetGate()) {
         return
       }
       
@@ -8016,7 +2911,7 @@ export default function FretMasterPage() {
         let fundamentalResult: { frequency: number; probability: number } | null = null
         
         if (currentPitchAlgorithm === 'solo') {
-          const soloAnalyser2 = getSOLOYinAnalyser(inputData.length, sampleRate)
+          const soloAnalyser2 = getSOLOYinAnalyser(inputData.length, sampleRate, yinParams.threshold)
           const soloResult = soloAnalyser2.analyze(inputData)
           if (soloResult && soloResult.valid) {
             fundamentalResult = {
@@ -8034,17 +2929,7 @@ export default function FretMasterPage() {
         }
       }
       
-      // 性能优化：节流更新调试信息（每200ms更新一次）
       const now = Date.now()
-      if (now - lastDebugUpdateTime >= DEBUG_UPDATE_INTERVAL) {
-        setPitchDebugInfo(prev => ({
-          ...prev,
-          rms: energy,
-          frequency: detectedFreq,
-          probability: yinResult.probability
-        }))
-        lastDebugUpdateTime = now
-      }
       
       // 获取检测到的音符用于显示
       const detectedNote = frequencyToNoteName(detectedFreq)
@@ -8057,102 +2942,17 @@ export default function FretMasterPage() {
       }
       
       // 调用共用的练习匹配逻辑（Web 和 Tauri 两条路径共用）
-      processPracticeMatchRef.current(detectedFreq, yinResult.probability, detectedNote)
+      processPracticeMatchRef.current({
+        frequency: detectedFreq,
+        note: detectedNote,
+        probability: yinResult.probability,
+        isNoteOnset,
+        rawFrequency: detectedFreq,
+        frameMs: frameMsOf(SCRIPT_PROCESSOR_BUFFER_SIZE, sampleRate)
+      })
     }
-  }, [getTransposedChordsRef, practiceLevelRef, findRootFirstRef, targetNoteRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, currentIntervalExerciseRef, currentChordIndexRef, chordDegreeCurrentStepRef, nextChordRef, nextChordInfoRef, nextScaleExerciseRef, nextChordExerciseRef, generateNewTargetRef, generateIntervalExerciseRef, isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef, scriptProcessorRef, processPracticeMatchRef])
+  }, [instrumentConfig.lowestStringHz, setDetectedPitch])
 
-  // 旧的 requestAnimationFrame 方式（保留但不使用）
-  const runPitchDetectionOld = useCallback((analyser: AnalyserNode, ctx: AudioContext) => {
-    const bufferLength = analyser.fftSize
-    const buffer = new Float32Array(bufferLength)
-    let lastDetectedNote: string | null = null
-    let noteHoldCount = 0
-    const NOTE_HOLD_THRESHOLD = 3
-    
-    const yinThreshold = Math.max(0.05, 0.15 - sensitivity * 0.1)
-    const yinDetector = YINDetector({ 
-      threshold: yinThreshold,
-      probabilityCliff: 0.1 
-    })
-    
-    const detectPitch = () => {
-      if (!pitchDetectionRef.current) return
-      
-      if (cooldownEnabled && isCoolingDownRef.current) {
-        pitchDetectionRef.current = requestAnimationFrame(detectPitch)
-        return
-      }
-      
-      analyser.getFloatTimeDomainData(buffer)
-      
-      const rms = calculateRMS(buffer)
-      const energyThreshold = 0.001 + (1 - sensitivity) * 0.002
-      
-      if (rms < energyThreshold) {
-        setDetectedPitch(null)
-        setDetectedCents(null)
-        lastDetectedNote = null
-        noteHoldCount = 0
-        pitchDetectionRef.current = requestAnimationFrame(detectPitch)
-        return
-      }
-      
-      const result = yinDetector(buffer)
-      
-      if (result && result.frequency && result.probability > confidenceThreshold) {
-        const detectedNote = frequencyToNoteName(result.frequency)
-        setDetectedPitch(detectedNote)
-        
-        if (targetNote && isPlaying) {
-          const targetFreq = 440 * Math.pow(2, (getNoteIndex(targetNote) - 9) / 12)
-          const cents = calculateCents(result.frequency, targetFreq)
-          setDetectedCents(cents)
-        }
-        
-        if (isPlaying && detectedNote) {
-          if (detectedNote === lastDetectedNote) {
-            noteHoldCount++
-            if (noteHoldCount >= NOTE_HOLD_THRESHOLD) {
-              if (handleMIDINoteInputRef.current) {
-                handleMIDINoteInputRef.current(detectedNote)
-              }
-              noteHoldCount = 0
-              
-              if (cooldownEnabled) {
-                isCoolingDownRef.current = true
-                if (cooldownRef.current) {
-                  clearTimeout(cooldownRef.current)
-                }
-                cooldownRef.current = setTimeout(() => {
-                  isCoolingDownRef.current = false
-                }, cooldownDuration)
-              }
-            }
-          } else {
-            noteHoldCount = 0
-          }
-          lastDetectedNote = detectedNote
-        }
-      } else {
-        setDetectedPitch(null)
-        setDetectedCents(null)
-      }
-      
-      pitchDetectionRef.current = requestAnimationFrame(detectPitch)
-    }
-    
-    detectPitch()
-  }, [isPlaying, activeTab, cooldownEnabled, cooldownDuration, sensitivity, confidenceThreshold, targetNote])
-
-  // 使用当前状态的音高检测
-  const startPitchDetection = useCallback(() => {
-    logger.debug('startPitchDetection 被调用', 'analyserNode:', !!analyserNode, 'audioContext:', !!audioContext, 'scriptProcessor:', !!scriptProcessorRef.current)
-    if (!analyserNode || !audioContext || !scriptProcessorRef.current) {
-      logger.debug('analyserNode、audioContext 或 scriptProcessor 为空，无法启动音高检测')
-      return
-    }
-    runPitchDetection(analyserNode, audioContext, scriptProcessorRef.current)
-  }, [analyserNode, audioContext, runPitchDetection])
 
   // 直接使用节点启动音高检测（用于避免React状态延迟）
   const startPitchDetectionWithNodes = useCallback((analyser: AnalyserNode, ctx: AudioContext, scriptProcessor: ScriptProcessorNode) => {
@@ -8169,8 +2969,6 @@ export default function FretMasterPage() {
     // 总是生成指板位置（在 fretboard 模式下不会被使用，但确保 buttons 模式下始终有值）
     const allStrings = Array.from({ length: STRING_COUNT }, (_, i) => i + 1)
     const availableStrings = selectedStrings.length > 0 ? selectedStrings : allStrings
-    const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
-    const stringIndex = STRING_COUNT - randomStringNum
 
     // 限制练习 - 5品区: 仅在指定品区范围内生成品数
     let minFret = 0
@@ -8180,9 +2978,44 @@ export default function FretMasterPage() {
       maxFret = Math.min(fretCount, fretZoneStart + fretZoneSize - 1)
     }
 
+    // 弱点加权出题：枚举品区内所有可用位置，按掌握度权重随机（正确率低的位置权重更高）
+    // 常规模式：弦与品均匀随机
+    let stringIndex: number
+    let baseFret: number
+    if (weaknessWeightedEnabled) {
+      const prev = highlightedTargetPositionRef.current
+      // 候选总数多于一个时才排除上次位置，避免连续重复
+      const hasAlternatives = availableStrings.length * (maxFret - minFret + 1) > 1
+      const candidates: { si: number; fret: number; weight: number }[] = []
+      for (const s of availableStrings) {
+        const si = STRING_COUNT - s
+        for (let f = minFret; f <= maxFret; f++) {
+          if (prev && hasAlternatives && si === prev.stringIndex && f === prev.fret) continue
+          candidates.push({ si, fret: f, weight: getPositionWeight(user.instrument, si, f) })
+        }
+      }
+      if (candidates.length > 0) {
+        const total = candidates.reduce((sum, c) => sum + c.weight, 0)
+        let r = Math.random() * total
+        let chosen = candidates[candidates.length - 1]
+        for (const c of candidates) {
+          r -= c.weight
+          if (r <= 0) { chosen = c; break }
+        }
+        stringIndex = chosen.si
+        baseFret = chosen.fret
+      } else {
+        const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
+        stringIndex = STRING_COUNT - randomStringNum
+        baseFret = Math.floor(Math.random() * (maxFret - minFret + 1)) + minFret
+      }
+    } else {
+      const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
+      stringIndex = STRING_COUNT - randomStringNum
+      baseFret = Math.floor(Math.random() * (maxFret - minFret + 1)) + minFret
+    }
+
     // 限制练习 - 八度切换: 在已有位置基础上向上下八度平移
-    // 首次随机生成一个基础位置
-    const baseFret = Math.floor(Math.random() * (maxFret - minFret + 1)) + minFret
     let randomFret = baseFret
     let noteAtPosition = getNoteAtPosition(stringIndex, randomFret)
 
@@ -8216,452 +3049,17 @@ export default function FretMasterPage() {
     }
 
     // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
-  }, [intervalRootMode, recordPractice, selectedStrings, fretCount, fretZoneEnabled, fretZoneStart, fretZoneSize, octaveShiftEnabled, octaveShiftMode])
+  }, [STRING_COUNT, selectedStrings, fretCount, fretZoneEnabled, weaknessWeightedEnabled, octaveShiftEnabled, intervalRootMode, fretZoneStart, fretZoneSize, user.instrument, octaveShiftMode, setRootNote])
 
   // 生成音程练习队列
-  const generateIntervalExerciseQueue = useCallback(() => {
-    if (selectedIntervals.length === 0) return []
-    
-    let effectiveIntervals = [...selectedIntervals]
-    if (findRootFirst) {
-      effectiveIntervals = effectiveIntervals.filter(idx => idx !== 0)
-    }
-    if (effectiveIntervals.length === 0) return []
-    
-    let queue = [...effectiveIntervals]
-    
-    if (intervalDirection === "down") {
-      queue = queue.map(idx => {
-        const interval = INTERVALS[idx]
-        const downSemitones = (12 - interval.semitones) % 12
-        const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-        return downIndex !== -1 ? downIndex : idx
-      })
-    } else if (intervalDirection === "random") {
-      queue = queue.map(idx => {
-        if (Math.random() > 0.5) {
-          const interval = INTERVALS[idx]
-          const downSemitones = (12 - interval.semitones) % 12
-          const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-          return downIndex !== -1 ? downIndex : idx
-        }
-        return idx
-      })
-    } else if (intervalDirection === "either") {
-      // Either 模式：上行与下行同时入队，每个音程产生两个条目
-      const expanded: number[] = []
-      queue.forEach(idx => {
-        expanded.push(idx) // 上行
-        const interval = INTERVALS[idx]
-        const downSemitones = (12 - interval.semitones) % 12
-        const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-        expanded.push(downIndex !== -1 ? downIndex : idx) // 下行
-      })
-      queue = expanded
-    }
-    
-    if (intervalRandomizeOrder) {
-      queue = queue.sort(() => Math.random() - 0.5)
-    }
-    
-    return queue
-  }, [selectedIntervals, intervalRandomizeOrder, intervalDirection, findRootFirst])
 
   // 生成音程练习题目
-  const generateIntervalExercise = useCallback(() => {
-    if (selectedIntervals.length === 0) return
-    
-    // 获取当前队列状态
-    const currentQueue = intervalExerciseQueue
-    const currentIndex = intervalCurrentQueueIndex
-    
-    let queue = currentQueue
-    let nextIndex = currentIndex
-    
-    // 如果队列为空或已遍历完，重新生成队列
-    if (queue.length === 0 || nextIndex >= queue.length) {
-      queue = generateIntervalExerciseQueue()
-      setIntervalExerciseQueue(queue)
-      nextIndex = 0
-      setIntervalCurrentQueueIndex(0)
-    }
-    
-    if (queue.length === 0) return
-    
-    // 获取当前音程
-    const intervalIndex = queue[nextIndex]
-    const selectedInterval = INTERVALS[intervalIndex]
-    
-    // 随机选择根音
-    let exerciseRoot = rootNote
-    if (intervalRootMode === "random") {
-      exerciseRoot = NOTES[Math.floor(Math.random() * NOTES.length)]
-      setRootNote(exerciseRoot)
-    }
-    
-    // 获取选中的音程对象
-    const selectedIntervalObjects = selectedIntervals.map(i => INTERVALS[i])
-    
-    // 计算目标音符
-    const rootIdx = getNoteIndex(exerciseRoot)
-    const targetIndex = (rootIdx + selectedInterval.semitones) % 12
-    const targetNoteName = NOTES[targetIndex]
-    
-    // 构建当前题目显示的音程
-    // 先找根音模式: "1 3" (根音 + 音程)
-    // 不先找根音模式: "3" (仅音程)
-    const currentIntervalDisplay = findRootFirst ? `1 ${selectedInterval.symbol}` : selectedInterval.symbol
-    const rootBackDisplay = addRootBack ? ` ${selectedInterval.symbol} 1` : ''
-    
-    setCurrentIntervalExercise({
-      rootNote: exerciseRoot,
-      interval: selectedInterval,
-      targetNote: targetNoteName,
-      allIntervals: selectedIntervalObjects,
-      currentIntervalDisplay: currentIntervalDisplay + rootBackDisplay,
-      completedIntervals: [] as number[],
-      answered: false
-    })
-    
-    // 重置步骤到根音
-    setIntervalPracticeStep("root")
-    
-    // 更新队列索引
-    setIntervalCurrentQueueIndex(nextIndex + 1)
-
-    // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
-  }, [rootNote, intervalRootMode, selectedIntervals, findRootFirst, addRootBack, recordPractice, intervalExerciseQueue, intervalCurrentQueueIndex])
-
-  // 辅助函数：生成和弦练习序列
-  const generateChordSequence = useCallback((root: string, chordType: string, levelId: string, order: string, bass: string) => {
-    // 从 ALL_PRACTICE_LEVELS 获取练习模式
-    const level = ALL_PRACTICE_LEVELS.find(l => l.id === levelId)
-    if (!level) return []
-
-    // 使用共用的 getSequenceTypeForChord 函数，与 getChordDegrees 保持一致
-    // generateChordSequence 用于 chord_exercise tab，使用 level.forceNaturalFive
-    const sequenceType = getSequenceTypeForChord(chordType, level.forceNaturalFive) as keyof typeof level.sequences
-    let sequenceNumbers = getSequenceWithFallback(level.sequences, sequenceType)
-    if (!sequenceNumbers.length) sequenceNumbers = [1]
-
-    // Solo 架构：sequence 数字作为 1-indexed 索引访问 chord type 对应 scale 的 intervals
-    // 越界时跳过（与 Solo ChangesWorkoutStepBuilder 一致）
-    const scaleName = getScaleForChord(chordType, level.forceNaturalFive, chordSymbols.sevenFlatNineScaleChoice)
-    const scaleIntervals = SCALE_INTERVALS[scaleName] || SCALE_INTERVALS.major
-    let sequence = sequenceNumbers
-      .filter(n => n >= 1 && n <= scaleIntervals.length)
-      .map(n => scaleIntervals[n - 1])
-
-    // 应用低音音符（旋转序列使指定音级排在最前）
-    if (bass && bass !== "root") {
-      const bassDegreeMap: Record<string, string> = {
-        "3rd": "3", "5th": "5", "7th": "7",
-        "b3": "b3", "b5": "b5", "bb7": "bb7", "#5": "#5"
-      }
-      const targetDegree = bassDegreeMap[bass]
-      if (targetDegree) {
-        const bassIdx = sequence.indexOf(targetDegree)
-        if (bassIdx > 0) {
-          sequence = [...sequence.slice(bassIdx), ...sequence.slice(0, bassIdx)]
-        }
-      }
-    }
-
-    // 应用演奏顺序
-    if (order === "desc") {
-      sequence = sequence.reverse()
-    } else if (order === "random") {
-      for (let i = sequence.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        ;[sequence[i], sequence[j]] = [sequence[j], sequence[i]]
-      }
-    }
-
-    return sequence
-  }, [])
-
-  // 生成和弦练习
-  const generateChordExercise = useCallback(() => {
-    // 确定根音
-    let root = chordExerciseRoot
-    if (root === "random") {
-      root = NOTES[Math.floor(Math.random() * NOTES.length)]
-    }
-
-    // 确定和弦类型（从选中的类型中随机选择）
-    let chordType = "Major"
-    if (chordExerciseTypes.length > 0) {
-      const randomIndex = Math.floor(Math.random() * chordExerciseTypes.length)
-      chordType = chordExerciseTypes[randomIndex]
-    }
-
-    // 确定低音音符
-    let bass = chordExerciseBass
-    if (bass === "random") {
-      const bassOptions = ["root", "3rd", "5th", "7th"]
-      bass = bassOptions[Math.floor(Math.random() * bassOptions.length)]
-    }
-
-    // 生成序列
-    const sequence = generateChordSequence(root, chordType, chordExerciseLevel, chordExerciseOrder, bass)
-
-    setChordExerciseTargetChord({ root, type: chordType })
-    setChordExerciseSequence(sequence)
-    setChordExerciseCurrentStep(0)
-    setChordExerciseIsAnswered(false)
-    chordExerciseIsAnsweredRef.current = false
-
-    // 预生成下一题
-    let nextRoot = chordExerciseRoot === "random" ? NOTES[Math.floor(Math.random() * NOTES.length)] : root
-    let nextType = chordExerciseTypes.length > 0 ? chordExerciseTypes[Math.floor(Math.random() * chordExerciseTypes.length)] : chordType
-    let nextBass = chordExerciseBass === "random" ? ["root", "3rd", "5th", "7th"][Math.floor(Math.random() * 4)] : bass
-    const nextSequence = generateChordSequence(nextRoot, nextType, chordExerciseLevel, chordExerciseOrder, nextBass)
-
-    setNextChordExerciseInfo({
-      root: nextRoot,
-      type: nextType,
-      sequence: nextSequence
-    })
-
-    // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
-  }, [chordExerciseRoot, chordExerciseTypes, chordExerciseLevel, chordExerciseOrder, chordExerciseBass, generateChordSequence, recordPractice])
-
-  // 下一和弦练习
-  const nextChordExercise = useCallback(() => {
-    // 使用预览中的下一题信息
-    if (nextChordExerciseInfo) {
-      setChordExerciseTargetChord({ root: nextChordExerciseInfo.root, type: nextChordExerciseInfo.type })
-      setChordExerciseSequence(nextChordExerciseInfo.sequence)
-      setChordExerciseCurrentStep(0)
-      setChordExerciseIsAnswered(false)
-      chordExerciseIsAnsweredRef.current = false
-
-      // 预生成新的下一题
-      let newNextRoot = chordExerciseRoot === "random" ? NOTES[Math.floor(Math.random() * NOTES.length)] : nextChordExerciseInfo.root
-      let newNextType = chordExerciseTypes.length > 0 ? chordExerciseTypes[Math.floor(Math.random() * chordExerciseTypes.length)] : nextChordExerciseInfo.type
-      let newNextBass = chordExerciseBass === "random" ? ["root", "3rd", "5th", "7th"][Math.floor(Math.random() * 4)] : chordExerciseBass
-      const newNextSequence = generateChordSequence(newNextRoot, newNextType, chordExerciseLevel, chordExerciseOrder, newNextBass)
-
-      setNextChordExerciseInfo({
-        root: newNextRoot,
-        type: newNextType,
-        sequence: newNextSequence
-      })
-    } else {
-      // 如果没有预览信息，重新生成
-      generateChordExercise()
-    }
-  }, [nextChordExerciseInfo, chordExerciseRoot, chordExerciseTypes, chordExerciseLevel, chordExerciseOrder, chordExerciseBass, generateChordSequence, generateChordExercise])
-
-  // 查找音阶中第一个出现的指定音程（如'3', 'b3', '#3'等）
-  const findFirstIntervalOfType = useCallback((intervals: string[], degree: string): string | null => {
-    // 特殊处理：对于blues音阶等特殊音阶，优先检查是否有对应度数的变音记号版本
-    if (degree === '3') {
-      for (let i = 0; i < intervals.length; i++) {
-        if (intervals[i] === 'b3') return intervals[i]
-      }
-    } else if (degree === '4') {
-      for (let i = 0; i < intervals.length; i++) {
-        if (intervals[i] === 'b4') return intervals[i]
-      }
-    } else if (degree === '7') {
-      for (let i = 0; i < intervals.length; i++) {
-        if (intervals[i] === 'b7') return intervals[i]
-      }
-    }
-
-    // 检查音阶中是否包含该度数的任何变体
-    for (let i = 0; i < intervals.length; i++) {
-      const intervalNumber = intervals[i].replace(/[^0-9]/g, '')
-      if (intervalNumber === degree) {
-        return intervals[i]
-      }
-    }
-
-    return null
-  }, [])
-
-  // 当音阶中缺少特定音程时，查找音阶中实际存在的最近音程
-  const findNearestIntervalInScale = useCallback((intervals: string[], degree: string): string | null => {
-    // 首先尝试查找指定度数的音程
-    const foundInterval = findFirstIntervalOfType(intervals, degree)
-    if (foundInterval) return foundInterval
-
-    // 如果没找到，根据音程类型选择最近的替代音程
-    switch (degree) {
-      case '3':
-        // 3音缺失时，查找2音（优先）或4音
-        for (let i = 0; i < intervals.length; i++) {
-          const intervalNumber = intervals[i].replace(/[^0-9]/g, '')
-          if (intervalNumber === '4') return intervals[i]
-        }
-        for (let i = 0; i < intervals.length; i++) {
-          const intervalNumber = intervals[i].replace(/[^0-9]/g, '')
-          if (intervalNumber === '2') return intervals[i]
-        }
-        break
-      case '5':
-        // 5音缺失时，查找4音或6音
-        for (let i = 0; i < intervals.length; i++) {
-          const intervalNumber = intervals[i].replace(/[^0-9]/g, '')
-          if (intervalNumber === '4') return intervals[i]
-        }
-        for (let i = 0; i < intervals.length; i++) {
-          const intervalNumber = intervals[i].replace(/[^0-9]/g, '')
-          if (intervalNumber === '6') return intervals[i]
-        }
-        break
-      case '7':
-        // 7音缺失时，查找6音（优先）或1→1
-        for (let i = 0; i < intervals.length; i++) {
-          const intervalNumber = intervals[i].replace(/[^0-9]/g, '')
-          if (intervalNumber === '6') return intervals[i]
-        }
-        for (let i = 0; i < intervals.length; i++) {
-          const intervalNumber = intervals[i].replace(/[^0-9]/g, '')
-          if (intervalNumber === '1') return intervals[i]
-        }
-        break
-    }
-
-    // 如果还是没找到，返回音阶中的第一个音程作为默认值
-    return intervals.length > 0 ? intervals[0] : '1'
-  }, [findFirstIntervalOfType])
 
   // 辅助函数：生成音阶练习序列
-  const generateScaleSequence = useCallback((scale: typeof SCALE_MODES.basic[0], sequenceType: string, order: string) => {
-    // 获取音阶的音级字符串数组
-    let intervals: string[] = [...(scale.intervals || [])]
-    
-    // 如果没有 intervals，从 notes 转换
-    if (intervals.length === 0) {
-      const semitoneToDegree: Record<number, string> = {
-        0: "1", 1: "b2", 2: "2", 3: "b3", 4: "3", 5: "4",
-        6: "b5", 7: "5", 8: "b6", 9: "6", 10: "b7", 11: "7"
-      }
-      intervals = scale.notes.map(i => semitoneToDegree[i] || String(i))
-    }
-    
-    let startEndInterval = '1' // 默认使用1作为首尾音
-    
-    // 根据练习序列类型确定首尾音
-    if (sequenceType === 'random') {
-      const availableChordTones: string[] = []
-      const thirdInterval = findFirstIntervalOfType(intervals, '3')
-      if (thirdInterval) availableChordTones.push(thirdInterval)
-      const fifthInterval = findFirstIntervalOfType(intervals, '5')
-      if (fifthInterval) availableChordTones.push(fifthInterval)
-      const seventhInterval = findFirstIntervalOfType(intervals, '7')
-      if (seventhInterval) availableChordTones.push(seventhInterval)
-      
-      if (availableChordTones.length > 0) {
-        startEndInterval = availableChordTones[Math.floor(Math.random() * availableChordTones.length)]
-      } else {
-        startEndInterval = '1'
-      }
-    } else if (sequenceType === '3to3') {
-      const found = findFirstIntervalOfType(intervals, '3')
-      startEndInterval = found || findNearestIntervalInScale(intervals, '3') || '1'
-    } else if (sequenceType === '5to5') {
-      const found = findFirstIntervalOfType(intervals, '5')
-      startEndInterval = found || findNearestIntervalInScale(intervals, '5') || '1'
-    } else if (sequenceType === '7to7') {
-      const found = findFirstIntervalOfType(intervals, '7')
-      startEndInterval = found || findNearestIntervalInScale(intervals, '7') || '1'
-    }
 
-    // 根据方向重新排列序列
-    if (order === 'down') {
-      const startEndIndex = intervals.indexOf(startEndInterval)
-      if (startEndIndex !== -1) {
-        const middleIntervals = [...intervals.slice(startEndIndex + 1), ...intervals.slice(0, startEndIndex)].reverse()
-        intervals = [startEndInterval, ...middleIntervals, startEndInterval]
-      } else {
-        const middleIntervals = intervals.slice(1).reverse()
-        intervals = [intervals[0], ...middleIntervals, intervals[0]]
-      }
-    } else if (order === 'up_down') {
-      const startEndIndex = intervals.indexOf(startEndInterval)
-      if (startEndIndex !== -1) {
-        const ascendingMiddle = [...intervals.slice(startEndIndex + 1), ...intervals.slice(0, startEndIndex)]
-        const descendingMiddle = [...ascendingMiddle].reverse()
-        intervals = [startEndInterval, ...ascendingMiddle, startEndInterval, ...descendingMiddle, startEndInterval]
-      } else {
-        const ascendingMiddle = intervals.slice(1)
-        const descendingMiddle = [...ascendingMiddle].reverse()
-        intervals = [intervals[0], ...ascendingMiddle, intervals[0], ...descendingMiddle, intervals[0]]
-      }
-    } else if (order === 'random') {
-      // 方向随机时，首尾音从1→1、3→3、5→5、7→7中随机选择，中间是音阶其他音的随机排列
-      const availableStartEndTones: string[] = ['1'] // 1音始终可用
-      const thirdInterval = findFirstIntervalOfType(intervals, '3')
-      if (thirdInterval) availableStartEndTones.push(thirdInterval)
-      const fifthInterval = findFirstIntervalOfType(intervals, '5')
-      if (fifthInterval) availableStartEndTones.push(fifthInterval)
-      const seventhInterval = findFirstIntervalOfType(intervals, '7')
-      if (seventhInterval) availableStartEndTones.push(seventhInterval)
-      
-      // 从可用的首尾音中随机选择首尾音
-      startEndInterval = availableStartEndTones[Math.floor(Math.random() * availableStartEndTones.length)]
-      
-      // 获取音阶中除首尾音外的其他音
-      const startEndIndex = intervals.indexOf(startEndInterval)
-      let otherIntervals: string[]
-      if (startEndIndex !== -1) {
-        otherIntervals = [...intervals.slice(0, startEndIndex), ...intervals.slice(startEndIndex + 1)]
-      } else {
-        otherIntervals = intervals.filter(i => i !== startEndInterval)
-      }
-      
-      // 随机打乱中间音的顺序
-      for (let i = otherIntervals.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        ;[otherIntervals[i], otherIntervals[j]] = [otherIntervals[j], otherIntervals[i]]
-      }
-      
-      // 构建最终序列：首尾音 + 随机排列的中间音 + 首尾音
-      intervals = [startEndInterval, ...otherIntervals, startEndInterval]
-    } else {
-      if (sequenceType === '1to1' || sequenceType === '3to3' || sequenceType === '5to5' || sequenceType === '7to7' || sequenceType === 'random') {
-        const startEndIndex = intervals.indexOf(startEndInterval)
-        if (startEndIndex !== -1) {
-          const middleIntervals = [...intervals.slice(startEndIndex + 1), ...intervals.slice(0, startEndIndex)]
-          intervals = [startEndInterval, ...middleIntervals, startEndInterval]
-        } else {
-          intervals = [startEndInterval, ...intervals, startEndInterval]
-        }
-      } else {
-        intervals = [...intervals, intervals[0]]
-      }
-    }
-    
-    return intervals
-  }, [findFirstIntervalOfType, findNearestIntervalInScale])
 
-  const SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'a', 'e', 'b', 'f♯', 'c♯', 'g♯', 'd♯']
-  const FLAT_KEYS = ['F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'd', 'g', 'c', 'f', 'bb', 'eb']
 
-  const ENHARMONIC_MAP: Record<string, string> = {
-    'C#': 'D♭', 'D♭': 'C#', 'C♯': 'D♭',
-    'D#': 'E♭', 'E♭': 'D#', 'D♯': 'E♭',
-    'F#': 'G♭', 'G♭': 'F#', 'F♯': 'G♭',
-    'G#': 'A♭', 'A♭': 'G#', 'G♯': 'A♭',
-    'A#': 'B♭', 'B♭': 'A#', 'A♯': 'B♭',
-  }
 
-  const preferSharp = (note: string): string => {
-    const normalized = normalizeNoteName(note)
-    // 使用 normalized 进行匹配，避免传入 # 形式时无法命中 b 形式列表
-    if (['D♭', 'E♭', 'G♭', 'A♭', 'B♭'].includes(normalized)) return normalizeNoteName(ENHARMONIC_MAP[normalized] || ENHARMONIC_MAP[note] || note)
-    return normalized
-  }
-
-  const preferFlat = (note: string): string => {
-    const normalized = normalizeNoteName(note)
-    // 使用 normalized 进行匹配（♯ 形式），避免传入 b 形式时无法命中
-    if (['C♯', 'D♯', 'F♯', 'G♯', 'A♯'].includes(normalized)) return normalizeNoteName(ENHARMONIC_MAP[normalized] || ENHARMONIC_MAP[note] || note)
-    return normalized
-  }
 
   const formatNoteByAccidentalSetting = useCallback((note: string): string => {
     if (noteAccidentalDisplay === 'flat') return preferFlat(note)
@@ -8677,40 +3075,117 @@ export default function FretMasterPage() {
     return preferSharp(note)
   }, [noteAccidentalDisplay])
   
-  const getNextKeyByMovement = useCallback((currentKey: string, movement: typeof scaleRootMovement): string => {
-    const normalizedKey = normalizeNoteName(currentKey)
-    const noteIndex = NOTES.indexOf(normalizedKey)
-    if (noteIndex === -1) return normalizedKey
+  // ==================== 一弦三音（3NPS）====================
+  // 练习序列选「一弦3音」时启用。算法来自 guitarrun.com 的 3NPS Marathon，
+  // 生成器在 lib/three-notes-per-string.ts（含参考表与差分对照测试），
+  // 逆向过程见 guitarrun-3nps-analysis.md。
+  //
+  // 关键设计：**序列仍然只用「音级标签」表达**（scaleExerciseSequence），
+  // 匹配路径因此完全不用改；把位信息（弦/品）另存在 threeNpsSteps 里，只供显示与指板高亮。
+  // Marathon 的推进也不需要单独的循环 —— 它只是「下一题 = 同一调同音阶的下一个把位」。
+  const isThreeNpsMode = scalePracticeSequence === THREE_NPS_SEQUENCE_ID
+  /** 一弦三音只支持七声音阶；从已选音阶里筛出可用的 */
+  const threeNpsEligibleScales = useMemo(
+    () => selectedScales.filter((s) => isThreeNpsEligible(s.notes)),
+    [selectedScales]
+  )
+  const isThreeNpsActive = isThreeNpsMode && threeNpsEligibleScales.length > 0
 
-    const isSharpKey = SHARP_KEYS.includes(normalizedKey)
-    const isFlatKey = FLAT_KEYS.includes(normalizedKey)
-    const useSharps = isSharpKey || (!isFlatKey && Math.random() > 0.5)
+  /** 生成某调 + 某音阶的七个把位（品数太小导致把所有音都截掉时返回空） */
+  const buildThreeNpsFor = useCallback((
+    key: string,
+    scale: { name: string; notes: number[]; intervals: string[] }
+  ): ThreeNpsPosition[] => {
+    return buildThreeNpsPositions({
+      rootPitchClass: getNoteIndex(key),
+      intervals: scale.notes,
+      degreeLabels: scale.intervals,
+      tuning: instrumentConfig.tuning,
+      maxFret: fretCount,
+    })
+  }, [instrumentConfig.tuning, fretCount])
 
-    switch (movement) {
-      case 'static':
-        return normalizedKey
-      case 'random':
-        return NOTES[Math.floor(Math.random() * NOTES.length)]
-      case 'upSemiTone': {
-        const next = NOTES[(noteIndex + 1) % 12]
-        return useSharps ? preferSharp(next) : preferFlat(next)
-      }
-      case 'downSemiTone': {
-        const next = NOTES[(noteIndex - 1 + 12) % 12]
-        return useSharps ? preferSharp(next) : preferFlat(next)
-      }
-      case 'circleOfFifths': {
-        const next = NOTES[(noteIndex + 7) % 12]
-        return preferSharp(next)
-      }
-      case 'circleOfFourths': {
-        const next = NOTES[(noteIndex + 5) % 12]
-        return preferFlat(next)
-      }
-      default:
-        return currentKey
-    }
+  /** 把某个把位装载成当前题目：序列 = 该把位 35 步的音级标签（上行 + 下行） */
+  const applyThreeNpsPosition = useCallback((
+    positions: ThreeNpsPosition[],
+    positionIndex: number
+  ): ThreeNpsPosition | null => {
+    if (positions.length === 0) return null
+    const idx = Math.max(0, Math.min(positionIndex, positions.length - 1))
+    const position = positions[idx]
+    if (!position || position.steps.length === 0) return null
+    setThreeNpsPositions(positions)
+    setThreeNpsPositionIndex(idx)
+    setThreeNpsSteps(position.steps)
+    setScaleExerciseSequence(position.steps.map((s) => s.degreeLabel))
+    setScaleExerciseCurrentStep(0)
+    return position
   }, [])
+
+  /**
+   * 计算「下一题」。
+   *
+   * 一弦三音时优先**同一调、同一音阶的下一个把位** —— 这就是 Marathon；
+   * 七个把位都跑完了才换调/换音阶并把位回 1（GuitarRun 的 `ye()` 也是跑到 7 才收尾）。
+   */
+  const computeNextScaleExerciseInfo = useCallback((
+    key: string,
+    scale: { name: string; notes: number[]; intervals: string[] },
+    positionIndex: number
+  ): NextScaleExerciseInfo => {
+    if (isThreeNpsActive) {
+      const positions = buildThreeNpsFor(key, scale)
+      const nextIdx = nextThreeNpsPositionIndex(positionIndex, positions.length)
+      if (nextIdx !== null) {
+        const position = positions[nextIdx]
+        const first = position.steps[0]
+        return {
+          key,
+          scaleName: scale.name,
+          sequence: position.steps.map((s) => s.degreeLabel),
+          threeNps: {
+            positionIndex: nextIdx,
+            position: position.index,
+            totalPositions: positions.length,
+            startStringIndex: first.stringIndex,
+            startFret: first.fret,
+          },
+        }
+      }
+      // 跑完七个把位 ⇒ 换调/换音阶，把位回到第一个可用把位
+      const nextKey = isScaleKeyRandom
+        ? NOTES[Math.floor(Math.random() * NOTES.length)]
+        : getNextKeyByMovement(key, scaleRootMovement)
+      const pool = threeNpsEligibleScales
+      const nextScale = pool[Math.floor(Math.random() * pool.length)] ?? scale
+      const nextPositions = buildThreeNpsFor(nextKey, nextScale)
+      const firstPos = nextPositions[0]
+      return {
+        key: nextKey,
+        scaleName: nextScale.name,
+        sequence: firstPos ? firstPos.steps.map((s) => s.degreeLabel) : [],
+        threeNps: firstPos
+          ? {
+              positionIndex: 0,
+              position: firstPos.index,
+              totalPositions: nextPositions.length,
+              startStringIndex: firstPos.steps[0].stringIndex,
+              startFret: firstPos.steps[0].fret,
+            }
+          : null,
+      }
+    }
+
+    const nextKey = isScaleKeyRandom
+      ? NOTES[Math.floor(Math.random() * NOTES.length)]
+      : getNextKeyByMovement(key, scaleRootMovement)
+    const nextScale = selectedScales[Math.floor(Math.random() * selectedScales.length)] ?? scale
+    return {
+      key: nextKey,
+      scaleName: nextScale.name,
+      sequence: generateScaleSequence(nextScale, scalePracticeSequence, scaleDirection),
+    }
+  }, [isThreeNpsActive, buildThreeNpsFor, threeNpsEligibleScales, isScaleKeyRandom, scaleRootMovement, selectedScales, scalePracticeSequence, scaleDirection])
 
   // 生成音阶练习序列 - 参考 F:\新建文件夹\吉他指板视觉化练习工具.html
   const generateScaleExercise = useCallback(() => {
@@ -8721,30 +3196,33 @@ export default function FretMasterPage() {
       currentKey = NOTES[Math.floor(Math.random() * NOTES.length)]
       setScaleKey(currentKey)
     }
-    
+
+    // 一弦三音：从七声音阶里选一个，装载第 1 个把位
+    if (isThreeNpsActive) {
+      const scale = threeNpsEligibleScales[Math.floor(Math.random() * threeNpsEligibleScales.length)]
+      setSelectedScale(scale)
+      const position = applyThreeNpsPosition(buildThreeNpsFor(currentKey, scale), 0)
+      if (position) {
+        setNextScaleExerciseInfo(computeNextScaleExerciseInfo(currentKey, scale, 0))
+        return
+      }
+    }
+
     const randomScale = selectedScales[Math.floor(Math.random() * selectedScales.length)]
     setSelectedScale(randomScale)
-    
+    // 退出 3NPS（或 3NPS 不可用）时清掉把位快照，避免指板继续按旧把位高亮
+    setThreeNpsPositions([])
+    setThreeNpsSteps([])
+    setThreeNpsPositionIndex(0)
+
     const intervals = generateScaleSequence(randomScale, scalePracticeSequence, scaleDirection)
     setScaleExerciseSequence(intervals)
     setScaleExerciseCurrentStep(0)
-    
-    let nextKey: string
-    if (isScaleKeyRandom) {
-      nextKey = NOTES[Math.floor(Math.random() * NOTES.length)]
-    } else {
-      nextKey = getNextKeyByMovement(currentKey, scaleRootMovement)
-    }
-    const nextScale = selectedScales[Math.floor(Math.random() * selectedScales.length)]
-    const nextSequence = generateScaleSequence(nextScale, scalePracticeSequence, scaleDirection)
-    setNextScaleExerciseInfo({
-      key: nextKey,
-      scaleName: nextScale.name,
-      sequence: nextSequence
-    })
+
+    setNextScaleExerciseInfo(computeNextScaleExerciseInfo(currentKey, randomScale, 0))
 
     // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
-  }, [selectedScales, scalePracticeSequence, scaleDirection, isScaleKeyRandom, scaleKey, generateScaleSequence, recordPractice, scaleRootMovement, getNextKeyByMovement])
+  }, [selectedScales, scalePracticeSequence, scaleDirection, isScaleKeyRandom, scaleKey, isThreeNpsActive, threeNpsEligibleScales, buildThreeNpsFor, applyThreeNpsPosition, computeNextScaleExerciseInfo])
 
   // 下一音阶练习
   const nextScaleExercise = useCallback(() => {
@@ -8752,26 +3230,128 @@ export default function FretMasterPage() {
       setScaleKey(nextScaleExerciseInfo.key)
       const scale = selectedScales.find(s => s.name === nextScaleExerciseInfo.scaleName) || selectedScales[0]
       setSelectedScale(scale)
+
+      if (isThreeNpsActive) {
+        // 跑完 P7 时 threeNps 是 null ⇒ 换调换音阶、把位回到 0；否则就是「下一个把位」
+        const targetIndex = nextScaleExerciseInfo.threeNps?.positionIndex ?? 0
+        const position = applyThreeNpsPosition(buildThreeNpsFor(nextScaleExerciseInfo.key, scale), targetIndex)
+        if (position) {
+          // Marathon 收尾：上一题是最后一个把位，本题已经跨到新调/新音阶
+          if (!nextScaleExerciseInfo.threeNps) {
+            toast.success(t('three_nps_marathon_complete'))
+          }
+          setNextScaleExerciseInfo(computeNextScaleExerciseInfo(nextScaleExerciseInfo.key, scale, targetIndex))
+          return
+        }
+      }
+
+      setThreeNpsPositions([])
+      setThreeNpsSteps([])
+      setThreeNpsPositionIndex(0)
       setScaleExerciseSequence(nextScaleExerciseInfo.sequence)
       setScaleExerciseCurrentStep(0)
-      
-      let newNextKey: string
-      if (isScaleKeyRandom) {
-        newNextKey = NOTES[Math.floor(Math.random() * NOTES.length)]
-      } else {
-        newNextKey = getNextKeyByMovement(nextScaleExerciseInfo.key, scaleRootMovement)
-      }
-      const newNextScale = selectedScales[Math.floor(Math.random() * selectedScales.length)]
-      const newNextSequence = generateScaleSequence(newNextScale, scalePracticeSequence, scaleDirection)
-      setNextScaleExerciseInfo({
-        key: newNextKey,
-        scaleName: newNextScale.name,
-        sequence: newNextSequence
-      })
+
+      setNextScaleExerciseInfo(computeNextScaleExerciseInfo(nextScaleExerciseInfo.key, scale, 0))
     } else {
       generateScaleExercise()
     }
-  }, [nextScaleExerciseInfo, selectedScales, isScaleKeyRandom, scalePracticeSequence, scaleDirection, generateScaleSequence, generateScaleExercise, scaleRootMovement, getNextKeyByMovement])
+  }, [nextScaleExerciseInfo, selectedScales, generateScaleExercise, isThreeNpsActive, buildThreeNpsFor, applyThreeNpsPosition, computeNextScaleExerciseInfo, t])
+
+  // ==================== 一弦三音：视图快照 ====================
+  /** 当前把位的「弦-品」索引 → 指板高亮查表 */
+  const threeNpsCellKeys = useMemo(() => {
+    const map = new Map<string, ThreeNpsStep>()
+    if (!isThreeNpsActive) return map
+    for (const step of threeNpsSteps) map.set(`${step.stringIndex}-${step.fret}`, step)
+    return map
+  }, [isThreeNpsActive, threeNpsSteps])
+
+  /** 设置面板的把位按钮：数组下标（回传） + 把位号（显示）。把位号可能跳号（见 props 注释） */
+  const threeNpsPositionOptions = useMemo(
+    () => threeNpsPositions.map((p, i) => ({ index: i, position: p.index })),
+    [threeNpsPositions]
+  )
+
+  /** 当前目标音（弦 + 品 + 音级）；非 3NPS 或已跑完时为 null */
+  const threeNpsTarget = isThreeNpsActive ? (threeNpsSteps[scaleExerciseCurrentStep] ?? null) : null
+
+  /** 给 ScaleSequenceDisplay 的只读快照（滑窗已在纯函数里算好） */
+  const threeNpsView = useMemo(() => {
+    if (!isThreeNpsActive) return null
+    const position = threeNpsPositions[threeNpsPositionIndex]
+    if (!position || threeNpsSteps.length === 0) return null
+    const target = threeNpsSteps[scaleExerciseCurrentStep] ?? null
+    const win = threeNpsWindow(threeNpsSteps, scaleExerciseCurrentStep)
+    return {
+      position: position.index,
+      totalPositions: threeNpsPositions.length,
+      combo: scaleCombo,
+      maxCombo: scaleMaxCombo,
+      direction: target?.direction ?? ('up' as const),
+      isShift: !!target?.isShift,
+      stepNow: scaleExerciseCurrentStep + 1,
+      stepTotal: threeNpsSteps.length,
+      target: target
+        ? {
+            label: target.degreeLabel,
+            note: NOTES[target.pitchClass] ?? '',
+            stringIndex: target.stringIndex,
+            fret: target.fret,
+            isRoot: target.isRoot,
+          }
+        : null,
+      window: win.items.map((item) => ({
+        label: item.item.degreeLabel,
+        done: item.done,
+        current: item.current,
+      })),
+    }
+  }, [isThreeNpsActive, threeNpsPositions, threeNpsPositionIndex, threeNpsSteps, scaleExerciseCurrentStep, scaleCombo, scaleMaxCombo])
+
+  /** 下一把位预览（Marathon 换把前先看一眼落点） */
+  const nextThreeNpsView = isThreeNpsActive && nextScaleExerciseInfo?.threeNps
+    ? {
+        position: nextScaleExerciseInfo.threeNps.position,
+        totalPositions: nextScaleExerciseInfo.threeNps.totalPositions,
+        startStringIndex: nextScaleExerciseInfo.threeNps.startStringIndex,
+        startFret: nextScaleExerciseInfo.threeNps.startFret,
+      }
+    : null
+
+  /**
+   * 指板上的「下一把位预览」：只在**当前把位已跑完、且下一把位已知**时给出。
+   *
+   * 为什么不常驻显示：GuitarRun 把预览绑在「换把倒计时」这个中断点上（`be()` 里给 5 拍排练时间），
+   * 我们的一弦三音是切题式的、没有那个倒计时窗口。真正与之等价的时机只有一个 —— 当前把位
+   * 35 步弹完、界面停在那里等「下一题」的时候。此时把下一把位画出来，正好承担了
+   * 「换把前先看一眼落点」的作用；其余时刻显示会干扰对当前把位的辨认。
+   */
+  const nextThreeNpsCells = useMemo(() => {
+    const map = new Map<string, ThreeNpsPreviewKind>()
+    if (!isThreeNpsActive || threeNpsTarget) return map
+    const next = nextScaleExerciseInfo?.threeNps
+    if (!next) return map
+    const position = buildThreeNpsFor(scaleKey, selectedScale)[next.positionIndex]
+    if (!position) return map
+    const startKey = `${next.startStringIndex}-${next.startFret}`
+    for (const step of position.steps) {
+      const key = `${step.stringIndex}-${step.fret}`
+      map.set(key, key === startKey ? 'start' : step.isRoot ? 'root' : 'note')
+    }
+    return map
+  }, [isThreeNpsActive, threeNpsTarget, nextScaleExerciseInfo, buildThreeNpsFor, scaleKey, selectedScale])
+
+  /**
+   * 在设置面板里手动选把位：直接装载该把位（序列重置到第 1 步）。
+   * 「下一题」也一并跟着改，否则跑完当前把位会跳到「手动选之前」的那个把位。
+   */
+  const handleThreeNpsPositionChange = useCallback((positionIndex: number) => {
+    const positions = buildThreeNpsFor(scaleKey, selectedScale)
+    if (positions.length === 0) return
+    const idx = Math.max(0, Math.min(positionIndex, positions.length - 1))
+    if (!applyThreeNpsPosition(positions, idx)) return
+    setNextScaleExerciseInfo(computeNextScaleExerciseInfo(scaleKey, selectedScale, idx))
+  }, [buildThreeNpsFor, scaleKey, selectedScale, applyThreeNpsPosition, computeNextScaleExerciseInfo])
 
   // 处理MIDI音符输入
   const handleMIDINoteInput = useCallback((note: string) => {
@@ -8785,6 +3365,8 @@ export default function FretMasterPage() {
       case "practice":
         // 辨音模式下通过按钮答题，不自动匹配（使用 ref 避免闭包延迟）
         if (practiceAnswerModeRef.current === "buttons") break
+        // 逐位置掌握度统计：指板点击路径优先用点击位置，否则用目标位置
+        recordPositionStat(note === targetNote)
         if (note === targetNote) {
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
           // 音高识别统计改为按会话记录，不在此处累加 —— 见 pitchFindingSession 统计 effect
@@ -8902,7 +3484,6 @@ export default function FretMasterPage() {
           if (isCorrect) {
             // 完成当前和弦，记录最后一个音用于 voice leading（与 audio 路径一致）
             lastChordNoteRef.current = note
-            setLastChordNote(note)
             setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
           } else {
             setScore(prev => ({ ...prev, total: prev.total + 1 }))
@@ -8916,15 +3497,19 @@ export default function FretMasterPage() {
           
           const currentDegree = scaleExerciseSequence[scaleExerciseCurrentStep]
           
-          // 音级到半音的映射（支持各种变音记号）
-          const degreeToSemitone: Record<string, number> = {
-            "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5,
-            "#4": 6, "b5": 6, "5": 7, "#5": 8, "b6": 8, "6": 9,
-            "#6": 9, "b7": 10, "7": 11,
-            "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
+          // 🚨 音级 → 半音交给 `resolveScaleDegreeSemitone`：它优先查**当前音阶自己的对齐表**
+          // （`intervals[i]` ↔ `notes[i]`），手写兜底表只在该标签不在音阶里时才用。
+          // 为什么不能只手写表 —— 实测（`__tests__/scale-degree-semitone.test.ts` 穷举 76 个音阶）：
+          //  ① 手写表缺 `#2`，而 Altered / Lydian #9 / Lydian Augmented #2 /
+          //     Diminished Half Whole / Augmented Scale 都含它 ⇒ 查不到 ⇒ 返回 undefined
+          //     ⇒ 下面 break ⇒ **当前题永远不推进**（表现为「弹对了没反应」）且不报错；
+          //  ② 手写表把 `#6` 记成 9，而 Whole Tone / Augmented Scale 里的 `#6` 是 10
+          //     ⇒ 要求弹低半音的那个音，练习照常推进但判定错 —— 比 ① 更隐蔽。
+          const semitone = resolveScaleDegreeSemitone(selectedScale, currentDegree)
+          if (semitone === undefined) {
+            logger.warn('[scale] 未知音级标签，练习无法推进', currentDegree, selectedScale.name)
+            break
           }
-          const semitone = degreeToSemitone[currentDegree]
-          if (semitone === undefined) break
           
           const keyIdx = getNoteIndex(scaleKey)
           const targetNoteIdx = (keyIdx + semitone) % 12
@@ -8933,6 +3518,13 @@ export default function FretMasterPage() {
           if (playedNoteIdx === targetNoteIdx) {
             // 答对了
             const nextStep = scaleExerciseCurrentStep + 1
+            // 连击：ref 记账 + 同步 state（一弦三音面板显示；普通音阶模式下不显示）
+            scaleComboRef.current += 1
+            setScaleCombo(scaleComboRef.current)
+            if (scaleComboRef.current > scaleMaxComboRef.current) {
+              scaleMaxComboRef.current = scaleComboRef.current
+              setScaleMaxCombo(scaleComboRef.current)
+            }
             if (nextStep >= scaleExerciseSequence.length) {
               // 完成当前序列，使用预览的下一题
               setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
@@ -8946,6 +3538,8 @@ export default function FretMasterPage() {
             }
           } else {
             // 答错了
+            scaleComboRef.current = 0
+            setScaleCombo(0)
             setScore(prev => ({ ...prev, total: prev.total + 1 }))
           }
         }
@@ -8995,7 +3589,7 @@ export default function FretMasterPage() {
         }
         break
     }
-  }, [isPlaying, activeTab, targetNote, generateNewTarget, findRootFirst, intervalPracticeStep, rootNote, selectedIntervals, intervalRootMode, customChords, selectedSong, currentChordIndex, practiceLevel, scaleKey, selectedScale, currentIntervalExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, generateChordExercise, nextChordExercise, scaleExerciseSequence, scaleExerciseCurrentStep, nextScaleExercise, generateScaleExercise, recordPractice])
+  }, [isPlaying, activeTab, recordPositionStat, targetNote, currentIntervalExercise, setScore, generateNewTarget, findRootFirst, setCurrentIntervalExercise, generateIntervalExerciseRef, setIntervalPracticeStep, transposedChords, currentChordIndex, practiceLevel, getLevelOptions, scaleExerciseSequence, scaleExerciseCurrentStep, selectedScale, scaleKey, nextScaleExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, nextChordExercise, setChordExerciseCurrentStep])
 
   // 更新 ref 以便在 startPitchDetection 中使用（不含 nextChord，它在后面定义）
   useEffect(() => {
@@ -9006,7 +3600,7 @@ export default function FretMasterPage() {
     generateIntervalExerciseRef.current = generateIntervalExercise
     chordExerciseIsAnsweredRef.current = chordExerciseIsAnswered
     practiceAnswerModeRef.current = practiceAnswerMode
-  }, [handleMIDINoteInput, nextChordExercise, nextScaleExercise, generateNewTarget, chordExerciseIsAnswered, practiceAnswerMode])
+  }, [handleMIDINoteInput, nextChordExercise, nextScaleExercise, generateNewTarget, chordExerciseIsAnswered, practiceAnswerMode, nextChordExerciseRef, generateIntervalExerciseRef, generateIntervalExercise, chordExerciseIsAnsweredRef])
 
   // 安全网：辨音模式下如果 highlightedTargetPosition 为 null，重新生成目标位置
   useEffect(() => {
@@ -9113,6 +3707,8 @@ export default function FretMasterPage() {
         case "practice":
           // 找音练习：点击的音等于目标音
           isCorrect = clickedNote === targetNote
+          // 逐位置统计：暂存点击位置，供随后 handleMIDINoteInput 记录
+          lastFretClickPositionRef.current = { stringIndex, fret }
           break
           
         case "chord_exercise":
@@ -9212,24 +3808,16 @@ export default function FretMasterPage() {
         handleMIDINoteInput(clickedNote)
       }, 100)
     }
-  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, currentIntervalExercise, rootNote, customChords, selectedSong, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount])
+  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords])
 
   const updateLevelOptions = useCallback((levelId: string) => {
     const level = ALL_SOLO_LEVELS.find(l => l.id === levelId)
     if (level) {
-      setLevelOrderOption(level.orderOption)
-      setLevelRandomOption(level.randomOption)
-      setLevelStartingInterval(level.startingIntervalOption)
       setLevelForceNaturalFive(level.forceNaturalFive)
-      setLevelNotesPerChord(level.notesPerChord)
       setLevelEndOnStartingInterval(level.endOnStartingInterval || false)
       setLevelUsePassingNoteBebopScale(level.usePassingNoteBebopScale || false)
     } else {
-      setLevelOrderOption(false)
-      setLevelRandomOption(false)
-      setLevelStartingInterval("any")
       setLevelForceNaturalFive(true)
-      setLevelNotesPerChord(1)
       setLevelEndOnStartingInterval(false)
       setLevelUsePassingNoteBebopScale(false)
     }
@@ -9242,16 +3830,18 @@ export default function FretMasterPage() {
   const pausePractice = useCallback(() => {
     if (isPlaying && !isPracticePaused) {
       setIsPracticePaused(true)
-      setPracticeElapsedTime(prev => prev + (Date.now() - (practiceSessionStartTime || Date.now())))
+      // practiceElapsedTime 的单位是【秒】（见 recordPractice 中 *1000 的使用），
+      // 原实现直接累加毫秒差，导致恢复后时长被放大 1000 倍。
+      setPracticeElapsedTime(prev => prev + (Date.now() - (practiceSessionStartTime || Date.now())) / 1000)
     }
-  }, [isPlaying, isPracticePaused, practiceSessionStartTime])
+  }, [isPlaying, isPracticePaused, practiceSessionStartTime, setPracticeElapsedTime])
 
   const resumePractice = useCallback(() => {
     if (isPlaying && isPracticePaused) {
       setIsPracticePaused(false)
       setPracticeSessionStartTime(Date.now())
     }
-  }, [isPlaying, isPracticePaused])
+  }, [isPlaying, isPracticePaused, setPracticeSessionStartTime])
 
   const togglePausePractice = useCallback(() => {
     if (isPracticePaused) {
@@ -9263,16 +3853,25 @@ export default function FretMasterPage() {
 
   // 开始/停止练习
   const togglePractice = useCallback(() => {
+    // 每一轮练习开始时清空收音确认记忆：上一轮遗留的 firedNote / stableFrames
+    // 会挡住本轮第一个音（同一个音级要等到下次起音才能再放行）。
+    resetNoteConfirmState(noteConfirmStateRef.current!)
     if (!isPlaying) {
       setScore({ correct: 0, total: 0 })
+      // 连击随会话重置（一弦三音面板上的「连击 n×」）
+      scaleComboRef.current = 0
+      scaleMaxComboRef.current = 0
+      setScaleCombo(0)
+      setScaleMaxCombo(0)
       // 根据活动标签设置时长
       let timeInSeconds = practiceTime
       if (activeTab === "practice") {
         timeInSeconds = pitchFindingTime * 60
         // 显示练习建议
         if (showPracticeSuggestions) {
-          const randomIndex = Math.floor(Math.random() * PRACTICE_SUGGESTIONS.length)
-          setCurrentPracticeSuggestion(PRACTICE_SUGGESTIONS[randomIndex])
+          const pool = PRACTICE_SUGGESTIONS[user.instrument] ?? PRACTICE_SUGGESTIONS.six_string_guitar
+          const picked = pool[Math.floor(Math.random() * pool.length)]
+          setCurrentPracticeSuggestion(language === "en" ? picked.text : picked.textZh)
         } else {
           setCurrentPracticeSuggestion("")
         }
@@ -9285,7 +3884,7 @@ export default function FretMasterPage() {
       // 重置音程练习队列
       if (activeTab === "interval") {
         // 使用函数式更新避免依赖循环
-        setIntervalExerciseQueue(prev => {
+        setIntervalExerciseQueue(() => {
           if (selectedIntervals.length === 0) return []
           let queue = [...selectedIntervals]
           if (intervalDirection === "down") {
@@ -9338,7 +3937,6 @@ export default function FretMasterPage() {
         setCurrentChordIndex(0)
         setChordDegreeCurrentStep(0)
         setNextChordInfo(null)
-        setLastChordNote(null)
       }
       setIsPlaying(true)
       setIsPracticePaused(false)
@@ -9351,7 +3949,10 @@ export default function FretMasterPage() {
       setHighlightedTargetPosition(null)
       setPracticeSessionStartTime(null)
     }
-  }, [isPlaying, activeTab, pitchFindingTime, practiceTime, intervalPracticeDuration, selectedIntervals, intervalDirection, intervalRandomizeOrder, generateNewTarget, generateChordExercise, generateScaleExercise])
+  }, [isPlaying, setScore, practiceTime, activeTab, generateNewTarget, setIntervalPracticeStep, setIsPlaying, setPracticeSessionStartTime, setPracticeElapsedTime, pitchFindingTime, showPracticeSuggestions, user.instrument, language, intervalPracticeDuration, setIntervalExerciseQueue, setIntervalCurrentQueueIndex, selectedIntervals, intervalDirection, intervalRandomizeOrder, generateIntervalExerciseRef, generateChordExercise, generateScaleExercise])
+
+  // 保持 togglePractice 的最新引用，供课程练习启动等延迟调用使用
+  togglePracticeRef.current = togglePractice
 
   // 重置练习
   const resetPractice = useCallback(() => {
@@ -9388,7 +3989,21 @@ export default function FretMasterPage() {
       cooldownRef.current = null
     }
     isCoolingDownRef.current = false
-  }, [practiceTime])
+  }, [practiceTime, setChordExerciseCurrentStep, setChordExerciseSequence, setChordExerciseTargetChord, setCurrentIntervalExercise, setIntervalPracticeStep, setIsPlaying, setNextChordExerciseInfo, setPracticeElapsedTime, setPracticeSessionStartTime, setScore, setShowChordExerciseFretboard, setShowIntervalFretboard])
+
+  /**
+   * 按 tab 设置「指板显隐」开关。
+   *
+   * 🚨 这是 ↑/↓ 键与真相源之间**唯一**的桥：开关名 → setter 的映射在这里写一份，
+   * 而「哪个 tab 对应哪个开关」由 `lib/tab-fretboard-toggle.ts` 决定。
+   * 因此新增练习 tab 时**只需**在真相源里加一行 + 这里加一个 setter，
+   * 不会再出现「↑ 生效、↓ 漏改」这种半截分叉。
+   */
+  const setTabFretboardFlag = useCallback((tab: string, value: boolean) => {
+    const flag = getTabFretboardFlag(tab)
+    if (!flag) return
+    SET_TAB_FRETBOARD[flag](value)
+  }, [SET_TAB_FRETBOARD])
 
   // 处理标签切换 - 使用 useRef 避免依赖 isPlaying 变化
   const handleTabChange = useCallback((tabId: string) => {
@@ -9396,7 +4011,7 @@ export default function FretMasterPage() {
       resetPractice()
     }
     setActiveTab(tabId)
-  }, [resetPractice])
+  }, [resetPractice, setActiveTab])
 
   // 键盘事件由全局 window 监听器统一处理（见下方 useEffect），避免 Card 聚焦时与全局处理器重复触发
 
@@ -9459,7 +4074,7 @@ export default function FretMasterPage() {
         setCurrentChordIndex(nextIndex)
       }
     }
-  }, [nextChordInfo, customChords, selectedSong, chordPlayOrder, currentChordIndex, recordPractice, t, shouldRandomizeKeyOnRepeat, progressionRepeat])
+  }, [nextChordInfo, customChords, selectedSong, chordPlayOrder, currentChordIndex, shouldRandomizeKeyOnRepeat, progressionRepeat])
 
   // 单独更新 nextChordRef（避免循环依赖）
   useEffect(() => {
@@ -9476,6 +4091,12 @@ export default function FretMasterPage() {
       }
       // contenteditable 元素（如富文本编辑器）也跳过
       if (target && target.isContentEditable) {
+        return
+      }
+
+      // 带系统修饰键的组合（Ctrl/Cmd/Alt）交给浏览器处理，
+      // 避免劫持 Ctrl+P 打印、Ctrl+F 查找、Ctrl+S 保存、Ctrl+M 等系统快捷键
+      if (event.ctrlKey || event.metaKey || event.altKey) {
         return
       }
 
@@ -9506,10 +4127,27 @@ export default function FretMasterPage() {
         return
       }
 
-      // M - 切换麦克风
+      // M - 切换麦克风（用户显式选择 ⇒ 走偏好落盘，跨会话记住）
       if (event.key === 'm' || event.key === 'M') {
         event.preventDefault()
-        setMicEnabled(!micEnabled)
+        const next = !useAppStore.getState().audio.micEnabled
+        setMicUserPreference(next)
+        if (isTauri) {
+          // 🚨 只翻标志不碰 Rust ⇒ 会复刻「以为开了其实没开」的老 bug（另一扇门）。
+          // 运行时对齐：开 ⇒ 确保采集在跑（ensureCaptureRunning 幂等：已在采集就不动）；
+          // 关 ⇒ 停采集。pitch stream 由练习/调音 effect 依 micEnabled 自行启停，这里不管。
+          import('@/lib/native-audio').then(({ stopAudioCapture, ensureCaptureRunning }) => {
+            const a = useAppStore.getState().audio
+            const job = next
+              ? ensureCaptureRunning({
+                  selectedDevice: a.selectedAudioDevice || undefined,
+                  sampleRate: a.sampleRate || 48000,
+                  backend: a.audioBackend || 'wasapi_shared',
+                })
+              : stopAudioCapture()
+            job.catch((err) => console.error('[Tauri] M 键切换音频输入失败:', err))
+          })
+        }
         return
       }
 
@@ -9556,18 +4194,8 @@ export default function FretMasterPage() {
       // 上箭头/PageUp - 显示指板（与快捷键说明一致）
       if ((event.key === 'ArrowUp' || event.key === 'PageUp') && isPlaying) {
         event.preventDefault()
-        // 根据当前练习 tab 显示对应的指板
-        if (activeTab === 'practice') {
-          setShowFretboard(true)
-        } else if (activeTab === 'interval') {
-          setShowIntervalFretboard(true)
-        } else if (activeTab === 'chord') {
-          setShowChordFretboard(true)
-        } else if (activeTab === 'chord_exercise') {
-          setShowChordExerciseFretboard(true)
-        } else if (activeTab === 'scale') {
-          setShowScaleFretboard(true)
-        }
+        // 根据当前练习 tab 显示对应的指板（映射见唯一真相源 lib/tab-fretboard-toggle.ts）
+        setTabFretboardFlag(activeTab, true)
         setShowAllNotes(true)
         return
       }
@@ -9576,18 +4204,8 @@ export default function FretMasterPage() {
       // 练习中：隐藏指板并生成下一题；非练习中：仅隐藏指板
       if (event.key === 'ArrowDown') {
         event.preventDefault()
-        // 根据当前练习 tab 隐藏对应的指板
-        if (activeTab === 'practice') {
-          setShowFretboard(false)
-        } else if (activeTab === 'interval') {
-          setShowIntervalFretboard(false)
-        } else if (activeTab === 'chord') {
-          setShowChordFretboard(false)
-        } else if (activeTab === 'chord_exercise') {
-          setShowChordExerciseFretboard(false)
-        } else if (activeTab === 'scale') {
-          setShowScaleFretboard(false)
-        }
+        // 根据当前练习 tab 隐藏对应的指板（映射见唯一真相源 lib/tab-fretboard-toggle.ts）
+        setTabFretboardFlag(activeTab, false)
         setShowAllNotes(false)
         // 练习中同时生成下一题
         if (isPlaying) {
@@ -9629,206 +4247,29 @@ export default function FretMasterPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isFullscreen, isPlaying, togglePractice, activeTab, generateNewTarget, generateIntervalExercise, nextChordExercise, nextScaleExercise, nextChord])
+  }, [isFullscreen, isPlaying, togglePractice, activeTab, generateNewTarget, generateIntervalExercise, nextChordExercise, nextScaleExercise, nextChord, micEnabled, handleTabChange, setFullscreenMode, setIsPlaying, setMicUserPreference, isTauri, setSettingsOpen, generateIntervalExerciseRef, setTabFretboardFlag])
 
   // 获取音符颜色
-  const getNoteButtonColor = useCallback((note: string, stringIndex: number, fret: number) => {
-    const key = `${stringIndex}-${fret}`
-    
-    // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标作为非颜色编码）
-    if (highlightedFrets.has(key)) {
-      const isCorrect = highlightedFrets.get(key)
-      return isCorrect
-        ? "bg-green-500 text-white fret-feedback-correct"
-        : "bg-red-500 text-white fret-feedback-wrong"
-    }
-
-    // 限制练习 - 5品区: 品区外置灰（练习中生效，引导用户在品区内演奏）
-    if (isPlaying && fretZoneEnabled) {
-      const minFret = fretZoneStart
-      const maxFret = Math.min(fretCount, fretZoneStart + fretZoneSize - 1)
-      if (fret < minFret || fret > maxFret) {
-        return "opacity-20 cursor-not-allowed hover:bg-transparent"
-      }
-    }
-
-    if (activeTab === "practice") {
-      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
-      if (highlightedFrets.has(key)) {
-        const isCorrect = highlightedFrets.get(key)
-        return isCorrect
-          ? "bg-green-500 text-white fret-feedback-correct" 
-          : "bg-red-500 text-white fret-feedback-wrong"
-      }
-      
-      // 按钮答题模式下，高亮显示目标位置
-      if (practiceAnswerMode === "buttons" && highlightedTargetPosition) {
-        if (stringIndex === highlightedTargetPosition.stringIndex && fret === highlightedTargetPosition.fret) {
-          return "bg-primary/80 text-primary-foreground"
-        }
-      }
-      
-      if (showAllNotes && note === targetNote) {
-        return "bg-primary/80 text-primary-foreground"
-      }
-      // 未开始练习时只显示 hover 效果
-      if (!isPlaying) {
-        return "hover:bg-muted"
-      }
-    }
-
-    if (activeTab === "chord_exercise") {
-      // 和弦练习模式 - 色块按和弦转换练习样式
-      const key = `${stringIndex}-${fret}`
-      
-      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
-      if (highlightedFrets.has(key)) {
-        const isCorrect = highlightedFrets.get(key)
-        return isCorrect
-          ? "bg-green-500 text-white fret-feedback-correct" 
-          : "bg-red-500 text-white fret-feedback-wrong"
-      }
-      
-      // 开始练习后显示当前和弦的所有音 - 按和弦转换练习色块样式
-      if (isPlaying && chordExerciseTargetChord) {
-        const noteIdx = getNoteIndex(note)
-        const rootIdx = getNoteIndex(chordExerciseTargetChord.root)
-        const normalizedType = normalizeChordType(chordExerciseTargetChord.type)
-        const chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === chordExerciseTargetChord.type)
-        
-        if (chordType) {
-          const interval = (noteIdx - rootIdx + 12) % 12
-          
-          // 检查这个音是否在当前和弦中
-          if (!chordType.intervals.includes(interval)) {
-            return "hover:bg-muted/50"
-          }
-
-          // 根音用柔和的蓝色
-          if (noteIdx === rootIdx) {
-            return "bg-blue-400/60 text-white"
-          }
-          // 其他和弦音用柔和的绿色
-          return "bg-emerald-400/50 text-white"
-        }
-      }
-      // 不在和弦中的音，只显示 hover 效果
-      return "hover:bg-muted/50"
-    }
-
-    if (activeTab === "interval") {
-      // 音程练习 - 色块按和弦转换练习样式
-      const key = `${stringIndex}-${fret}`
-      
-      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
-      if (highlightedFrets.has(key)) {
-        const isCorrect = highlightedFrets.get(key)
-        return isCorrect
-          ? "bg-green-500 text-white fret-feedback-correct" 
-          : "bg-red-500 text-white fret-feedback-wrong"
-      }
-      
-      // 练习未开始时只显示 hover 效果
-      if (!isPlaying) {
-        return "hover:bg-muted/50"
-      }
-
-      // 开始练习后显示当前音程的所有音 - 按和弦转换练习色块样式
-      const noteIdx = getNoteIndex(note)
-      const rootIdx = getNoteIndex(rootNote)
-      
-      // 根音用柔和的蓝色
-      if (noteIdx === rootIdx) {
-        return "bg-blue-400/60 text-white"
-      }
-      
-      // 选中的音程音用柔和的绿色
-      const interval = (noteIdx - rootIdx + 12) % 12
-      if (selectedIntervals.some(i => INTERVALS[i].semitones % 12 === interval)) {
-        return "bg-emerald-400/50 text-white"
-      }
-      
-      // 不在选中音程中的音，只显示 hover 效果
-      return "hover:bg-muted/50"
-    }
-
-    if (activeTab === "scale") {
-      // 音阶练习模式 - 色块按和弦转换练习样式
-      const key = `${stringIndex}-${fret}`
-      
-      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
-      if (highlightedFrets.has(key)) {
-        const isCorrect = highlightedFrets.get(key)
-        return isCorrect
-          ? "bg-green-500 text-white fret-feedback-correct" 
-          : "bg-red-500 text-white fret-feedback-wrong"
-      }
-      
-      // 开始练习后显示当前音阶的所有音 - 按和弦转换练习色块样式
-      if (isPlaying && scaleExerciseSequence.length > 0) {
-        const noteIdx = getNoteIndex(note)
-        const keyIdx = getNoteIndex(scaleKey)
-
-        // 检查这个音是否在音阶中
-        const interval = (noteIdx - keyIdx + 12) % 12
-        if (!selectedScale.notes.includes(interval)) {
-          return "hover:bg-muted/50"
-        }
-
-        // 根音（1级）用柔和的蓝色
-        if (interval === 0) {
-          return "bg-blue-400/60 text-white"
-        }
-        // 其他音阶音用柔和的绿色
-        return "bg-emerald-400/50 text-white"
-      }
-
-      // 不在音阶中的音，只显示 hover 效果
-      return "hover:bg-muted/50"
-    }
-
-    if (activeTab === "chord") {
-      // 和弦转换练习 - 指板样式参考找音练习
-      const key = `${stringIndex}-${fret}`
-      
-      // 优先显示点击反馈（正确绿色，错误红色，加 ✓/✗ 角标）
-      if (highlightedFrets.has(key)) {
-        const isCorrect = highlightedFrets.get(key)
-        return isCorrect
-          ? "bg-green-500 text-white fret-feedback-correct" 
-          : "bg-red-500 text-white fret-feedback-wrong"
-      }
-      
-      const chords = transposedChords
-      const currentChord = chords[currentChordIndex]
-      if (!currentChord) return "hover:bg-muted/50"
-
-      const noteIdx = getNoteIndex(note)
-      const rootIdx = getNoteIndex(currentChord.root)
-
-      // 检查这个音是否在当前和弦中
-      const normalizedType = normalizeChordType(currentChord.type)
-      const chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === currentChord.type || ct.symbol === currentChord.type)
-      if (!chordType) return "hover:bg-muted/50"
-
-      const interval = (noteIdx - rootIdx + 12) % 12
-      if (!chordType.intervals.includes(interval)) {
-        // 不在和弦中的音，只显示 hover 效果
-        return "hover:bg-muted/50"
-      }
-
-      // 根音用柔和的蓝色
-      if (noteIdx === rootIdx) {
-        return "bg-blue-400/60 text-white"
-      }
-
-      // 其他和弦音用柔和的绿色
-      return "bg-emerald-400/50 text-white"
-    }
-
-    // 默认返回 hover 效果样式
-    return "hover:bg-muted/50"
-  }, [activeTab, highlightedFrets, targetNote, showAllNotes, isPlaying, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, rootNote, selectedIntervals, scaleKey, selectedScale, customChords, selectedSong, currentChordIndex, practiceLevel, practiceAnswerMode, highlightedTargetPosition, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount])
+  // 获取音符颜色（判定已抽到 lib/fretboard-note-button-color.ts —— 那里可单测，
+  // 并与 lib/fretboard-cell-role.ts 做「两套皮肤结论一致」的行为护栏）
+  const getNoteButtonColor = useCallback(
+    (note: string, stringIndex: number, fret: number) =>
+      computeNoteButtonColor(
+        {
+          activeTab, isPlaying, showAllNotes, targetNote, practiceAnswerMode,
+          highlightedTargetPosition, highlightedFrets,
+          fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount,
+          chordExerciseTargetChord, rootNote, selectedIntervals,
+          scaleKey, selectedScale, scaleExerciseSequence,
+          transposedChords, currentChordIndex,
+          threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells,
+        },
+        note,
+        stringIndex,
+        fret,
+      ),
+    [activeTab, highlightedFrets, targetNote, showAllNotes, isPlaying, chordExerciseTargetChord, rootNote, selectedIntervals, scaleKey, selectedScale, currentChordIndex, practiceAnswerMode, highlightedTargetPosition, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, scaleExerciseSequence, transposedChords, threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells]
+  )
 
   // 格式化时间
   const formatTime = (seconds: number) => {
@@ -9838,13 +4279,6 @@ export default function FretMasterPage() {
   }
 
   // 切换音程选择
-  const toggleInterval = (index: number) => {
-    setSelectedIntervals(prev => 
-      prev.includes(index) 
-        ? prev.filter(i => i !== index)
-        : [...prev, index]
-    )
-  }
 
   // 添加自定义和弦
   const addCustomChord = () => {
@@ -9872,61 +4306,41 @@ export default function FretMasterPage() {
       sequence: customChords
     }
     if (typeof window !== 'undefined') {
-      localStorage.setItem('customChordSequence', JSON.stringify(data))
+      localStorage.setItem(CUSTOM_CHORD_STORAGE_KEY, JSON.stringify(data))
     }
     toast.success(t('custom_chord_saved'))
   }
 
-  // 从本地存储加载自定义和弦序列
+  // 从本地存储加载自定义和弦序列（解析与四种结果分类见 lib/custom-chords-io.ts）
   const loadCustomChords = () => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('customChordSequence')
-      if (saved) {
-        try {
-          const data = JSON.parse(saved)
-          if (data.sequence && data.sequence.length > 0) {
-            setCustomChords(data.sequence)
-            setCustomChordName(data.name || '')
-            toast.success(t('custom_chord_loaded'))
-          } else {
-            toast.error(t('custom_chord_empty_load'))
-          }
-        } catch (e) {
-          toast.error(t('custom_chord_load_error'))
-        }
-      } else {
-        toast.error(t('custom_chord_not_found'))
-      }
-    } else {
-      toast.error(t('custom_chord_not_found'))
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(CUSTOM_CHORD_STORAGE_KEY) : null
+    const result = parseStoredCustomChords(raw)
+    if (result.kind === 'loaded') {
+      setCustomChords(result.sequence)
+      setCustomChordName(result.name)
+      toast.success(t('custom_chord_loaded'))
+      return
     }
+    if (result.kind === 'empty') {
+      toast.error(t('custom_chord_empty_load'))
+      return
+    }
+    if (result.kind === 'invalid') {
+      toast.error(t('custom_chord_load_error'))
+      return
+    }
+    toast.error(t('custom_chord_not_found'))
   }
 
-  // 解析iReal Pro格式
-  const parseIrealPro = (text: string) => {
-    const chords: { root: string; type: string; bass?: string }[] = []
-    
-    // 简单解析 - 按空格或|分割
-    const tokens = text.split(/[\s|]+/).filter(t => t.trim())
-    
-    for (const token of tokens) {
-      // 跳过特殊标记
-      if (token.match(/^[\[\]\(\)\*\r\n]/)) continue
-      
-      const parsed = parseChord(token)
-      if (parsed.root) {
-        chords.push(parsed)
-      }
-    }
-    
-    return chords
-  }
-
-  // 导入iReal Pro
+  // 导入iReal Pro（解析实现见 lib/song-chords.ts）
+  // irealbook:// URL 优先 —— 一次能拿到歌名与和弦进行；不是 URL 时回退到纯文本解析
   const importIrealPro = () => {
-    const chords = parseIrealPro(irealInput)
+    const fromUrl = parseIrealUrl(irealInput)
+    const chords = fromUrl ? fromUrl.chords : parseIrealPro(irealInput)
     if (chords.length > 0) {
       setCustomChords(chords)
+      // URL 里带的歌名顺手用作序列名（纯文本导入没有这个信息）
+      if (fromUrl?.title) setCustomChordName(fromUrl.title)
       toast.success(t('import_success'))
       setIrealInput("")
     } else {
@@ -9934,34 +4348,28 @@ export default function FretMasterPage() {
     }
   }
 
-  // 导出自定义和弦为简化格式
+  // 导出自定义和弦为简化格式（文本构造见 lib/custom-chords-io.ts 的 buildCustomChordsExport）
   const exportCustomChords = () => {
     if (customChords.length === 0) {
       toast.error(t('custom_chord_empty'))
       return
     }
-    
-    const chordText = customChords.map(chord => {
-      const chordTypeName = getChordDisplayName(chord.type, chordScaleDisplay, chordSymbols)
-      const displayName = `${chord.root}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : chordTypeName}${chord.bass ? '/' + chord.bass : ''}`
-      return displayName
-    }).join(' | ')
-    
-    const exportData = {
-      name: customChordName || t('custom_chord_unnamed'),
-      chords: chordText
-    }
-    
-    const exportString = `${exportData.name}\n${exportData.chords}`
-    
-    navigator.clipboard.writeText(exportString).then(() => {
+
+    const { name, text } = buildCustomChordsExport(customChords, {
+      name: customChordName,
+      unnamedLabel: t('custom_chord_unnamed'),
+      chordScaleDisplay,
+      chordSymbols,
+    })
+
+    navigator.clipboard.writeText(text).then(() => {
       toast.success(t('export_success'))
     }).catch(() => {
-      const blob = new Blob([exportString], { type: 'text/plain' })
+      const blob = new Blob([text], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${exportData.name}.txt`
+      a.download = `${name}.txt`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -9970,23 +4378,6 @@ export default function FretMasterPage() {
     })
   }
 
-  // 获取转调后的和弦列表 - 使用useMemo缓存
-  const transposedChords = useMemo(() => {
-    if (customChords.length > 0) {
-      return customChords
-    }
-    const songKey = selectedSong.key || "C"
-    // 提取歌曲调性的音名部分进行比较
-    const songKeyNote = songKey.endsWith('m') ? songKey.slice(0, -1) : songKey
-    if (progressionKey === songKeyNote) {
-      return selectedSong.chords.map(c => parseChord(c))
-    }
-    // 转调
-    return selectedSong.chords.map(chordString => {
-      const transposed = transposeChord(chordString, songKeyNote, progressionKey)
-      return parseChord(transposed)
-    })
-  }, [customChords, selectedSong, progressionKey])
   
   // 更新 getTransposedChordsRef
   useEffect(() => { getTransposedChordsRef.current = () => transposedChords }, [transposedChords])
@@ -9996,9 +4387,8 @@ export default function FretMasterPage() {
     const chords = transposedChords
     const chord = chords[currentChordIndex]
     if (!chord) return ""
-    const chordTypeName = getChordDisplayName(chord.type, chordScaleDisplay, chordSymbols)
-    const displayName = `${normalizeNoteName(chord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : normalizeNoteName(chordTypeName)}${chord.bass ? '/' + normalizeNoteName(chord.bass) : ''}`
-    return displayName
+    // 显示规则见 lib/page-theory-functions 的 formatChordShape（唯一真相源）
+    return formatChordShape(chord, chordScaleDisplay, chordSymbols)
   }
 
   // 获取下一题和弦显示 - 使用预生成的信息
@@ -10010,24 +4400,83 @@ export default function FretMasterPage() {
   }
 
   // Slider回调 - 必须在顶层调用，不能在JSX中内联useCallback
-  const handleReferenceFrequencyChange = useCallback(([v]: number[]) => setReferenceFrequency(v), [])
-  const handlePracticeTimeChange = useCallback(([v]: number[]) => setPracticeTime(v), [])
-  const handleFretCountChange = useCallback(([v]: number[]) => setFretCount(v), [])
-  const handleCooldownDurationChange = useCallback(([v]: number[]) => setCooldownDuration(v), [])
-  const handleMetronomeBpmChange = useCallback(([v]: number[]) => setMetronomeBpm(v), [])
-  const handleInputGainChange = useCallback(([v]: number[]) => setInputGain(v / 100), [])
+  const handleReferenceFrequencyChange = useCallback(([v]: number[]) => setReferenceFrequency(v), [setReferenceFrequency])
+  const handlePracticeTimeChange = useCallback(([v]: number[]) => setPracticeTime(v), [setPracticeTime])
+  const handleFretCountChange = useCallback(([v]: number[]) => setFretCount(v), [setFretCount])
+  const handleCooldownDurationChange = useCallback(([v]: number[]) => setCooldownDuration(v), [setCooldownDuration])
+  const handleMetronomeBpmChange = useCallback(([v]: number[]) => setMetronomeBpm(v), [setMetronomeBpm])
+  const handleInputGainChange = useCallback(([v]: number[]) => setInputGain(v / 100), [setInputGain])
+
+  // 弹窗回调 —— 提为 useCallback 以保持引用稳定，配合子组件的 React.memo 生效
+  const handleShowLevelInfo = useCallback((level: typeof ALL_PRACTICE_LEVELS[0] | null) => {
+    setSelectedLevelInfo(level)
+    setShowLevelInfoDialog(true)
+  }, [])
+  const handleSelectSong = useCallback((song: typeof SONG_PROGRESSIONS[0]) => {
+    setSelectedSong(song)
+    if (song.key) {
+      const songKey = song.key
+      const notePart = songKey.endsWith('m') ? songKey.slice(0, -1) : songKey
+
+      let normalizedKey = notePart
+      if (notePart.includes('b') && !notePart.includes('#')) {
+        const flatIndex = findNoteIndexInArray(notePart, NOTES_FLAT)
+        if (flatIndex !== -1) {
+          normalizedKey = NOTES[flatIndex]
+        }
+      }
+
+      setProgressionKey(normalizedKey)
+      setIsMinor(songKey.endsWith('m'))
+    }
+    setCustomChords([])
+    setCurrentChordIndex(0)
+    setShowSongSelector(false)
+  }, [])
+  const handleShowSongInfo = useCallback((song: typeof SONG_PROGRESSIONS[0]) => {
+    setSelectedSongInfo(song)
+    setShowSongInfoDialog(true)
+  }, [])
+  const handleEditCustomSong = useCallback(() => setShowCustomSongEditor(true), [])
+  const handleCreateCustomSong = useCallback(() => {
+    setSelectedSong({ name: '__custom__', composer: '', year: '', style: '', tempo: '', key: 'C', chords: [] })
+    setCurrentChordIndex(0)
+    setShowSongSelector(false)
+  }, [])
+  const handleSongInfoConfirm = useCallback((song: typeof SONG_PROGRESSIONS[0] | null) => {
+    if (song) {
+      setSelectedSong(song)
+      if (song.key) {
+        setProgressionKey(song.key)
+      }
+      setCustomChords([])
+      setCurrentChordIndex(0)
+    }
+    setShowSongSelector(false)
+  }, [])
+  const handleLevelInfoConfirm = useCallback((level: typeof ALL_PRACTICE_LEVELS[0] | null) => {
+    if (level) {
+      setPracticeLevel(level.id)
+    }
+    setShowLevelSelector(false)
+  }, [])
 
   // ==================== 渲染 ====================
+
+  // 显示缩放：只改 `html` 根字号（rem 基准），**布局长度完全不参与缩放**。
+  // 前两版（CSS zoom / 外层滚动容器 + transform: scale）都把视觉尺寸与布局尺寸绑定
+  // ⇒ 放大后逻辑可用宽被压缩、标题被截、按钮出屏。详见 lib/display-scale.ts 头注释。
+  useEffect(() => {
+    return applyRootFontSize(displayScale)
+  }, [displayScale])
 
   return (
     <OnboardingProvider t={t}>
     <TooltipProvider>
       <div
-        className="h-screen bg-background flex flex-col relative overflow-hidden"
-        style={{
-          zoom: displayScale !== 1 ? displayScale : undefined,
-          height: '100dvh',
-        }}
+        data-display-scale-root
+        className="app-height bg-background flex flex-col relative overflow-hidden"
+        style={{ height: '100dvh' }}
       >
         {/* 节拍器闪烁层 */}
         <div 
@@ -10035,1122 +4484,46 @@ export default function FretMasterPage() {
           className="fixed inset-0 pointer-events-none z-[90] opacity-0 transition-opacity duration-100"
           style={{ backgroundColor: 'hsl(0 0% 100% / 0.3)' }}
         />
-        {/* Header */}
-        <header className="border-b border-border/50 bg-card sticky top-0 z-50 shadow-sm">
-          <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Guitar className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-base font-semibold text-foreground">FretMaster</h1>
-                <p className="text-[10px] text-muted-foreground">{t('app_title').replace('🎸 ', '')}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              {/* Score display */}
-              {isPlaying && (
-                <div className="flex items-center gap-2" role="status" aria-live="polite" aria-label={`得分 ${score.correct} / ${score.total}`}>
-                  <Badge variant="outline" className="font-mono tabular-nums text-xs">
-                    {score.correct}/{score.total}
-                  </Badge>
-                  {score.total > 0 && (
-                    <Badge variant={score.correct / score.total >= 0.7 ? "default" : "secondary"} className="tabular-nums text-xs">
-                      {Math.round((score.correct / score.total) * 100)}%
-                    </Badge>
-                  )}
-                </div>
-              )}
-
-              {/* Timer */}
-              {isPlaying && practiceTime > 0 && (
-                <Badge variant="outline" className="font-mono tabular-nums gap-1 text-xs" role="status" aria-live="off" aria-label={`剩余时间 ${formatTime(timeLeft)}`}>
-                  <Timer className="h-3 w-3" />
-                  {formatTime(timeLeft)}
-                </Badge>
-              )}
-
-              {/* Detected Pitch */}
-              {detectedPitch && (
-                <div className="flex items-center gap-2" role="status" aria-live="polite">
-                  <Badge variant="outline" className="font-mono text-xs bg-primary/10">
-                    {detectedPitch}
-                  </Badge>
-                  {detectedCents !== null && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "font-mono tabular-nums text-xs",
-                        detectedCents <= 15 ? "bg-green-500/20 text-green-400" :
-                        detectedCents <= 35 ? "bg-amber-500/20 text-amber-400" :
-                        "bg-red-500/20 text-red-400"
-                      )}
-                    >
-                      {detectedCents < 0 ? '' : '+'}{detectedCents.toFixed(0)}¢
-                    </Badge>
-                  )}
-                </div>
-              )}
-              
-              {/* Keyboard Shortcuts Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9"
-                onClick={() => setShowShortcutsHelp(true)}
-                title={t('keyboard_shortcuts')}
-                aria-label={t('keyboard_shortcuts')}
-              >
-                <Keyboard className="h-4 w-4" />
-              </Button>
-
-              {/* Tuner */}
-              <Sheet open={tunerOpen} onOpenChange={setTunerOpen}>
-                <SheetTrigger asChild>
-                  <div data-onboarding="tuner">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9"
-                      title={t('nav_tuner')}
-                      aria-label={t('nav_tuner')}
-                    >
-                      <Activity className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </SheetTrigger>
-                <SheetContent className="w-80 overflow-y-auto">
-                  <SheetHeader className="px-4">
-                    <SheetTitle>{t('tuner_title')}</SheetTitle>
-                  </SheetHeader>
-
-                  <div className="space-y-6 py-4 px-4">
-                    {/* 调音器显示*/}
-                    <div className="space-y-4">
-                      {/* 主显示区域：in-tune 时整块闪绿 + 放大反馈 */}
-                      <div
-                        className={`bg-card border rounded-lg p-6 text-center space-y-4 transition-all duration-200 ${
-                          detectedFrequency > 0 && Math.abs(cents) <= 5
-                            ? 'border-green-500/60 bg-green-500/10 scale-[1.02] shadow-[0_0_24px_-4px] shadow-green-500/40'
-                            : ''
-                        }`}
-                        role="status"
-                        aria-live="polite"
-                        aria-label={detectedFrequency > 0 ? `检测到 ${detectedNote}，偏差 ${cents} 音分` : '未检测到音高'}
-                      >
-                        {/* 检测到的音高*/}
-                        <div className={`text-6xl font-bold tabular-nums transition-colors ${
-                          detectedFrequency > 0 && Math.abs(cents) <= 5 ? 'text-green-400' : 'text-primary'
-                        }`}>
-                          {detectedNote}
-                        </div>
-
-                        {/* 频率显示 */}
-                        <div className="text-sm text-muted-foreground tabular-nums">
-                          {detectedFrequency > 0 ? `${detectedFrequency} Hz` : '--'}
-                        </div>
-
-                        {/* 音分偏差指示器：加大尺寸 + 刻度标记 */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
-                            <span>-50¢</span>
-                            <span className={`font-medium tabular-nums ${
-                              Math.abs(cents) <= 5 ? 'text-green-400' : 'text-foreground'
-                            }`}>
-                              {cents > 0 ? '+' : ''}{cents}¢
-                            </span>
-                            <span>+50¢</span>
-                          </div>
-                          {/* bar 高度从 h-2 提升到 h-6，远距离可见 */}
-                          <div className="relative h-6 bg-muted rounded-full overflow-hidden border border-border/40">
-                            {/* 中心刻度（0¢）*/}
-                            <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-primary/60" />
-                            {/* -10/-5/+5/+10 辅助刻度 */}
-                            <div className="absolute top-1/2 -translate-y-1/2 w-px h-3 bg-muted-foreground/40" style={{ left: '40%' }} />
-                            <div className="absolute top-1/2 -translate-y-1/2 w-px h-3 bg-muted-foreground/40" style={{ left: '45%' }} />
-                            <div className="absolute top-1/2 -translate-y-1/2 w-px h-3 bg-muted-foreground/40" style={{ left: '55%' }} />
-                            <div className="absolute top-1/2 -translate-y-1/2 w-px h-3 bg-muted-foreground/40" style={{ left: '60%' }} />
-                            {/* in-tune 安全区（±5¢）*/}
-                            <div className="absolute top-0 bottom-0 bg-green-500/15" style={{ left: '45%', width: '10%' }} />
-                            {/* 指示器：从 w-1.5 加宽到 w-2 */}
-                            <div
-                              className="absolute top-0 bottom-0 w-2 rounded-full transition-all duration-100 shadow-md"
-                              style={{
-                                left: `${50 + Math.max(-50, Math.min(50, cents))}%`,
-                                transform: 'translateX(-50%)',
-                                backgroundColor: Math.abs(cents) <= 5 ? '#22c55e' : Math.abs(cents) <= 20 ? '#f59e0b' : '#ef4444'
-                              }}
-                            />
-                          </div>
-                          <div className="text-center text-xs font-medium tabular-nums">
-                            {detectedFrequency > 0 && (
-                              <span className={Math.abs(cents) <= 5 ? 'text-green-400' : cents < 0 ? 'text-amber-400' : 'text-red-400'}>
-                                {Math.abs(cents) <= 5 ? t('tuner_in_tune') : cents < 0 ? t('tuner_too_low') : t('tuner_too_high')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 控制按钮 */}
-                      <Button
-                        onClick={toggleTuner}
-                        variant={tunerActive ? "destructive" : "default"}
-                        className="w-full"
-                      >
-                        {tunerActive ? (
-                          <>
-                            <MicOff className="h-4 w-4 mr-2" />
-                            {t('tuner_stop')}
-                          </>
-                        ) : (
-                          <>
-                            <Mic className="h-4 w-4 mr-2" />
-                            {t('tuner_start')}
-                          </>
-                        )}
-                      </Button>
-
-                      {/* 参考频率设置*/}
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{t('tuner_reference')}</span>
-                          <span className="font-mono">{referenceFrequency} Hz</span>
-                        </div>
-                        <Slider
-                          value={[referenceFrequency]}
-                          onValueChange={handleReferenceFrequencyChange}
-                          min={430}
-                          max={450}
-                          step={1}
-                        />
-                      </div>
-
-                      {/* 吉他标准音参考*/}
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium">{t('tuner_strings')}</h4>
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                          {[
-                            { name: t('tuner_e6'), freq: 82.41 },
-                            { name: t('tuner_a5'), freq: 110.00 },
-                            { name: t('tuner_d4'), freq: 146.83 },
-                            { name: t('tuner_g3'), freq: 196.00 },
-                            { name: t('tuner_b2'), freq: 246.94 },
-                            { name: t('tuner_e1'), freq: 329.63 },
-                          ].map((string) => (
-                            <div
-                              key={string.name}
-                              className="bg-muted/50 rounded px-2 py-1.5 text-center"
-                            >
-                              <div className="font-medium">{string.name}</div>
-                              <div className="text-muted-foreground">{string.freq} Hz</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
-
-              {/* Settings */}
-              <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
-                <SheetTrigger asChild>
-                  <div data-onboarding="settings">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t('nav_settings')} aria-label={t('nav_settings')}>
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </SheetTrigger>
-                <SheetContent className="w-80 overflow-y-auto">
-                  <SheetHeader className="px-4">
-                    <SheetTitle>{t('nav_settings')}</SheetTitle>
-                  </SheetHeader>
-                  
-                  <ErrorBoundary>
-                  <Accordion type="multiple" defaultValue={["practice","audio","display","data"]} className="py-4 px-4">
-                    <AccordionItem value="practice" className="border-b-0">
-                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
-                        <span className="flex items-center gap-2">
-                          <SlidersHorizontal className="h-4 w-4" />
-                          {t('settings_practice')}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3 pb-2">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">{t('instrument_select')}</span>
-                          <Select
-                            value={user.instrument}
-                            onValueChange={(v) => store.setInstrument(v as InstrumentType)}
-                          >
-                            <SelectTrigger className="w-36 h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="six_string_guitar">{t('instrument_guitar_6')}</SelectItem>
-                              <SelectItem value="six_string_fourths">{t('instrument_guitar_6_fourths')}</SelectItem>
-                              <SelectItem value="seven_string_guitar">{t('instrument_guitar_7')}</SelectItem>
-                              <SelectItem value="seven_string_fourths">{t('instrument_guitar_7_fourths')}</SelectItem>
-                              <SelectItem value="four_string_bass">{t('instrument_bass_4')}</SelectItem>
-                              <SelectItem value="five_string_bass">{t('instrument_bass_5')}</SelectItem>
-                              <SelectItem value="b_flat_horn">{t('instrument_horn_bflat')}</SelectItem>
-                              <SelectItem value="e_flat_horn">{t('instrument_horn_eflat')}</SelectItem>
-                              <SelectItem value="concert_pitch">{t('instrument_concert')}</SelectItem>
-                              <SelectItem value="concert_pitch_minus_one">{t('instrument_concert_minus_one')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{t('practice_time')}</span>
-                          <span className="font-mono">{practiceTime}s</span>
-                        </div>
-                        <Slider
-                          value={[practiceTime]}
-                          onValueChange={handlePracticeTimeChange}
-                          min={30}
-                          max={600}
-                          step={30}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{t('fretboard_title')}</span>
-                          <span className="font-mono">{fretCount} frets</span>
-                        </div>
-                        <Slider
-                          value={[fretCount]}
-                          onValueChange={handleFretCountChange}
-                          min={12}
-                          max={24}
-                          step={1}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{t('device_cooldown_enabled')}</span>
-                        <Switch checked={cooldownEnabled} onCheckedChange={setCooldownEnabled} />
-                      </div>
-                      {cooldownEnabled && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{t('device_cooldown_duration')}</span>
-                            <span className="font-mono">{cooldownDuration}ms</span>
-                          </div>
-                          <Slider
-                            value={[cooldownDuration]}
-                            onValueChange={handleCooldownDurationChange}
-                            min={200}
-                            max={3000}
-                            step={100}
-                          />
-                        </div>
-                      )}
-
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Layers className="h-3.5 w-3.5" />
-                      {t('limitation_exercises')}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {language === 'zh-CN'
-                        ? '限制练习是 SOLO 教学法中的核心训练方式，通过约束演奏区域、方向或八度，强化指板熟悉度与即兴能力。'
-                        : 'Limitation Exercises are core training methods in the SOLO pedagogy. By constraining fretting region, direction, or octave, they strengthen fretboard familiarity and improvisation skills.'}
-                    </p>
-
-                    {/* 5 品区限制 */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">{t('limit_fret_zone')}</span>
-                      <Switch checked={fretZoneEnabled} onCheckedChange={setFretZoneEnabled} />
-                    </div>
-                    {fretZoneEnabled && (
-                      <>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{t('limit_fret_zone_start')}</span>
-                            <span className="font-mono">{fretZoneStart}</span>
-                          </div>
-                          <Slider
-                            value={[fretZoneStart]}
-                            onValueChange={(v) => setFretZoneStart(v[0])}
-                            min={0}
-                            max={Math.max(0, fretCount - fretZoneSize)}
-                            step={1}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{t('limit_fret_zone_size')}</span>
-                            <span className="font-mono">{fretZoneSize}</span>
-                          </div>
-                          <Slider
-                            value={[fretZoneSize]}
-                            onValueChange={(v) => setFretZoneSize(v[0])}
-                            min={2}
-                            max={fretCount}
-                            step={1}
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {language === 'zh-CN'
-                            ? `当前品区：${fretZoneStart} - ${fretZoneStart + fretZoneSize - 1} 品`
-                            : `Current zone: frets ${fretZoneStart} - ${fretZoneStart + fretZoneSize - 1}`}
-                        </p>
-                      </>
-                    )}
-
-                    {/* 八度切换 */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">{t('limit_octave_shift')}</span>
-                      <Switch checked={octaveShiftEnabled} onCheckedChange={setOctaveShiftEnabled} />
-                    </div>
-                    {octaveShiftEnabled && (
-                      <div className="space-y-1.5">
-                        <div className="text-[10px] text-muted-foreground leading-3">{t('limit_octave_mode')}</div>
-                        <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
-                          {[
-                            { id: 'up', label: t('direction_up') },
-                            { id: 'down', label: t('direction_down') },
-                            { id: 'random', label: t('direction_random') },
-                          ].map((mode) => (
-                            <Button
-                              key={mode.id}
-                              variant={octaveShiftMode === mode.id ? 'default' : 'ghost'}
-                              size="sm"
-                              onClick={() => setOctaveShiftMode(mode.id as 'up' | 'down' | 'random')}
-                              className="h-7 text-xs px-2.5 flex-1"
-                            >
-                              {mode.label}
-                            </Button>
-                          ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {language === 'zh-CN'
-                            ? '在同弦上等价八度位置间切换，扩展对指板不同区域的熟悉度。'
-                            : 'Shift between equivalent octave positions on the same string to expand fretboard familiarity.'}
-                        </p>
-                      </div>
-                    )}
-                      </AccordionContent>
-                    </AccordionItem>
-                    
-                    <AccordionItem value="metronome" className="border-b-0">
-                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
-                        <span className="flex items-center gap-2">
-                          <Activity className="h-4 w-4" />
-                          {t('device_metronome')}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3 pb-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground" id="metronome-toggle-label">{t('device_metronome')}</span>
-                        <Switch checked={metronomeEnabled} onCheckedChange={setMetronomeEnabled} aria-labelledby="metronome-toggle-label" />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{t('device_tempo')}</span>
-                          <span className="font-mono">{metronomeBpm} BPM</span>
-                        </div>
-                        <Slider
-                          value={[metronomeBpm]}
-                          onValueChange={handleMetronomeBpmChange}
-                          min={40}
-                          max={240}
-                          step={1}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{t('metronome_sound')}</span>
-                        <Switch checked={metronomeSound} onCheckedChange={setMetronomeSound} />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{t('metronome_flash')}</span>
-                        <Switch checked={metronomeFlash} onCheckedChange={setMetronomeFlash} />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{t('metronome_visualize')}</span>
-                        <Switch checked={metronomeSettings.visualize ?? false} onCheckedChange={(v) => store.setMetronomeSettings({ ...metronomeSettings, visualize: v })} />
-                      </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                    
-                    <AccordionItem value="audio" className="border-b-0">
-                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
-                        <span className="flex items-center gap-2">
-                          <Volume2 className="h-4 w-4" />
-                          {language === 'zh-CN' ? '音频与输入' : 'Audio & Input'}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3 pb-2">
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Volume2 className="h-3.5 w-3.5" />
-                      {t('feedback_sound')}
-                    </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{t('feedback_sound_enabled')}</span>
-                        <Switch checked={feedbackSoundSettings.enabled} onCheckedChange={store.setFeedbackSoundEnabled} />
-                      </div>
-                      {feedbackSoundSettings.enabled && (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">{t('correct_sound')}</span>
-                            <Switch checked={feedbackSoundSettings.correctSound} onCheckedChange={store.setCorrectSoundEnabled} />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">{t('wrong_sound')}</span>
-                            <Switch checked={feedbackSoundSettings.wrongSound} onCheckedChange={store.setWrongSoundEnabled} />
-                          </div>
-                        </>
-                      )}
-                    
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Mic className="h-3.5 w-3.5" />
-                      {t('device_audio_input')}
-                    </div>
-                    
-                    {!mounted ? (
-                      <div className="space-y-2">
-                        <div className="h-20 animate-pulse bg-muted rounded-lg" />
-                      </div>
-                    ) : isTauri ? (
-                      <WindowsAudioSettings language={language as 'zh-CN' | 'en'} />
-                    ) : (
-                      <div className="space-y-2">
-                        
-                        {/* 权限请求提示 - 当没有设备或设备没有标签时显示 */}
-                        {(audioDevices.length === 0 || audioDevices.every(d => !d.label)) && (
-                          <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-600 dark:text-yellow-400">
-                            <p className="mb-2">{audioDevices.length === 0 ? t('mic_permission_needed_for_device') : t('mic_permission_needed_for_label')}</p>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={async () => {
-                                try {
-                                  if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
-                                    toast.error(t('browser_not_support_audio'))
-                                    return
-                                  }
-                                  toast.info(t('requesting_mic_permission'))
-                                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-                                  stream.getTracks().forEach(track => track.stop())
-                                  // 刷新设备列表
-                                  await enumerateAudioDevices(false)
-                                  // 检查是否成功获取设备
-                                  const devices = await navigator.mediaDevices.enumerateDevices()
-                                  const audioInputs = devices.filter(d => d.kind === 'audioinput')
-                                  if (audioInputs.length > 0 && audioInputs.some(d => d.label)) {
-                                    toast.success(t('mic_granted_with_label'))
-                                  } else if (audioInputs.length > 0) {
-                                    toast.warning(t('mic_granted_no_label'))
-                                  } else {
-                                    toast.warning(t('mic_no_input_device'))
-                                  }
-                                } catch (err: unknown) {
-                                  console.error('麦克风权限错误', err)
-                                  const error = err instanceof Error ? err : new Error(String(err))
-                                  if (error.name === 'NotAllowedError') {
-                                    toast.error(t('mic_permission_denied'))
-                                  } else if (error.name === 'NotFoundError') {
-                                    toast.error(t('mic_not_found'))
-                                  } else {
-                                    toast.error(`${t('mic_generic_error')} ${error.message || ''}`)
-                                  }
-                                }
-                              }}
-                            >
-                              {t('request_mic_permission')}
-                            </Button>
-                          </div>
-                        )}
-                        
-                        <Select value={selectedAudioDevice} onValueChange={setSelectedAudioDevice}>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t('hint_select_device')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {audioDevices.map(device => (
-                              <SelectItem key={device.deviceId} value={device.deviceId}>
-                                {device.label || `Device ${device.deviceId.slice(0, 8)}...`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="flex items-center justify-between">
-                          <div className="flex flex-col">
-                            <span className="text-sm text-muted-foreground">{t('device_audio_input')}</span>
-                            {micEnabled && (
-                              <span className="text-xs text-green-600 dark:text-green-500">
-                                {useAudioWorklet ? 'AudioWorklet' : 'ScriptProcessor'}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {audioInitializing && (
-                              <span className="text-xs text-muted-foreground animate-pulse">
-                                {language === 'zh-CN' ? '初始化中...' : 'Initializing...'}
-                              </span>
-                            )}
-                            <Switch 
-                              checked={micEnabled} 
-                              disabled={audioInitializing}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  // 直接启动音频输入，不通过 useEffect
-                                  setMicEnabled(true)
-                                } else {
-                                  setMicEnabled(false)
-                                  stopAudioInput()
-                                }
-                              }} 
-                            />
-                          </div>
-                        </div>
-                        {audioError && (
-                          <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
-                            {audioError}
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between py-2 border-t border-border/50">
-                          <div className="flex flex-col">
-                            <span className="text-sm text-muted-foreground">
-                              {language === 'zh-CN' ? '使用 AudioWorklet' : 'Use AudioWorklet'}
-                            </span>
-                            <span className="text-xs text-muted-foreground/60">
-                              {language === 'zh-CN' ? '关闭则使用 ScriptProcessorNode' : 'Off to use ScriptProcessorNode'}
-                            </span>
-                          </div>
-                          <Switch
-                            checked={useAudioWorklet}
-                            disabled={micEnabled}
-                            onCheckedChange={(checked) => {
-                              setUseAudioWorklet(checked)
-                              logger.debug(`[音频模式] 切换为 ${checked ? 'AudioWorklet' : 'ScriptProcessorNode'}`)
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{t('device_gain')}</span>
-                            <span className="font-mono">{Math.round(inputGain * 100)}%</span>
-                          </div>
-                          <Slider
-                            value={[inputGain * 100]}
-                            onValueChange={handleInputGainChange}
-                            min={0}
-                            max={200}
-                            step={10}
-                            disabled={!micEnabled}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{t('device_pitch_algorithm')}</span>
-                          </div>
-                          <Select 
-                            value={audioSettings.pitchAlgorithm} 
-                            onValueChange={(value) => store.setPitchAlgorithm(value as 'standard' | 'solo')}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="solo">{t('algorithm_solo')}</SelectItem>
-                              <SelectItem value="standard">{t('algorithm_standard')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground">
-                            {language === 'zh-CN' 
-                              ? 'SOLO算法使用FFT加速，检测速度更快' 
-                              : 'SOLO algorithm uses FFT acceleration for faster detection'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Piano className="h-3.5 w-3.5" />
-                      {t('midi_support')}
-                    </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{t('midi_enable')}</span>
-                        <Switch checked={midiEnabled} onCheckedChange={setMidiEnabled} />
-                      </div>
-                      <Select value={selectedMidiDevice} onValueChange={setSelectedMidiDevice} disabled={!midiEnabled}>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('midi_select_device')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="random">{t('random')}</SelectItem>
-                          {midiDevices.map(device => (
-                            <SelectItem key={device.id} value={device.id}>
-                              {device.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        {midiDevices.length > 0 
-                          ? t('midi_device_detected').replace('{count}', String(midiDevices.length))
-                          : t('midi_device_none')
-                        }
-                      </p>
-                      </AccordionContent>
-                    </AccordionItem>
-                    
-                    <AccordionItem value="display" className="border-b-0">
-                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
-                        <span className="flex items-center gap-2">
-                          <Palette className="h-4 w-4" />
-                          {language === 'zh-CN' ? '显示与外观' : 'Display & Appearance'}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3 pb-2">
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            {language === 'zh-CN' ? '全屏类型' : 'Fullscreen Type'}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            variant={focusMode?.fullscreenMode === 'windowed' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => store.setFullscreenMode('windowed')}
-                          >
-                            {language === 'zh-CN' ? '窗口全屏' : 'Windowed'}
-                          </Button>
-                          <Button
-                            variant={focusMode?.fullscreenMode === 'fullscreen' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => store.setFullscreenMode('fullscreen')}
-                          >
-                            {language === 'zh-CN' ? '真全屏' : 'Fullscreen'}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {language === 'zh-CN' 
-                            ? '窗口全屏：保留窗口边框，可快速切换；真全屏：完全覆盖任务栏，沉浸式体验'
-                            : 'Windowed: keep window borders for quick switching; Fullscreen: fully immersive, covers taskbar'}
-                        </p>
-                      </div>
-
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Globe className="h-3.5 w-3.5" />
-                      {t('language')}
-                    </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={language === 'zh-CN' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => {
-                            setLanguage('zh-CN')
-                            setChordScaleDisplay('chinese')
-                          }}
-                          className="flex-1"
-                        >
-                          <Globe className="h-4 w-4 mr-2" />
-                          {t('lang_zh')}
-                        </Button>
-                        <Button
-                          variant={language === 'en' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => {
-                            setLanguage('en')
-                            setChordScaleDisplay('english')
-                          }}
-                          className="flex-1"
-                        >
-                          <Globe className="h-4 w-4 mr-2" />
-                          {t('lang_en')}
-                        </Button>
-                      </div>
-
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Palette className="h-3.5 w-3.5" />
-                      {t('general_theme')}
-                    </div>
-                      {(() => {
-                        const { style: currentStyle, brightness: currentBrightness } = parseTheme(theme)
-                        const themeStyleOptions: { id: ThemeStyle; name: string; desc: string; shortName: string; lightBg: string; darkBg: string; lightPrimary: string; darkPrimary: string }[] = [
-                          { id: 'classic', name: t('theme_style_classic'), desc: t('theme_style_classic_desc'), shortName: t('theme_style_classic').slice(0, 1), lightBg: 'hsl(40 12% 89%)', darkBg: 'hsl(220 14% 7%)', lightPrimary: 'hsl(142 68% 30%)', darkPrimary: 'hsl(142 65% 48%)' },
-                          { id: 'forest', name: t('theme_style_forest'), desc: t('theme_style_forest_desc'), shortName: t('theme_style_forest').slice(0, 1), lightBg: 'hsl(75 16% 86%)', darkBg: 'hsl(150 18% 7%)', lightPrimary: 'hsl(145 55% 24%)', darkPrimary: 'hsl(140 55% 46%)' },
-                          { id: 'ocean', name: t('theme_style_ocean'), desc: t('theme_style_ocean_desc'), shortName: t('theme_style_ocean').slice(0, 1), lightBg: 'hsl(200 26% 88%)', darkBg: 'hsl(215 32% 7%)', lightPrimary: 'hsl(205 72% 34%)', darkPrimary: 'hsl(195 75% 50%)' },
-                          { id: 'sunset', name: t('theme_style_sunset'), desc: t('theme_style_sunset_desc'), shortName: t('theme_style_sunset').slice(0, 1), lightBg: 'hsl(35 32% 89%)', darkBg: 'hsl(350 24% 7%)', lightPrimary: 'hsl(18 78% 40%)', darkPrimary: 'hsl(25 85% 56%)' },
-                          { id: 'monochrome', name: t('theme_style_monochrome'), desc: t('theme_style_monochrome_desc'), shortName: t('theme_style_monochrome').slice(0, 1), lightBg: 'hsl(220 10% 88%)', darkBg: 'hsl(220 8% 7%)', lightPrimary: 'hsl(220 10% 24%)', darkPrimary: 'hsl(220 6% 92%)' },
-                          { id: 'rose', name: t('theme_style_rose'), desc: t('theme_style_rose_desc'), shortName: t('theme_style_rose').slice(0, 1), lightBg: 'hsl(340 18% 89%)', darkBg: 'hsl(345 22% 7%)', lightPrimary: 'hsl(340 72% 36%)', darkPrimary: 'hsl(340 70% 54%)' },
-                          { id: 'midnight', name: t('theme_style_midnight'), desc: t('theme_style_midnight_desc'), shortName: t('theme_style_midnight').slice(0, 1), lightBg: 'hsl(230 28% 88%)', darkBg: 'hsl(235 32% 6%)', lightPrimary: 'hsl(235 65% 38%)', darkPrimary: 'hsl(230 60% 60%)' },
-                          { id: 'sand', name: t('theme_style_sand'), desc: t('theme_style_sand_desc'), shortName: t('theme_style_sand').slice(0, 1), lightBg: 'hsl(30 16% 87%)', darkBg: 'hsl(25 14% 7%)', lightPrimary: 'hsl(22 58% 36%)', darkPrimary: 'hsl(22 60% 52%)' },
-                          { id: 'celadon', name: t('theme_style_celadon'), desc: t('theme_style_celadon_desc'), shortName: t('theme_style_celadon').slice(0, 1), lightBg: 'hsl(165 18% 87%)', darkBg: 'hsl(170 20% 6%)', lightPrimary: 'hsl(172 58% 28%)', darkPrimary: 'hsl(172 55% 44%)' },
-                          { id: 'lavender', name: t('theme_style_lavender'), desc: t('theme_style_lavender_desc'), shortName: t('theme_style_lavender').slice(0, 1), lightBg: 'hsl(265 18% 89%)', darkBg: 'hsl(260 26% 7%)', lightPrimary: 'hsl(262 60% 38%)', darkPrimary: 'hsl(262 60% 58%)' },
-                          { id: 'carbon', name: t('theme_style_carbon'), desc: t('theme_style_carbon_desc'), shortName: t('theme_style_carbon').slice(0, 1), lightBg: 'hsl(215 10% 88%)', darkBg: 'hsl(215 14% 6%)', lightPrimary: 'hsl(212 45% 32%)', darkPrimary: 'hsl(212 55% 52%)' },
-                        ]
-                        return (
-                          <div className="space-y-2">
-                            {/* 主题风格色卡 - 8列两行 */}
-                            <div className="grid grid-cols-4 gap-1.5">
-                              {themeStyleOptions.map(opt => {
-                                const isActive = currentStyle === opt.id
-                                return (
-                                  <button
-                                    key={opt.id}
-                                    onClick={() => setTheme(composeTheme(opt.id, currentBrightness))}
-                                    title={`${opt.name} — ${opt.desc}`}
-                                    aria-label={opt.name}
-                                    aria-pressed={isActive}
-                                    className={cn(
-                                      "relative h-9 rounded-md overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                      isActive
-                                        ? "border-primary shadow-sm ring-1 ring-primary/30"
-                                        : "border-transparent hover:border-border/60"
-                                    )}
-                                  >
-                                    {/* 浅色半 */}
-                                    <div className="absolute inset-y-0 left-0 w-1/2" style={{ background: opt.lightBg }} />
-                                    {/* 深色半 */}
-                                    <div className="absolute inset-y-0 right-0 w-1/2" style={{ background: opt.darkBg }} />
-                                    {/* 主色圆点居中 */}
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <span className="h-2.5 w-2.5 rounded-full shadow ring-1 ring-black/10" style={{ background: currentBrightness === 'light' ? opt.lightPrimary : opt.darkPrimary }} />
-                                    </div>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                            {/* 当前主题名称 */}
-                            <div className="text-[10px] text-muted-foreground text-center">
-                              {themeStyleOptions.find(o => o.id === currentStyle)?.name} · {themeStyleOptions.find(o => o.id === currentStyle)?.desc}
-                            </div>
-                            {/* 明暗模式 */}
-                            <div className="flex gap-2">
-                              <Button
-                                variant={currentBrightness === 'dark' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setTheme(composeTheme(currentStyle, 'dark'))}
-                                className="flex-1"
-                              >
-                                <Moon className="h-4 w-4 mr-2" />
-                                {t('theme_dark')}
-                              </Button>
-                              <Button
-                                variant={currentBrightness === 'light' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setTheme(composeTheme(currentStyle, 'light'))}
-                                className="flex-1"
-                              >
-                                <Sun className="h-4 w-4 mr-2" />
-                                {t('theme_light')}
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      })()}
-
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Monitor className="h-3.5 w-3.5" />
-                      {language === 'zh-CN' ? '显示大小' : 'Display Size'}
-                    </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            {language === 'zh-CN' ? '缩放比例' : 'Scale'}
-                          </span>
-                          <span className="font-mono">{Math.round(displayScale * 100)}%</span>
-                        </div>
-                        <Slider
-                          value={[displayScale * 100]}
-                          onValueChange={([v]) => setDisplayScale(v / 100)}
-                          min={80}
-                          max={150}
-                          step={10}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {language === 'zh-CN' 
-                            ? '调整界面整体大小，适用于高分辨率屏幕'
-                            : 'Adjust overall UI size for high resolution screens'}
-                        </p>
-                      </div>
-
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Music className="h-3.5 w-3.5" />
-                      {t('chord_scale_display')}
-                    </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          variant={chordScaleDisplay === 'chinese' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setChordScaleDisplay('chinese')}
-                        >
-                          {t('display_chinese')}
-                        </Button>
-                        <Button
-                          variant={chordScaleDisplay === 'english' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setChordScaleDisplay('english')}
-                        >
-                          {t('display_english')}
-                        </Button>
-                        <Button
-                          variant={chordScaleDisplay === 'english_short' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setChordScaleDisplay('english_short')}
-                        >
-                          {t('display_english_short')}
-                        </Button>
-                        <Button
-                          variant={chordScaleDisplay === 'jazz' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setChordScaleDisplay('jazz')}
-                        >
-                          {t('display_jazz')}
-                        </Button>
-                      </div>
-
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Music className="h-3.5 w-3.5" />
-                      {language === 'zh-CN' ? '音符升降号显示' : 'Note Accidental Display'}
-                    </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={noteAccidentalDisplay === 'sharp' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setNoteAccidentalDisplay('sharp')}
-                        >
-                          {language === 'zh-CN' ? '升号 ♯' : 'Sharp ♯'}
-                        </Button>
-                        <Button
-                          variant={noteAccidentalDisplay === 'flat' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setNoteAccidentalDisplay('flat')}
-                        >
-                          {language === 'zh-CN' ? '降号 ♭' : 'Flat ♭'}
-                        </Button>
-                        <Button
-                          variant={noteAccidentalDisplay === 'mixed' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setNoteAccidentalDisplay('mixed')}
-                        >
-                          {language === 'zh-CN' ? '混用' : 'Mixed'}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {language === 'zh-CN'
-                          ? '升号：所有变化音用♯显示（如C♯, F♯）；降号：所有变化音用♭显示（如D♭, G♭）；混用：根据音名自动选择升降号'
-                          : 'Sharp: display all accidentals as ♯ (e.g. C♯, F♯); Flat: display all as ♭ (e.g. D♭, G♭); Mixed: auto-select based on note name'}
-                      </p>
-
-                    <Separator className="my-1" />
-                    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
-                      <Music className="h-3.5 w-3.5" />
-                      {t('chord_symbol_fine_grained')}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {language === 'zh-CN'
-                        ? '细粒度和弦符号偏好，仅对英文/爵士记谱法生效（中文显示不受影响）。'
-                        : 'Fine-grained chord symbol preferences. Only affects English/Jazz notation (Chinese display is unchanged).'}
-                    </p>
-
-                    {/* 小调和弦符号 */}
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] text-muted-foreground leading-3">{t('chord_symbol_minor')}</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={chordSymbols.minorSymbol === 'm' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ minorSymbol: 'm' })}
-                        >
-                          Cm7
-                        </Button>
-                        <Button
-                          variant={chordSymbols.minorSymbol === '-' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ minorSymbol: '-' })}
-                        >
-                          C-7
-                        </Button>
-                        <Button
-                          variant={chordSymbols.minorSymbol === 'min' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ minorSymbol: 'min' })}
-                        >
-                          Cmin7
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* 半减七和弦符号 */}
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] text-muted-foreground leading-3">{t('chord_symbol_m7b5')}</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={chordSymbols.minor7flat5Symbol === 'm7b5' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ minor7flat5Symbol: 'm7b5' })}
-                        >
-                          Cm7b5
-                        </Button>
-                        <Button
-                          variant={chordSymbols.minor7flat5Symbol === 'ø7' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ minor7flat5Symbol: 'ø7' })}
-                        >
-                          Cø7
-                        </Button>
-                        <Button
-                          variant={chordSymbols.minor7flat5Symbol === 'half-dim' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ minor7flat5Symbol: 'half-dim' })}
-                        >
-                          C half-dim
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* 属七降九符号 */}
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] text-muted-foreground leading-3">{t('chord_symbol_7b9')}</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={chordSymbols.dominant7flat9Symbol === '7b9' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ dominant7flat9Symbol: '7b9' })}
-                        >
-                          C7b9
-                        </Button>
-                        <Button
-                          variant={chordSymbols.dominant7flat9Symbol === '7♭9' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ dominant7flat9Symbol: '7♭9' })}
-                        >
-                          C7♭9
-                        </Button>
-                        <Button
-                          variant={chordSymbols.dominant7flat9Symbol === '7-9' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ dominant7flat9Symbol: '7-9' })}
-                        >
-                          C7-9
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* 7b9 和弦对应音阶 */}
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] text-muted-foreground leading-3">{t('chord_symbol_7b9_scale')}</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={chordSymbols.sevenFlatNineScaleChoice === 'altered' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ sevenFlatNineScaleChoice: 'altered' })}
-                        >
-                          Altered
-                        </Button>
-                        <Button
-                          variant={chordSymbols.sevenFlatNineScaleChoice === 'diminishedWholeHalf' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ sevenFlatNineScaleChoice: 'diminishedWholeHalf' })}
-                        >
-                          W-H Dim
-                        </Button>
-                        <Button
-                          variant={chordSymbols.sevenFlatNineScaleChoice === 'diminishedHalfWhole' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => store.setChordSymbolSettings({ sevenFlatNineScaleChoice: 'diminishedHalfWhole' })}
-                        >
-                          H-W Dim
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {language === 'zh-CN'
-                          ? '属七降九和弦（7b9）在和弦音阶练习中对应的音阶：Altered（变化音阶）/ 全半减音阶 / 半全减音阶。'
-                          : 'Scale used for 7b9 chords in chord-scale exercises: Altered / Whole-Half Diminished / Half-Whole Diminished.'}
-                      </p>
-                    </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                    
-                    <AccordionItem value="data" className="border-b-0">
-                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
-                        <span className="flex items-center gap-2">
-                          <Save className="h-4 w-4" />
-                          {t('settings_management')}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3 pb-2">
-                      <p className="text-xs text-muted-foreground">{t('reset_settings_hint')}</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" size="sm" onClick={saveSettings}>
-                          <Save className="h-4 w-4 mr-2" />
-                          {t('btn_save')}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={resetSettings}>
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          {t('btn_reset')}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={exportSettings}>
-                          <Download className="h-4 w-4 mr-2" />
-                          {t('export_settings')}
-                        </Button>
-                        <label className="contents">
-                          <input
-                            type="file"
-                            accept=".json"
-                            className="hidden"
-                            onChange={(e) => e.target.files?.[0] && importSettings(e.target.files[0])}
-                          />
-                          <Button variant="outline" size="sm" className="w-full">
-                            <Upload className="h-4 w-4 mr-2" />
-                            {t('import_settings')}
-                          </Button>
-                        </label>
-                      </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                    
-                    <AccordionItem value="help" className="border-b-0">
-                      <AccordionTrigger className="py-2 text-sm font-medium flex items-center gap-2 hover:no-underline">
-                        <span className="flex items-center gap-2">
-                          <HelpCircle className="h-4 w-4" />
-                          {language === 'zh-CN' ? '帮助' : 'Help'}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3 pb-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={async () => {
-                          const { restartTutorial } = await import('@/components/onboarding')
-                          restartTutorial()
-                        }}
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        {t('restart_tutorial')}
-                      </Button>
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <div className="pt-2 border-t border-border/30">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground/50">
-                        <span>Build</span>
-                        <span className="font-mono">v{VERSION} ({BUILD_DATE_LOCAL})</span>
-                      </div>
-                    </div>
-                  </Accordion>
-                  </ErrorBoundary>
-                </SheetContent>
-              </Sheet>
-            </div>
-          </div>
-        </header>
+      {/* Header */}
+        <AppHeader
+          t={t}
+          formatTime={formatTime}
+          timeLeft={timeLeft}
+          mounted={mounted}
+          isTauri={isTauri}
+          detectedNote={detectedNote}
+          detectedFrequency={detectedFrequency}
+          cents={cents}
+          tunerActive={tunerActive}
+          tunerOpen={tunerOpen}
+          onTunerOpenChange={setTunerOpen}
+          toggleTuner={toggleTuner}
+          handleReferenceFrequencyChange={handleReferenceFrequencyChange}
+          onShowShortcutsHelpChange={setShowShortcutsHelp}
+          midiEnabled={midiEnabled}
+          onMidiEnabledChange={setMidiEnabled}
+          midiDevices={midiDevices}
+          selectedMidiDevice={selectedMidiDevice}
+          onSelectedMidiDeviceChange={setSelectedMidiDevice}
+          useAudioWorklet={useAudioWorklet}
+          onUseAudioWorkletChange={setUseAudioWorklet}
+          noiseFloor={noiseFloor}
+          noiseCalibrating={noiseCalibrating}
+          noiseCalibrationCountdown={noiseCalibrationCountdown}
+          noiseCalibrationProgress={noiseCalibrationProgress}
+          onCalibrateNoiseFloor={calibrateNoiseFloor}
+          enumerateAudioDevices={enumerateAudioDevices}
+          stopAudioInput={stopAudioInput}
+          handlePracticeTimeChange={handlePracticeTimeChange}
+          handleFretCountChange={handleFretCountChange}
+          handleCooldownDurationChange={handleCooldownDurationChange}
+          handleMetronomeBpmChange={handleMetronomeBpmChange}
+          handleInputGainChange={handleInputGainChange}
+          saveSettings={saveSettings}
+          resetSettings={resetSettings}
+          exportSettings={exportSettings}
+          importSettings={importSettings}
+        />
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden h-0 min-h-0">
@@ -11190,6 +4563,8 @@ export default function FretMasterPage() {
               <button
                 onClick={() => setSidebarCollapsed()}
                 className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-accent transition-colors"
+                aria-label={sidebarCollapsed ? t('btn_expand_sidebar') : t('btn_collapse_sidebar')}
+                title={sidebarCollapsed ? t('btn_expand_sidebar') : t('btn_collapse_sidebar')}
               >
                 {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
               </button>
@@ -11199,8 +4574,8 @@ export default function FretMasterPage() {
           {/* Main Area */}
           <main className="flex-1 overflow-auto min-h-0 p-2 sm:p-4 pb-20 sm:pb-6">
             <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
-              {/* Control Panel - 统计页面不显示*/}
-              {activeTab !== "stats" && (
+              {/* Control Panel - 统计/乐理页面不显示（依赖场景，无练习需控制） */}
+              {activeTab !== "stats" && activeTab !== "theory" && (
               <Card
                 ref={practiceCardRef}
                 tabIndex={0}
@@ -11269,1102 +4644,207 @@ export default function FretMasterPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="px-6 pt-0 pb-3">
+                  {/* 音频输入未开启提示：练习模式识别依赖 micEnabled（store 默认 false），
+                      而调音器走完全独立的音频链路 —— 用户无法从「调音器可用」推断出这条已开启 */}
+                  {!isTauri && !micEnabled &&
+                    ['practice', 'interval', 'chord_exercise', 'chord', 'scale'].includes(activeTab) && (
+                      <AudioInputNotice t={t} onOpenSettings={() => setSettingsOpen(true)} />
+                    )}
                   {/* Practice Mode Controls */}
                   {activeTab === "practice" && (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-end gap-2">
-                        {/* 目标音符 - 仅在指板点击模式下显示*/}
-                        {practiceAnswerMode === "fretboard" && (
-                          <div className="flex items-center gap-2 px-3 h-16 bg-primary/5 rounded-md border border-primary/20 min-w-[110px] sm:min-w-[130px]">
-                            <Target className="h-5 w-5 text-primary shrink-0" />
-                            <div className="min-w-0">
-                              <div className="text-[10px] text-muted-foreground leading-3">{t('target_note')}</div>
-                              <div className="text-2xl sm:text-3xl font-bold text-primary leading-tight truncate">{formatNoteByAccidentalSetting(targetNote)}</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 琴弦选择 - segmented */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('select_strings')}</div>
-                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
-                            {Array.from({ length: STRING_COUNT }, (_, i) => i + 1).map((stringNum) => (
-                              <Button
-                                key={stringNum}
-                                variant={selectedStrings.includes(stringNum) ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => {
-                                  if (selectedStrings.includes(stringNum)) {
-                                    // 至少保留一根弦
-                                    if (selectedStrings.length > 1) {
-                                      setSelectedStrings(prev => prev.filter(s => s !== stringNum))
-                                    }
-                                  } else {
-                                    setSelectedStrings(prev => [...prev, stringNum].sort())
-                                  }
-                                }}
-                                className="h-7 w-7 p-0 text-xs"
-                              >
-                                {stringNum}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* 练习时长选择 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('pitch_finding_practice_time')}</div>
-                          <Select value={String(pitchFindingTime)} onValueChange={(v) => setPitchFindingTime(Number(v))}>
-                            <SelectTrigger className="w-[68px] sm:w-[80px] h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">{t('pitch_finding_1_minute')}</SelectItem>
-                              <SelectItem value="2">{t('pitch_finding_2_minutes')}</SelectItem>
-                              <SelectItem value="3">{t('pitch_finding_3_minutes')}</SelectItem>
-                              <SelectItem value="5">{t('pitch_finding_5_minutes')}</SelectItem>
-                              <SelectItem value="10">{t('pitch_finding_10_minutes')}</SelectItem>
-                              <SelectItem value="15">{t('pitch_finding_15_minutes')}</SelectItem>
-                              <SelectItem value="30">{t('pitch_finding_30_minutes')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 练习建议开关 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
-                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30">
-                            <Label className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('pitch_finding_show_suggestions')}</Label>
-                            <Switch
-                              checked={showPracticeSuggestions}
-                              onCheckedChange={setShowPracticeSuggestions}
-                              className="scale-90"
-                            />
-                          </div>
-                        </div>
-
-                        {/* 显示/隐藏所有音符 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
-                          <Button variant="outline" size="sm" onClick={() => setShowAllNotes(prev => !prev)} className="h-8 px-2 text-xs">
-                            {showAllNotes ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
-                            <span>{showAllNotes ? t('hide_notes') : t('show_all_notes')}</span>
-                          </Button>
-                        </div>
-
-                        {/* 答题模式切换 - segmented */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('answer_mode')}</div>
-                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
-                            <Button
-                              variant={practiceAnswerMode === "fretboard" ? "default" : "ghost"}
-                              size="sm"
-                              onClick={() => {
-                                // 如果正在练习中，先停止练习
-                                if (isPlaying) {
-                                  setIsPlaying(false)
-                                  setTimeLeft(practiceTime)
-                                  setHighlightedFrets(new Map())
-                                  setHighlightedTargetPosition(null)
-                                }
-                                setPracticeAnswerMode("fretboard")
-                              }}
-                              className="h-7 px-2.5 text-xs"
-                            >
-                              {t('practice_mode_find')}
-                            </Button>
-                            <Button
-                              variant={practiceAnswerMode === "buttons" ? "default" : "ghost"}
-                              size="sm"
-                              onClick={() => {
-                                // 如果正在练习中，先停止练习
-                                if (isPlaying) {
-                                  setIsPlaying(false)
-                                  setTimeLeft(practiceTime)
-                                  setHighlightedFrets(new Map())
-                                  setHighlightedTargetPosition(null)
-                                }
-                                setPracticeAnswerMode("buttons")
-                              }}
-                              className="h-7 px-2.5 text-xs"
-                            >
-                              {t('practice_mode_identify')}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* 按钮答题模式：显示音名按钮*/}
-                      {practiceAnswerMode === "buttons" && isPlaying && (
-                        <div className="space-y-2">
-                          <div className="text-sm text-muted-foreground">{t('practice_mode_description_identify')}</div>
-                          <div className="flex flex-wrap gap-2">
-                            {NOTES.map((note) => (
-                              <Button
-                                key={note}
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  // 检查答案是否正确（使用 isEquivalentNote 处理等音，如 C♯ = D♭）
-                                  if (highlightedTargetPosition) {
-                                    const { stringIndex, fret } = highlightedTargetPosition
-                                    const correctNote = getNoteAtPosition(stringIndex, fret)
-                                    const isCorrect = isEquivalentNote(note, correctNote)
-
-                                    // 显示反馈
-                                    setHighlightedFrets(new Map([[`${stringIndex}-${fret}`, isCorrect]]))
-
-                                    // 更新分数
-                                    setScore(prev => ({
-                                      correct: prev.correct + (isCorrect ? 1 : 0),
-                                      total: prev.total + 1
-                                    }))
-
-                                    // 音高识别统计改为按会话记录，不在此处累加 —— 见 pitchFindingSession 统计 effect
-
-                                    // 延迟后生成新题目
-                                    setTimeout(() => {
-                                      setHighlightedFrets(new Map())
-                                      generateNewTarget()
-                                    }, 800)
-                                  }
-                                }}
-                                className="h-10 w-10 text-sm font-semibold"
-                              >
-                                {formatNoteByAccidentalSetting(note)}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* 显示剩余时间 */}
-                      {isPlaying && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>{t('time_remaining')}: {formatTime(timeLeft)}</span>
-                        </div>
-                      )}
-                      
-                      {/* 显示练习建议 */}
-                      {isPlaying && currentPracticeSuggestion && (
-                        <div className="p-2 bg-card/50 rounded-lg border border-border/30">
-                          <p className="text-xs text-muted-foreground">
-                            <span className="font-medium text-primary">{t('practice_suggestion_title')}:</span> {currentPracticeSuggestion}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <PracticeModeControls
+                      t={t}
+                      practiceAnswerMode={practiceAnswerMode}
+                      onPracticeAnswerModeChange={setPracticeAnswerMode}
+                      formatNoteByAccidentalSetting={formatNoteByAccidentalSetting}
+                      targetNote={targetNote}
+                      stringCount={STRING_COUNT}
+                      selectedStrings={selectedStrings}
+                      onSelectedStringsChange={setSelectedStrings}
+                      pitchFindingTime={pitchFindingTime}
+                      onPitchFindingTimeChange={setPitchFindingTime}
+                      showPracticeSuggestions={showPracticeSuggestions}
+                      onShowPracticeSuggestionsChange={setShowPracticeSuggestions}
+                      showAllNotes={showAllNotes}
+                      onShowAllNotesChange={setShowAllNotes}
+                      isPlaying={isPlaying}
+                      onIsPlayingChange={setIsPlaying}
+                      practiceTime={practiceTime}
+                      timeLeft={timeLeft}
+                      onTimeLeftChange={setTimeLeft}
+                      highlightedTargetPosition={highlightedTargetPosition}
+                      onHighlightedFretsChange={setHighlightedFrets}
+                      onHighlightedTargetPositionChange={setHighlightedTargetPosition}
+                      onScoreChange={setScore}
+                      recordPositionStat={recordPositionStat}
+                      generateNewTarget={generateNewTarget}
+                      formatTime={formatTime}
+                      currentPracticeSuggestion={currentPracticeSuggestion}
+                    />
                   )}
                   
                   {/* Interval Controls */}
                   {activeTab === "interval" && (
-                    <div className="space-y-2">
-                      {/* 第一行：基础设置 */}
-                      <div className="flex flex-wrap items-end gap-2">
-                        {/* 根音 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('interval_root_note_label')}</div>
-                          <Select value={rootNote} onValueChange={setRootNote} disabled={intervalRootMode === "random"}>
-                            <SelectTrigger className="w-[68px] h-8 text-xs px-2">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {NOTES.map(note => (
-                                <SelectItem key={note} value={note} className="text-xs">{note}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 根音模式 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('interval_root_mode_label')}</div>
-                          <Select value={intervalRootMode} onValueChange={(v: "fixed" | "random") => setIntervalRootMode(v)}>
-                            <SelectTrigger className="w-[80px] sm:w-[92px] h-8 text-xs px-2">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="fixed" className="text-xs">{t('fixed_root')}</SelectItem>
-                              <SelectItem value="random" className="text-xs">{t('random_root')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 选项开关组 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
-                          <div className="flex items-center gap-2 h-8 px-2 bg-card/30 rounded-md border border-border/30">
-                            <div className="flex items-center gap-1.5">
-                              <Checkbox
-                                id="findRootFirst"
-                                checked={findRootFirst}
-                                onCheckedChange={(c) => setFindRootFirst(c as boolean)}
-                                className="h-3.5 w-3.5"
-                              />
-                              <Label htmlFor="findRootFirst" className="text-xs cursor-pointer whitespace-nowrap">{t('find_root_first')}</Label>
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Checkbox
-                                id="addRootBack"
-                                checked={addRootBack}
-                                onCheckedChange={(c) => setAddRootBack(c as boolean)}
-                                className="h-3.5 w-3.5"
-                              />
-                              <Label htmlFor="addRootBack" className="text-xs cursor-pointer whitespace-nowrap">{t('add_root_back')}</Label>
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Switch
-                                id="showIntervalFretboard"
-                                checked={showIntervalFretboard}
-                                onCheckedChange={setShowIntervalFretboard}
-                                className="scale-90"
-                              />
-                              <Label htmlFor="showIntervalFretboard" className="text-xs cursor-pointer whitespace-nowrap">{t('show_fretboard')}</Label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 第二行：高级设置 */}
-                      <div className="flex flex-wrap items-end gap-2">
-                        {/* 练习时长 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('practice_duration')}</div>
-                          <Select value={String(intervalPracticeDuration)} onValueChange={(v) => setIntervalPracticeDuration(Number(v))}>
-                            <SelectTrigger className="w-[68px] h-8 text-xs px-2">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {[1, 3, 5, 10, 15, 20].map(min => (
-                                <SelectItem key={min} value={String(min)} className="text-xs">{min}{t('minutes')}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 音程方向 - segmented */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('interval_direction')}</div>
-                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
-                            {[
-                              { id: "up", label: t('direction_up') },
-                              { id: "down", label: t('direction_down') },
-                              { id: "either", label: t('direction_either') },
-                              { id: "random", label: t('direction_random') },
-                            ].map((dir) => (
-                              <Button
-                                key={dir.id}
-                                variant={intervalDirection === dir.id ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setIntervalDirection(dir.id as "up" | "down" | "random" | "either")}
-                                className="h-7 text-xs px-2.5"
-                              >
-                                {dir.label}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* 自动推进 + 指板时长 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
-                          <div className="flex items-center gap-2 h-8 px-2 bg-card/30 rounded-md border border-border/30">
-                            <div className="flex items-center gap-1.5">
-                              <Switch
-                                id="intervalAutoAdvance"
-                                checked={intervalAutoAdvance}
-                                onCheckedChange={setIntervalAutoAdvance}
-                                className="scale-90"
-                                disabled={!showIntervalFretboard}
-                              />
-                              <Label htmlFor="intervalAutoAdvance" className="text-xs cursor-pointer whitespace-nowrap">{t('auto_advance')}</Label>
-                            </div>
-                            {intervalAutoAdvance && showIntervalFretboard && (
-                              <>
-                                <Separator orientation="vertical" className="h-4" />
-                                <Select value={String(intervalFretboardDuration)} onValueChange={(v) => setIntervalFretboardDuration(Number(v))}>
-                                  <SelectTrigger className="w-[52px] h-7 text-xs px-1.5">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {[1, 2, 3, 5, 7, 10].map(sec => (
-                                      <SelectItem key={sec} value={String(sec)} className="text-xs">{sec}s</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* 随机顺序 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">&nbsp;</div>
-                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30">
-                            <Switch
-                              id="intervalRandomizeOrder"
-                              checked={intervalRandomizeOrder}
-                              onCheckedChange={setIntervalRandomizeOrder}
-                              className="scale-90"
-                            />
-                            <Label htmlFor="intervalRandomizeOrder" className="text-xs cursor-pointer whitespace-nowrap">{t('randomize_order')}</Label>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 音程选择 - segmented 多选 */}
-                      <div className="space-y-0.5">
-                        <div className="text-[10px] text-muted-foreground leading-3">{t('select_intervals_label')}</div>
-                        <div className="flex flex-wrap items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5 w-fit">
-                          {INTERVALS.map((interval, index) => (
-                            <Button
-                              key={interval.name}
-                              variant={selectedIntervals.includes(index) ? "default" : "ghost"}
-                              size="sm"
-                              onClick={() => toggleInterval(index)}
-                              className="text-xs h-7 px-2 min-w-[36px]"
-                            >
-                              {formatDegree(interval.symbol)}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 开始练习提示*/}
-                      {!isPlaying && (
-                        <div className="text-muted-foreground text-sm py-4">
-                          {t('click_start_to_begin')}
-                        </div>
-                      )}
-                    </div>
+                    <IntervalControls
+                      t={t}
+                      rootNote={rootNote}
+                      onRootNoteChange={setRootNote}
+                      intervalRootMode={intervalRootMode}
+                      onIntervalRootModeChange={setIntervalRootMode}
+                      findRootFirst={findRootFirst}
+                      onFindRootFirstChange={setFindRootFirst}
+                      addRootBack={addRootBack}
+                      onAddRootBackChange={setAddRootBack}
+                      showIntervalFretboard={showIntervalFretboard}
+                      onShowIntervalFretboardChange={setShowIntervalFretboard}
+                      intervalPracticeDuration={intervalPracticeDuration}
+                      onIntervalPracticeDurationChange={setIntervalPracticeDuration}
+                      intervalDirection={intervalDirection}
+                      onIntervalDirectionChange={setIntervalDirection}
+                      intervalAutoAdvance={intervalAutoAdvance}
+                      onIntervalAutoAdvanceChange={setIntervalAutoAdvance}
+                      intervalFretboardDuration={intervalFretboardDuration}
+                      onIntervalFretboardDurationChange={setIntervalFretboardDuration}
+                      intervalRandomizeOrder={intervalRandomizeOrder}
+                      onIntervalRandomizeOrderChange={setIntervalRandomizeOrder}
+                      selectedIntervals={selectedIntervals}
+                      onToggleInterval={toggleInterval}
+                      isPlaying={isPlaying}
+                    />
                   )}
                   
                   {/* Chord Exercise Controls */}
                   {activeTab === "chord_exercise" && (
-                    <div 
-                      data-onboarding="chord-exercise"
-                      className="space-y-2"
-                    >
-                      {/* 第一行：基础设置 */}
-                      <div className="flex flex-wrap items-end gap-2">
-                        {/* 根音选择 */}
-                        <div className="w-[72px] sm:w-[80px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_root_note')}</div>
-                          <Select value={chordExerciseRoot} onValueChange={setChordExerciseRoot}>
-                            <SelectTrigger className="h-8 text-xs px-2 w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="random" className="text-xs">{t('random')}</SelectItem>
-                              {NOTES.map(note => (
-                                <SelectItem key={note} value={note} className="text-xs">{note}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 练习模式 */}
-                        <div className="w-[130px] sm:w-[150px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('practice_level')}</div>
-                          <Button
-                            variant="outline"
-                            className="h-8 text-xs w-full justify-between px-2"
-                            onClick={() => setShowChordExerciseLevelSelector(true)}
-                          >
-                            <span className="truncate">
-                              {t(ALL_PRACTICE_LEVELS.find(l => l.id === chordExerciseLevel)?.nameKey || '') || chordExerciseLevel}
-                            </span>
-                            <ChevronRight className="h-3 w-3 ml-1 shrink-0" />
-                          </Button>
-                        </div>
-
-                        {/* 低音音符选择 */}
-                        <div className="w-[80px] sm:w-[88px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_bass_note')}</div>
-                          <Select value={chordExerciseBass} onValueChange={setChordExerciseBass}>
-                            <SelectTrigger className="h-8 text-xs px-2 w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="root" className="text-xs">{t('chord_bass_root')}</SelectItem>
-                              <SelectItem value="3rd" className="text-xs">{t('chord_bass_3rd')}</SelectItem>
-                              <SelectItem value="5th" className="text-xs">{t('chord_bass_5th')}</SelectItem>
-                              <SelectItem value="7th" className="text-xs">{t('chord_bass_7th')}</SelectItem>
-                              <SelectItem value="random" className="text-xs">{t('chord_bass_random')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 演奏顺序 - segmented */}
-                        <div className="w-[150px] sm:w-[168px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_order')}</div>
-                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
-                            {[
-                              { id: "asc", label: t('order_ascending') },
-                              { id: "desc", label: t('order_descending') },
-                              { id: "random", label: t('order_random') },
-                            ].map((order) => (
-                              <Button
-                                key={order.id}
-                                variant={chordExerciseOrder === order.id ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setChordExerciseOrder(order.id as "asc" | "desc" | "random")}
-                                className="h-7 text-xs flex-1 px-1"
-                              >
-                                {order.label}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* 显示选项开关组 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('display_options')}</div>
-                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30">
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showChordExerciseFretboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('fretboard')}</Label>
-                              <Switch
-                                id="showChordExerciseFretboard"
-                                checked={showChordExerciseFretboard}
-                                onCheckedChange={setShowChordExerciseFretboard}
-                                className="scale-90"
-                              />
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showChordExerciseKeyboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('keyboard')}</Label>
-                              <Switch
-                                id="showChordExerciseKeyboard"
-                                checked={showChordExerciseKeyboard}
-                                onCheckedChange={setShowChordExerciseKeyboard}
-                                className="scale-90"
-                              />
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showChordExerciseStructure" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('structure')}</Label>
-                              <Switch
-                                id="showChordExerciseStructure"
-                                checked={showChordExerciseStructure}
-                                onCheckedChange={setShowChordExerciseStructure}
-                                className="scale-90"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {/* 第二行：和弦类型选择 - 按分组显示 */}
-                      <div className="bg-card/30 rounded-md p-2 border border-border/30">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_type')}</div>
-                          <div className="flex items-center bg-background/40 rounded-md border border-border/30 p-0.5 gap-0.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setChordExerciseTypes(CHORD_TYPES.map(t => t.name))}
-                              className="h-6 text-[11px] px-2"
-                            >
-                              {t('select_all')}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setChordExerciseTypes([])}
-                              className="h-6 text-[11px] px-2"
-                            >
-                              {t('clear_all')}
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="max-h-[160px] overflow-y-auto pr-1">
-                        {(() => {
-                          const groups = CHORD_TYPES.reduce((acc, type) => {
-                            const groupKey = type.group || 'other'
-                            if (!acc[groupKey]) {
-                              acc[groupKey] = { name: type.groupName || type.groupZh || 'Other', nameZh: type.groupZh || '其他', types: [] }
-                            }
-                            acc[groupKey].types.push(type)
-                            return acc
-                          }, {} as Record<string, { name: string; nameZh: string; types: typeof CHORD_TYPES }>)
-                          
-                          return Object.entries(groups).map(([key, group]) => (
-                            <div key={key} className="mb-2 last:mb-0">
-                              <div className="text-[10px] font-medium text-muted-foreground/70 mb-1 px-1">{language === 'zh-CN' ? group.nameZh : group.name}</div>
-                              <div className="flex flex-wrap gap-1">
-                                {group.types.map(type => (
-                                  <Button
-                                    key={type.name}
-                                    variant={chordExerciseTypes.includes(type.name) ? "default" : "outline"}
-                                    size="sm"
-                                    onClick={() => {
-                                      if (chordExerciseTypes.includes(type.name)) {
-                                        setChordExerciseTypes(chordExerciseTypes.filter(t => t !== type.name))
-                                      } else {
-                                        setChordExerciseTypes([...chordExerciseTypes, type.name])
-                                      }
-                                    }}
-                                    className="h-7 text-xs px-2"
-                                  >
-                                    {type.symbol || type.name}
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                          ))
-                        })()}
-                        </div>
-                      </div>
-                    </div>
+                    <ChordExerciseControls
+                      t={t}
+                      language={language}
+                      root={chordExerciseRoot}
+                      onRootChange={setChordExerciseRoot}
+                      level={chordExerciseLevel}
+                      onOpenLevelSelector={() => setShowChordExerciseLevelSelector(true)}
+                      bass={chordExerciseBass}
+                      onBassChange={setChordExerciseBass}
+                      chordOrder={chordExerciseOrder}
+                      onChordOrderChange={setChordExerciseOrder}
+                      showFretboard={showChordExerciseFretboard}
+                      onShowFretboardChange={setShowChordExerciseFretboard}
+                      showKeyboard={showChordExerciseKeyboard}
+                      onShowKeyboardChange={setShowChordExerciseKeyboard}
+                      showStructure={showChordExerciseStructure}
+                      onShowStructureChange={setShowChordExerciseStructure}
+                      selectedTypes={chordExerciseTypes}
+                      onSelectedTypesChange={setChordExerciseTypes}
+                    />
                   )}
 
                   {/* Chord Progression Controls */}
                   {activeTab === "chord" && (
-                    <div className="space-y-2">
-                      {/* 第一行：歌曲选择、调性、练习模式、和弦顺序 */}
-                      <div className="flex flex-wrap items-end gap-2">
-                        <div className="w-[140px] sm:w-[180px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('select_song')}</div>
-                          <Button
-                            variant="outline"
-                            className="h-8 text-xs w-full justify-between px-2"
-                            onClick={() => setShowSongSelector(true)}
-                          >
-                            <span className="truncate">{selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name}</span>
-                            <ChevronRight className="h-3 w-3 ml-1 shrink-0" />
-                          </Button>
-                        </div>
-                        <div className="w-[110px] sm:w-[130px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('select_key')}</div>
-                          <Select value={progressionKey} onValueChange={(value) => setProgressionKey(value)}>
-                            <SelectTrigger className="h-8 text-xs w-full px-2">
-                              <SelectValue>
-                                {normalizeNoteName(progressionKey) + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {NOTES.map((note, index) => {
-                                const flatNote = NOTES_FLAT[index]
-                                const displayName = note === flatNote
-                                  ? note + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))
-                                  : `${note} / ${flatNote}` + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))
-                                return (
-                                  <SelectItem key={note} value={note} className="text-xs">{displayName}</SelectItem>
-                                )
-                              })}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="w-[130px] sm:w-[150px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('practice_level')}</div>
-                          <Button
-                            variant="outline"
-                            className="h-8 text-xs w-full justify-between px-2"
-                            onClick={() => setShowLevelSelector(true)}
-                          >
-                            <span className="truncate">
-                              {t(ALL_PRACTICE_LEVELS.find(l => l.id === practiceLevel)?.nameKey || '') || practiceLevel}
-                            </span>
-                            <ChevronRight className="h-3 w-3 ml-1 shrink-0" />
-                          </Button>
-                        </div>
-                        <div className="w-[110px] sm:w-[130px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('chord_order')}</div>
-                          <Select value={chordPlayOrder} onValueChange={(v: "asc" | "desc" | "random") => setChordPlayOrder(v)}>
-                            <SelectTrigger className="h-8 text-xs w-full px-2">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="asc" className="text-xs">{t('order_ordered')}</SelectItem>
-                              <SelectItem value="desc" className="text-xs">{t('order_reverse')}</SelectItem>
-                              <SelectItem value="random" className="text-xs">{t('order_random')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* 第二行：开关选项 + 操作按钮 */}
-                      <div className="flex items-end gap-2 flex-wrap">
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('display_options')}</div>
-                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30 flex-wrap">
-                            <div className="flex items-center gap-1.5">
-                              <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('progression_repeat')}</Label>
-                              <Switch
-                                checked={progressionRepeat}
-                                onCheckedChange={setProgressionRepeat}
-                                className="scale-90"
-                              />
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Label className={`text-xs whitespace-nowrap ${chordPlayOrder !== 'random' ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}>{t('progression_voice_leading')}</Label>
-                              <Switch
-                                checked={shouldVoiceLead}
-                                onCheckedChange={setShouldVoiceLead}
-                                disabled={chordPlayOrder === 'random'}
-                                className="scale-90"
-                              />
-                            </div>
-                            {progressionRepeat && (
-                              <>
-                                <Separator orientation="vertical" className="h-4" />
-                                <div className="flex items-center gap-1.5">
-                                  <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('progression_randomize_key')}</Label>
-                                  <Switch
-                                    checked={shouldRandomizeKeyOnRepeat}
-                                    onCheckedChange={setShouldRandomizeKeyOnRepeat}
-                                    className="scale-90"
-                                  />
-                                </div>
-                              </>
-                            )}
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showChordFretboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('show_fretboard')}</Label>
-                              <Switch
-                                id="showChordFretboard"
-                                checked={showChordFretboard}
-                                onCheckedChange={setShowChordFretboard}
-                                className="scale-90"
-                              />
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showChordStructure" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('chord_progression_structure')}</Label>
-                              <Switch
-                                id="showChordStructure"
-                                checked={showChordStructure}
-                                onCheckedChange={setShowChordStructure}
-                                className="scale-90"
-                              />
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showChordKeyboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('show_keyboard')}</Label>
-                              <Switch
-                                id="showChordKeyboard"
-                                checked={showChordKeyboard}
-                                onCheckedChange={setShowChordKeyboard}
-                                className="scale-90"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-0.5 ml-auto">
-                          <div className="text-[10px] text-transparent leading-3">&nbsp;</div>
-                          <Button
-                            onClick={nextChord}
-                            variant="outline"
-                            className="h-8 px-3 text-xs"
-                            disabled={!isPlaying}
-                          >
-                            <SkipForward className="h-3.5 w-3.5 mr-1" />
-                            {t('btn_next')}
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* 第三行：自定义和弦（折叠） */}
-                      <Accordion type="multiple" defaultValue={[]} className="w-full">
-                        <AccordionItem value="custom" className="border-0">
-                          <AccordionTrigger className="text-xs py-1.5 px-2 bg-card/30 rounded-md border border-border/30 hover:no-underline">
-                            {t('chord_custom')}
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <div className="space-y-3 pt-2 p-2 bg-card/20 rounded-b-md border-x border-b border-border/30">
-                              {/* 手动添加和弦 */}
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 grid grid-cols-12 gap-1">
-                                  <Select value={newChordRoot} onValueChange={setNewChordRoot}>
-                                    <SelectTrigger className="col-span-3 h-8 text-xs px-2">
-                                      <SelectValue placeholder={t('chord_root_note')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {NOTES.map(note => (
-                                        <SelectItem key={note} value={note} className="text-xs">{note}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Select value={newChordType} onValueChange={setNewChordType}>
-                                    <SelectTrigger className="col-span-6 h-8 text-xs px-2">
-                                      <SelectValue placeholder={t('chord_type')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {CHORD_TYPES.map(type => (
-                                        <SelectItem key={type.name} value={type.name} className="text-xs">{type.symbol || type.name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Button onClick={addCustomChord} size="sm" className="col-span-3 h-8 text-xs px-2">
-                                    <Plus className="h-3.5 w-3.5 mr-1" />
-                                    {t('custom_chord_add')}
-                                  </Button>
-                                </div>
-                              </div>
-
-                              {/* iReal Pro 导入 */}
-                              <div className="space-y-2 pt-2 border-t border-border/30">
-                                <p className="text-xs text-muted-foreground">{t('ireal_import_title')}</p>
-                                <Textarea
-                                  placeholder={t('ireal_import_help')}
-                                  value={irealInput}
-                                  onChange={(e) => setIrealInput(e.target.value)}
-                                  className="min-h-[50px] text-xs"
-                                />
-                                <Button onClick={importIrealPro} size="sm" className="w-full h-8 text-xs">
-                                  <Upload className="h-3.5 w-3.5 mr-1" />
-                                  {t('ireal_import_btn')}
-                                </Button>
-                              </div>
-
-                              {/* 和弦序列显示 */}
-                              {customChords.length > 0 && (
-                                <div className="flex flex-wrap gap-1 pt-2 border-t border-border/30">
-                                  {customChords.map((chord, index) => (
-                                    <Badge key={index} variant="secondary" className="text-xs gap-1 py-0.5">
-                                      {formatChordName(chord, t)}
-                                      <button onClick={() => removeCustomChord(index)} className="hover:text-destructive">
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </Badge>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* 操作按钮 */}
-                              <div className="flex items-center gap-1 pt-2 border-t border-border/30 flex-wrap">
-                                <Input
-                                  placeholder={t('custom_chord_sequence_name')}
-                                  value={customChordName}
-                                  onChange={(e) => setCustomChordName(e.target.value)}
-                                  className="h-8 text-xs flex-1 min-w-[120px]"
-                                />
-                                <Button variant="outline" size="sm" onClick={saveCustomChords} className="h-8 px-2 text-xs" disabled={customChords.length === 0}>
-                                  <Save className="h-3.5 w-3.5 mr-1" />
-                                  {t('custom_chord_save')}
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={loadCustomChords} className="h-8 px-2 text-xs">
-                                  <Upload className="h-3.5 w-3.5 mr-1" />
-                                  {t('custom_chord_load')}
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={exportCustomChords} className="h-8 px-2 text-xs" disabled={customChords.length === 0}>
-                                  <Download className="h-3.5 w-3.5 mr-1" />
-                                  {t('custom_chord_export')}
-                                </Button>
-                                {customChords.length > 0 && (
-                                  <Button variant="outline" size="sm" onClick={clearCustomChords} className="h-8 px-2 text-xs">
-                                    <Trash2 className="h-3.5 w-3.5 mr-1" />
-                                    {t('custom_chord_clear')}
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      </Accordion>
-                    </div>
+                    <ChordProgressionControls
+                      t={t}
+                      language={language}
+                      selectedSong={selectedSong}
+                      onShowSongSelectorChange={setShowSongSelector}
+                      progressionKey={progressionKey}
+                      onProgressionKeyChange={setProgressionKey}
+                      isMinor={isMinor}
+                      practiceLevel={practiceLevel}
+                      onShowLevelSelectorChange={setShowLevelSelector}
+                      chordPlayOrder={chordPlayOrder}
+                      onChordPlayOrderChange={setChordPlayOrder}
+                      progressionRepeat={progressionRepeat}
+                      onProgressionRepeatChange={setProgressionRepeat}
+                      shouldVoiceLead={shouldVoiceLead}
+                      onShouldVoiceLeadChange={setShouldVoiceLead}
+                      shouldRandomizeKeyOnRepeat={shouldRandomizeKeyOnRepeat}
+                      onShouldRandomizeKeyOnRepeatChange={setShouldRandomizeKeyOnRepeat}
+                      showChordFretboard={showChordFretboard}
+                      onShowChordFretboardChange={setShowChordFretboard}
+                      showChordStructure={showChordStructure}
+                      onShowChordStructureChange={setShowChordStructure}
+                      showChordKeyboard={showChordKeyboard}
+                      onShowChordKeyboardChange={setShowChordKeyboard}
+                      isPlaying={isPlaying}
+                      nextChord={nextChord}
+                      newChordRoot={newChordRoot}
+                      onNewChordRootChange={setNewChordRoot}
+                      newChordType={newChordType}
+                      onNewChordTypeChange={setNewChordType}
+                      addCustomChord={addCustomChord}
+                      irealInput={irealInput}
+                      onIrealInputChange={setIrealInput}
+                      importIrealPro={importIrealPro}
+                      customChords={customChords}
+                      removeCustomChord={removeCustomChord}
+                      customChordName={customChordName}
+                      onCustomChordNameChange={setCustomChordName}
+                      saveCustomChords={saveCustomChords}
+                      loadCustomChords={loadCustomChords}
+                      exportCustomChords={exportCustomChords}
+                      clearCustomChords={clearCustomChords}
+                    />
                   )}
 
                   {/* 和弦进行信息浮动窗口 */}
                   {activeTab === "chord" && showChordStructure && (
-                    <div 
-                      className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-50"
-                      style={{ 
-                        transform: `translate(${chordStructurePosition.x}px, ${chordStructurePosition.y}px)`,
-                        cursor: dragRef.current.isDragging && dragRef.current.target === 'chord' ? 'grabbing' : 'default'
-                      }}
-                    >
-                      <div className="bg-card/95 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg p-3">
-                        <div 
-                          className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                          role="button"
-                          tabIndex={0}
-                          aria-label={t('chord_structure_drag_hint') || '拖动或用方向键移动面板'}
-                          onMouseDown={(e) => handleDragStart(e, 'chord')}
-                          onTouchStart={(e) => handleDragStart(e, 'chord')}
-                          onKeyDown={(e) => {
-                            const step = e.shiftKey ? 20 : 5
-                            if (e.key === 'ArrowLeft') { e.preventDefault(); setChordStructurePosition(p => ({ ...p, x: p.x - step })) }
-                            else if (e.key === 'ArrowRight') { e.preventDefault(); setChordStructurePosition(p => ({ ...p, x: p.x + step })) }
-                            else if (e.key === 'ArrowUp') { e.preventDefault(); setChordStructurePosition(p => ({ ...p, y: p.y - step })) }
-                            else if (e.key === 'ArrowDown') { e.preventDefault(); setChordStructurePosition(p => ({ ...p, y: p.y + step })) }
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <GripVertical className="h-3 w-3 text-muted-foreground" />
-                            <h4 className="text-xs font-semibold">{t('chord_progression_info')}</h4>
-                          </div>
-                          <button
-                            onClick={() => setShowChordStructure(false)}
-                            className="text-muted-foreground hover:text-foreground p-1 min-h-[28px] min-w-[28px] flex items-center justify-center"
-                            aria-label="关闭和弦进行信息"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                        <div className="space-y-1.5 text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">{t('select_key')}:</span>
-                            <span className="font-mono">{progressionKey + (isMinor ? (language === 'zh-CN' ? '小调' : ' minor') : (language === 'zh-CN' ? '大调' : ' Major'))}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">{t('select_song')}:</span>
-                            <span className="font-mono">{selectedSong.name === '__custom__' ? t('chord_custom') : selectedSong.name}</span>
-                          </div>
-                          {/* 显示该调的所有和弦*/}
-                          <div className="pt-1.5 border-t border-border/20">
-                            <span className="text-muted-foreground block mb-1.5">{t('chord_progression')}:</span>
-                            <div className="flex flex-wrap gap-1">
-                              {(() => {
-                                const chords = transposedChords
-                                return chords.map((chord, index) => (
-                                  <Badge
-                                    key={index}
-                                    variant={index === currentChordIndex ? "default" : "secondary"}
-                                    className="text-[10px] py-0 px-1"
-                                  >
-                                    {formatChordName(chord, t)}
-                                  </Badge>
-                                ))
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <ChordStructureWindow
+                      t={t}
+                      language={language}
+                      showChordStructure={showChordStructure}
+                      onShowChordStructureChange={setShowChordStructure}
+                      chordStructurePosition={chordStructurePosition}
+                      onChordStructurePositionChange={setChordStructurePosition}
+                      dragRef={dragRef}
+                      handleDragStart={handleDragStart}
+                      progressionKey={progressionKey}
+                      isMinor={isMinor}
+                      selectedSong={selectedSong}
+                      transposedChords={transposedChords}
+                      currentChordIndex={currentChordIndex}
+                    />
                   )}
 
                   {/* Scale Controls */}
                   {activeTab === "scale" && (
-                    <div 
-                      data-onboarding="scale-exercise"
-                      className="space-y-2"
-                    >
-                      {/* 第一行：基础设置 */}
-                      <div className="flex flex-wrap items-end gap-2">
-                        {/* 调性选择 */}
-                        <div className="w-[80px] sm:w-[88px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('scale_key')}</div>
-                          <Select value={isScaleKeyRandom ? 'random' : scaleKey} onValueChange={(value) => {
-                            if (value === 'random') {
-                              setIsScaleKeyRandom(true)
-                              const randomNote = NOTES[Math.floor(Math.random() * NOTES.length)]
-                              setScaleKey(randomNote)
-                            } else {
-                              setIsScaleKeyRandom(false)
-                              setScaleKey(value)
-                            }
-                          }}>
-                            <SelectTrigger className="h-8 text-xs px-2 w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {NOTES.map(note => (
-                                <SelectItem key={note} value={note} className="text-xs">{note}</SelectItem>
-                              ))}
-                              <SelectItem value="random" className="text-xs font-medium text-primary">
-                                {t('random_key')}
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 调式分类 */}
-                        <div className="w-[120px] sm:w-[140px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('scale_mode')}</div>
-                          <Select value={selectedScaleCategory} onValueChange={(v: keyof typeof SCALE_MODES) => {
-                            setSelectedScaleCategory(v)
-                            setSelectedScale(SCALE_MODES[v][0])
-                          }}>
-                            <SelectTrigger className="h-8 text-xs px-2 w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pentatonic" className="text-xs">{language === 'zh-CN' ? '五声音阶' : 'Pentatonic'}</SelectItem>
-                              <SelectItem value="majorScaleModes" className="text-xs">{language === 'zh-CN' ? '大调模式' : 'Major Modes'}</SelectItem>
-                              <SelectItem value="melodicMinorScaleModes" className="text-xs">{language === 'zh-CN' ? '旋律小调模式' : 'Melodic Minor Modes'}</SelectItem>
-                              <SelectItem value="harmonicMinorScaleModes" className="text-xs">{language === 'zh-CN' ? '和声小调模式' : 'Harmonic Minor Modes'}</SelectItem>
-                              <SelectItem value="harmonicMajorScaleModes" className="text-xs">{language === 'zh-CN' ? '和声大调模式' : 'Harmonic Major Modes'}</SelectItem>
-                              <SelectItem value="otherScales" className="text-xs">{language === 'zh-CN' ? '其他音阶' : 'Other Scales'}</SelectItem>
-                              <SelectItem value="bebopScales" className="text-xs">{language === 'zh-CN' ? 'Bebop音阶' : 'Bebop Scales'}</SelectItem>
-                              <SelectItem value="exotic" className="text-xs">{language === 'zh-CN' ? '异域音阶' : 'Exotic'}</SelectItem>
-                              <SelectItem value="symmetrical" className="text-xs">{language === 'zh-CN' ? '对称音阶' : 'Symmetrical'}</SelectItem>
-                              <SelectItem value="basic" className="text-xs">{language === 'zh-CN' ? '基础' : 'Basic'}</SelectItem>
-                              <SelectItem value="church" className="text-xs">{language === 'zh-CN' ? '教会调式' : 'Church'}</SelectItem>
-                              <SelectItem value="minor" className="text-xs">{language === 'zh-CN' ? '小调变体' : 'Minor'}</SelectItem>
-                              <SelectItem value="bebop" className="text-xs">{language === 'zh-CN' ? 'Bebop(旧)' : 'Bebop(Old)'}</SelectItem>
-                              <SelectItem value="jazz" className="text-xs">{language === 'zh-CN' ? '爵士' : 'Jazz'}</SelectItem>
-                              <SelectItem value="other" className="text-xs">{language === 'zh-CN' ? '其他(旧)' : 'Other(Old)'}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 方向 - segmented */}
-                        <div className="w-[180px] sm:w-[200px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('scale_direction')}</div>
-                          <div className="flex items-center bg-card/30 rounded-md border border-border/30 p-0.5 gap-0.5">
-                            {[
-                              { id: "up", label: t('order_ascending') },
-                              { id: "down", label: t('order_descending') },
-                              { id: "up_down", label: t('order_asc_desc') },
-                              { id: "random", label: t('order_random') },
-                            ].map((order) => (
-                              <Button
-                                key={order.id}
-                                variant={scaleDirection === order.id ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setScaleDirection(order.id as "up" | "down" | "up_down" | "random")}
-                                className="h-7 text-xs flex-1 px-1"
-                              >
-                                {order.label}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* 根音移动 */}
-                        <div className="w-[130px] sm:w-[150px] space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('root_movement')}</div>
-                          <Select value={scaleRootMovement} onValueChange={(v) => setScaleRootMovement(v as typeof scaleRootMovement)}>
-                            <SelectTrigger className="h-8 text-xs px-2 w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="static" className="text-xs">{t('root_movement_static')}</SelectItem>
-                              <SelectItem value="random" className="text-xs">{t('root_movement_random')}</SelectItem>
-                              <SelectItem value="upSemiTone" className="text-xs">{t('root_movement_up_semitone')}</SelectItem>
-                              <SelectItem value="downSemiTone" className="text-xs">{t('root_movement_down_semitone')}</SelectItem>
-                              <SelectItem value="circleOfFifths" className="text-xs">{t('root_movement_circle_of_fifths')}</SelectItem>
-                              <SelectItem value="circleOfFourths" className="text-xs">{t('root_movement_circle_of_fourths')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* 显示选项开关组 */}
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-muted-foreground leading-3">{t('display_options')}</div>
-                          <div className="flex items-center gap-1.5 h-8 px-2 bg-card/30 rounded-md border border-border/30">
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showScaleFretboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('fretboard')}</Label>
-                              <Switch
-                                id="showScaleFretboard"
-                                checked={showScaleFretboard}
-                                onCheckedChange={setShowScaleFretboard}
-                                className="scale-90"
-                              />
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showScaleKeyboard" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('keyboard')}</Label>
-                              <Switch
-                                id="showScaleKeyboard"
-                                checked={showScaleKeyboard}
-                                onCheckedChange={setShowScaleKeyboard}
-                                className="scale-90"
-                              />
-                            </div>
-                            <Separator orientation="vertical" className="h-4" />
-                            <div className="flex items-center gap-1.5">
-                              <Label htmlFor="showScaleStructure" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">{t('structure')}</Label>
-                              <Switch
-                                id="showScaleStructure"
-                                checked={showScaleStructure}
-                                onCheckedChange={setShowScaleStructure}
-                                className="scale-90"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 第二行：练习序列和音阶选择 */}
-                      <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                        {/* 练习序列选择 */}
-                        <div className="bg-card/30 rounded-md p-2 border border-border/30 sm:w-auto w-full">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div className="text-[10px] text-muted-foreground leading-3">{t('scale_practice_sequence')}</div>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {SCALE_PRACTICE_SEQUENCES.map((seq) => (
-                              <Button
-                                key={seq.id}
-                                variant={scalePracticeSequence === seq.id ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setScalePracticeSequence(seq.id)}
-                                className="h-7 text-xs px-2"
-                              >
-                                {seq.id === 'random' ? t('random') : seq.name}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* 音阶类型选择 */}
-                        <div className="bg-card/30 rounded-md p-2 border border-border/30 flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div className="text-[10px] text-muted-foreground leading-3">
-                              {selectedScaleCategory === 'pentatonic' ? (language === 'zh-CN' ? '五声音阶' : 'Pentatonic Scales') :
-                               selectedScaleCategory === 'majorScaleModes' ? (language === 'zh-CN' ? '大调音阶模式' : 'Major Scale Modes') :
-                               selectedScaleCategory === 'melodicMinorScaleModes' ? (language === 'zh-CN' ? '旋律小调模式' : 'Melodic Minor Scale Modes') :
-                               selectedScaleCategory === 'harmonicMinorScaleModes' ? (language === 'zh-CN' ? '和声小调模式' : 'Harmonic Minor Scale Modes') :
-                               selectedScaleCategory === 'harmonicMajorScaleModes' ? (language === 'zh-CN' ? '和声大调模式' : 'Harmonic Major Scale Modes') :
-                               selectedScaleCategory === 'otherScales' ? (language === 'zh-CN' ? '其他音阶' : 'Other Scales') :
-                               selectedScaleCategory === 'bebopScales' ? (language === 'zh-CN' ? 'Bebop音阶' : 'Bebop Scales') :
-                               selectedScaleCategory === 'basic' ? (language === 'zh-CN' ? '基础音阶' : 'Basic Scales') :
-                               selectedScaleCategory === 'church' ? (language === 'zh-CN' ? '教会调式' : 'Church Modes') :
-                               selectedScaleCategory === 'minor' ? (language === 'zh-CN' ? '小调变体' : 'Minor Variants') :
-                               selectedScaleCategory === 'bebop' ? (language === 'zh-CN' ? 'Bebop音阶(旧)' : 'Bebop Scales(Old)') :
-                               selectedScaleCategory === 'jazz' ? (language === 'zh-CN' ? '爵士音阶' : 'Jazz Scales') :
-                               selectedScaleCategory === 'exotic' ? (language === 'zh-CN' ? '异域音阶' : 'Exotic Scales') :
-                               selectedScaleCategory === 'symmetrical' ? (language === 'zh-CN' ? '对称音阶' : 'Symmetrical Scales') :
-                               (language === 'zh-CN' ? '其他音阶(旧)' : 'Other Scales(Old)')}
-                              <span className="ml-1 text-[9px] text-muted-foreground/70">({t('multi_select_hint')})</span>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {SCALE_MODES[selectedScaleCategory].map((scale) => (
-                              <Button
-                                key={scale.name}
-                                variant={selectedScales.some(s => s.name === scale.name) ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => {
-                                  const isSelected = selectedScales.some(s => s.name === scale.name)
-                                  if (isSelected) {
-                                    // 取消选择（至少保留一个）
-                                    if (selectedScales.length > 1) {
-                                      const newScales = selectedScales.filter(s => s.name !== scale.name)
-                                      setSelectedScales(newScales)
-                                      setSelectedScale(newScales[0])
-                                    }
-                                  } else {
-                                    // 添加选择
-                                    const newScales = [...selectedScales, scale]
-                                    setSelectedScales(newScales)
-                                    setSelectedScale(scale)
-                                  }
-                                }}
-                                className="h-7 text-xs px-2"
-                              >
-                                {scale.name}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <ScaleControls
+                      t={t}
+                      language={language}
+                      isScaleKeyRandom={isScaleKeyRandom}
+                      onIsScaleKeyRandomChange={setIsScaleKeyRandom}
+                      scaleKey={scaleKey}
+                      onScaleKeyChange={setScaleKey}
+                      selectedScaleCategory={selectedScaleCategory}
+                      onSelectedScaleCategoryChange={setSelectedScaleCategory}
+                      selectedScale={selectedScale}
+                      onSelectedScaleChange={setSelectedScale}
+                      scaleDirection={scaleDirection}
+                      onScaleDirectionChange={setScaleDirection}
+                      scaleRootMovement={scaleRootMovement}
+                      onScaleRootMovementChange={setScaleRootMovement}
+                      showScaleFretboard={showScaleFretboard}
+                      onShowScaleFretboardChange={setShowScaleFretboard}
+                      showScaleKeyboard={showScaleKeyboard}
+                      onShowScaleKeyboardChange={setShowScaleKeyboard}
+                      showScaleStructure={showScaleStructure}
+                      onShowScaleStructureChange={setShowScaleStructure}
+                      scalePracticeSequence={scalePracticeSequence}
+                      onScalePracticeSequenceChange={setScalePracticeSequence}
+                      selectedScales={selectedScales}
+                      onSelectedScalesChange={setSelectedScales}
+                      threeNpsActive={isThreeNpsActive}
+                      threeNpsPositions={threeNpsPositionOptions}
+                      threeNpsSelectedIndex={threeNpsPositionIndex}
+                      onThreeNpsPositionChange={handleThreeNpsPositionChange}
+                      threeNpsShortestScaleNoteCount={selectedScale.notes.length}
+                    />
                   )}
                 </CardContent>
               </Card>
               )}
 
-              {/* 音阶结构浮动窗口 */}
+              {/* 音阶结构浮动窗口（专注模式「隐藏干扰元素」时随 .focus-clean 收起） */}
               {activeTab === "scale" && showScaleStructure && (
                 <div 
+                  data-focus-distraction
                   className="fixed bottom-4 right-4 z-50 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg p-3 max-w-xs"
                   style={{ 
                     transform: `translate(${scaleStructurePosition.x}px, ${scaleStructurePosition.y}px)`,
@@ -12375,7 +4855,7 @@ export default function FretMasterPage() {
                     className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                     role="button"
                     tabIndex={0}
-                    aria-label={t('chord_structure_drag_hint') || '拖动或用方向键移动面板'}
+                    aria-label={t('chord_structure_drag_hint')}
                     onMouseDown={(e) => handleDragStart(e, 'scale')}
                     onTouchStart={(e) => handleDragStart(e, 'scale')}
                     onKeyDown={(e) => {
@@ -12393,7 +4873,7 @@ export default function FretMasterPage() {
                     <button 
                       onClick={() => setShowScaleStructure(false)}
                       className="text-muted-foreground hover:text-foreground p-1 min-h-[28px] min-w-[28px] flex items-center justify-center"
-                      aria-label="关闭音阶结构"
+                      aria-label={t('scale_structure_close_label')}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -12430,9 +4910,10 @@ export default function FretMasterPage() {
                 </div>
               )}
 
-              {/* 和弦练习结构浮动窗口 */}
+              {/* 和弦练习结构浮动窗口（专注模式「隐藏干扰元素」时随 .focus-clean 收起） */}
               {activeTab === "chord_exercise" && showChordExerciseStructure && chordExerciseTargetChord && (
                 <div 
+                  data-focus-distraction
                   className="fixed bottom-4 right-4 z-50 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg p-3 max-w-xs"
                   style={{ 
                     transform: `translate(${chordExerciseStructurePosition.x}px, ${chordExerciseStructurePosition.y}px)`,
@@ -12443,7 +4924,7 @@ export default function FretMasterPage() {
                     className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                     role="button"
                     tabIndex={0}
-                    aria-label={t('chord_structure_drag_hint') || '拖动或用方向键移动面板'}
+                    aria-label={t('chord_structure_drag_hint')}
                     onMouseDown={(e) => handleDragStart(e, 'chordExercise')}
                     onTouchStart={(e) => handleDragStart(e, 'chordExercise')}
                     onKeyDown={(e) => {
@@ -12461,7 +4942,7 @@ export default function FretMasterPage() {
                     <button
                       onClick={() => setShowChordExerciseStructure(false)}
                       className="text-muted-foreground hover:text-foreground p-1 min-h-[28px] min-w-[28px] flex items-center justify-center"
-                      aria-label="关闭和弦练习结构"
+                      aria-label={t('chord_exercise_structure_close_label')}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -12519,827 +5000,186 @@ export default function FretMasterPage() {
               )}
 
               {showPracticeSummary && (
-                <Dialog open={showPracticeSummary} onOpenChange={(open) => !open && setShowPracticeSummary(false)}>
-                  <DialogContent className="max-w-sm">
-                    <DialogHeader>
-                      <DialogTitle className="text-center text-xl font-bold">
-                        {t('practice_summary_title')}
-                      </DialogTitle>
-                      <DialogDescription className="text-center text-sm text-muted-foreground sr-only">
-                        {t('practice_summary_title')}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="text-center mb-2">
-                      <div className="text-4xl mb-2" aria-hidden="true">
-                        {practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.8 ? '🎉' : 
-                         practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.5 ? '👍' : '💪'}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.8 ? t('practice_summary_excellent') :
-                         practiceSummaryData.total > 0 && (practiceSummaryData.correct / practiceSummaryData.total) >= 0.5 ? t('practice_summary_good') : t('practice_summary_keep')}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 mb-2">
-                      <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-center">
-                        <div className="text-2xl font-bold text-green-600 dark:text-green-500">{practiceSummaryData.correct}</div>
-                        <div className="text-xs text-muted-foreground">{t('practice_summary_correct')}</div>
-                      </div>
-                      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center">
-                        <div className="text-2xl font-bold text-red-600 dark:text-red-500">{practiceSummaryData.total - practiceSummaryData.correct}</div>
-                        <div className="text-xs text-muted-foreground">{t('practice_summary_wrong')}</div>
-                      </div>
-                      <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-center">
-                        <div className="text-2xl font-bold text-primary">
-                          {practiceSummaryData.total > 0 ? Math.round((practiceSummaryData.correct / practiceSummaryData.total) * 100) : 0}%
-                        </div>
-                        <div className="text-xs text-muted-foreground">{t('practice_summary_accuracy')}</div>
-                      </div>
-                      <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 text-center">
-                        <div className="text-2xl font-bold text-accent">{Math.floor(practiceSummaryData.duration / 60)}:{String(practiceSummaryData.duration % 60).padStart(2, '0')}</div>
-                        <div className="text-xs text-muted-foreground">{t('practice_summary_duration')}</div>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => setShowPracticeSummary(false)}
-                      >
-                        {t('practice_summary_close')}
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        onClick={() => {
-                          setShowPracticeSummary(false)
-                          togglePractice()
-                        }}
-                      >
-                        {t('practice_summary_again')}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <PracticeSummaryDialog
+                  open={showPracticeSummary}
+                  onOpenChange={(open) => !open && setShowPracticeSummary(false)}
+                  data={practiceSummaryData}
+                  onPracticeAgain={togglePractice}
+                  t={t}
+                />
               )}
 
-              {/* Fretboard - 根据模式显示/隐藏，统计页面不显示 */}
-              {activeTab !== "stats" &&
+              {/* Fretboard - 根据模式显示/隐藏，统计/乐理页面不显示 */}
+              {activeTab !== "stats" && activeTab !== "theory" &&
                (activeTab !== "chord" || showChordFretboard) &&
                (activeTab !== "scale" || showScaleFretboard) &&
                (activeTab !== "interval" || showIntervalFretboard) &&
                (activeTab !== "chord_exercise" || showChordExerciseFretboard) && (
-                <Card 
-                  data-onboarding="fretboard"
-                  className="gap-0 pt-3 sm:pt-4 pb-0"
-                >
-                  <CardContent className="p-2 sm:p-4 pt-0">
-                    {/* 指板外层容器 - 统一圆角 */}
-                    <div className="relative rounded-lg overflow-hidden border border-border bg-muted/30 dark:bg-zinc-900/30">
-                      {/* 琴弦之间的虚线分隔 - 深浅主题都显示，浅色主题使用更浅的颜色*/}
-                      {Array.from({ length: STRING_COUNT - 1 }).map((_, i) => (
-                        <div
-                          key={`string-separator-${i}`}
-                          className="absolute left-0 right-0 pointer-events-none block z-10 dark:border-t dark:border-dashed dark:border-[oklch(0.35_0.02_260_/_0.8)]"
-                          style={{
-                            top: `${((i + 1) / STRING_COUNT) * 100}%`,
-                            borderTop: '1px dashed oklch(0.7 0.02 260 / 0.5)',
-                            transform: 'translateY(-1px)',
-                          }}
-                        />
-                      ))}
-
-                      {/* String labels and frets */}
-                      {STRING_TUNING.map((_, stringIndex) => {
-                        // 找音练习：检查弦是否被选中（stringIndex 0-5 对应 1-6弦）
-                        const stringNum = stringIndex + 1
-                        const isStringEnabled = activeTab !== "practice" || selectedStrings.includes(stringNum)
-
-                        return (
-                        <div key={stringIndex} className={cn(
-                          "flex items-center",
-                          !isStringEnabled && "opacity-60"
-                        )}>
-                          {/* Frets - 包含空弦（0品） */}
-                          <div className="flex-1 flex">
-                            {/* 空弦（0品） */}
-                            <button
-                              onClick={() => isStringEnabled && handleFretClick(stringIndex, 0)}
-                              disabled={!isStringEnabled}
-                              aria-label={isStringEnabled ? `${formatNoteByAccidentalSetting(getNoteAtPosition(stringIndex, 0))} ${stringIndex + 1}弦 0品` : undefined}
-                              className={cn(
-                                "flex-[0.8] h-8 sm:h-10 text-[10px] sm:text-xs font-mono font-semibold transition-all duration-150 relative",
-                                "flex items-center justify-center",
-                                isStringEnabled 
-                                  ? cn("text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(getNoteAtPosition(stringIndex, 0), stringIndex, 0))
-                                  : "text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
-                              )}
-                            >
-                              {formatNoteByAccidentalSetting(getNoteAtPosition(stringIndex, 0))}
-                            </button>
-                            
-                            {/* 1品及以上 */}
-                            {Array.from({ length: fretCount }, (_, fret) => {
-                              const actualFret = fret + 1
-                              const note = getNoteAtPosition(stringIndex, actualFret)
-                              
-                              // 确定是否显示内容
-                              // 1. 显示所有音符模式
-                              // 2. 点击后有反馈
-                              // 3. 练习模式下显示当前题目的音级
-                              const isHighlighted = highlightedFrets.has(`${stringIndex}-${actualFret}`)
-                              const showNote = showAllNotes || isHighlighted
-                              
-                              // 检查是否是当前练习题目中的音
-                              let isCurrentExerciseNote = false
-                              let exerciseDegree = ""
-                              
-                              // 和弦转换练习
-                              if (activeTab === "chord" && isPlaying) {
-                                const chords = transposedChords
-                                const currentChord = chords[currentChordIndex]
-                                if (currentChord) {
-                                  const degree = getNoteDegreeInChord(note, currentChord.root, currentChord.type)
-                                  if (degree) {
-                                    isCurrentExerciseNote = true
-                                    exerciseDegree = degree
-                                  }
-                                }
-                              }
-                              
-                              // 和弦练习
-                              if (activeTab === "chord_exercise" && isPlaying && chordExerciseTargetChord) {
-                                const degree = getNoteDegreeInChord(note, chordExerciseTargetChord.root, chordExerciseTargetChord.type)
-                                if (degree) {
-                                  isCurrentExerciseNote = true
-                                  exerciseDegree = degree
-                                }
-                              }
-                              
-                              // 音程练习
-                              if (activeTab === "interval" && isPlaying) {
-                                const noteIdx = getNoteIndex(note)
-                                const rootIdx = getNoteIndex(rootNote)
-                                // 计算音程，考虑超过一个八度的情况
-                                const rawInterval = (noteIdx - rootIdx + 12) % 12
-                                
-                                // 查找选中的音程中是否有匹配当前音程的（考虑多个八度）
-                                for (const intervalIndex of selectedIntervals) {
-                                  const intervalInfo = INTERVALS[intervalIndex]
-                                  if (!intervalInfo) continue
-                                  
-                                  // 检查音程是否匹配（考虑b2的情况）
-                                  if (intervalInfo.semitones % 12 === rawInterval) {
-                                    isCurrentExerciseNote = true
-                                    exerciseDegree = intervalInfo.symbol
-                                    break
-                                  }
-                                }
-                              }
-                              
-                              // 音阶练习
-                              if (activeTab === "scale" && isPlaying && scaleExerciseSequence.length > 0) {
-                                const noteIdx = getNoteIndex(note)
-                                const keyIdx = getNoteIndex(scaleKey)
-                                const interval = (noteIdx - keyIdx + 12) % 12
-                                if (selectedScale.notes.includes(interval)) {
-                                  const semitoneToDegree: Record<number, string> = {
-                                    0: "1", 1: "b9", 2: "2", 3: "b3", 4: "3", 5: "4",
-                                    6: "#4", 7: "5", 8: "b6", 9: "6", 10: "b7", 11: "7"
-                                  }
-                                  isCurrentExerciseNote = true
-                                  exerciseDegree = semitoneToDegree[interval]
-                                }
-                              }
-                              
-                              // 根据模式确定显示内容
-                              let displayText = formatNoteByAccidentalSetting(note)
-                              let showText = showNote || isCurrentExerciseNote
-                              
-                              // 练习模式下显示音级数字
-                              if (isCurrentExerciseNote && exerciseDegree) {
-                                displayText = exerciseDegree
-                              }
-
-                              return (
-                                <button
-                                  key={actualFret}
-                                  onClick={() => isStringEnabled && handleFretClick(stringIndex, actualFret)}
-                                  disabled={!isStringEnabled}
-                                  aria-label={isStringEnabled ? `${formatNoteByAccidentalSetting(note)} ${stringIndex + 1}弦 ${actualFret}品` : undefined}
-                                  className={cn(
-                                    "flex-1 h-8 sm:h-10 text-[8px] sm:text-[10px] font-medium transition-all duration-150 min-w-[20px] sm:min-w-[28px]",
-                                    "flex items-center justify-center relative z-10",
-                                    "border-r",
-                                    isStringEnabled
-                                      ? cn("border-border/50 dark:border-zinc-600/50", getNoteButtonColor(note, stringIndex, actualFret))
-                                      : "border-border/30 dark:border-zinc-800/50 text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
-                                  )}
-                                >
-                                  <span className={cn(
-                                    "transition-opacity duration-150",
-                                    showText ? "opacity-100" : "opacity-0"
-                                  )}>
-                                    {formatDegree(displayText)}
-                                  </span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )})}
-                    </div>
-                    
-                    {/* Fret numbers - 品数显示（泛音点位置用绿色标记） */}
-                    <div className="flex items-center py-1">
-                      <div className="flex-1 flex">
-                        {/* 0品占位（与指板空弦对齐） */}
-                        <div className="flex-[0.8]" />
-                        {/* 品数 */}
-                        {Array.from({ length: fretCount }, (_, fret) => {
-                          const actualFret = fret + 1
-                          const isMarker = FRET_MARKERS.includes(actualFret)
-                          return (
-                            <div key={actualFret} className="flex-1 flex justify-center min-w-[20px] sm:min-w-[28px]">
-                              <span className={cn(
-                                "text-[10px]",
-                                isMarker ? "text-primary font-semibold" : "text-muted-foreground"
-                              )}>
-                                {actualFret}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                  </CardContent>
-                </Card>
+                user.fretboardStyle !== 'classic' ? (
+                  <GuitarRunFretboard
+                    t={t}
+                    formatNoteByAccidentalSetting={formatNoteByAccidentalSetting}
+                    handleFretClick={handleFretClick}
+                    showAllNotes={showAllNotes}
+                    highlightedFrets={highlightedFrets}
+                    selectedStrings={selectedStrings}
+                    rootNote={rootNote}
+                    selectedIntervals={selectedIntervals}
+                    scaleKey={scaleKey}
+                    selectedScale={selectedScale}
+                    scaleExerciseSequence={scaleExerciseSequence}
+                    transposedChords={transposedChords}
+                    currentChordIndex={currentChordIndex}
+                    chordExerciseTargetChord={chordExerciseTargetChord}
+                    FRET_MARKERS={FRET_MARKERS}
+                    targetNote={targetNote}
+                    practiceAnswerMode={practiceAnswerMode}
+                    highlightedTargetPosition={highlightedTargetPosition}
+                    threeNpsTarget={threeNpsTarget}
+                    threeNpsCellKeys={threeNpsCellKeys}
+                    nextThreeNpsCells={nextThreeNpsCells}
+                    // 两套「圆点皮肤」共用同一个组件，只有外观不同（skin 决定用 .gr-* 还是 .ft-*）
+                    skin={user.fretboardStyle === 'trainer' ? 'trainer' : 'guitarrun'}
+                  />
+                ) : (
+                <PracticeFretboard
+                  t={t}
+                  formatNoteByAccidentalSetting={formatNoteByAccidentalSetting}
+                  handleFretClick={handleFretClick}
+                  getNoteButtonColor={getNoteButtonColor}
+                  showAllNotes={showAllNotes}
+                  highlightedFrets={highlightedFrets}
+                  selectedStrings={selectedStrings}
+                  rootNote={rootNote}
+                  selectedIntervals={selectedIntervals}
+                  scaleKey={scaleKey}
+                  selectedScale={selectedScale}
+                  scaleExerciseSequence={scaleExerciseSequence}
+                  transposedChords={transposedChords}
+                  currentChordIndex={currentChordIndex}
+                  chordExerciseTargetChord={chordExerciseTargetChord}
+                  targetNote={targetNote}
+                  practiceAnswerMode={practiceAnswerMode}
+                  highlightedTargetPosition={highlightedTargetPosition}
+                  threeNpsTarget={threeNpsTarget}
+                  threeNpsCellKeys={threeNpsCellKeys}
+                  nextThreeNpsCells={nextThreeNpsCells}
+                  FRET_MARKERS={FRET_MARKERS}
+                />
+                )
               )}
 
               {/* 钢琴键盘显示 - 和弦练习 */}
               {activeTab === "chord_exercise" && showChordExerciseKeyboard && (
-                <Card className="py-2">
-                  <CardContent className="p-2 sm:p-4">
-                    <SimplePianoKeyboard
-                      rootNote={chordExerciseTargetChord ? chordExerciseTargetChord.root : chordExerciseRoot}
-                      highlightedNotes={(() => {
-                        const targetChord = chordExerciseTargetChord
-                        if (targetChord) {
-                          const degrees = getChordDegrees(targetChord.type, chordExerciseLevel, getLevelOptions())
-                          const rootIdx = getNoteIndex(targetChord.root)
-                          return degrees.map(degree => {
-                            const semitone = DEGREE_TO_SEMITONE[degree]
-                            if (semitone === undefined) return null
-                            const noteIdx = (rootIdx + semitone) % 12
-                            return NOTES[noteIdx]
-                          }).filter((n): n is string => n !== null)
-                        } else {
-                          const chordType = chordExerciseTypes[0] || "Major"
-                          const degrees = getChordDegrees(chordType, chordExerciseLevel, getLevelOptions())
-                          const rootIdx = getNoteIndex(chordExerciseRoot)
-                          return degrees.map(degree => {
-                            const semitone = DEGREE_TO_SEMITONE[degree]
-                            if (semitone === undefined) return null
-                            const noteIdx = (rootIdx + semitone) % 12
-                            return NOTES[noteIdx]
-                          }).filter((n): n is string => n !== null)
-                        }
-                      })()}
-                      currentStepNote={chordExerciseTargetChord ? (() => {
-                        const degrees = getChordDegrees(chordExerciseTargetChord.type, chordExerciseLevel, getLevelOptions())
-                        const currentDegree = degrees[chordExerciseCurrentStep]
-                        if (!currentDegree) return undefined
-                        const semitone = DEGREE_TO_SEMITONE[currentDegree]
-                        if (semitone === undefined) return undefined
-                        const rootIdx = getNoteIndex(chordExerciseTargetChord.root)
-                        const noteIdx = (rootIdx + semitone) % 12
-                        return NOTES[noteIdx]
-                      })() : undefined}
-                    />
-                  </CardContent>
-                </Card>
+                <ChordExerciseKeyboard
+                  chordExerciseRoot={chordExerciseRoot}
+                  chordExerciseTypes={chordExerciseTypes}
+                  chordExerciseLevel={chordExerciseLevel}
+                  chordExerciseTargetChord={chordExerciseTargetChord}
+                  chordExerciseCurrentStep={chordExerciseCurrentStep}
+                  getLevelOptions={getLevelOptions}
+                />
               )}
 
               {/* 钢琴键盘显示 - 和弦转换练习 */}
-              {activeTab === "chord" && showChordKeyboard && (() => {
-                const chords = transposedChords
-                const currentChord = chords[currentChordIndex]
-                return currentChord ? (
-                  <Card className="py-2">
-                    <CardContent className="p-2 sm:p-4">
-                      <SimplePianoKeyboard
-                        rootNote={currentChord.root}
-                        highlightedNotes={(() => {
-                          const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
-                          const rootIdx = getNoteIndex(currentChord.root)
-                          return degrees.map(degree => {
-                            const semitone = DEGREE_TO_SEMITONE[degree]
-                            if (semitone === undefined) return null
-                            const noteIdx = (rootIdx + semitone) % 12
-                            return NOTES[noteIdx]
-                          }).filter((n): n is string => n !== null)
-                        })()}
-                        currentStepNote={(() => {
-                          const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
-                          const currentDegree = degrees[chordDegreeCurrentStep]
-                          if (!currentDegree) return undefined
-                          const semitone = DEGREE_TO_SEMITONE[currentDegree]
-                          if (semitone === undefined) return undefined
-                          const rootIdx = getNoteIndex(currentChord.root)
-                          const noteIdx = (rootIdx + semitone) % 12
-                          return NOTES[noteIdx]
-                        })()}
-                      />
-                    </CardContent>
-                  </Card>
-                ) : null
-              })()}
+              {activeTab === "chord" && showChordKeyboard && (
+                <ChordProgressionKeyboard
+                  transposedChords={transposedChords}
+                  currentChordIndex={currentChordIndex}
+                  practiceLevel={practiceLevel}
+                  chordDegreeCurrentStep={chordDegreeCurrentStep}
+                  getLevelOptions={getLevelOptions}
+                />
+              )}
 
               {/* 钢琴键盘显示 - 音阶练习 */}
               {activeTab === "scale" && showScaleKeyboard && (
-                <Card className="py-2">
-                  <CardContent className="p-2 sm:p-4">
-                    <SimplePianoKeyboard
-                      rootNote={scaleKey}
-                      highlightedNotes={(() => {
-                        const keyIdx = getNoteIndex(scaleKey)
-                        const scale = SCALE_MODES[selectedScaleCategory].find(s => s.name === selectedScale.name)
-                        if (!scale) return []
-                        return scale.notes.map(interval => {
-                          const noteIdx = (keyIdx + interval) % 12
-                          return NOTES[noteIdx]
-                        }).filter((n): n is string => n !== null)
-                      })()}
-                      currentStepNote={scaleExerciseSequence.length > 0 ? (() => {
-                        const currentDegree = scaleExerciseSequence[scaleExerciseCurrentStep]
-                        if (!currentDegree) return undefined
-                        const semitone = DEGREE_TO_SEMITONE[currentDegree]
-                        if (semitone === undefined) return undefined
-                        const keyIdx = getNoteIndex(scaleKey)
-                        const noteIdx = (keyIdx + semitone) % 12
-                        return NOTES[noteIdx]
-                      })() : undefined}
-                    />
-                  </CardContent>
-                </Card>
+                <ScaleKeyboard
+                  scaleKey={scaleKey}
+                  selectedScale={selectedScale}
+                  selectedScaleCategory={selectedScaleCategory}
+                  scaleExerciseSequence={scaleExerciseSequence}
+                  scaleExerciseCurrentStep={scaleExerciseCurrentStep}
+                />
               )}
 
-              {/* 和弦练习 - 显示要答题的和弦音级（度数） */}
-              {activeTab === "chord" && !showChordFretboard && (
-                <Card className="py-2">
-                  <CardContent className="p-0 px-4">
-                    <div className="text-center">
-                      {/* 当前题目 */}
-                      <div className="mb-3">
-                        <h3 className="text-lg font-semibold">{getCurrentChordDisplay()}</h3>
-                        <div className="flex flex-wrap justify-center gap-2 mt-2">
-                          {(() => {
-                            const chords = transposedChords
-                            const currentChord = chords[currentChordIndex]
-                            if (!currentChord) return null
-                            const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
-                            return degrees.map((degree, i) => (
-                              <Badge 
-                                key={i} 
-                                variant={i === chordDegreeCurrentStep ? "default" : "outline"}
-                                className={cn(
-                                  "text-lg px-4 py-2",
-                                  i < chordDegreeCurrentStep && "opacity-50"
-                                )}
-                              >
-                                {formatDegree(degree)}
-                              </Badge>
-                            ))
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* 下一题预览*/}
-                      {(() => {
-                        const nextChord = getNextChordDisplay()
-                        if (!nextChord) return null
-                        const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay, chordSymbols)
-                        const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
-                        return (
-                          <div className="py-1 border-t border-border/30 flex flex-col justify-center">
-                            <p className="text-[10px] text-muted-foreground mb-0.5">{t('next_chord')}</p>
-                            <div className="text-sm font-medium text-muted-foreground mb-0.5">
-                              {displayName}
-                            </div>
-                            <div className="text-xs text-muted-foreground tracking-tight">
-                              {nextChord.degrees.map(formatDegree).join(' ')}
-                            </div>
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* 和弦进行 - 显示要答题的和弦音级（度数）
+                  🚨 **不能带 `!showChordFretboard`**：显示指板是**辅助**（课程文案明确要求
+                  「先用『显示指板』辅助，再关闭它凭记忆找音」），题目区与指板必须**同屏**。
+                  带上这个条件 ⇒ 一开指板题目区就被卸载，用户不知道要弹什么，直接没法练。 */}
+              {activeTab === "chord" && (
+                <ChordDegreesDisplay
+                  t={t}
+                  transposedChords={transposedChords}
+                  currentChordIndex={currentChordIndex}
+                  practiceLevel={practiceLevel}
+                  chordDegreeCurrentStep={chordDegreeCurrentStep}
+                  getLevelOptions={getLevelOptions}
+                  getCurrentChordDisplay={getCurrentChordDisplay}
+                  getNextChordDisplay={getNextChordDisplay}
+                  nextChord={nextChord}
+                />
               )}
               
-              {/* 音阶练习 - 显示练习序列 */}
-              {activeTab === "scale" && !showScaleFretboard && (
-                <Card className="py-2">
-                  <CardContent className="p-0 px-4">
-                    <div className="text-center">
-                      {/* 当前题目 */}
-                      <div className="mb-3">
-                        {isPlaying && scaleExerciseSequence.length > 0 ? (
-                          <>
-                            <h3 className="text-lg font-semibold">{normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</h3>
-                            <div className="flex flex-wrap justify-center gap-2 mt-3">
-                              {scaleExerciseSequence.map((degree, i) => (
-                                <Badge 
-                                  key={i} 
-                                  variant={i === scaleExerciseCurrentStep ? "default" : "outline"}
-                                  className={cn(
-                                    "text-lg px-4 py-2",
-                                    i < scaleExerciseCurrentStep && "opacity-50"
-                                  )}
-                                >
-                                  {formatDegree(degree)}
-                                </Badge>
-                              ))}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-muted-foreground py-4">
-                            <p className="text-sm">{t('click_start_to_begin')}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 下一题预览*/}
-                      {isPlaying && nextScaleExerciseInfo && (
-                        <div className="py-1 border-t border-border/30 flex flex-col justify-center">
-                          <p className="text-[10px] text-muted-foreground mb-0.5">{t('next_chord')}</p>
-                          <div className="text-sm font-medium text-muted-foreground mb-0.5">
-                            {normalizeNoteName(nextScaleExerciseInfo.key)} {getScaleDisplayName(nextScaleExerciseInfo.scaleName, chordScaleDisplay)}
-                          </div>
-                          <div className="text-xs text-muted-foreground tracking-tight">
-                            {nextScaleExerciseInfo.sequence.map(formatDegree).join(' ')}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* 音阶练习 - 显示练习序列（与指板同屏，理由同上） */}
+              {activeTab === "scale" && (
+                <ScaleSequenceDisplay
+                  t={t}
+                  scaleKey={scaleKey}
+                  selectedScale={selectedScale}
+                  scaleExerciseSequence={scaleExerciseSequence}
+                  scaleExerciseCurrentStep={scaleExerciseCurrentStep}
+                  nextScaleExerciseInfo={nextScaleExerciseInfo}
+                  threeNps={threeNpsView}
+                  nextThreeNps={nextThreeNpsView}
+                />
               )}
               
-              {/* 和弦练习 - 显示当前题目 */}
-              {activeTab === "chord_exercise" && !showChordExerciseFretboard && (
-                <Card className="py-2">
-                  <CardContent className="p-0 px-4">
-                    <div className="text-center">
-                      {/* 当前题目 */}
-                      <div className="mb-3">
-                        {isPlaying && chordExerciseTargetChord ? (
-                          <>
-                            <h3 className="text-lg font-semibold">
-                              {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay, chordSymbols))}
-                            </h3>
-                            <div className="flex flex-wrap justify-center gap-2 mt-3">
-                              {chordExerciseSequence.map((degree, i) => (
-                                <Badge 
-                                  key={i} 
-                                  variant={i === chordExerciseCurrentStep ? "default" : "outline"}
-                                  className={cn(
-                                    "text-lg px-4 py-2",
-                                    i < chordExerciseCurrentStep && "opacity-50"
-                                  )}
-                                >
-                                  {formatDegree(degree)}
-                                </Badge>
-                              ))}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-muted-foreground py-4">
-                            <p className="text-sm">{t('click_start_to_begin')}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 下一题预览*/}
-                      {isPlaying && nextChordExerciseInfo && (
-                        <div className="py-1 border-t border-border/30 flex flex-col justify-center">
-                          <p className="text-[10px] text-muted-foreground mb-0.5">{t('next_chord')}</p>
-                          <div className="text-sm font-medium text-muted-foreground mb-0.5">
-                            {nextChordExerciseInfo.root} {getChordDisplayName(nextChordExerciseInfo.type, chordScaleDisplay, chordSymbols)}
-                          </div>
-                          <div className="text-xs text-muted-foreground tracking-tight">
-                            {nextChordExerciseInfo.sequence.map(formatDegree).join(' ')}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* 和弦练习 - 显示当前题目（与指板同屏，理由同上） */}
+              {activeTab === "chord_exercise" && (
+                <ChordExerciseQuestion
+                  t={t}
+                  chordExerciseTargetChord={chordExerciseTargetChord}
+                  chordExerciseSequence={chordExerciseSequence}
+                  chordExerciseCurrentStep={chordExerciseCurrentStep}
+                  nextChordExerciseInfo={nextChordExerciseInfo}
+                />
               )}
 
-              {/* 音程练习 - 显示当前题目 */}
-              {activeTab === "interval" && !showIntervalFretboard && isPlaying && currentIntervalExercise && (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center space-y-4">
-                      {/* 顶部信息栏 */}
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>{formatTime(timeLeft)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>{t('direction')}: {intervalDirection === 'up' ? '↑' : intervalDirection === 'down' ? '↓' : intervalDirection === 'either' ? '↕' : '🔀'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>{intervalCurrentQueueIndex}/{intervalExerciseQueue.length}</span>
-                        </div>
-                      </div>
-                      
-                      {/* 根音显示 */}
-                      <div className="text-6xl font-bold">
-                        {normalizeNoteName(currentIntervalExercise.rootNote)}
-                      </div>
-                      {/* 音程题目显示 */}
-                      <div className="relative">
-                        {/* 背景：所有选中的音符*/}
-                        <div className="text-sm text-muted-foreground mb-2">
-                          {currentIntervalExercise.allIntervals.map(i => formatDegree(i.symbol)).join(' ')}
-                        </div>
-                        {/* 当前题目 */}
-                        <div className="text-4xl font-bold text-primary">
-                          {currentIntervalExercise.currentIntervalDisplay.split(' ').map((interval, idx) => (
-                            <span 
-                              key={idx}
-                              className={cn(
-                                "mx-2",
-                                currentIntervalExercise.completedIntervals.includes(idx) && "text-muted-foreground line-through"
-                              )}
-                            >
-                              {formatDegree(interval)}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* 目标音符提示（可选） */}
-                      {currentIntervalExercise.answered && (
-                        <div className="text-lg text-green-600">
-                          {currentIntervalExercise.targetNote}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* 音程练习 - 显示当前题目（与指板同屏，理由同上） */}
+              {activeTab === "interval" && isPlaying && currentIntervalExercise && (
+                <IntervalQuestion
+                  t={t}
+                  currentIntervalExercise={currentIntervalExercise!}
+                  rootNote={rootNote}
+                  targetNote={targetNote}
+                  intervalDirection={intervalDirection}
+                  intervalExerciseQueue={intervalExerciseQueue}
+                  intervalCurrentQueueIndex={intervalCurrentQueueIndex}
+                  timeLeft={timeLeft}
+                  formatTime={formatTime}
+                />
               )}
 
               {/* 统计页面 */}
               {activeTab === "stats" && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-primary" />
-                        {t('nav_stats')}
-                      </CardTitle>
-                      <div className="flex gap-1 flex-wrap">
-                        {[
-                          { key: 'today', label: t('stats_today') },
-                          { key: 'week', label: t('stats_week') },
-                          { key: 'month', label: t('stats_month') },
-                          { key: 'total', label: t('stats_total') },
-                        ].map((range) => (
-                          <Button
-                            key={range.key}
-                            variant={statsTimeRange === range.key ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setStatsTimeRange(range.key as StatsTimeRange)}
-                            className="text-xs h-7 px-2 flex-1 sm:flex-none"
-                          >
-                            {range.label}
-                          </Button>
-                        ))}
-                        <div className="flex gap-1 ml-auto">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-7 px-2"
-                            onClick={async () => {
-                              try {
-                                const { getAllPracticeStats } = await import('@/lib/stats-api')
-                                const { exportPracticeData } = await import('@/lib/export-utils')
-                                const allStats = await getAllPracticeStats()
-                                const result = await exportPracticeData(allStats, { format: 'csv', language: language as 'zh-CN' | 'en' })
-                                if (result.success) {
-                                  toast.success(result.path ? `${t('export_success')} ${result.path}` : t('export_success'))
-                                } else if (result.error !== 'cancelled') {
-                                  toast.error(t('export_failed'))
-                                }
-                              } catch (e) {
-                                toast.error(t('export_failed'))
-                              }
-                            }}
-                          >
-                            <Download className="h-3 w-3 mr-1" />
-                            CSV
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-7 px-2"
-                            onClick={async () => {
-                              try {
-                                const { getAllPracticeStats } = await import('@/lib/stats-api')
-                                const { exportPracticeData } = await import('@/lib/export-utils')
-                                const allStats = await getAllPracticeStats()
-                                const result = await exportPracticeData(allStats, { format: 'pdf', language: language as 'zh-CN' | 'en' })
-                                if (result.success) {
-                                  toast.success(result.path ? `${t('export_success')} ${result.path}` : t('export_success'))
-                                } else if (result.error !== 'cancelled') {
-                                  toast.error(t('export_failed'))
-                                }
-                              } catch (e) {
-                                toast.error(t('export_failed'))
-                              }
-                            }}
-                          >
-                            <Download className="h-3 w-3 mr-1" />
-                            PDF
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-7 px-2"
-                            onClick={async () => {
-                              try {
-                                const { getAllPracticeStats } = await import('@/lib/stats-api')
-                                const { exportPracticeData } = await import('@/lib/export-utils')
-                                const allStats = await getAllPracticeStats()
-                                const result = await exportPracticeData(allStats, { format: 'json', language: language as 'zh-CN' | 'en' })
-                                if (result.success) {
-                                  toast.success(result.path ? `${t('export_success')} ${result.path}` : t('export_success'))
-                                } else if (result.error !== 'cancelled') {
-                                  toast.error(t('export_failed'))
-                                }
-                              } catch (e) {
-                                toast.error(t('export_failed'))
-                              }
-                            }}
-                          >
-                            <Download className="h-3 w-3 mr-1" />
-                            JSON
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-7 px-2"
-                            onClick={async () => {
-                              try {
-                                const { getAllPracticeStats } = await import('@/lib/stats-api')
-                                const { exportPracticeData } = await import('@/lib/export-utils')
-                                const allStats = await getAllPracticeStats()
-                                const result = await exportPracticeData(allStats, { format: 'html', language: language as 'zh-CN' | 'en' })
-                                if (result.success) {
-                                  toast.success(result.path ? `${t('export_success')} ${result.path}` : t('export_success'))
-                                } else if (result.error !== 'cancelled') {
-                                  toast.error(t('export_failed'))
-                                }
-                              } catch (e) {
-                                toast.error(t('export_failed'))
-                              }
-                            }}
-                          >
-                            <Download className="h-3 w-3 mr-1" />
-                            HTML
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {(() => {
-                      const stats = getStatsByTimeRange(statsTimeRange)
-                      const practiceTypeNames: Record<PracticeType, string> = {
-                        pitch_finding: t('nav_practice'),
-                        scale: t('nav_scale'),
-                        chord_exercise: t('nav_chord_exercise'),
-                        interval: t('nav_interval'),
-                        chord_progression: t('nav_chord')
-                      }
-                      
-                      return (
-                        <>
-                          {/* 总练习次数*/}
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                            <div className="bg-primary/5 rounded-lg p-2 sm:p-3 text-center">
-                              <div className="text-xl sm:text-2xl font-bold text-primary">{stats.count}</div>
-                              <div className="text-[10px] sm:text-xs text-muted-foreground">{t('stats_total_practices')}</div>
-                            </div>
-                            {(Object.keys(stats.byType) as PracticeType[]).map(type => (
-                              <div key={type} className="bg-card/50 rounded-lg p-2 sm:p-3 text-center border border-border/30">
-                                <div className="text-lg sm:text-xl font-semibold">{stats.byType[type] || 0}</div>
-                                <div className="text-[10px] sm:text-xs text-muted-foreground">{practiceTypeNames[type]}</div>
-                              </div>
-                            ))}
-                          </div>
-                          
-                          {/* 详细统计 - 找音练习和音程练习不显示详细分类 */}
-                          <div className="space-y-3">
-                            <h4 className="text-sm font-medium text-muted-foreground">{t('stats_detail_breakdown')}</h4>
-                            {(Object.keys(stats.byDetail) as PracticeType[])
-                              .filter(type => type !== 'pitch_finding' && type !== 'interval')
-                              .map(type => {
-                                const details = stats.byDetail[type]
-                                if (!details || details.length === 0) return null
-                                
-                                return (
-                                  <div key={type} className="bg-card/30 rounded-lg p-3 border border-border/30">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <span className="text-sm font-medium">{practiceTypeNames[type]}</span>
-                                      <span className="text-xs text-muted-foreground">{t('stats_count')}: {stats.byType[type] || 0}</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {details
-                                        .sort((a, b) => b.count - a.count)
-                                        .map(detail => (
-                                          <span
-                                            key={detail.name}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full"
-                                          >
-                                            {detail.name}
-                                            <span className="bg-primary/20 px-1 rounded text-[10px]">{detail.count}</span>
-                                          </span>
-                                        ))}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                          </div>
-                          
-                          {/* 近期练习记录列表 */}
-                          <div className="space-y-2">
-                            <h4 className="text-sm font-medium text-muted-foreground">{t('stats_recent_records')}</h4>
-                            {recentRecords.length === 0 ? (
-                              <div className="text-center py-4 text-xs text-muted-foreground">
-                                {t('stats_recent_empty')}
-                              </div>
-                            ) : (
-                              <div className="space-y-1 max-h-80 overflow-y-auto">
-                                {recentRecords.map((rec, idx) => {
-                                  const dt = parseDbTimestamp(rec.created_at || rec.date)
-                                  const dateStr = isNaN(dt.getTime()) ? '-' : dbTimestampToLocalDate(rec.created_at || rec.date)
-                                  const timeStr = isNaN(dt.getTime()) ? '-' : dt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
-                                  // 提取练习项目名（兼容 "练习项目: xxx" 格式）
-                                  const notesStr = rec.notes || ''
-                                  const m = notesStr.match(/练习项目[:：]\s*(.+)/)
-                                  const detailName = m ? m[1].trim() : (notesStr.trim() || '-')
-                                  // 类型中文名映射
-                                  const typeDisplayMap: Record<string, string> = {
-                                    'pitch_finding': t('nav_practice'),
-                                    'find_note': t('nav_practice'),
-                                    '音高识别': t('nav_practice'),
-                                    '找音练习': t('nav_practice'),
-                                    'scale': t('nav_scale'),
-                                    '音阶练习': t('nav_scale'),
-                                    'chord_exercise': t('nav_chord_exercise'),
-                                    '和弦练习': t('nav_chord_exercise'),
-                                    'interval': t('nav_interval'),
-                                    '音程练习': t('nav_interval'),
-                                    'chord_progression': t('nav_chord'),
-                                    '和弦进行': t('nav_chord'),
-                                    '练习': t('nav_practice'),
-                                  }
-                                  const typeDisplay = typeDisplayMap[rec.exercise_type || rec.exerciseType || ''] || rec.exercise_type || rec.exerciseType || '-'
-                                  const acc = rec.accuracy != null ? Math.round(rec.accuracy <= 1 ? rec.accuracy * 100 : rec.accuracy) : null
-                                  return (
-                                    <div key={rec.id ?? idx} className="flex items-center justify-between gap-2 px-2 py-1.5 bg-card/30 rounded border border-border/20 text-xs">
-                                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                                        <span className="text-muted-foreground tabular-nums shrink-0">{dateStr} {timeStr}</span>
-                                        <span className="text-primary shrink-0">{typeDisplay}</span>
-                                        <span className="truncate text-muted-foreground">{detailName}</span>
-                                      </div>
-                                      <div className="flex items-center gap-2 shrink-0 text-muted-foreground tabular-nums">
-                                        {acc != null && <span>{acc}%</span>}
-                                        {rec.duration ? <span>{rec.duration}{t('stats_duration_sec')}</span> : null}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-                          
-                          {stats.count === 0 && (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                              <p className="text-sm">{t('stats_no_data')}</p>
-                              <p className="text-xs mt-1">{t('stats_start_practicing')}</p>
-                            </div>
-                          )}
-                        </>
-                      )
-                    })()}
-                  </CardContent>
-                </Card>
+                <StatsPanel
+                  t={t}
+                  statsTimeRange={statsTimeRange}
+                  onStatsTimeRangeChange={setStatsTimeRange}
+                  getStatsByTimeRange={getStatsByTimeRange}
+                  recentRecords={recentRecords}
+                />
+              )}
+
+              {/* 指板掌握度热力图（逐位置统计） */}
+              {activeTab === "stats" && (
+                <PositionHeatmap instrument={user.instrument} fretCount={fretCount} language={language} />
+              )}
+
+              {/* 乐理知识面板 */}
+              {activeTab === "theory" && (
+                <TheoryPanel instrument={user.instrument} fretCount={fretCount} language={language} fretMarkers={FRET_MARKERS} />
               )}
             </div>
           </main>
@@ -13347,13 +5187,13 @@ export default function FretMasterPage() {
 
         {/* Mobile bottom navigation - 优化显示 */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border/50 p-1 pb-safe z-50 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]" role="tablist" aria-label={t('nav_practice')}>
-          <div className="flex justify-around">
+          <div className="flex justify-around overflow-x-auto">
             {bottomNavItems.map((mode) => (
               <button
                 key={mode.id}
                 onClick={() => handleTabChange(mode.id)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-[3rem]",
+                  "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg flex-1 min-w-[2.75rem]",
                   activeTab === mode.id
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground"
@@ -13364,7 +5204,7 @@ export default function FretMasterPage() {
                 aria-label={mode.label}
               >
                 <mode.Icon className="h-5 w-5" />
-                <span className="text-[10px] font-medium truncate max-w-full">{mode.shortLabel}</span>
+                <span className="text-2xs font-medium truncate max-w-full">{mode.shortLabel}</span>
               </button>
             ))}
           </div>
@@ -13372,1214 +5212,112 @@ export default function FretMasterPage() {
 
         {/* 全屏模式覆盖层 */}
         {isFullscreen && (
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label={t('fullscreen_exit_hint')}
-            className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center overflow-auto cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            style={{ margin: 0, padding: 0, width: '100vw', height: '100vh', top: 0, left: 0, right: 0, bottom: 0 }}
-            onClick={() => setFullscreenMode(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                setFullscreenMode(false)
-              }
-            }}
-          >
-            <div
-              className="text-center p-8 min-w-[400px] min-h-[300px] flex flex-col items-center justify-center cursor-default"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* 根据当前练习模式显示不同内容 */}
-              {activeTab === "practice" && isPlaying && (
-                <div className="space-y-8">
-                  {practiceAnswerMode === "fretboard" ? (
-                    <>
-                      <div className="text-8xl font-bold text-primary">{formatNoteByAccidentalSetting(targetNote)}</div>
-                      <div className="text-2xl text-muted-foreground">{t('target_note')}</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-6xl font-bold text-primary">{t('target_note')}</div>
-                      <div className="text-2xl text-muted-foreground">{t('practice_mode_description_identify')}</div>
-                    </>
-                  )}
-                  {currentPracticeSuggestion && (
-                    <div className="mt-4 p-4 bg-card/50 rounded-lg border border-border/30 max-w-md">
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium text-primary">{t('practice_suggestion_title')}:</span> {currentPracticeSuggestion}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {activeTab === "chord" && (
-                <div className="space-y-8">
-                  <div className="text-7xl font-bold text-primary">{getCurrentChordDisplay()}</div>
-                  <div className="flex flex-wrap justify-center gap-4">
-                    {(() => {
-                      const chords = transposedChords
-                      const currentChord = chords[currentChordIndex]
-                      if (!currentChord) return null
-                      const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
-                      return degrees.map((degree, i) => (
-                        <span key={i} className="text-5xl font-bold text-primary">{formatDegree(degree)}</span>
-                      ))
-                    })()}
-                  </div>
-                  {/* 下一题预览*/}
-                  {(() => {
-                    const nextChord = getNextChordDisplay()
-                    if (!nextChord) return null
-                    const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay, chordSymbols)
-                    const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
-                    return (
-                      <div className="pt-8 mt-8 border-t border-border/30">
-                        <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
-                        <div className="text-xl font-medium text-muted-foreground mb-1">{displayName}</div>
-                        <div className="text-lg text-muted-foreground/70">{nextChord.degrees.map(formatDegree).join(' ')}</div>
-                      </div>
-                    )
-                  })()}
-                </div>
-              )}
-              
-              {activeTab === "chord_exercise" && isPlaying && chordExerciseTargetChord && (
-                <div className="space-y-8">
-                  <div className="text-7xl font-bold text-primary">
-                    {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay, chordSymbols))}
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-4">
-                    {chordExerciseSequence.map((degree, i) => (
-                      <span 
-                        key={i} 
-                        className={cn(
-                          "text-5xl font-bold",
-                          i === chordExerciseCurrentStep ? "text-primary" : "text-muted-foreground",
-                          i < chordExerciseCurrentStep && "opacity-30"
-                        )}
-                      >
-                        {formatDegree(degree)}
-                      </span>
-                    ))}
-                  </div>
-                  {/* 下一题预览*/}
-                  {nextChordExerciseInfo && (
-                    <div className="pt-8 mt-8 border-t border-border/30">
-                      <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
-                      <div className="text-xl font-medium mb-1">
-                        {nextChordExerciseInfo.root} {getChordDisplayName(nextChordExerciseInfo.type, chordScaleDisplay, chordSymbols)}
-                      </div>
-                      <div className="text-lg text-muted-foreground/70">
-                        {nextChordExerciseInfo.sequence.map(formatDegree).join(' ')}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {activeTab === "scale" && isPlaying && scaleExerciseSequence.length > 0 && (
-                <div className="space-y-6">
-                  <div className="text-6xl font-bold text-primary">{normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</div>
-                  <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
-                    {scaleExerciseSequence.map((degree, i) => (
-                      <span 
-                        key={i} 
-                        className={cn(
-                          "text-4xl font-bold",
-                          i === scaleExerciseCurrentStep ? "text-primary" : "text-muted-foreground",
-                          i < scaleExerciseCurrentStep && "opacity-30"
-                        )}
-                      >
-                        {formatDegree(degree)}
-                      </span>
-                    ))}
-                  </div>
-                  {/* 下一题预览*/}
-                  {nextScaleExerciseInfo && (
-                    <div className="pt-6 mt-6 border-t border-border/30">
-                      <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
-                      <div className="text-xl font-medium mb-1">
-                        {normalizeNoteName(nextScaleExerciseInfo.key)} {getScaleDisplayName(nextScaleExerciseInfo.scaleName, chordScaleDisplay)}
-                      </div>
-                      <div className="text-lg text-muted-foreground/70">
-                        {nextScaleExerciseInfo.sequence.map(formatDegree).join(' ')}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {activeTab === "interval" && isPlaying && currentIntervalExercise && (
-                <div className="space-y-8">
-                  <div className="text-8xl font-bold text-primary">{normalizeNoteName(currentIntervalExercise.rootNote)}</div>
-                  <div className="text-6xl font-bold">
-                    {currentIntervalExercise.currentIntervalDisplay.split(' ').map((interval, idx) => (
-                      <span 
-                        key={idx}
-                        className={cn(
-                          "mx-4",
-                          currentIntervalExercise.completedIntervals.includes(idx) && "text-muted-foreground line-through"
-                        )}
-                      >
-                        {formatDegree(interval)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 全屏模式指板 - 按 ↑ 显示，按 ↓ 隐藏 */}
-              {isPlaying && (() => {
-                const showFb = activeTab === 'practice' ? showFretboard :
-                  activeTab === 'interval' ? showIntervalFretboard :
-                  activeTab === 'chord' ? showChordFretboard :
-                  activeTab === 'chord_exercise' ? showChordExerciseFretboard :
-                  activeTab === 'scale' ? showScaleFretboard : false
-                if (!showFb) return null
-                return (
-                  <div className="w-full max-w-5xl mt-8 px-4">
-                    {/* 指板外层容器 */}
-                    <div className="relative rounded-lg overflow-hidden border border-border bg-muted/30 dark:bg-zinc-900/30">
-                      {/* 弦分隔线 */}
-                      {Array.from({ length: STRING_COUNT - 1 }).map((_, i) => (
-                        <div
-                          key={`fs-sep-${i}`}
-                          className="absolute left-0 right-0 pointer-events-none block z-10 border-t border-dashed border-border/60"
-                          style={{
-                            top: `${((i + 1) / STRING_COUNT) * 100}%`,
-                            transform: 'translateY(-1px)',
-                          }}
-                        />
-                      ))}
-                      {/* 弦 × 品 */}
-                      {STRING_TUNING.map((_, stringIndex) => {
-                        const stringNum = stringIndex + 1
-                        const isStringEnabled = activeTab !== "practice" || selectedStrings.includes(stringNum)
-                        return (
-                          <div key={stringIndex} className={cn("flex items-center", !isStringEnabled && "opacity-60")}>
-                            <div className="flex-1 flex">
-                              {/* 0品（空弦） */}
-                              <button
-                                onClick={() => isStringEnabled && handleFretClick(stringIndex, 0)}
-                                disabled={!isStringEnabled}
-                                className={cn(
-                                  "flex-1 h-8 sm:h-10 text-xs sm:text-sm font-mono font-semibold transition-all duration-150 flex items-center justify-center min-w-[24px] sm:min-w-[32px]",
-                                  isStringEnabled
-                                    ? cn("text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(getNoteAtPosition(stringIndex, 0), stringIndex, 0))
-                                    : "text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
-                                )}
-                              >
-                                {formatNoteByAccidentalSetting(getNoteAtPosition(stringIndex, 0))}
-                              </button>
-                              {/* 1品及以上 */}
-                              {Array.from({ length: fretCount }, (_, fret) => {
-                                const actualFret = fret + 1
-                                const note = getNoteAtPosition(stringIndex, actualFret)
-                                const isHighlighted = highlightedFrets.has(`${stringIndex}-${actualFret}`)
-                                const showNote = showAllNotes || isHighlighted
-                                return (
-                                  <button
-                                    key={actualFret}
-                                    onClick={() => isStringEnabled && handleFretClick(stringIndex, actualFret)}
-                                    disabled={!isStringEnabled}
-                                    className={cn(
-                                      "flex-1 h-8 sm:h-10 text-[10px] sm:text-xs font-medium transition-all duration-150 min-w-[24px] sm:min-w-[32px] flex items-center justify-center relative z-10 border-r",
-                                      isStringEnabled
-                                        ? cn("border-border/50 dark:border-zinc-600/50", getNoteButtonColor(note, stringIndex, actualFret))
-                                        : "border-border/30 dark:border-zinc-800/50 text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
-                                    )}
-                                  >
-                                    <span className={cn("transition-opacity duration-150", showNote ? "opacity-100" : "opacity-0")}>
-                                      {formatNoteByAccidentalSetting(note)}
-                                    </span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    {/* 品数显示 */}
-                    <div className="flex items-center py-1">
-                      <div className="flex-1 flex">
-                        <div className="flex-1 min-w-[24px] sm:min-w-[32px]" />
-                        {Array.from({ length: fretCount }, (_, fret) => {
-                          const actualFret = fret + 1
-                          const isMarker = FRET_MARKERS.includes(actualFret)
-                          return (
-                            <div key={actualFret} className="flex-1 flex justify-center min-w-[24px] sm:min-w-[32px]">
-                              <span className={cn("text-xs", isMarker ? "text-primary font-semibold" : "text-muted-foreground")}>
-                                {actualFret}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* 提示文字 */}
-              <div className="mt-12 text-sm text-muted-foreground">
-                {t('click_to_exit_fullscreen')}
-              </div>
-            </div>
-          </div>
+          <FullscreenOverlay
+            t={t}
+            setFullscreenMode={setFullscreenMode}
+            formatNoteByAccidentalSetting={formatNoteByAccidentalSetting}
+            targetNote={targetNote}
+            practiceAnswerMode={practiceAnswerMode}
+            currentPracticeSuggestion={currentPracticeSuggestion}
+            selectedStrings={selectedStrings}
+            showAllNotes={showAllNotes}
+            highlightedFrets={highlightedFrets}
+            currentChordIndex={currentChordIndex}
+            practiceLevel={practiceLevel}
+            transposedChords={transposedChords}
+            getCurrentChordDisplay={getCurrentChordDisplay}
+            getNextChordDisplay={getNextChordDisplay}
+            getLevelOptions={getLevelOptions}
+            chordExerciseTargetChord={chordExerciseTargetChord}
+            chordExerciseSequence={chordExerciseSequence}
+            chordExerciseCurrentStep={chordExerciseCurrentStep}
+            nextChordExerciseInfo={nextChordExerciseInfo}
+            scaleExerciseSequence={scaleExerciseSequence}
+            scaleExerciseCurrentStep={scaleExerciseCurrentStep}
+            scaleKey={scaleKey}
+            selectedScale={selectedScale}
+            nextScaleExerciseInfo={nextScaleExerciseInfo}
+            currentIntervalExercise={currentIntervalExercise}
+            showFretboard={showFretboard}
+            showIntervalFretboard={showIntervalFretboard}
+            showChordFretboard={showChordFretboard}
+            showChordExerciseFretboard={showChordExerciseFretboard}
+            showScaleFretboard={showScaleFretboard}
+            handleFretClick={handleFretClick}
+            getNoteButtonColor={getNoteButtonColor}
+            FRET_MARKERS={FRET_MARKERS}
+            highlightedTargetPosition={highlightedTargetPosition}
+            rootNote={rootNote}
+            selectedIntervals={selectedIntervals}
+            threeNpsTarget={threeNpsTarget}
+            threeNpsCellKeys={threeNpsCellKeys}
+            nextThreeNpsCells={nextThreeNpsCells}
+          />
         )}
 
         {/* 快捷键帮助对话框 */}
-        <Dialog open={showShortcutsHelp} onOpenChange={setShowShortcutsHelp}>
-          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Keyboard className="h-5 w-5" />
-                {t('shortcuts_title')}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                {t('shortcuts_title')}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6 py-4">
-              {/* 全局快捷键*/}
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  {t('shortcuts_global')}
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_esc')}</kbd>
-                    <span className="text-sm">{t('shortcuts_esc_desc')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_number')}</kbd>
-                    <span className="text-sm">{t('shortcuts_number_desc')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_f')}</kbd>
-                    <span className="text-sm">{t('shortcuts_f_desc')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_m')}</kbd>
-                    <span className="text-sm">{t('shortcuts_m_desc')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_s')}</kbd>
-                    <span className="text-sm">{t('shortcuts_s_desc')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_p')}</kbd>
-                    <span className="text-sm">{t('shortcuts_p_desc')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_h')}</kbd>
-                    <span className="text-sm">{t('shortcuts_h_desc')}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <Separator />
-              
-              {/* 练习模式快捷键*/}
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  {t('shortcuts_practice')}
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_space')}</kbd>
-                    <span className="text-sm">{t('shortcuts_space_desc')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_up')}</kbd>
-                    <span className="text-sm">{t('shortcuts_up_desc')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{t('shortcuts_down')}</kbd>
-                    <span className="text-sm">{t('shortcuts_down_desc')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button onClick={() => setShowShortcutsHelp(false)} variant="outline" size="sm">
-                {t('shortcuts_close')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ShortcutsHelpDialog
+          open={showShortcutsHelp}
+          onOpenChange={setShowShortcutsHelp}
+          t={t}
+        />
 
         {/* 乐曲选择弹窗 */}
-        <Dialog open={showSongSelector} onOpenChange={setShowSongSelector}>
-          <DialogContent className="max-w-3xl max-h-[85vh] p-0 overflow-hidden">
-            <DialogHeader className="px-6 py-4 border-b">
-              <div className="flex items-center justify-between">
-                <DialogTitle className="flex items-center gap-2">
-                  <ListMusic className="h-5 w-5" />
-                  {t('select_song')}
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                  {t('select_song')}
-                </DialogDescription>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{t('sort_label')}</span>
-                  <Select value={songSortBy} onValueChange={(v) => setSongSortBy(v as typeof songSortBy)}>
-                    <SelectTrigger className="h-8 text-xs w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="title-asc" className="text-xs">{t('sort_title_asc')}</SelectItem>
-                      <SelectItem value="title-desc" className="text-xs">{t('sort_title_desc')}</SelectItem>
-                      <SelectItem value="style-asc" className="text-xs">{t('sort_style_asc')}</SelectItem>
-                      <SelectItem value="style-desc" className="text-xs">{t('sort_style_desc')}</SelectItem>
-                      <SelectItem value="composer-asc" className="text-xs">{t('sort_composer_asc')}</SelectItem>
-                      <SelectItem value="composer-desc" className="text-xs">{t('sort_composer_desc')}</SelectItem>
-                      <SelectItem value="year-asc" className="text-xs">{t('sort_year_asc')}</SelectItem>
-                      <SelectItem value="year-desc" className="text-xs">{t('sort_year_desc')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </DialogHeader>
-
-            {/* 搜索框*/}
-            <div className="px-6 py-3 border-b bg-muted/30">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder={t('search_song_placeholder')}
-                  value={songSearchQuery}
-                  onChange={(e) => setSongSearchQuery(e.target.value)}
-                  className="w-full h-9 pl-9 pr-4 text-sm bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">🔍</span>
-              </div>
-            </div>
-
-            {/* 乐曲列表 */}
-            <div className="flex-1 overflow-y-auto max-h-[300px]">
-              {groupedSongs.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  {t('no_songs_found')}
-                </div>
-              ) : (
-                <div className="px-4 py-2">
-                  {groupedSongs.map(({ group, songs }) => (
-                    <div key={group}>
-                      <div className="flex items-center py-1 bg-background/95 backdrop-blur z-10 sticky top-0">
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">
-                          {group}
-                        </h4>
-                      </div>
-                      {songs.map((song, songIndex) => (
-                        <div
-                          key={`${song.name}-${songIndex}`}
-                          className={cn(
-                            "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors",
-                            selectedSong.name === song.name
-                              ? "bg-primary/10 border border-primary/30"
-                              : "hover:bg-muted/50 border border-transparent"
-                          )}
-                          onClick={() => {
-                            setSelectedSong(song)
-                            if (song.key) {
-                              const songKey = song.key
-                              const notePart = songKey.endsWith('m') ? songKey.slice(0, -1) : songKey
-                              
-                              let normalizedKey = notePart
-                              if (notePart.includes('b') && !notePart.includes('#')) {
-                                const flatIndex = findNoteIndexInArray(notePart, NOTES_FLAT)
-                                if (flatIndex !== -1) {
-                                  normalizedKey = NOTES[flatIndex]
-                                }
-                              }
-                              
-                              setProgressionKey(normalizedKey)
-                              setIsMinor(songKey.endsWith('m'))
-                            }
-                            setCustomChords([])
-                            setCurrentChordIndex(0)
-                            setShowSongSelector(false)
-                          }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm truncate">{song.name}</div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                              <span>{song.composer || t('unknown')}</span>
-                              <span>·</span>
-                              <span>{song.year || t('unknown')}</span>
-                              <span>·</span>
-                              <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                                {song.style || t('jazz_standard')}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleSongFavorite(song.name)
-                              }}
-                            >
-                              {isSongFavorite(song.name) ? (
-                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              ) : (
-                                <Star className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedSongInfo(song)
-                                setShowSongInfoDialog(true)
-                              }}
-                            >
-                              <Info className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <DialogFooter className="px-6 py-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowCustomSongEditor(true)
-                }}
-              >
-                <Edit3 className="h-4 w-4 mr-2" />
-                {language === 'zh-CN' ? '自定义歌曲编辑器' : 'Song Editor'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedSong({ name: '__custom__', composer: '', year: '', style: '', tempo: '', key: 'C', chords: [] })
-                  setCurrentChordIndex(0)
-                  setShowSongSelector(false)
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {t('chord_custom')}
-              </Button>
-              <Button variant="outline" onClick={() => setShowSongSelector(false)}>
-                {t('btn_cancel')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <SongSelectorDialog
+          open={showSongSelector}
+          onOpenChange={setShowSongSelector}
+          groups={groupedSongs}
+          sortBy={songSortBy}
+          onSortByChange={setSongSortBy}
+          searchQuery={songSearchQuery}
+          onSearchQueryChange={setSongSearchQuery}
+          selectedSongName={selectedSong.name}
+          onSelectSong={handleSelectSong}
+          onShowSongInfo={handleShowSongInfo}
+          onEditCustomSong={handleEditCustomSong}
+          onCreateCustomSong={handleCreateCustomSong}
+          t={t}
+        />
 
         {/* 乐曲信息弹窗 */}
-        <Dialog open={showSongInfoDialog} onOpenChange={setShowSongInfoDialog}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Music className="h-5 w-5" />
-                {selectedSongInfo?.name}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                {selectedSongInfo?.name}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedSongInfo && (
-              <div className="space-y-4 py-4">
-                {/* 基本信息 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{t('song_composer')}</Label>
-                    <p className="text-sm font-medium">{selectedSongInfo.composer || t('unknown')}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{t('song_year')}</Label>
-                    <p className="text-sm font-medium">{selectedSongInfo.year || t('unknown')}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{t('song_style')}</Label>
-                    <p className="text-sm font-medium">{selectedSongInfo.style || t('jazz_standard')}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{t('song_tempo')}</Label>
-                    <p className="text-sm font-medium">{selectedSongInfo.tempo || t('unknown')}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{t('song_key')}</Label>
-                    <p className="text-sm font-medium">{selectedSongInfo.key || t('unknown')}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{t('chord_count')}</Label>
-                    <p className="text-sm font-medium">{selectedSongInfo.chords?.length || 0} {t('chords')}</p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* 和弦进行 */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">{t('chord_progression')}</Label>
-                  <div className="p-3 bg-muted/30 rounded-lg">
-                    <p className="text-sm font-mono leading-relaxed">
-                      {selectedSongInfo.chords?.join(' - ') || t('no_chords')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button
-                onClick={() => {
-                  if (selectedSongInfo) {
-                    setSelectedSong(selectedSongInfo)
-                    if (selectedSongInfo.key) {
-                      setProgressionKey(selectedSongInfo.key)
-                    }
-                    setCustomChords([])
-                    setCurrentChordIndex(0)
-                  }
-                  setShowSongInfoDialog(false)
-                  setShowSongSelector(false)
-                }}
-              >
-                <Check className="h-4 w-4 mr-2" />
-                {t('select_this_song')}
-              </Button>
-              <Button variant="outline" onClick={() => setShowSongInfoDialog(false)}>
-                {t('btn_close')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <SongInfoDialog
+          open={showSongInfoDialog}
+          onOpenChange={setShowSongInfoDialog}
+          song={selectedSongInfo}
+          onConfirm={handleSongInfoConfirm}
+          t={t}
+        />
 
         {/* 练习模式选择弹窗 */}
-        <Dialog open={showLevelSelector} onOpenChange={setShowLevelSelector}>
-          <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden">
-            <DialogHeader className="px-6 py-4 border-b">
-              <DialogTitle className="flex items-center gap-2">
-                <Layers className="h-5 w-5" />
-                {t('practice_level')}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                {t('practice_level')}
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* 练习模式列表 */}
-            <ScrollArea className="max-h-[60vh]">
-              <div className="p-4 space-y-4">
-                {/* 基础练习 */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {t('practice_category_basic')}
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {PRACTICE_LEVELS.map((level) => (
-                      <div
-                        key={level.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                          practiceLevel === level.id
-                            ? "bg-primary/10 border-primary/30"
-                            : "hover:bg-muted/50 border-transparent"
-                        )}
-                        onClick={() => {
-                          setPracticeLevel(level.id)
-                          setShowLevelSelector(false)
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {t(`level_desc_${level.id.replace(/-/g, '_')}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleLevelFavorite(level.id)
-                            }}
-                          >
-                            {isLevelFavorite(level.id) ? (
-                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            ) : (
-                              <Star className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
-                              setSelectedLevelInfo(fullLevel || null)
-                              setShowLevelInfoDialog(true)
-                            }}
-                          >
-                            <Info className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 四和弦音 */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {t('level_group_four_chord_tones')}
-                  </h4>
-                  <div className="grid grid-cols-1 gap-2">
-                    {FOUR_CHORD_TONES.map((level) => (
-                      <div
-                        key={level.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                          practiceLevel === level.id
-                            ? "bg-primary/10 border-primary/30"
-                            : "hover:bg-muted/50 border-transparent"
-                        )}
-                        onClick={() => {
-                          setPracticeLevel(level.id)
-                          setShowLevelSelector(false)
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
-                            setSelectedLevelInfo(fullLevel || null)
-                            setShowLevelInfoDialog(true)
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 旋律结构 - R到3th */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {t('practice_category_melodic_r5')}
-                  </h4>
-                  <div className="grid grid-cols-1 gap-2">
-                    {MELODIC_STRUCTURE_R_TO_5TH.map((level) => (
-                      <div
-                        key={level.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                          practiceLevel === level.id
-                            ? "bg-primary/10 border-primary/30"
-                            : "hover:bg-muted/50 border-transparent"
-                        )}
-                        onClick={() => {
-                          setPracticeLevel(level.id)
-                          setShowLevelSelector(false)
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
-                            setSelectedLevelInfo(fullLevel || null)
-                            setShowLevelInfoDialog(true)
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 旋律结构 - 5th到7th */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {t('practice_category_melodic_59')}
-                  </h4>
-                  <div className="grid grid-cols-1 gap-2">
-                    {MELODIC_STRUCTURE_5TH_TO_9TH.map((level) => (
-                      <div
-                        key={level.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                          practiceLevel === level.id
-                            ? "bg-primary/10 border-primary/30"
-                            : "hover:bg-muted/50 border-transparent"
-                        )}
-                        onClick={() => {
-                          setPracticeLevel(level.id)
-                          setShowLevelSelector(false)
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
-                            setSelectedLevelInfo(fullLevel || null)
-                            setShowLevelInfoDialog(true)
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Voice Led结构 */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {t('practice_category_voice_led')}
-                  </h4>
-                  <div className="grid grid-cols-1 gap-2">
-                    {VOICE_LED_STRUCTURES.map((level) => (
-                      <div
-                        key={level.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                          practiceLevel === level.id
-                            ? "bg-primary/10 border-primary/30"
-                            : "hover:bg-muted/50 border-transparent"
-                        )}
-                        onClick={() => {
-                          setPracticeLevel(level.id)
-                          setShowLevelSelector(false)
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
-                            setSelectedLevelInfo(fullLevel || null)
-                            setShowLevelInfoDialog(true)
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 经过音技巧*/}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {t('practice_category_passing')}
-                  </h4>
-                  <div className="grid grid-cols-1 gap-2">
-                    {PASSING_TONE_TECHNIQUES.map((level) => (
-                      <div
-                        key={level.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                          practiceLevel === level.id
-                            ? "bg-primary/10 border-primary/30"
-                            : "hover:bg-muted/50 border-transparent"
-                        )}
-                        onClick={() => {
-                          setPracticeLevel(level.id)
-                          setShowLevelSelector(false)
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
-                            setSelectedLevelInfo(fullLevel || null)
-                            setShowLevelInfoDialog(true)
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 变化属和弦结构 */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {t('level_group_altered')}
-                  </h4>
-                  <div className="grid grid-cols-1 gap-2">
-                    {ALTERED_LEVELS.map((level) => (
-                      <div
-                        key={level.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                          practiceLevel === level.id
-                            ? "bg-primary/10 border-primary/30"
-                            : "hover:bg-muted/50 border-transparent"
-                        )}
-                        onClick={() => {
-                          setPracticeLevel(level.id)
-                          setShowLevelSelector(false)
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedLevelInfo(level)
-                            setShowLevelInfoDialog(true)
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 减音阶 */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                    {t('level_group_diminished')}
-                  </h4>
-                  <div className="grid grid-cols-1 gap-2">
-                    {DIMINISHED_SCALES_LEVELS.map((level) => (
-                      <div
-                        key={level.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                          practiceLevel === level.id
-                            ? "bg-primary/10 border-primary/30"
-                            : "hover:bg-muted/50 border-transparent"
-                        )}
-                        onClick={() => {
-                          setPracticeLevel(level.id)
-                          setShowLevelSelector(false)
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {t(`level_desc_${level.id}` as keyof typeof TRANSLATIONS['zh-CN']) || level.description}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedLevelInfo(level)
-                            setShowLevelInfoDialog(true)
-                          }}
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </ScrollArea>
-
-            <DialogFooter className="px-6 py-4 border-t">
-              <Button variant="outline" onClick={() => setShowLevelSelector(false)}>
-                {t('btn_close')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <LevelSelectorDialog
+          open={showLevelSelector}
+          onOpenChange={setShowLevelSelector}
+          selectedLevelId={practiceLevel}
+          onSelectLevel={setPracticeLevel}
+          onShowLevelInfo={handleShowLevelInfo}
+          t={t}
+        />
 
         {/* 练习模式详细信息弹窗 */}
-        <Dialog open={showLevelInfoDialog} onOpenChange={setShowLevelInfoDialog}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Layers className="h-5 w-5" />
-                {selectedLevelInfo ? t(selectedLevelInfo.nameKey) : ''}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                {selectedLevelInfo ? t(selectedLevelInfo.nameKey) : ''}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedLevelInfo && (
-              <div className="space-y-4 py-4">
-                {/* 基本信息 */}
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{t('practice_level')}</Label>
-                    <p className="text-sm font-medium">{t(selectedLevelInfo.nameKey)}</p>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{t('description')}</Label>
-                    <p className="text-sm">
-                      {t(`level_desc_${selectedLevelInfo.id}` as keyof typeof TRANSLATIONS['zh-CN']) || 
-                       t(`level_desc_${selectedLevelInfo.id.replace(/-/g, '_')}` as keyof typeof TRANSLATIONS['zh-CN']) || 
-                       selectedLevelInfo.description}
-                    </p>
-                  </div>
-
-                  {/* 音程信息 */}
-                  {(() => {
-                    const level = selectedLevelInfo as { intervals?: number[] }
-                    if (level.intervals && Array.isArray(level.intervals)) {
-                      const degreeMap: Record<number, string> = {
-                        0: '1', 1: 'b2', 2: '2', 3: 'b3', 4: '3', 5: '4',
-                        6: 'b5', 7: '5', 8: 'b6', 9: '6', 10: 'b7', 11: '7'
-                      }
-                      return (
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">{t('intervals')}</Label>
-                          <div className="p-3 bg-muted/30 rounded-lg">
-                            <p className="text-sm font-mono">
-                              {formatDegree(level.intervals.map(i => degreeMap[i] || i).join(' - '))}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  })()}
-
-                  {/* 和弦类型特定音程 */}
-                  {(() => {
-                    const level = selectedLevelInfo as { chordTypes?: Record<string, number[]> }
-                    if (level.chordTypes && typeof level.chordTypes === 'object') {
-                      const degreeMap: Record<number, string> = {
-                        0: '1', 1: 'b2', 2: '2', 3: 'b3', 4: '3', 5: '4',
-                        6: 'b5', 7: '5', 8: 'b6', 9: '6', 10: 'b7', 11: '7'
-                      }
-                      return (
-                        <div className="space-y-2">
-                          <Label className="text-xs text-muted-foreground">{t('chord_type_intervals')}</Label>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            {Object.entries(level.chordTypes).map(([type, intervals]) => (
-                              <div key={type} className="p-2 bg-muted/30 rounded">
-                                <span className="font-medium capitalize">{type}:</span>{' '}
-                                <span className="font-mono text-xs">
-                                  {formatDegree(intervals.map(i => degreeMap[i] || i).join('-'))}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  })()}
-
-                  {/* SOLO风格等级选项 */}
-                  {(() => {
-                    const soloLevel = selectedLevelInfo as typeof ALL_SOLO_LEVELS[0]
-                    if (soloLevel.sequences) {
-                      return (
-                        <div className="space-y-3 pt-2 border-t">
-                          <Label className="text-xs text-muted-foreground">{t('level_options')}</Label>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="p-2 bg-muted/30 rounded flex items-center justify-between">
-                              <span>{t('level_order_option')}</span>
-                              <Badge variant={soloLevel.orderOption ? "default" : "outline"}>
-                                {soloLevel.orderOption ? t('enabled') : t('disabled')}
-                              </Badge>
-                            </div>
-                            <div className="p-2 bg-muted/30 rounded flex items-center justify-between">
-                              <span>{t('level_random_option')}</span>
-                              <Badge variant={soloLevel.randomOption ? "default" : "outline"}>
-                                {soloLevel.randomOption ? t('enabled') : t('disabled')}
-                              </Badge>
-                            </div>
-                            <div className="p-2 bg-muted/30 rounded flex items-center justify-between">
-                              <span>{t('level_starting_interval')}</span>
-                              <Badge variant="secondary">{soloLevel.startingIntervalOption}</Badge>
-                            </div>
-                            <div className="p-2 bg-muted/30 rounded flex items-center justify-between">
-                              <span>{t('level_notes_per_chord')}</span>
-                              <Badge variant="secondary">{soloLevel.notesPerChord}</Badge>
-                            </div>
-                            <div className="p-2 bg-muted/30 rounded flex items-center justify-between">
-                              <span>{t('level_force_natural_five')}</span>
-                              <Badge variant={soloLevel.forceNaturalFive ? "default" : "outline"}>
-                                {soloLevel.forceNaturalFive ? t('yes') : t('no')}
-                              </Badge>
-                            </div>
-                            {soloLevel.endOnStartingInterval !== undefined && (
-                              <div className="p-2 bg-muted/30 rounded flex items-center justify-between">
-                                <span>{t('level_end_on_starting')}</span>
-                                <Badge variant={soloLevel.endOnStartingInterval ? "default" : "outline"}>
-                                  {soloLevel.endOnStartingInterval ? t('yes') : t('no')}
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  })()}
-                </div>
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button
-                onClick={() => {
-                  if (selectedLevelInfo) {
-                    setPracticeLevel(selectedLevelInfo.id)
-                  }
-                  setShowLevelInfoDialog(false)
-                  setShowLevelSelector(false)
-                }}
-              >
-                <Check className="h-4 w-4 mr-2" />
-                {t('select_this_level')}
-              </Button>
-              <Button variant="outline" onClick={() => setShowLevelInfoDialog(false)}>
-                {t('btn_close')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <LevelInfoDialog
+          open={showLevelInfoDialog}
+          onOpenChange={setShowLevelInfoDialog}
+          level={selectedLevelInfo}
+          onConfirm={handleLevelInfoConfirm}
+          t={t}
+        />
 
         {/* 和弦练习模式选择弹窗 */}
-        <Dialog open={showChordExerciseLevelSelector} onOpenChange={setShowChordExerciseLevelSelector}>
-          <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden">
-            <DialogHeader className="px-6 py-4 border-b">
-              <DialogTitle className="flex items-center gap-2">
-                <Layers className="h-5 w-5" />
-                {t('practice_level')}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                {t('practice_level')}
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* 练习模式列表 */}
-            <ScrollArea className="max-h-[60vh]">
-              <div className="p-4 space-y-4">
-                {LOCAL_PRACTICE_MODE_GROUPS.map((group) => (
-                  <div key={group.id} className="space-y-2">
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded">
-                      {language === 'zh-CN' ? group.nameZh : group.name}
-                    </h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {group.levels.map((level) => (
-                        <div
-                          key={level.id}
-                          className={cn(
-                            "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border",
-                            chordExerciseLevel === level.id
-                              ? "bg-primary/10 border-primary/30"
-                              : "hover:bg-muted/50 border-transparent"
-                          )}
-                          onClick={() => {
-                            setChordExerciseLevel(level.id)
-                            setShowChordExerciseLevelSelector(false)
-                          }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">{t(level.nameKey)}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {level.description}
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedLevelInfo(level)
-                              setShowLevelInfoDialog(true)
-                            }}
-                          >
-                            <Info className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-
-            <DialogFooter className="px-6 py-4 border-t">
-              <Button variant="outline" onClick={() => setShowChordExerciseLevelSelector(false)}>
-                {t('btn_close')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ChordExerciseLevelSelector
+          open={showChordExerciseLevelSelector}
+          onOpenChange={setShowChordExerciseLevelSelector}
+          groups={LOCAL_PRACTICE_MODE_GROUPS}
+          selectedLevelId={chordExerciseLevel}
+          onSelectLevel={setChordExerciseLevel}
+          onShowLevelInfo={handleShowLevelInfo}
+          language={language}
+          t={t}
+        />
 
         {/* 新手教程覆盖层*/}
         <OnboardingOverlay />

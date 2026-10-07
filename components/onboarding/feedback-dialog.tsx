@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useOnboarding } from "./onboarding-context"
 import {
@@ -14,8 +14,9 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { Star, Send, MessageSquare, ThumbsUp } from "lucide-react"
+import { Send, MessageSquare, ThumbsUp } from "lucide-react"
 import { toast } from "sonner"
+import { useUser } from "@/lib/store"
 
 interface FeedbackDialogProps {
   open: boolean
@@ -24,17 +25,31 @@ interface FeedbackDialogProps {
 
 export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
   const { resetOnboarding } = useOnboarding()
+  const user = useUser()
+  const isZh = user.language === "zh-CN"
   const [rating, setRating] = useState<string>("")
   const [feedback, setFeedback] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
+  const ratingOptions = [
+    { value: "1", label: "😕", desc: isZh ? "没帮助" : "Not helpful" },
+    { value: "2", label: "😐", desc: isZh ? "一般" : "Neutral" },
+    { value: "3", label: "🙂", desc: isZh ? "有帮助" : "Helpful" },
+    { value: "4", label: "😊", desc: isZh ? "很有帮助" : "Very helpful" },
+    { value: "5", label: "🤩", desc: isZh ? "非常棒" : "Excellent" },
+  ]
+
+  const featureOptions = isZh
+    ? ["更多练习模式", "进度统计", "社交功能", "视频教程", "乐谱导入", "节拍器改进"]
+    : ["More practice modes", "Progress stats", "Social features", "Video tutorials", "Score import", "Metronome improvements"]
+
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    
+
     // 模拟提交
     await new Promise(resolve => setTimeout(resolve, 1000))
-    
+
     // 保存到 localStorage
     const feedbackData = {
       rating,
@@ -42,17 +57,17 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
     }
-    
+
     try {
       const existing = JSON.parse(localStorage.getItem("fretmaster-feedback") || "[]")
       localStorage.setItem("fretmaster-feedback", JSON.stringify([...existing, feedbackData]))
     } catch (e) {
       console.error('Failed to save feedback:', e)
     }
-    
+
     setIsSubmitting(false)
     setIsSubmitted(true)
-    toast.success("感谢你的反馈！")
+    toast.success(isZh ? "感谢你的反馈！" : "Thanks for your feedback!")
   }
 
   const handleClose = () => {
@@ -81,29 +96,25 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <MessageSquare className="w-5 h-5" />
-                  教程完成反馈
+                  {isZh ? "教程完成反馈" : "Tutorial Feedback"}
                 </DialogTitle>
                 <DialogDescription>
-                  感谢你完成新手教程！请花一分钟告诉我们你的体验，帮助我们改进产品。
+                  {isZh
+                    ? "感谢你完成新手教程！请花一分钟告诉我们你的体验，帮助我们改进产品。"
+                    : "Thanks for completing the tutorial! Please take a minute to share your experience and help us improve."}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-6 py-4">
                 {/* 评分 */}
                 <div className="space-y-3">
-                  <Label className="text-base">教程对你有帮助吗？</Label>
+                  <Label className="text-base">{isZh ? "教程对你有帮助吗？" : "Was the tutorial helpful?"}</Label>
                   <RadioGroup
                     value={rating}
                     onValueChange={setRating}
                     className="flex gap-2"
                   >
-                    {[
-                      { value: "1", label: "😕", desc: "没帮助" },
-                      { value: "2", label: "😐", desc: "一般" },
-                      { value: "3", label: "🙂", desc: "有帮助" },
-                      { value: "4", label: "😊", desc: "很有帮助" },
-                      { value: "5", label: "🤩", desc: "非常棒" },
-                    ].map((item) => (
+                    {ratingOptions.map((item) => (
                       <div key={item.value} className="flex flex-col items-center">
                         <RadioGroupItem
                           value={item.value}
@@ -124,10 +135,12 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
 
                 {/* 文字反馈 */}
                 <div className="space-y-2">
-                  <Label htmlFor="feedback">有什么建议或遇到的问题吗？（可选）</Label>
+                  <Label htmlFor="feedback">
+                    {isZh ? "有什么建议或遇到的问题吗？（可选）" : "Any suggestions or issues? (optional)"}
+                  </Label>
                   <Textarea
                     id="feedback"
-                    placeholder="告诉我们你的想法..."
+                    placeholder={isZh ? "告诉我们你的想法..." : "Tell us what you think..."}
                     value={feedback}
                     onChange={(e) => setFeedback(e.target.value)}
                     className="min-h-[100px] resize-none"
@@ -136,16 +149,9 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
 
                 {/* 功能建议 */}
                 <div className="space-y-2">
-                  <Label>你最希望增加什么功能？（可多选）</Label>
+                  <Label>{isZh ? "你最希望增加什么功能？（可多选）" : "Which features would you like most? (multi-select)"}</Label>
                   <div className="flex flex-wrap gap-2">
-                    {[
-                      "更多练习模式",
-                      "进度统计",
-                      "社交功能",
-                      "视频教程",
-                      "乐谱导入",
-                      "节拍器改进",
-                    ].map((feature) => (
+                    {featureOptions.map((feature) => (
                       <Button
                         key={feature}
                         variant="outline"
@@ -155,7 +161,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
                           setFeedback((prev) =>
                             prev.includes(feature)
                               ? prev
-                              : prev + (prev ? "，" : "") + `希望增加：${feature}`
+                              : prev + (prev ? (isZh ? "，" : ", ") : "") + (isZh ? `希望增加：${feature}` : `Requested: ${feature}`)
                           )
                         }}
                       >
@@ -168,22 +174,22 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={handleClose}>
-                  跳过
+                  {isZh ? "跳过" : "Skip"}
                 </Button>
-                <Button 
-                  onClick={handleSubmit} 
+                <Button
+                  onClick={handleSubmit}
                   disabled={!rating || isSubmitting}
                   className="gap-2"
                 >
                   {isSubmitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      提交中...
+                      {isZh ? "提交中..." : "Submitting..."}
                     </>
                   ) : (
                     <>
                       <Send className="w-4 h-4" />
-                      提交反馈
+                      {isZh ? "提交反馈" : "Submit Feedback"}
                     </>
                   )}
                 </Button>
@@ -205,16 +211,18 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
                 <ThumbsUp className="w-8 h-8 text-green-600 dark:text-green-400" />
               </motion.div>
               <div>
-                <h3 className="text-lg font-semibold">感谢你的反馈！</h3>
+                <h3 className="text-lg font-semibold">{isZh ? "感谢你的反馈！" : "Thanks for your feedback!"}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  你的意见对我们非常重要，我们会认真考虑每一条建议。
+                  {isZh
+                    ? "你的意见对我们非常重要，我们会认真考虑每一条建议。"
+                    : "Your input matters to us, and we carefully consider every suggestion."}
                 </p>
               </div>
               <div className="flex justify-center gap-2 pt-4">
                 <Button variant="outline" onClick={handleRestartTutorial}>
-                  重新观看教程
+                  {isZh ? "重新观看教程" : "Restart Tutorial"}
                 </Button>
-                <Button onClick={handleClose}>开始使用</Button>
+                <Button onClick={handleClose}>{isZh ? "开始使用" : "Get Started"}</Button>
               </div>
             </motion.div>
           )}

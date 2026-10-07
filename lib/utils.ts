@@ -114,19 +114,38 @@ export function getLocalDaysAgoStart(days: number, from: Date = new Date()): Dat
 
 /**
  * 获取 N 个月前本地时区的起始时刻。
+ *
+ * **不要改回 `start.setMonth(start.getMonth() - months)`**：setMonth 的溢出行为
+ * 不是这里想要的。3/31 减 1 个月会被算成 3/3（2 月没有 31 日 → 2/31 溢出到 3/3），
+ * 于是「本月」统计窗口凭空少几天 —— 3 月 31 日查「本月」，3/1、3/2 的记录会被漏掉。
+ * 现在显式构造目标日期，溢出时**夹到目标月最后一天**（3/31 → 2/28，闰年 → 2/29）。
  */
 export function getLocalMonthsAgoStart(months: number, from: Date = new Date()): Date {
   const start = getLocalDayStart(from)
-  start.setMonth(start.getMonth() - months)
-  return start
+  const targetMonth = start.getMonth() - months
+  const result = new Date(start.getFullYear(), targetMonth, start.getDate(), 0, 0, 0, 0)
+  // 目标月没有该日（如 2 月没有 31 日）时，`new Date` 会溢出到下个月；
+  // 用「归一化后的目标月」与「实际落到哪个月」对比来识别这种情况。
+  const normalizedTargetMonth = ((targetMonth % 12) + 12) % 12
+  if (result.getMonth() !== normalizedTargetMonth) {
+    // 目标月最后一天：下个月的第 0 天
+    return new Date(start.getFullYear(), targetMonth + 1, 0, 0, 0, 0, 0)
+  }
+  return result
 }
 
 /**
  * 规范化准确率到 0-100 范围。
  * 兼容两种存储方式：0-1 (例如 1.0 = 100%) 和 0-100 (例如 100 = 100%)。
+ *
+ * 负数一律归 0：本函数承诺「输出落在 0-100」，但旧实现把负数送进
+ * `value <= 1 → value * 100` 分支，`-0.5` 会输出 `-50`（导出报表里就成了
+ * "-50%"）。脏数据（服务端/历史库里的负 accuracy）不该污染统计，
+ * 归 0 比输出负数更安全；同时对所有 `>= 0` 的输入行为完全不变。
  */
 export function normalizeAccuracy(value: number | undefined | null): number {
   if (typeof value !== 'number' || !isFinite(value)) return 0
+  if (value <= 0) return 0
   if (value <= 1) return value * 100
   if (value > 100) return 100
   return value

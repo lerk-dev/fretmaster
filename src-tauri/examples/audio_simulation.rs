@@ -1,4 +1,3 @@
-use rustfft::FftPlanner;
 
 const MIN_FREQUENCY: f32 = 27.5;
 const MAX_FREQUENCY: f32 = 4186.0;
@@ -25,8 +24,6 @@ pub struct PitchDetector {
     sample_rate: u32,
     buffer_size: usize,
     yin_buffer: Vec<f32>,
-    fft_planner: FftPlanner<f32>,
-    fft_work: Vec<rustfft::num_complex::Complex<f32>>,
     frequency_history: Vec<f32>,
     smoothed_frequency: Option<f32>,
     adaptive_threshold: f32,
@@ -43,8 +40,6 @@ impl PitchDetector {
             sample_rate,
             buffer_size,
             yin_buffer: vec![0.0; half_size],
-            fft_planner: FftPlanner::new(),
-            fft_work: vec![rustfft::num_complex::Complex::new(0.0, 0.0); buffer_size],
             frequency_history: Vec::with_capacity(MAX_HISTORY),
             smoothed_frequency: None,
             adaptive_threshold: DEFAULT_THRESHOLD,
@@ -282,7 +277,6 @@ struct AudioPreprocessor {
     lp_filter: BiquadFilter,
     notch_50: BiquadFilter,
     notch_60: BiquadFilter,
-    sample_rate: f32,
 }
 
 impl AudioPreprocessor {
@@ -293,7 +287,6 @@ impl AudioPreprocessor {
             lp_filter: BiquadFilter::low_pass(sr, 5000.0, 0.707),
             notch_50: BiquadFilter::notch(sr, 50.0, 30.0),
             notch_60: BiquadFilter::notch(sr, 60.0, 30.0),
-            sample_rate: sr,
         }
     }
 
@@ -394,7 +387,6 @@ fn main() {
         let buffer = generate_sine_wave(*freq, sample_rate, buffer_size, 0.5);
         match detector.detect(&buffer) {
             Some(result) => {
-                let freq_error = (result.frequency - freq).abs();
                 let cents_error = result.cents.abs();
                 let pass = cents_error < 5.0;
                 if pass { pass_count += 1; } else { fail_count += 1; }

@@ -4,16 +4,16 @@
 
 **专业吉他指板视觉化练习工具 | Professional Guitar Fretboard Visualization Practice Tool**
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black?logo=next.js)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.1.0-blue?logo=react)](https://react.dev/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.6-black?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.2.0-blue?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Rust](https://img.shields.io/badge/Rust-1.85+-orange?logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-blue?logo=tauri)](https://tauri.app/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.2.157-orange.svg)](https://github.com/lerk-dev/fretmaster/releases)
+[![Version](https://img.shields.io/badge/Version-0.2.219-orange.svg)](https://github.com/lerk-dev/fretmaster/releases)
 
-[在线演示](#) | [功能特点](#功能特点) | [快速开始](#快速开始) | [练习指南](#练习指南) | [部署](#部署指南)
+[在线演示](https://lerk-dev.github.io/fretmaster/) | [功能特点](#功能特点) | [快速开始](#快速开始) | [练习指南](#练习指南) | [部署](#部署指南)
 
 </div>
 
@@ -185,6 +185,7 @@ Web 版是 FretMaster 的基础版本，基于 Next.js 构建，支持部署到�
 
 **访问方式**：
 - GitHub Pages: `https://lerk-dev.github.io/fretmaster/`
+- 自托管：`npm run build` 的产物 `out/` 是**纯静态目录**，可直接放到任意静态文件服务器 / CDN / 内网主机（Web 版无需后端，统计功能可选配 CGI 接口）
 
 ### 桌面版 (EXE)
 
@@ -337,7 +338,23 @@ Web 版是 FretMaster 的基础版本，基于 Next.js 构建，支持部署到�
 
 #### 版本更新日志
 
-##### v0.2.157 (当前版本)
+##### v0.2.219 (当前版本)
+
+**工程门禁与质量**
+- 恢复构建期 TypeScript 类型门禁（移除 `next.config.mjs` 中两处 `ignoreBuildErrors`）
+- 迁移到 ESLint 9 flat config（`eslint.config.mjs`）；`npm run lint` 改为 `eslint . --max-warnings 0`，warning 回潮即 CI 红
+- 新增 GitHub Actions 四闸门（`tsc` + `lint` + `vitest` + `build`）
+- 开启 `noUnusedLocals`；清理 47 处死局部变量、全部 `@ts-ignore` 与裸 `console.*` 调试输出
+- lint warning 由 88 清零至 0（`prefer-const` / `no-unused-vars` / `react-hooks/exhaustive-deps` 逐条分诊）
+
+**修复**
+- `react-hooks/exhaustive-deps` 47 条全部处理：其中 1 处为真 stale closure（「一弦三音 · 下一把位预览」未随进度刷新），其余按「引用恒定即补依赖 / 前向引用 TDZ 显式豁免 / 冗余依赖移除」分类处理
+- 删除 `PracticeFretboard` 上 4 个从未生效的「指板显隐」props（显示与否由外层控制）
+- 统一调试日志出口到 `lib/logger.ts`（dev-only，warn/error 保留）
+- trainer 皮肤层序修复：品记点与音名圆点此前被琴弦线遮挡（z-index 低于弦线）
+- Rust 音频路径（`src-tauri/src/audio/`）clippy 警告归零
+
+##### v0.2.157
 
 **P0 关键修复**：
 - 修复 YIN 音高检测采样率硬编码（48000）问题，Tauri 环境下按设备实际采样率计算，避免升号偏差
@@ -462,8 +479,8 @@ npm run tauri:build
 
 | 类别 | 技术 | 版本 |
 |------|------|------|
-| **框架** | Next.js | 16.1.6 |
-| **UI库** | React | 19.1.0 |
+| **框架** | Next.js | 16.2.6 |
+| **UI库** | React | 19.2.0 |
 | **语言** | TypeScript | 5.8 |
 | **样式** | Tailwind CSS | 3.4 |
 | **组件** | shadcn/ui + Radix UI | Latest |
@@ -490,9 +507,9 @@ npm run tauri:build
 
 ### 开发环境
 
-- **Node.js**: >= 18.17.0 (推荐 20.x)
+- **Node.js**: >= 20.9.0 (推荐 22.x)
 - **npm**: >= 9.0.0 或 **pnpm**: >= 8.0.0
-- **Rust**: >= 1.70 (构建桌面版)
+- **Rust**: >= 1.85 (构建桌面版)
 - **浏览器**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 
 ### 运行环境
@@ -887,8 +904,8 @@ Focus 模式提供沉浸式练习体验：
 node -v
 
 # 推荐使用 nvm 管理版本
-nvm install 20
-nvm use 20
+nvm install 22
+nvm use 22
 ```
 
 #### 依赖安装失败

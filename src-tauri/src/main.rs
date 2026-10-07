@@ -32,6 +32,7 @@ fn main() {
             fretmaster::commands::get_default_audio_device,
             fretmaster::commands::start_audio_capture,
             fretmaster::commands::start_audio_capture_with_sample_rate,
+            fretmaster::commands::start_audio_capture_with_backend,
             fretmaster::commands::stop_audio_capture,
             fretmaster::commands::is_capturing,
             fretmaster::commands::detect_pitch,
@@ -77,6 +78,10 @@ fn main() {
             fretmaster::commands::get_stats_by_exercise_type,
             fretmaster::commands::delete_practice_stat,
             fretmaster::commands::clear_all_practice_stats,
+            // Position stats commands
+            fretmaster::commands::upsert_position_stats,
+            fretmaster::commands::get_position_stats,
+            fretmaster::commands::clear_position_stats,
             // Window commands
             fretmaster::commands::minimize_window,
             fretmaster::commands::maximize_window,
@@ -85,7 +90,6 @@ fn main() {
             fretmaster::commands::start_dragging,
             fretmaster::commands::set_fullscreen,
             fretmaster::commands::is_fullscreen,
-            fretmaster::commands::set_windowed_fullscreen,
             fretmaster::commands::set_true_fullscreen,
             fretmaster::commands::is_true_fullscreen,
         ])

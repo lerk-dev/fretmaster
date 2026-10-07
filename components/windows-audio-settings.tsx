@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
-import { Mic, Activity, Zap, Filter, Volume2, Usb } from 'lucide-react'
+import { Activity, Zap, Filter } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAppStore } from '@/lib/store'
+import { getEffectiveAudioSettings } from '@/lib/audio-settings-effective'
 import { nativeAudio, type AudioDeviceInfo, type PitchResult, type DeviceChangeEvent } from '@/lib/native-audio'
 import { toast } from 'sonner'
 
@@ -17,16 +18,19 @@ interface WindowsAudioSettingsProps {
 
 export const WindowsAudioSettings = memo(function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
   const store = useAppStore()
+  const setMicUserPreference = useAppStore((s) => s.setMicUserPreference)
   const audioSettings = store?.audio || {}
+  // 音频设置的「有效值」（旧持久化缺字段时兜底）—— 显示与推送共用，唯一真相源
+  const eff = getEffectiveAudioSettings(store?.audio)
   
   const [devices, setDevices] = useState<AudioDeviceInfo[]>([])
   const [lastPitch, setLastPitch] = useState<PitchResult | null>(null)
   const [latency, setLatency] = useState(0)
   const [isInitializing, setIsInitializing] = useState(false)
-  const [deviceChangeDetected, setDeviceChangeDetected] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
+  // 实际生效的后端（可能因设备不支持而回退，与用户所选不同）
+  const [activeBackend, setActiveBackend] = useState<string>('')
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const devicePollRef = useRef<NodeJS.Timeout | null>(null)
   // 使用 store 中的 micEnabled 作为音频启用状态，避免组件卸载后状态丢失
   const isCapturing = audioSettings.micEnabled
   
@@ -53,6 +57,10 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         'audio_active': '音频输入已启用',
         'audio_inactive': '音频输入已停止',
         'no_device': '未选择设备',
+        'audio_backend': '音频后端',
+        'backend_shared': 'WASAPI 共享 (兼容)',
+        'backend_exclusive': 'WASAPI 独占 (低延迟)',
+        'backend_asio': 'ASIO (最低延迟)',
       },
       'en': {
         'audio_device': 'Audio Input Device',
@@ -75,6 +83,10 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         'audio_active': 'Audio Input Active',
         'audio_inactive': 'Audio Input Stopped',
         'no_device': 'No device selected',
+        'audio_backend': 'Audio Backend',
+        'backend_shared': 'WASAPI Shared (Compatible)',
+        'backend_exclusive': 'WASAPI Exclusive (Low Latency)',
+        'backend_asio': 'ASIO (Lowest Latency)',
       }
     }
     return translations[language]?.[key] || key
@@ -99,7 +111,6 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
 
   useEffect(() => {
     try {
-      console.log('[WindowsAudioSettings] Mounting, loading devices...')
       loadDevices()
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err))
@@ -130,12 +141,20 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
     
     setIsInitializing(true)
     try {
-      await nativeAudio.startAudioCaptureWithSampleRate(
+      await nativeAudio.startAudioCaptureWithBackend(
         audioSettings.selectedAudioDevice,
-        audioSettings.sampleRate || 48000
+        audioSettings.sampleRate || 48000,
+        audioSettings.audioBackend || 'wasapi_shared'
       )
-      store.setMicEnabled(true)
+      // 用户显式开：同步落偏好（micUserDisabled=false），桌面端重启后据此恢复采集
+      setMicUserPreference(true)
       toast.success(t('audio_active'))
+
+      // 读取实际生效的后端：独占/ASIO 失败时后端会自动回退，这里让用户看得见
+      try {
+        const status = await nativeAudio.getAudioStatus()
+        setActiveBackend(status.backend)
+      } catch { /* 忽略：仅用于显示 */ }
       
       // 开始检测音高
       intervalRef.current = setInterval(async () => {
@@ -156,7 +175,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
     } finally {
       setIsInitializing(false)
     }
-  }, [isCapturing, isInitializing, audioSettings.selectedAudioDevice, audioSettings.sampleRate, language, t])
+  }, [isCapturing, isInitializing, audioSettings.selectedAudioDevice, audioSettings.sampleRate, audioSettings.audioBackend, language, t, setMicUserPreference])
   
   // 停止音频捕获 - 使用 ref 避免依赖循环
   const stopAudio = useCallback(async () => {
@@ -167,13 +186,15 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         intervalRef.current = null
       }
       await nativeAudio.stopAudioCapture()
-      store.setMicEnabled(false)
+      // 用户显式关：同步落偏好（micUserDisabled=true），桌面端重启后不会再默认开
+      setMicUserPreference(false)
       setLastPitch(null)
+      setActiveBackend('')
       toast.success(t('audio_inactive'))
     } catch (error) {
       console.error('Failed to stop audio:', error)
     }
-  }, [t])
+  }, [t, setMicUserPreference])
   
   // 使用 ref 存储 stopAudio 以避免依赖循环
   const stopAudioRef = useRef(stopAudio)
@@ -192,7 +213,6 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   
   // 处理设备变化 - 使用 ref 避免依赖循环
   const handleDeviceChange = useCallback((event: DeviceChangeEvent) => {
-    setDeviceChangeDetected(true)
     setDevices(event.devices)
 
     // 静默更新设备列表，不弹出"检测到新设备"提示（Rust device_monitor 启动时会 emit 所有设备作为 added 事件，易误报）
@@ -220,12 +240,21 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   // 启动设备热插拔检测（使用 Rust 后端事件驱动）
   useEffect(() => {
     let unlisten: (() => void) | null = null
-    
+    let cancelled = false
+
     nativeAudio.listenDeviceChanges(handleDeviceChange).then((fn) => {
-      if (fn) unlisten = fn
+      if (!fn) return
+      if (cancelled) {
+        // 组件在 promise 落地前已卸载：此时清理函数已经跑过，必须在这里补注销，
+        // 否则 Tauri 事件监听器与 Rust device_monitor（每 1.5s 一发）会一直挂着
+        fn()
+        return
+      }
+      unlisten = fn
     })
-    
+
     return () => {
+      cancelled = true
       if (unlisten) unlisten()
       nativeAudio.unlistenDeviceChanges()
     }
@@ -243,16 +272,30 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   // 采样率选项 - SOLO 默认使用 48000
   const sampleRateOptions = [
     { value: 44100, label: '44.1 kHz' },
-    { value: 48000, label: '48 kHz (SOLO默认)' },
+    { value: 48000, label: language === 'zh-CN' ? '48 kHz (SOLO默认)' : '48 kHz (SOLO default)' },
     { value: 96000, label: '96 kHz' },
     { value: 192000, label: '192 kHz' },
+  ]
+
+  // 音频后端：WASAPI 共享/独占、ASIO。
+  // 这三种后端都是 Windows 专属实现（Rust 侧 wasapi_exclusive 有 cfg(target_os = "windows") 门控），
+  // macOS/Linux 的 Tauri 桌面版不显示该下拉，避免选了必回退的选项。
+  const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
+  const backendOptions = [
+    { value: 'wasapi_shared', label: t('backend_shared') },
+    ...(isWindows
+      ? [
+          { value: 'wasapi_exclusive', label: t('backend_exclusive') },
+          { value: 'asio', label: t('backend_asio') },
+        ]
+      : []),
   ]
   
   return (
     <div className="space-y-4">
       {initError && (
         <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-600 dark:text-red-400">
-          <p className="font-medium">Audio Init Error</p>
+          <p className="font-medium">{language === 'zh-CN' ? '音频初始化错误' : 'Audio Init Error'}</p>
           <p className="text-xs mt-1">{initError}</p>
         </div>
       )}
@@ -281,7 +324,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             )}
             {devices.map(device => (
               <SelectItem key={device.name} value={device.name}>
-                {device.name} {device.isDefault && '(Default)'}
+                {device.name} {device.isDefault && (language === 'zh-CN' ? '（默认）' : '(Default)')}
               </SelectItem>
             ))}
           </SelectContent>
@@ -295,6 +338,25 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
           {isCapturing && (
             <span className="text-xs text-green-500">
               {latency.toFixed(1)}ms {t('latency')}
+              {activeBackend && ` · ${backendOptions.find(o => o.value === activeBackend)?.label ?? activeBackend}`}
+            </span>
+          )}
+          {isCapturing && activeBackend === 'wasapi_shared'
+            && (audioSettings.audioBackend === 'wasapi_exclusive' || audioSettings.audioBackend === 'asio') && (
+            <span className="text-xs text-amber-500">
+              {audioSettings.audioBackend === 'asio'
+                ? (language === 'zh-CN'
+                    // ASIO 回退几乎总是「本机没装 ASIO 驱动」——
+                    // 注册表 HKLM\SOFTWARE\ASIO 下没有任何驱动项时，CPAL 枚举出来是空的。
+                    // 直接说清原因 + 怎么办，比「所选后端不可用」有用得多。
+                    // ⚠️ 注意：ASUS 主板自带的 AsIO2.dll / AsIO3.dll 是**华硕自己的驱动**，
+                    //    **不是** Steinberg ASIO，实现不了 ASIO 接口（实测无 AsioInit 等导出）
+                    //    ⇒ 装了华硕音频驱动 ≠ 有 ASIO 可用。
+                    ? '未检测到 ASIO 驱动，已回退到共享模式（如 ASIO4ALL / 声卡厂商驱动）'
+                    : 'No ASIO driver found, fell back to Shared (e.g. ASIO4ALL / vendor driver)')
+                : (language === 'zh-CN'
+                    ? '所选后端不可用，已回退到共享模式'
+                    : 'Selected backend unavailable, fell back to Shared')}
             </span>
           )}
           {!isCapturing && !audioSettings.selectedAudioDevice && (
@@ -336,15 +398,50 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
           {language === 'zh-CN' ? '性能设置 (SOLO默认)' : 'Performance Settings (SOLO Default)'}
         </h5>
         
+        {/* 音频后端（仅 Windows：WASAPI/ASIO 是 Windows 专属实现） */}
+        {isWindows && (
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">{t('audio_backend')}</span>
+            <span className="font-mono text-xs">{backendOptions.find(o => o.value === (audioSettings.audioBackend || 'wasapi_shared'))?.label}</span>
+          </div>
+          <Select
+            value={audioSettings.audioBackend || 'wasapi_shared'}
+            onValueChange={(v) => store.setAudioBackend(v as 'wasapi_shared' | 'wasapi_exclusive' | 'asio')}
+            disabled={isCapturing}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {backendOptions.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {language === 'zh-CN'
+              ? '独占/ASIO 延迟更低；设备不支持时自动回退到共享模式'
+              : 'Exclusive/ASIO offer lower latency; auto-falls back to Shared if unsupported'}
+          </p>
+        </div>
+        )}
+        
         {/* 缓冲区大小 */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">{t('buffer_size')}</span>
-            <span className="font-mono">{audioSettings.bufferSize || 2048}</span>
+            <span className="font-mono">{eff.bufferSize}</span>
           </div>
           <Select 
-            value={String(audioSettings.bufferSize || 2048)} 
-            onValueChange={(v) => store.setBufferSize(Number(v))}
+            value={String(eff.bufferSize)} 
+            onValueChange={(v) => {
+              const n = Number(v)
+              store.setBufferSize(n)
+              // 立即送达后端：未采集时只落配置字段，采集时会重建流。
+              // 此前这里只写 store、全仓零调用方 ⇒ 下拉是装饰品（铁律 22）。
+              void nativeAudio.setBufferSize(n)
+            }}
             disabled={isCapturing}
           >
             <SelectTrigger>
@@ -391,11 +488,15 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">{t('noise_suppression')}</span>
-            <span className="font-mono">{audioSettings.noiseSuppression ?? 70}%</span>
+            <span className="font-mono">{eff.noiseSuppression}%</span>
           </div>
           <Slider
-            value={[audioSettings.noiseSuppression ?? 70]}
-            onValueChange={([v]) => store.setNoiseSuppression(v)}
+            value={[eff.noiseSuppression]}
+            onValueChange={([v]) => {
+              store.setNoiseSuppression(v)
+              // 立即生效：Rust 映射为「噪声门相对底噪的倍数」（0 档=门关闭）
+              void nativeAudio.setNoiseSuppression(v)
+            }}
             min={0}
             max={100}
             step={10}
@@ -407,29 +508,42 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{t('high_pass_filter')}</span>
             <Switch 
-              checked={audioSettings.enableHighPass ?? true} 
-              onCheckedChange={store.setEnableHighPass}
+              checked={eff.highPass} 
+              onCheckedChange={(checked) => {
+                store.setEnableHighPass(checked)
+                // setFilters 是整体接口：每次发全量 4 开关（顺带修复任何漂移）
+                void nativeAudio.setFilters({ highPass: checked, lowPass: eff.lowPass, notch50: eff.notch50, notch60: eff.notch60 })
+              }}
             />
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{t('low_pass_filter')}</span>
             <Switch 
-              checked={audioSettings.enableLowPass ?? true} 
-              onCheckedChange={store.setEnableLowPass}
+              checked={eff.lowPass} 
+              onCheckedChange={(checked) => {
+                store.setEnableLowPass(checked)
+                void nativeAudio.setFilters({ highPass: eff.highPass, lowPass: checked, notch50: eff.notch50, notch60: eff.notch60 })
+              }}
             />
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{t('notch_50hz')}</span>
             <Switch 
-              checked={audioSettings.enableNotch50 ?? true} 
-              onCheckedChange={store.setEnableNotch50}
+              checked={eff.notch50} 
+              onCheckedChange={(checked) => {
+                store.setEnableNotch50(checked)
+                void nativeAudio.setFilters({ highPass: eff.highPass, lowPass: eff.lowPass, notch50: checked, notch60: eff.notch60 })
+              }}
             />
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{t('notch_60hz')}</span>
             <Switch 
-              checked={audioSettings.enableNotch60 ?? false} 
-              onCheckedChange={store.setEnableNotch60}
+              checked={eff.notch60} 
+              onCheckedChange={(checked) => {
+                store.setEnableNotch60(checked)
+                void nativeAudio.setFilters({ highPass: eff.highPass, lowPass: eff.lowPass, notch50: eff.notch50, notch60: checked })
+              }}
             />
           </div>
         </div>
@@ -439,11 +553,15 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
       <div className="border-t border-border/50 pt-4 space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">{language === 'zh-CN' ? '输入增益' : 'Input Gain'}</span>
-          <span className="font-mono">{Math.round((audioSettings.inputGain || 1) * 100)}%</span>
+          <span className="font-mono">{Math.round(eff.inputGain * 100)}%</span>
         </div>
         <Slider
-          value={[audioSettings.inputGain * 100]}
-          onValueChange={([v]) => store.setInputGain(v / 100)}
+          value={[eff.inputGain * 100]}
+          onValueChange={([v]) => {
+            store.setInputGain(v / 100)
+            // 立即生效（面板百分比 ÷100 = Rust 的增益倍率）
+            void nativeAudio.setGain(v / 100)
+          }}
           min={0}
           max={200}
           step={10}

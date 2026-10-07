@@ -95,3 +95,62 @@ pub async fn clear_all_practice_stats() -> Result<(), String> {
     stats::clear_all_stats()
         .map_err(|e| e.to_string())
 }
+
+// ==================== 逐位置掌握度统计命令 ====================
+
+const MAX_POSITION_ENTRIES: usize = 2000;
+const MAX_INSTRUMENT_LEN: usize = 100;
+
+fn validate_position_entry(e: &stats::PositionStatEntry) -> Result<(), String> {
+    if e.string_index < 0 || e.string_index > 15 {
+        return Err("string_index must be between 0 and 15".into());
+    }
+    if e.fret < 0 || e.fret > 36 {
+        return Err("fret must be between 0 and 36".into());
+    }
+    if e.total < 0 || e.total > 1_000_000 {
+        return Err("total must be between 0 and 1000000".into());
+    }
+    if e.correct < 0 || e.correct > e.total {
+        return Err("correct must be between 0 and total".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn upsert_position_stats(
+    instrument: String,
+    entries: Vec<stats::PositionStatEntry>,
+) -> Result<(), String> {
+    if instrument.is_empty() || instrument.len() > MAX_INSTRUMENT_LEN {
+        return Err("instrument must be 1-100 characters".into());
+    }
+    if entries.is_empty() || entries.len() > MAX_POSITION_ENTRIES {
+        return Err("entries must contain 1-2000 items".into());
+    }
+    for e in &entries {
+        validate_position_entry(e)?;
+    }
+    stats::upsert_position_stats(&instrument, &entries)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_position_stats(
+    instrument: String,
+) -> Result<Vec<stats::PositionStatRecord>, String> {
+    if instrument.is_empty() || instrument.len() > MAX_INSTRUMENT_LEN {
+        return Err("instrument must be 1-100 characters".into());
+    }
+    stats::get_position_stats(&instrument)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn clear_position_stats(instrument: String) -> Result<(), String> {
+    if instrument.is_empty() || instrument.len() > MAX_INSTRUMENT_LEN {
+        return Err("instrument must be 1-100 characters".into());
+    }
+    stats::clear_position_stats(&instrument)
+        .map_err(|e| e.to_string())
+}

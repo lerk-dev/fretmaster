@@ -1,6 +1,6 @@
 {
   "name": "fretmaster",
-  "version": "0.2.159",
+  "version": "0.2.219",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,13 +12,14 @@
     "start:https": "node server-https.js",
     "start:static-https": "node server-static-https.js",
     "start:lan-https": "node server-lan-https.js",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "cross-env TAURI_BUILD=true next build && tauri build",
+    "tauri:build:asio": "cross-env TAURI_BUILD=true next build && tauri build --features asio",
     "deploy:router": "scp -r -o StrictHostKeyChecking=no ./out/* root@192.168.123.2:/www/fretmaster/"
   },
   "dependencies": {
