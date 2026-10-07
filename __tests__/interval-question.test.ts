@@ -170,11 +170,11 @@ describe('IntervalQuestion', () => {
       p.unmount()
     })
 
-    it('findRootFirst + addRootBack 的 "1 3 3 1" 会渲染成 4 个 span', () => {
+    it('findRootFirst + addRootBack 的 "1 3 1" 会渲染成 3 个 span', () => {
       const p = mount({
-        currentIntervalExercise: exercise({ currentIntervalDisplay: '1 3 3 1' }),
+        currentIntervalExercise: exercise({ currentIntervalDisplay: '1 3 1' }),
       })
-      expect(p.questionSpans()).toHaveLength(4)
+      expect(p.questionSpans()).toHaveLength(3)
       p.unmount()
     })
   })
@@ -183,22 +183,21 @@ describe('IntervalQuestion', () => {
     it('completedIntervals 里的下标加删除线并变暗，其余不加', () => {
       const p = mount({
         currentIntervalExercise: exercise({
-          currentIntervalDisplay: '1 3 3 1',
-          completedIntervals: [0, 3],
+          currentIntervalDisplay: '1 3 1',
+          completedIntervals: [0, 2],
         }),
       })
-      const [s0, s1, s2, s3] = p.questionSpans()
+      const [s0, s1, s2] = p.questionSpans()
       expect(s0.className).toContain('line-through')
       expect(s0.className).toContain('text-muted-foreground')
       expect(s1.className).not.toContain('line-through')
-      expect(s2.className).not.toContain('line-through')
-      expect(s3.className).toContain('line-through')
+      expect(s2.className).toContain('line-through')
       p.unmount()
     })
 
     it('completedIntervals 为空时没有任何删除线', () => {
       const p = mount({
-        currentIntervalExercise: exercise({ currentIntervalDisplay: '1 3 3 1', completedIntervals: [] }),
+        currentIntervalExercise: exercise({ currentIntervalDisplay: '1 3 1', completedIntervals: [] }),
       })
       expect(p.questionSpans().every((s) => !s.className.includes('line-through'))).toBe(true)
       p.unmount()

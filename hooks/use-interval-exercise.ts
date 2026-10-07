@@ -146,7 +146,10 @@ export function useIntervalExercise() {
     // 先找根音模式: "1 3" (根音 + 音程)
     // 不先找根音模式: "3" (仅音程)
     const currentIntervalDisplay = findRootFirst ? `1 ${selectedInterval.symbol}` : selectedInterval.symbol
-    const rootBackDisplay = addRootBack ? ` ${selectedInterval.symbol} 1` : ''
+    // 回弹根音 = 弹完音程后**回到根音**，只该补一个「1」：
+    //   不先找根音 → "X" + " 1" = "X 1"；先找根音 → "1 X" + " 1" = "1 X 1"
+    // 旧实现写成 ` ${symbol} 1`，把目标音程又拼了一遍 ⇒ "b3 b3 1"（2026-10-07 用户报）。
+    const rootBackDisplay = addRootBack ? ' 1' : ''
     
     setCurrentIntervalExercise({
       rootNote: exerciseRoot,

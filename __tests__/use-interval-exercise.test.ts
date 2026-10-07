@@ -276,7 +276,7 @@ describe('generateIntervalExercise', () => {
     h.unmount()
   })
 
-  it('findRootFirst 时显示「1 X」；addRootBack 再补「 X 1」', () => {
+  it('findRootFirst 时显示「1 X」；addRootBack 只补根音 →「1 X 1」', () => {
     const h = mount()
     act(() => { api!.setSelectedIntervals([THIRD]) })
     act(() => { api!.setFindRootFirst(true) })
@@ -286,7 +286,24 @@ describe('generateIntervalExercise', () => {
     act(() => { api!.setAddRootBack(true) })
     act(() => { api!.setIntervalExerciseQueue([]) })
     act(() => { api!.generateIntervalExercise() })
-    expect(api!.currentIntervalExercise!.currentIntervalDisplay).toBe('1 3 3 1')
+    const display = api!.currentIntervalExercise!.currentIntervalDisplay
+    expect(display).toBe('1 3 1')
+    // 内容级护栏：目标音程只能出现一次（旧实现在这里产出 "1 3 3 1"）
+    expect(display.split(' ').filter(d => d === '3')).toHaveLength(1)
+    h.unmount()
+  })
+
+  it('addRootBack 且不先找根音 →「X 1」：目标音程不得重复', () => {
+    // 2026-10-07 用户报：练 b3 时显示成 "b3 b3 1"，正确是 "b3 1"
+    const h = mount()
+    act(() => { api!.setSelectedIntervals([THIRD]) })
+    act(() => { api!.setAddRootBack(true) })
+    act(() => { api!.generateIntervalExercise() })
+
+    const display = api!.currentIntervalExercise!.currentIntervalDisplay
+    expect(display).toBe('3 1')
+    expect(display.split(' ').filter(d => d === '3')).toHaveLength(1)
+    expect(display.split(' ').filter(d => d === '1')).toHaveLength(1)
     h.unmount()
   })
 
