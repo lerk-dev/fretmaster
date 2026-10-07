@@ -20,6 +20,7 @@ import { transposeSongChords, parseIrealPro, parseIrealUrl } from "@/lib/song-ch
 import { CUSTOM_CHORD_STORAGE_KEY, parseStoredCustomChords, buildCustomChordsExport } from "@/lib/custom-chords-io"
 import { filterAndGroupSongs } from "@/lib/song-filters"
 import { setStringTuning } from "@/lib/string-tuning"
+import { resolveExpectedIntervalDegree } from "@/lib/interval-expected-degree"
 import type {
   PracticeType,
   PracticeStats,
@@ -3750,20 +3751,23 @@ export default function FretMasterPage() {
           break
           
         case "interval":
-          // 音程练习：点击的音是目标音程音
+          // 音程练习：点击的音 = 序列里当前该弹的那个音级
+          // （含「回弹根音」收尾的 1；推导见 lib/interval-expected-degree.ts）
           if (currentIntervalExercise) {
             const noteIdx = getNoteIndex(clickedNote)
             const rootIdx = getNoteIndex(currentIntervalExercise.rootNote)
             const clickedInterval = (noteIdx - rootIdx + 12) % 12
-            // 先找根音模式：根音未完成时根音为正确答案
-            const intervalsArr = currentIntervalExercise.currentIntervalDisplay.split(' ')
-            const rootCompleted = intervalsArr.some((intv, i) => intv === '1' && currentIntervalExercise.completedIntervals.includes(i))
-            if (findRootFirst && !rootCompleted) {
-              isCorrect = clickedInterval === 0
-            } else {
-              const targetInterval = currentIntervalExercise.interval?.semitones % 12
-              isCorrect = clickedInterval === targetInterval
-            }
+            const expectedDegree = resolveExpectedIntervalDegree(
+              currentIntervalExercise.currentIntervalDisplay,
+              currentIntervalExercise.completedIntervals,
+              findRootFirst,
+            )
+            const expectedSemitone = expectedDegree === null
+              ? undefined
+              : expectedDegree === '1'
+                ? 0
+                : currentIntervalExercise.interval?.semitones % 12
+            isCorrect = expectedSemitone !== undefined && clickedInterval === expectedSemitone
           }
           break
           
