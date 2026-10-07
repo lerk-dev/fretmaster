@@ -58,6 +58,8 @@ import {
   getKeyNote,
   resolveScaleDegreeSemitone,
 } from "@/lib/page-theory-functions"
+import { resolveScaleTargetNoteIndex } from "@/lib/scale-target-note"
+import { scaleDegreeLabels } from "@/lib/scale-degree-display"
 import { getNoteButtonColor as computeNoteButtonColor } from "@/lib/fretboard-note-button-color"
 import { ALL_PRACTICE_LEVELS, PRACTICE_MODE_GROUPS } from "@/lib/practice-levels"
 
@@ -847,6 +849,9 @@ export default function FretMasterPage() {
   const scaleKeyRef = useRef(scaleKey)
   const scaleExerciseSequenceRef = useRef(scaleExerciseSequence)
   const scaleExerciseCurrentStepRef = useRef(scaleExerciseCurrentStep)
+  // 当前音阶对象也要进 ref：麦克风匹配回调需要它做「音级 → 半音」解析，
+  // 但不能把它放进 useCallback 依赖 —— 换音阶会重建回调，打断正在跑的音频处理循环。
+  const selectedScaleRef = useRef(selectedScale)
   // 一弦三音连击：用 ref 记账再同步进 state。
   // 不能在 setState updater 里更新 maxCombo —— updater 必须是纯函数（StrictMode 会双调用）。
   const scaleComboRef = useRef(0)
@@ -878,6 +883,7 @@ export default function FretMasterPage() {
     scaleKeyRef.current = scaleKey
     scaleExerciseSequenceRef.current = scaleExerciseSequence
     scaleExerciseCurrentStepRef.current = scaleExerciseCurrentStep
+    selectedScaleRef.current = selectedScale
     chordExerciseTargetChordRef.current = chordExerciseTargetChord
     chordExerciseSequenceRef.current = chordExerciseSequence
     chordExerciseCurrentStepRef.current = chordExerciseCurrentStep
@@ -892,7 +898,7 @@ export default function FretMasterPage() {
     shouldRandomizeKeyOnRepeatRef.current = shouldRandomizeKeyOnRepeat
     progressionRepeatRef.current = progressionRepeat
     levelOptionsRef.current = getLevelOptions()
-  }, [isPlaying, activeTab, sensitivity, confidenceThreshold, targetNote, scaleKey, scaleExerciseSequence, scaleExerciseCurrentStep, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, currentIntervalExercise, currentChordIndex, chordDegreeCurrentStep, practiceLevel, findRootFirst, nextChordInfo, shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat, getLevelOptions, audioSettings.pitchAlgorithm, chordSymbols.sevenFlatNineScaleChoice, score, scoreRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, currentIntervalExerciseRef, addRootBack])
+  }, [isPlaying, activeTab, sensitivity, confidenceThreshold, targetNote, scaleKey, scaleExerciseSequence, scaleExerciseCurrentStep, selectedScale, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, currentIntervalExercise, currentChordIndex, chordDegreeCurrentStep, practiceLevel, findRootFirst, nextChordInfo, shouldVoiceLead, shouldRandomizeKeyOnRepeat, progressionRepeat, getLevelOptions, audioSettings.pitchAlgorithm, chordSymbols.sevenFlatNineScaleChoice, score, scoreRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, currentIntervalExerciseRef, addRootBack])
 
   const setIntervalPracticeSettings = store.setIntervalPracticeSettings
   useEffect(() => {
@@ -1603,6 +1609,9 @@ export default function FretMasterPage() {
       language,
       chordScaleDisplay,
       noteAccidentalDisplay,
+      // 🚨 原先漏了 theme：import 侧读 `settings.theme`，而 export 侧没写它
+      // ⇒ 换设备/重装后主题永远被重置成 dark（界面静默变样，且无从回溯）。
+      theme,
       practiceTime,
       fretCount,
       metronomeBpm,
@@ -1621,7 +1630,7 @@ export default function FretMasterPage() {
     a.click()
     URL.revokeObjectURL(url)
     toast.success(t('export_settings'))
-  }, [language, chordScaleDisplay, noteAccidentalDisplay, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, customChords, t])
+  }, [language, chordScaleDisplay, noteAccidentalDisplay, theme, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, customChords, t])
 
   // 导入设置
   const importSettings = useCallback((file: File) => {
@@ -1629,19 +1638,32 @@ export default function FretMasterPage() {
     reader.onload = (e) => {
       try {
         const settings = JSON.parse(e.target?.result as string)
-        setLanguage(settings.language || 'zh-CN')
-        setChordScaleDisplay(settings.chordScaleDisplay || (settings.language === 'en' ? 'english' : 'chinese'))
-        setNoteAccidentalDisplay(settings.noteAccidentalDisplay || 'sharp')
-        setTheme(settings.theme || 'dark')
-        setPracticeTime(settings.practiceTime || 60)
-        setFretCount(settings.fretCount || 15)
-        setMetronomeBpm(settings.metronomeBpm || 80)
-        setInputGain(settings.inputGain || 1)
-        setCooldownEnabled(settings.cooldownEnabled || false)
-        setCooldownDuration(settings.cooldownDuration || 1000)
-        setConfidenceThreshold(settings.confidenceThreshold || 0.8)
-        setSensitivity(settings.sensitivity || 0.5)
-        if (settings.customChords) setCustomChords(settings.customChords)
+        // 🚨 这里原先一律用 `||` 取缺省值，会把**合法的 0 / false 吞掉**：
+        // `inputGain` 滑块 `min={0}`，导出 0 再导回就变成 1（`sensitivity` /
+        // `confidenceThreshold` / `cooldownDuration` 同理），而用户完全看不出
+        // 「设置没被还原」。改用「只认正确类型」的取值器：既不吃 0/false，
+        // 也顺手挡掉手改 JSON 带来的 NaN / 错类型。
+        const num = (v: unknown, fallback: number) =>
+          typeof v === 'number' && Number.isFinite(v) ? v : fallback
+        const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback)
+        // 泛型 `<T extends string>` 是为了保住字面量联合类型（ThemeMode / 语言码…），
+        // 否则返回值退化成 `string`、setter 不收。
+        const str = <T extends string>(v: unknown, fallback: T): T =>
+          typeof v === 'string' && v.length > 0 ? (v as T) : fallback
+
+        setLanguage(str(settings.language, 'zh-CN'))
+        setChordScaleDisplay(str(settings.chordScaleDisplay, settings.language === 'en' ? 'english' : 'chinese'))
+        setNoteAccidentalDisplay(str(settings.noteAccidentalDisplay, 'sharp'))
+        setTheme(str(settings.theme, 'dark'))
+        setPracticeTime(num(settings.practiceTime, 60))
+        setFretCount(num(settings.fretCount, 15))
+        setMetronomeBpm(num(settings.metronomeBpm, 80))
+        setInputGain(num(settings.inputGain, 1))
+        setCooldownEnabled(bool(settings.cooldownEnabled, false))
+        setCooldownDuration(num(settings.cooldownDuration, 1000))
+        setConfidenceThreshold(num(settings.confidenceThreshold, 0.8))
+        setSensitivity(num(settings.sensitivity, 0.5))
+        if (Array.isArray(settings.customChords)) setCustomChords(settings.customChords)
         toast.success(t('import_success'))
       } catch {
         toast.error(t('error_occurred'))
@@ -2483,7 +2505,13 @@ export default function FretMasterPage() {
       if (sequence.length === 0 || step >= sequence.length) return
 
       const currentDegree = sequence[step]
-      const semitone = intervalToSemitones[currentDegree]
+      // 🚨 与点击 / MIDI 两条路径共用同一个真相源。这里原先直接用 `intervalToSemitones`，
+      // 那张表**缺 `#2` 和 `maj7`** ⇒ 含它们的音阶（Altered / Lydian #9 /
+      // Lydian Augmented #2 / Diminished Half Whole / Augmented Scale）解析出
+      // `undefined` ⇒ 下面 `return` ⇒ **弹对了没反应，且不报错**。
+      // 另外它对 `#6` 记的是 9，而 Whole Tone / Augmented Scale 里的 `#6` 是 10
+      // ⇒ 要求弹低半音的那个音（练习照常推进，只是判错，比上面更隐蔽）。
+      const semitone = resolveScaleDegreeSemitone(selectedScaleRef.current, currentDegree)
       if (semitone === undefined) return
 
       const targetSemitone = targetSemitoneOf(noteToSemitones[key] || 0, semitone)
@@ -3506,14 +3534,12 @@ export default function FretMasterPage() {
           //     ⇒ 下面 break ⇒ **当前题永远不推进**（表现为「弹对了没反应」）且不报错；
           //  ② 手写表把 `#6` 记成 9，而 Whole Tone / Augmented Scale 里的 `#6` 是 10
           //     ⇒ 要求弹低半音的那个音，练习照常推进但判定错 —— 比 ① 更隐蔽。
-          const semitone = resolveScaleDegreeSemitone(selectedScale, currentDegree)
-          if (semitone === undefined) {
+          const targetNoteIdx = resolveScaleTargetNoteIndex(selectedScale, currentDegree, scaleKey)
+          if (targetNoteIdx === undefined) {
             logger.warn('[scale] 未知音级标签，练习无法推进', currentDegree, selectedScale.name)
             break
           }
           
-          const keyIdx = getNoteIndex(scaleKey)
-          const targetNoteIdx = (keyIdx + semitone) % 12
           const playedNoteIdx = getNoteIndex(note)
           
           if (playedNoteIdx === targetNoteIdx) {
@@ -3739,14 +3765,19 @@ export default function FretMasterPage() {
           if (scaleExerciseSequence.length > 0) {
             const currentDegree = scaleExerciseSequence[scaleExerciseCurrentStep]
             const noteIdx = getNoteIndex(clickedNote)
-            const keyIdx = getNoteIndex(scaleKey)
-            const semitoneToDegree: Record<number, string> = {
-              0: "1", 1: "b2", 2: "2", 3: "b3", 4: "3", 5: "4",
-              6: "b5", 7: "5", 8: "b6", 9: "6", 10: "b7", 11: "7"
+            // 🚨 与 MIDI 路径共用真相源 `resolveScaleTargetNoteIndex`，**禁止**再手写
+            // 「半音 → 音级标签」反查表：音级标签是**异名同音**的（#4/b5、#5/b6、#2/b3…），
+            // 反查表只能表达其中一侧，另一侧永远比不上 ⇒ 弹对了判错。
+            // 实测（76 个音阶穷举）22 个音阶受影响，含最常用的 Lydian（#4 被反查成 b5）
+            // 与 Blues（#4）；Whole Tone 的 #4/#5/#6 三个音全错。
+            // 正向比较（标签 → 半音 → 音名下标）从根上不需要「选哪一侧」。
+            // 与 MIDI 路径共用 `lib/scale-target-note.ts` 这一个真相源。
+            const targetNoteIdx = resolveScaleTargetNoteIndex(selectedScale, currentDegree, scaleKey)
+            if (targetNoteIdx === undefined) {
+              logger.warn('[scale] 未知音级标签，练习无法推进', currentDegree, selectedScale.name)
+              break
             }
-            const clickedInterval = (noteIdx - keyIdx + 12) % 12
-            const clickedDegree = semitoneToDegree[clickedInterval]
-            isCorrect = clickedDegree === currentDegree
+            isCorrect = noteIdx === targetNoteIdx
           }
           break
           
@@ -3812,7 +3843,7 @@ export default function FretMasterPage() {
         handleMIDINoteInput(clickedNote)
       }, 100)
     }
-  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords])
+  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, selectedScale, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords])
 
   const updateLevelOptions = useCallback((levelId: string) => {
     const level = ALL_SOLO_LEVELS.find(l => l.id === levelId)
@@ -4889,26 +4920,11 @@ export default function FretMasterPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{t('scale_intervals')}:</span>
-                      <span className="font-mono">{formatDegree(selectedScale.intervals?.join(', ') || selectedScale.notes.map(n => {
-                        const semitoneToDegree: Record<number, string> = {
-                          0: "1", 1: "b9", 2: "2", 3: "b3", 4: "3", 5: "4",
-                          6: "#4", 7: "5", 8: "b6", 9: "6", 10: "b7", 11: "7"
-                        }
-                        return semitoneToDegree[n] || String(n)
-                      }).join(', '))}</span>
+                      <span className="font-mono">{formatDegree(scaleDegreeLabels(selectedScale).join(', '))}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{t('scale_notes')}:</span>
-                      <span className="font-mono">{(() => {
-                        const intervals = selectedScale.intervals || selectedScale.notes.map(n => {
-                          const semitoneToDegree: Record<number, string> = {
-                            0: "1", 1: "b2", 2: "2", 3: "b3", 4: "3", 5: "4",
-                            6: "b5", 7: "5", 8: "b6", 9: "6", 10: "b7", 11: "7"
-                          }
-                          return semitoneToDegree[n] || String(n)
-                        })
-                        return getScaleNoteNames(scaleKey, intervals).join(', ')
-                      })()}</span>
+                      <span className="font-mono">{getScaleNoteNames(scaleKey, scaleDegreeLabels(selectedScale)).join(', ')}</span>
                     </div>
                   </div>
                 </div>

@@ -182,9 +182,15 @@ function extractScaleCase(src: string): string {
   return end < 0 ? src.slice(start) : src.slice(start, end)
 }
 
-/** 该分支是否走了 lib 的音级解析 */
+/**
+ * 该分支是否走了 lib 的音级解析。
+ *
+ * 两个名字都算：MIDI/麦克风路径与点击路径现已统一收敛到 `resolveScaleTargetNoteIndex`
+ * （它内部再调 `resolveScaleDegreeSemitone`）。只认后者会让「接线到了更外层真相源」
+ * 这种合法重构误报成断线。
+ */
 function usesResolveHelper(block: string): boolean {
-  return /resolveScaleDegreeSemitone\s*\(/.test(block)
+  return /resolveScaleTargetNoteIndex\s*\(/.test(block) || /resolveScaleDegreeSemitone\s*\(/.test(block)
 }
 
 describe('接线：app/page.tsx 的音阶分支必须走 lib 的音级解析', () => {
@@ -200,12 +206,16 @@ describe('接线：app/page.tsx 的音阶分支必须走 lib 的音级解析', (
     expect(usesResolveHelper('const semitone = degreeToSemitoneOfScale[deg]')).toBe(false)
     // 负样本：把真源码里的调用换掉后必须变 false
     expect(
-      usesResolveHelper(scaleCase.replace(/resolveScaleDegreeSemitone\s*\(/g, 'legacyLookup('))
+      usesResolveHelper(
+        scaleCase
+          .replace(/resolveScaleTargetNoteIndex\s*\(/g, 'legacyLookup(')
+          .replace(/resolveScaleDegreeSemitone\s*\(/g, 'legacyLookup(')
+      )
     ).toBe(false)
   })
 
-  it('音阶分支用 resolveScaleDegreeSemitone(selectedScale, currentDegree) 取半音', () => {
-    expect(scaleCase).toContain('resolveScaleDegreeSemitone(selectedScale, currentDegree)')
+  it('音阶分支用 resolveScaleTargetNoteIndex(selectedScale, currentDegree, scaleKey) 取目标音', () => {
+    expect(scaleCase).toContain('resolveScaleTargetNoteIndex(selectedScale, currentDegree, scaleKey)')
   })
 
   it('页面里不再有第二个真相源（内联的 mod-12 手写表）', () => {
@@ -215,7 +225,7 @@ describe('接线：app/page.tsx 的音阶分支必须走 lib 的音级解析', (
   })
 
   it('未知音级仍然拒绝推进并告警（不是当成 0 继续跑）', () => {
-    expect(scaleCase).toContain('semitone === undefined')
+    expect(scaleCase).toContain('targetNoteIdx === undefined')
     expect(scaleCase).toMatch(/logger\.warn\(\s*'\[scale\]/)
     expect(scaleCase).toContain('break')
   })
