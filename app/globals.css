@@ -1466,3 +1466,23 @@
 .ft-legend-D {
   color: var(--ft-form-D);
 }
+
+/* ===== 对掉 Radix 浮层的「滚动条补偿」，它在本项目里是纯损失 =====
+   Radix 的 Select/Dialog 等（经 react-remove-scroll）打开时会给 body 注入：
+     body[data-scroll-locked] { margin-right: <滚动条宽>px !important; ... }
+   意图是补偿「页面滚动条被移除」造成的宽度跳变。
+   但本项目的滚动条是 **html 上常驻**的（`html { overflow-y: scroll }` +
+   `scrollbar-gutter: stable`，见下方 @layer base），打开浮层并不会让它消失 ——
+   真机实测（headless Chrome，脚本 scripts/cdp-probe-select.mjs）：
+     打开前 documentElement.clientWidth = 1246，打开后 **仍是 1246**；
+     而 body 的 margin-right 从 0px 变成 8px，body 宽度 1246 → 1238，
+     下拉框右边界 722 → 718（Δ = −4，容器居中所以左右各移一半）。
+   ⇒ 这笔补偿没有换来任何东西，只让页面右侧整体左移一个滚动条宽，
+      用户看到的就是「点开下拉选框时，最右边的边框向左跳」。
+   这里用**更高特异性**对掉它（html body[...] (0,1,1) > body[...] (0,1,0)）。
+   ⚠️ 这条规则必须留在文件顶层：若放进 @layer，会被 Radix 的非分层运行时样式压过，
+      与特异性无关。
+   ⚠️ 若将来引入「body 自身可滚动」的布局，需要重新评估本规则。 */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
