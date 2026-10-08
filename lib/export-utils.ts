@@ -178,6 +178,30 @@ const getDetailName = (stat: PracticeStats): string => {
 }
 
 /**
+ * 记录是否带**真实可用**的时间戳。
+ *
+ * 🚨 不能用 parseDbTimestamp 的返回值来判断：它对空值/非法值一律回退成
+ * `new Date()`（该语义已被 __tests__/stats-panel-export.test.ts 钉住），
+ * 永远返回合法 Date ⇒ 无法区分「真的发生在这一刻」与「压根没有时间戳」。
+ * 判定必须直接检视原始字段。
+ */
+const hasUsableTimestamp = (stat: PracticeStats): boolean => {
+  const raw = stat.created_at || stat.date
+  if (raw == null) return false
+  return typeof raw === 'string' ? raw.trim().length > 0 : true
+}
+
+/**
+ * 取排序/去重用的绝对时间（毫秒）。
+ *
+ * 无可用时间戳时返回 `-Infinity`：倒序排序里自然落到最末，且与任何真实时间
+ * 相减得到 ±Infinity、两条都无时间戳时得到 NaN —— 都不会落进
+ * `gap < minDuration * 1000` 的区间，因此不会误判成「时长重叠」。
+ */
+const timestampMs = (stat: PracticeStats): number =>
+  hasUsableTimestamp(stat) ? parseDbTimestamp(stat.created_at || stat.date).getTime() : -Infinity
+
+/**
  * 规范化并去重统计数据。
  * 1. 按 id 去重（如果有 id）
  * 2. 按 (时间戳+类型+详情) 去重（防止重复保存）
@@ -218,28 +242,31 @@ function normalizeAndDeduplicate(
   const seen = new Set<string>()
   const deduped: PracticeStats[] = []
   for (const stat of filtered) {
-    const ts = parseDbTimestamp(stat.created_at || stat.date).getTime()
     const type = stat.exercise_type || stat.exerciseType || ''
     const detail = getDetailName(stat)
-    // 按时间戳+类型+详情模糊去重（对所有记录生效，不区分有无 id）
-    const fuzzyKey = `t:${ts}|type:${type}|detail:${detail}`
-    if (seen.has(fuzzyKey)) continue
-    // 有 id 时额外按 id 去重
+    // 有 id 时按 id 去重
     if (stat.id != null) {
       const idKey = `id:${stat.id}`
       if (seen.has(idKey)) continue
       seen.add(idKey)
     }
-    seen.add(fuzzyKey)
+    // 按时间戳+类型+详情模糊去重（对所有记录生效，不区分有无 id）。
+    // 🚨 只在原始时间戳**真实存在**时才登记 fuzzyKey：parseDbTimestamp 对空值会
+    // 回退成「当前时刻」，一批无时间戳的记录会在同一毫秒内塌缩到同一个 key 上
+    // 互相吞掉 —— 实测 3 条无时间戳记录导出后只剩 1 条（静默丢数据）。
+    if (hasUsableTimestamp(stat)) {
+      const fuzzyKey = `t:${timestampMs(stat)}|type:${type}|detail:${detail}`
+      if (seen.has(fuzzyKey)) continue
+      seen.add(fuzzyKey)
+    }
     deduped.push(stat)
   }
 
   // 按时间倒序排序（最新的在前），便于后续相邻去重
-  deduped.sort((a, b) => {
-    const ta = parseDbTimestamp(a.created_at || a.date).getTime()
-    const tb = parseDbTimestamp(b.created_at || b.date).getTime()
-    return tb - ta
-  })
+  // ⚠️ 无时间戳的记录一律折成 -Infinity 参与排序：若沿用 parseDbTimestamp 的
+  // 「回退当前时刻」，comparator 每被调用一次就取到一个**全新的 now**，同一批
+  // 数据前后两次求值不同 ⇒ 比较不可传递、导出顺序不确定。（有合法时间戳时无此问题。）
+  deduped.sort((a, b) => timestampMs(b) - timestampMs(a))
 
   // 相邻同类型去重：若两条记录时间差 < 声称的 duration，则后者视为重复
   // （一次 60 秒的练习不可能在 27 秒后再次完成）
@@ -249,8 +276,10 @@ function normalizeAndDeduplicate(
   let prevKept: PracticeStats | null = null
   for (const stat of deduped) {
     if (prevKept) {
-      const prevTs = parseDbTimestamp(prevKept.created_at || prevKept.date).getTime()
-      const curTs = parseDbTimestamp(stat.created_at || stat.date).getTime()
+      // 用 timestampMs：它已把「无时间戳」折成 -Infinity，相减得到 ±Infinity/NaN，
+      // 落不进 gap < minDuration*1000 区间，故不会误杀合法记录。
+      const prevTs = timestampMs(prevKept)
+      const curTs = timestampMs(stat)
       const prevTypeKey = getExerciseTypeKey(prevKept.exercise_type || prevKept.exerciseType || '')
       const curTypeKey = getExerciseTypeKey(stat.exercise_type || stat.exerciseType || '')
       const prevDetail = getDetailName(prevKept)
