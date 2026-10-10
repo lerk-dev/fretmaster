@@ -34,6 +34,7 @@ import {
   INTERVALS,
   SCALE_MODES,
 } from "@/lib/page-theory-data"
+import { resolveAvailableStringIndexes } from "@/lib/string-index"
 import {
   normalizeNoteName,
   getNoteIndex,
@@ -2996,8 +2997,12 @@ export default function FretMasterPage() {
 
   const generateNewTarget = useCallback(() => {
     // 总是生成指板位置（在 fretboard 模式下不会被使用，但确保 buttons 模式下始终有值）
-    const allStrings = Array.from({ length: STRING_COUNT }, (_, i) => i + 1)
-    const availableStrings = selectedStrings.length > 0 ? selectedStrings : allStrings
+    // 🚨 弦号 → 行下标**一律**走唯一真相源（`lib/string-index.ts`）。
+    // 历史坑：这里原写成 `STRING_COUNT - 弦号`（镜像映射），而渲染端
+    // （practice-fretboard / guitarrun-fretboard）用 `下标 + 1` 当弦号 ⇒ 两端相反，
+    // 「限制弦」里**选中的弦被禁用、目标落在没选的弦上**（6 弦 63 种组合里 56 种中招），
+    // 表现为「出不在该弦上的音，看不到该位置无法答题」。护栏 string-index.test.ts。
+    const availableIndexes = resolveAvailableStringIndexes(selectedStrings, STRING_COUNT)
 
     // 限制练习 - 5品区: 仅在指定品区范围内生成品数
     let minFret = 0
@@ -3014,10 +3019,9 @@ export default function FretMasterPage() {
     if (weaknessWeightedEnabled) {
       const prev = highlightedTargetPositionRef.current
       // 候选总数多于一个时才排除上次位置，避免连续重复
-      const hasAlternatives = availableStrings.length * (maxFret - minFret + 1) > 1
+      const hasAlternatives = availableIndexes.length * (maxFret - minFret + 1) > 1
       const candidates: { si: number; fret: number; weight: number }[] = []
-      for (const s of availableStrings) {
-        const si = STRING_COUNT - s
+      for (const si of availableIndexes) {
         for (let f = minFret; f <= maxFret; f++) {
           if (prev && hasAlternatives && si === prev.stringIndex && f === prev.fret) continue
           candidates.push({ si, fret: f, weight: getPositionWeight(user.instrument, si, f) })
@@ -3034,13 +3038,11 @@ export default function FretMasterPage() {
         stringIndex = chosen.si
         baseFret = chosen.fret
       } else {
-        const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
-        stringIndex = STRING_COUNT - randomStringNum
+        stringIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)]
         baseFret = Math.floor(Math.random() * (maxFret - minFret + 1)) + minFret
       }
     } else {
-      const randomStringNum = availableStrings[Math.floor(Math.random() * availableStrings.length)]
-      stringIndex = STRING_COUNT - randomStringNum
+      stringIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)]
       baseFret = Math.floor(Math.random() * (maxFret - minFret + 1)) + minFret
     }
 

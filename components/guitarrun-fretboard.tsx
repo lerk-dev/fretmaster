@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { resolveInstrumentConfig } from '@/lib/practice-suggestions'
 import { formatDegree } from '@/lib/page-theory-functions'
 import { useAppStore, useIsPlaying, useUser, usePracticeSettings } from '@/lib/store'
+import { stringIndexToNumber } from '@/lib/string-index'
 import {
   resolveFretCellRole,
   type FretCellRole,
@@ -224,7 +225,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
         t={t}
         onCellClick={handleFretClick}
         isCellEnabled={(stringIndex) =>
-          activeTab !== 'practice' || selectedStrings.includes(stringIndex + 1)
+          activeTab !== 'practice' || selectedStrings.includes(stringIndexToNumber(stringIndex))
         }
       />
     )
@@ -237,7 +238,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
           <div className="gr-fretboard" style={{ gridTemplateColumns }}>
             {rows.map((stringRow, stringIndex) => {
               // 找音练习：未被选中的弦不可点击（与经典皮肤一致）
-              const isStringEnabled = activeTab !== 'practice' || selectedStrings.includes(stringIndex + 1)
+              const isStringEnabled = activeTab !== 'practice' || selectedStrings.includes(stringIndexToNumber(stringIndex))
               const cells = []
               for (let fret = 0; fret <= fretCount; fret++) {
                 const { role, degree, showText, note } = stringRow[fret]
@@ -254,7 +255,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
                       isStringEnabled
                         ? t('fretboard_position_label')
                             .replace('{note}', formatNoteByAccidentalSetting(note))
-                            .replace('{string}', String(stringIndex + 1))
+                            .replace('{string}', String(stringIndexToNumber(stringIndex)))
                             .replace('{fret}', String(fret))
                         : undefined
                     }

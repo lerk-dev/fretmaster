@@ -9,6 +9,7 @@ import { resolveInstrumentConfig } from '@/lib/practice-suggestions'
 import { resolveFretCellRole, type FretboardRoleContext, type ThreeNpsPreviewKind } from '@/lib/fretboard-cell-role'
 import { formatDegree } from '@/lib/page-theory-functions'
 import { useAppStore, useIsPlaying, useUser, usePracticeSettings } from '@/lib/store'
+import { stringIndexToNumber } from '@/lib/string-index'
 
 interface PracticeFretboardProps {
   /** 翻译函数 */
@@ -239,8 +240,9 @@ export const PracticeFretboard = memo(function PracticeFretboard({
 
       {/* String labels and frets */}
       {tuning.map((_, stringIndex) => {
-        // 找音练习：检查弦是否被选中（stringIndex 0-5 对应 1-6弦）
-        const stringNum = stringIndex + 1
+        // 找音练习：检查弦是否被选中（下标 0-5 对应 1-6 弦）
+        // 🚨 弦号一律走唯一真相源；出题端也用同一份（见 lib/string-index.ts 的历史坑说明）
+        const stringNum = stringIndexToNumber(stringIndex)
         const isStringEnabled = activeTab !== "practice" || selectedStrings.includes(stringNum)
         const openCell = cellOf(stringIndex, 0)
 
@@ -256,7 +258,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
               onClick={() => isStringEnabled && handleFretClick(stringIndex, 0)}
               disabled={!isStringEnabled}
               data-role={openCell.role}
-              aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(openCell.note)).replace('{string}', String(stringIndex + 1)).replace('{fret}', '0') : undefined}
+              aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(openCell.note)).replace('{string}', String(stringIndexToNumber(stringIndex))).replace('{fret}', '0') : undefined}
               className={cn(
                 // 🚨 字体与 1..n 品**必须同一条栈**（Globals.css 的 --font-fretboard）：
                 // 空弦原来是 `font-mono`、其余品是默认 sans ⇒ 同一个音名在第 0 品与第 1 品
@@ -287,7 +289,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                   onClick={() => isStringEnabled && handleFretClick(stringIndex, actualFret)}
                   disabled={!isStringEnabled}
                   data-role={role}
-                  aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(note)).replace('{string}', String(stringIndex + 1)).replace('{fret}', String(actualFret)) : undefined}
+                  aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(note)).replace('{string}', String(stringIndexToNumber(stringIndex))).replace('{fret}', String(actualFret)) : undefined}
                   className={cn(
                     // 🚨 音名字号比空弦列小一档是**刻意**的（刻度 4xs8 < 3xs9 < 2xs10 < xs12）；
                     // 2026-10-07 用户要求「音字体调大一号」⇒ 由 `text-4xs sm:text-2xs` 上移一档。
