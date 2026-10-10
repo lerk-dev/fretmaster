@@ -221,7 +221,11 @@ export const FocusMode = memo(function FocusMode({
 
   const remainingTime = currentPhaseDuration - pomodoroTime
   const correctRate = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0
-  const practiceProgress = practiceTime > 0 ? Math.min(100, Math.round(((practiceTime * 60 - timeLeft) / (practiceTime * 60)) * 100)) : 0
+  // 🚨 `practiceTime` 的单位是**秒**（store 默认 300；page.tsx 直接 `setTimeLeft(practiceTime)`，
+  //    计时器每秒 −1；音程练习那条路径也是 `duration * 60` 先折成秒再传）。
+  //    旧实现把分母写成 `practiceTime * 60`（当成分钟）⇒ 放大 60 倍，练习刚开始
+  //    进度就显示 ~98%，全程在 98%→100% 间爬。
+  const practiceProgress = practiceTime > 0 ? Math.min(100, Math.round(((practiceTime - timeLeft) / practiceTime) * 100)) : 0
 
   // 收起状态：只显示一个小条
   if (collapsed) {

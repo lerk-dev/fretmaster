@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { logger } from '@/lib/logger'
 import { getAudioContextClass } from '@/lib/utils'
 import { useFeedbackSoundSettings } from '@/lib/store'
@@ -30,6 +30,20 @@ export function useFeedbackSound() {
   // 反馈音共享 AudioContext，避免每次播放都创建新实例导致内存泄漏和配额耗尽
   // （浏览器/WebView 通常限制约 6 个 AudioContext 实例）
   const feedbackAudioCtxRef = useRef<AudioContext | null>(null)
+  // 🚨 P3-8：自动隐藏定时器必须去重 + 卸载清理。此前每次 trigger 都新挂一个裸 setTimeout，
+  //    高速连答（同一题答错立即再点下一题）时，**前一题的定时器**会先把后一题的反馈熄灭
+  //    ⇒ 后一题的正误提示一闪而过甚至完全不显示；卸载后还会在已卸载组件上 setState。
+  const correctFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wrongFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (correctFeedbackTimerRef.current !== null) clearTimeout(correctFeedbackTimerRef.current)
+      if (wrongFeedbackTimerRef.current !== null) clearTimeout(wrongFeedbackTimerRef.current)
+      correctFeedbackTimerRef.current = null
+      wrongFeedbackTimerRef.current = null
+    },
+    []
+  )
   const playFeedbackSound = useCallback((isCorrect: boolean) => {
     if (!feedbackSoundSettings.enabled) return
     if (isCorrect && !feedbackSoundSettings.correctSound) return
@@ -75,19 +89,24 @@ export function useFeedbackSound() {
   const triggerCorrectFeedback = useCallback((note: string) => {
     setCorrectFeedbackNote(note)
     setShowCorrectFeedback(true)
-    
-    setTimeout(() => {
+
+    // P3-8：先清掉上一题的定时器再挂新的（去重），否则旧定时器会提前熄灭本次反馈。
+    if (correctFeedbackTimerRef.current !== null) clearTimeout(correctFeedbackTimerRef.current)
+    correctFeedbackTimerRef.current = setTimeout(() => {
       setShowCorrectFeedback(false)
       setCorrectFeedbackNote(null)
+      correctFeedbackTimerRef.current = null
     }, 500)
   }, [])
   const triggerWrongFeedback = useCallback((note: string) => {
     setWrongFeedbackNote(note)
     setShowWrongFeedback(true)
 
-    setTimeout(() => {
+    if (wrongFeedbackTimerRef.current !== null) clearTimeout(wrongFeedbackTimerRef.current)
+    wrongFeedbackTimerRef.current = setTimeout(() => {
       setShowWrongFeedback(false)
       setWrongFeedbackNote(null)
+      wrongFeedbackTimerRef.current = null
     }, 600)
   }, [])
 

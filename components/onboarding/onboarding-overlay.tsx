@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useOnboarding } from "./onboarding-context"
 import { Button } from "@/components/ui/button"
@@ -91,10 +91,34 @@ export function OnboardingOverlay() {
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
   const [tooltipSize, setTooltipSize] = useState({ width: 320, height: 200 })
   const [mounted, setMounted] = useState(false)
+  // 🚨 气泡尺寸测量（P2-6）：
+  //    旧实现把测量写在**内联 ref 回调**里（`ref={(el) => { ...setTooltipSize(...) }}`）。
+  //    内联函数每次渲染都是新 identity ⇒ React 每次都会 detach/attach 一次，
+  //    于是 `setTooltipSize({新对象})` 每次都写进一个新对象引用 ⇒ 再渲染 ⇒ 再测量……
+  //    只要浮层出现，这个子树就持续重渲染（framer-motion 每帧重提交，低配设备掉帧）。
+  //    改为：真实 ref 持有 DOM + `useLayoutEffect` 测一次 + 尺寸未变则**不 setState**。
+  const tooltipRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  /**
+   * 测量气泡实际尺寸（供 `calculateTooltipPosition` 定位）。
+   *
+   * 判据是「尺寸**变了**才 setState」—— 这正是打断 P2-6 重渲染循环的关键：
+   * 用同一个值反复 setState 在 React 里仍算一次更新（新对象 ≠ 旧对象），会自续。
+   * 用 `useLayoutEffect` 是为了在浏览器绘制前拿到尺寸，避免气泡先闪一帧再跳位。
+   */
+  useLayoutEffect(() => {
+    if (!mounted || !isActive || !currentStep) return
+    const el = tooltipRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const w = Math.round(rect.width)
+    const h = Math.round(rect.height)
+    setTooltipSize((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }))
+  }, [mounted, isActive, currentStep, targetRect])
 
   const updateTargetPosition = useCallback(() => {
     if (currentStep?.targetSelector) {
@@ -205,12 +229,7 @@ export function OnboardingOverlay() {
         )}
 
         <motion.div
-          ref={(el) => {
-            if (el) {
-              const rect = el.getBoundingClientRect()
-              setTooltipSize({ width: rect.width, height: rect.height })
-            }
-          }}
+          ref={tooltipRef}
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ 
             opacity: isPaused ? 0.5 : 1, 

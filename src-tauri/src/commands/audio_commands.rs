@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 use crate::audio::{AudioDeviceInfo, AudioLevelInfo, device, preprocessor};
-use crate::audio::pipeline::{self, AppState};
+use crate::audio::pipeline::AppState;
 
 #[tauri::command]
 pub async fn get_audio_devices() -> Result<Vec<AudioDeviceInfo>, String> {
@@ -331,8 +331,9 @@ pub async fn start_pitch_stream(
 ) -> Result<(), String> {
     let interval = interval_ms.unwrap_or(50);
     let pipeline = state.inner().pipeline.clone();
-    let running = state.inner().pitch_stream_running.clone();
-    pipeline::start_pitch_stream(app, pipeline, running, interval);
+    // start 内部会先 stop+join 旧线程，因此 stop → start 的紧邻调用不会留下双检测线程。
+    let mut stream = state.inner().pitch_stream.lock();
+    stream.start(app, pipeline, interval);
     Ok(())
 }
 
@@ -340,7 +341,8 @@ pub async fn start_pitch_stream(
 pub async fn stop_pitch_stream(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    pipeline::stop_pitch_stream(&state.inner().pitch_stream_running);
+    let mut stream = state.inner().pitch_stream.lock();
+    stream.stop();
     Ok(())
 }
 
@@ -348,7 +350,7 @@ pub async fn stop_pitch_stream(
 pub async fn is_pitch_stream_running(
     state: State<'_, AppState>,
 ) -> Result<bool, String> {
-    Ok(state.inner().pitch_stream_running.load(std::sync::atomic::Ordering::SeqCst))
+    Ok(state.inner().pitch_stream.lock().is_running())
 }
 
 #[tauri::command]

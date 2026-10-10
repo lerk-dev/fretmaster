@@ -267,8 +267,8 @@ describe('action 落点矩阵：每个 action 只改自己那一个字段', () =
   }
 })
 
-describe('resetSettings 的作用范围（钉住现状，见文件末说明）', () => {
-  it('只回默认 6 个 slice：audio / practice / metronome / feedbackSound / focusMode / user', () => {
+describe('resetSettings 的作用范围（对用户承诺「恢复所有设置」）', () => {
+  it('回默认 8 个 slice/字段：6 个 slice + displayScale + chordSymbols', () => {
     S().setMicEnabled(true)
     S().setMetronomeBpm(150)
     S().setFocusModeEnabled(true)
@@ -276,6 +276,9 @@ describe('resetSettings 的作用范围（钉住现状，见文件末说明）',
     S().setFeedbackSoundEnabled(false)
     S().setPracticeTime(999)
     S().setNoiseFloor(0.008)
+    // P2-4：这两个也是「设置弹窗里能改 + 会被持久化」的顶层字段，必须一起回默认
+    S().setDisplayScale(1.5)
+    S().setChordSymbolSettings({ useUnicode: false, minorSymbol: '-' })
 
     S().resetSettings()
 
@@ -287,22 +290,20 @@ describe('resetSettings 的作用范围（钉住现状，见文件末说明）',
     expect(S().practice.practiceTime).toBe(300)
     // 校准结果是 audio slice 的字段 ⇒ 跟着一起回默认（没有值 = 下次用 EMA 默认初值）
     expect(S().audio.noiseFloor).toBeUndefined()
+    expect(S().displayScale).toBe(1)
+    expect(S().chordSymbols.useUnicode).toBe(true)
   })
 
-  it('**不**回默认 chordSymbols / scalePractice / intervalPractice / chordProgression / displayScale', () => {
-    S().setChordSymbolSettings({ useUnicode: false })
+  it('**不**回默认 scalePractice / intervalPractice / chordProgression（练习进度类，非设置）', () => {
     S().setScalePracticeSettings({ scaleKey: 'D' })
     S().setIntervalPracticeSettings({ rootNote: 'E' })
     S().setChordProgressionSettings({ selectedSongId: 'song-1' })
-    S().setDisplayScale(1.5)
 
     S().resetSettings()
 
-    expect(S().chordSymbols.useUnicode).toBe(false)
     expect(S().scalePractice.scaleKey).toBe('D')
     expect(S().intervalPractice.rootNote).toBe('E')
     expect(S().chordProgression.selectedSongId).toBe('song-1')
-    expect(S().displayScale).toBe(1.5)
   })
 
   it('重置后的 slice 与 initialState 是**同一个对象引用**（共享默认值，见文末说明）', () => {

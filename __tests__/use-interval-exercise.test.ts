@@ -20,6 +20,7 @@ import { createRoot } from 'react-dom/client'
 import { useIntervalExercise } from '@/hooks/use-interval-exercise'
 import { useAppStore } from '@/lib/store'
 import { NOTES, INTERVALS } from '@/lib/page-theory-data'
+import { resolveDownIndex } from '@/lib/interval-direction'
 
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -56,9 +57,6 @@ afterEach(() => {
 const ROOT = 0 // '1'
 const THIRD = 5 // '3'（4 半音）
 const FIFTH = 9 // '5'（7 半音）
-
-/** 把 INTERVALS 下标换回半音数，便于断言「下行」映射 */
-const semitonesOf = (index: number) => INTERVALS[index].semitones
 
 beforeEach(() => {
   useAppStore.setState({
@@ -147,9 +145,9 @@ describe('generateIntervalExerciseQueue', () => {
     act(() => { api!.setIntervalDirection('down') })
     const q = api!.generateIntervalExerciseQueue()
     expect(q).toHaveLength(2)
-    // 每一项的半音数应等于原音程的下行补数 (12 - s) % 12
-    expect(semitonesOf(q[0])).toBe((12 - semitonesOf(THIRD)) % 12)
-    expect(semitonesOf(q[1])).toBe((12 - semitonesOf(FIFTH)) % 12)
+    // 每一项换成方向真相源给出的互补音程（按符号选边，不是半音数反查）
+    expect(q[0]).toBe(resolveDownIndex(THIRD))
+    expect(q[1]).toBe(resolveDownIndex(FIFTH))
     h.unmount()
   })
 
@@ -163,7 +161,7 @@ describe('generateIntervalExerciseQueue', () => {
     spy.mockRestore()
 
     expect(q).toHaveLength(2)
-    expect(semitonesOf(q[0])).toBe((12 - semitonesOf(THIRD)) % 12)
+    expect(q[0]).toBe(resolveDownIndex(THIRD))
     expect(q[1]).toBe(FIFTH)   // 原样返回，不是「换成它自己」
     h.unmount()
   })
@@ -175,15 +173,17 @@ describe('generateIntervalExerciseQueue', () => {
     expect(q).toHaveLength(4)
     // 每个原音程产生 [上行, 下行] 两项
     expect(q[0]).toBe(THIRD)
-    expect(semitonesOf(q[1])).toBe((12 - semitonesOf(THIRD)) % 12)
+    expect(q[1]).toBe(resolveDownIndex(THIRD))
     expect(q[2]).toBe(FIFTH)
-    expect(semitonesOf(q[3])).toBe((12 - semitonesOf(FIFTH)) % 12)
+    expect(q[3]).toBe(resolveDownIndex(FIFTH))
     h.unmount()
   })
 
   it('扩展音程（九度以上）没有下行等价项 → 原样保留该项，不产生 undefined', () => {
-    // INTERVALS 里的 9/b9/#9/11/#11/13/b13 半音数 ≥ 13，(12 - s) % 12 在 JS 里是负数，
-    // 查不到对应的下行音程 ⇒ downIndex === -1 ⇒ 必须回落到原下标。
+    // 复合音程（≥ 12 半音）无下行等价项 ⇒ resolveDownIndex 返回入参本身。
+    // 旧实现用 (12 - s) % 12 得到**负数**（如 9 度 = 14 半音 ⇒ -2），
+    // 同样是「原样保留」——所以这条用例无法区分新旧（见 interval-direction.test.ts
+    // 里对「负数取模」的专项用例）；此处只钉住「不产生 undefined」。
     const EXT = INTERVALS.findIndex((i) => i.semitones === 14)   // nine
     expect(EXT).toBeGreaterThanOrEqual(0)
 
@@ -224,12 +224,10 @@ describe('generateIntervalExerciseQueue', () => {
     const h = mount()
     act(() => { api!.setIntervalDirection('either') })
     act(() => { api!.setIntervalRandomizeOrder(true) })
-    const downOf = (i: number) =>
-      INTERVALS.findIndex(x => x.semitones === (12 - INTERVALS[i].semitones) % 12)
     const q = api!.generateIntervalExerciseQueue()
     expect(q).toHaveLength(4)
     expect([...q].sort((a, b) => a - b))
-      .toEqual([THIRD, FIFTH, downOf(THIRD), downOf(FIFTH)].sort((a, b) => a - b))
+      .toEqual([THIRD, FIFTH, resolveDownIndex(THIRD), resolveDownIndex(FIFTH)].sort((a, b) => a - b))
     h.unmount()
   })
 })

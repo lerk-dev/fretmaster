@@ -1069,9 +1069,18 @@ export type ScaleRootMovement =
   | 'circleOfFifths'
   | 'circleOfFourths'
 
-const SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'a', 'e', 'b', 'f♯', 'c♯', 'g♯', 'd♯']
+// 🚨 这两个列表用于「这个调该优先写 ♯ 还是 ♭」的判定，而入参已经过 `normalizeNoteName`
+//    （把所有 `b` 替换成 `♭`）⇒ 列表里的条目**也必须是归一化后的 ♯/♭ 写法**。
+//    旧写法混入了小写条目（`'a' / 'e' / 'f♯' / 'bb' / 'eb'` …）：
+//      - `'bb'` 归一化后是 `'♭♭'`（两个降号），永远比不中 ⇒ 死条目；
+//      - `'f♯'` / `'c♯'` 等小写字母形式也永远比不中（音名首字母必为大写）；
+//      - `'a' / 'e' / 'b' / 'd' / 'g' / 'c' / 'f'` 这些「小调」条目同样比不中
+//        （本函数收到的 key 不带 `m` 后缀，见 `scale-practice-logic.test.ts`）。
+//    结果：这些调落入「既非 sharp 也非 flat」⇒ `useSharps` 变成 `Math.random() > 0.5`
+//    抛硬币（用户侧表现为同一个调每次推进写法都在 ♯/♭ 之间跳）。这里改为纯归一化写法。
+const SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'G♯', 'D♯', 'A♯']
 
-const FLAT_KEYS = ['F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'd', 'g', 'c', 'f', 'bb', 'eb']
+const FLAT_KEYS = ['F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭']
 
 const ENHARMONIC_MAP: Record<string, string> = {
   'C#': 'D♭', 'D♭': 'C#', 'C♯': 'D♭',

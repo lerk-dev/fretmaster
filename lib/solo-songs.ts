@@ -201,6 +201,13 @@ export async function loadSoloSongs(): Promise<Song[]> {
   
   try {
     const response = await fetch('/data/songs.json')
+    // P3-7：必须显式查 `ok`。此前只 catch 解析异常 ⇒ 404/500 返回的 HTML 错误页
+    // 会让 `response.json()` 抛 SyntaxError，被下面的 catch 当成「解析错误」吞掉，
+    // 日志里看不到真实原因（HTTP 状态），排查时只能看到 "Unexpected token '<'"。
+    if (!response.ok) {
+      logger.error(`Failed to load songs: HTTP ${response.status} ${response.statusText}`)
+      return []
+    }
     const data: SoloSongsData = await response.json()
     cachedSongs = data.songs.map(convertSoloSong)
     return cachedSongs

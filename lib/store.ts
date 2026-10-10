@@ -973,6 +973,18 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
       
       // 重置
+      //
+      // 🚨 「恢复**所有**设置」是 UI 对用户的承诺（`reset_settings_hint` 文案），
+      //    所以凡是「用户在设置弹窗里能改、且被持久化」的顶层字段都必须回默认。
+      //    此前只回 6 个 slice，漏掉了两个同样是顶层、同样可改、同样会被存下来的：
+      //      - `displayScale`（显示缩放滑杆）
+      //      - `chordSymbols`（和弦符号 m / m7b5 / 7b9 / Unicode 的显示偏好）
+      //    用户在设置里改过这两个之后点「重置」，它们**静默保留** —— 宣称与行为不符。
+      //
+      // 有意**不**重置的（避免「重置设置」顺手清掉用户数据 / 练习进度）：
+      //      - `premium` / `customSongs` / `favorites`：用户资产，不是设置
+      //      - `scalePractice` / `intervalPractice` / `chordProgression`：
+      //        练习进度与配置的混合体，重置设置不应抹掉进度（如需请另给「清空进度」入口）
       resetSettings: () => set({
         audio: initialState.audio,
         practice: initialState.practice,
@@ -980,6 +992,8 @@ export const useAppStore = create<AppState & AppActions>()(
         feedbackSound: initialState.feedbackSound,
         focusMode: initialState.focusMode,
         user: initialState.user,
+        displayScale: initialState.displayScale,
+        chordSymbols: initialState.chordSymbols,
       }),
 
     }),

@@ -527,11 +527,18 @@ export class SOLOYinAnalyser {
         }
         const halfN = this.yinBuffer.length;
         const energyTerms = new Float32Array(halfN);
+        // E(0) = Σ_{i=0}^{W-1} x[i]²，其中 W = halfN
         for(let i = 0; i < halfN; i++){
             energyTerms[0] += buffer[i] * buffer[i];
         }
+        // E(τ) = Σ_{i=τ}^{τ+W-1} x[i]² = E(τ-1) − x[τ-1]² + x[τ-1+W]²
+        //
+        // 🚨 递推的「加项」下标必须是 `halfN - 1 + tau`。旧写法 `halfN + tau`
+        //    多移了一位，等价于给每个 d(τ) 掺入 −x[W]² + x[W+τ]² 的误差；
+        //    它不越界、不抛错，只在门限（0.15/0.2）边缘表现为「特定音高 / 大音量
+        //    下偶发检不出或八度跳变」这类难复现的怪象。
         for(let tau = 1; tau < halfN; tau++){
-            energyTerms[tau] = energyTerms[tau - 1] - buffer[tau - 1] * buffer[tau - 1] + buffer[halfN + tau] * buffer[halfN + tau];
+            energyTerms[tau] = energyTerms[tau - 1] - buffer[tau - 1] * buffer[tau - 1] + buffer[halfN - 1 + tau] * buffer[halfN - 1 + tau];
         }
         for(let i = 0; i < buffer.length; i++){
             this.audioBufferFFT[i * 2] = buffer[i];

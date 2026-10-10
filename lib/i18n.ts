@@ -407,6 +407,7 @@ export const TRANSLATIONS = {
         'custom_chord_empty_load': '没有可加载的和弦',
         'custom_chord_loaded': '和弦已加载',
         'custom_chord_saved': '和弦已保存',
+        'custom_chord_save_failed': '保存和弦失败（本地存储不可用或已满）',
         'custom_chord_unnamed': '未命名和弦',
         'custom_chord_empty': '和弦为空',
         'error_occurred': '发生错误',
@@ -1015,6 +1016,7 @@ export const TRANSLATIONS = {
         // 通用设置其他标签
         'settings_management': '设置管理',
         'reset_settings_hint': '点击重置按钮将恢复所有设置为默认值',
+        'settings_reset_done': '设置已重置为默认值',
         'chord_name_display': '和弦名显示',
         'chord_name_display_hint': '选择和弦名称的显示方式',
         'chord_name_english': '英文名',
@@ -1944,6 +1946,7 @@ export const TRANSLATIONS = {
         // 通用设置其他标签
         'settings_management': 'Settings Management',
         'reset_settings_hint': 'Click reset button to restore all settings to default values',
+        'settings_reset_done': 'Settings restored to defaults',
         'chord_name_display': 'Chord Name Display',
         'chord_name_display_hint': 'Select chord name display format',
         'chord_name_english': 'English',
@@ -2244,6 +2247,7 @@ export const TRANSLATIONS = {
         'custom_chord_loaded': 'Chords loaded',
         'custom_chord_not_found': 'Chord not found',
         'custom_chord_saved': 'Chords saved',
+        'custom_chord_save_failed': 'Failed to save chords (storage unavailable or full)',
         'custom_chord_unnamed': 'Unnamed Chord',
         'description': 'Description',
         'device_cooldown_duration': 'Cooldown Duration',

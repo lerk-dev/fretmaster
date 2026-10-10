@@ -1123,7 +1123,7 @@ dependencies = [
 
 [[package]]
 name = "fretmaster"
-version = "0.2.220"
+version = "0.2.223"
 dependencies = [
  "anyhow",
  "chrono",

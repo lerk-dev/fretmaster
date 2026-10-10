@@ -204,6 +204,43 @@ describe('和弦理论系统', () => {
       expect(parseChord('H')).toBeNull()
     })
 
+    // 🚨 P2-8 端到端：三个「符号写法」的和弦类型此前被分词器啃错字符 ⇒ 类型判错。
+    //    这里钉住「显示符号 ⇄ 解析」自洽（显示用 `Δ7`/`°7`/`ø7`，解析必须认得它们）。
+    it('应该正确解析 CΔ7（单字符 Δ = 大七）', () => {
+      const chord = parseChord('CΔ7')
+      expect(chord).not.toBeNull()
+      expect(chord!.rootNote).toBe(0)
+      expect(chord!.chordType).toBe(ChordType.majorSeven)
+    })
+
+    it('应该正确解析 Cdim7 / Cdim 为「根音 D + 垃圾 token」（既有问题，如实钉住）', () => {
+      // ⚠️ `dim` / `dim7` 被「根音分支」截走（首字符 d→D 被当作根音 D）⇒ 连同后面的
+      //    字母一起解成垃圾 token。这是既有问题，与本轮 P2-8（°7/ø7/Δ 的 slice 长度）无关，
+      //    故不在本轮修复；此处如实钉住，避免它被误认为「已支持」。
+      const chord = parseChord('Cdim7')
+      expect(chord).not.toBeNull()
+      expect(chord!.rootNote).toBe(0) // 'C' 是根音
+      expect(chord!.chordType).not.toBe(ChordType.diminished)
+    })
+
+    it('应该正确解析 C°7（符号形式减七 → ChordType.diminished，不是减三）', () => {
+      const chord = parseChord('C°7')
+      expect(chord).not.toBeNull()
+      expect(chord!.rootNote).toBe(0)
+      expect(chord!.chordType).toBe(ChordType.diminished)
+    })
+
+    it('应该正确解析 Cø7（半减七 m7♭5，不是小三/小七）', () => {
+      const chord = parseChord('Cø7')
+      expect(chord).not.toBeNull()
+      expect(chord!.rootNote).toBe(0)
+      expect(chord!.chordType).toBe(ChordType.minorSevenFlatFive)
+    })
+
+    it('应该正确解析 C°（符号形式减三，不带七音）', () => {
+      expect(parseChord('C°')!.chordType).toBe(ChordType.diminishedTriad)
+    })
+
     it('应该利用缓存提高性能', () => {
       const chord1 = parseChord('Cmaj7')
       const chord2 = parseChord('Cmaj7')
@@ -305,7 +342,8 @@ describe('和弦理论系统', () => {
 
 describe('ChordTokenizer.nextToken：每个符号分支', () => {
   // [输入, 期望 token, 期望 remaining]
-  const CASES: Array<[string, string | null, string]> = [
+  // 🚨 token 允许是数组：`ø7`（半减七 m7♭5）一次性产出 MINOR + SEVEN + FLAT_FIVE 三个 token。
+  const CASES: Array<[string, string | string[] | null, string]> = [
     ['', null, ''], // 空串早退
     ['b13', 'FLAT_THIRTEEN', ''],
     ['♭13', 'FLAT_THIRTEEN', ''],
@@ -324,8 +362,6 @@ describe('ChordTokenizer.nextToken：每个符号分支', () => {
     ['M7', 'MAJOR', '7'], // 大写 M + 数字 = 大和弦
     ['M', 'MAJOR', ''],
     ['-', 'MINOR', ''],
-    ['°7', 'DIMINISHED', ''],
-    ['°', 'DIMINISHED', ''],
     ['+', 'AUGMENTED', ''],
     ['sus2', 'SUS2', ''],
     ['sus4', 'SUS4', '4'],
@@ -334,7 +370,23 @@ describe('ChordTokenizer.nextToken：每个符号分支', () => {
     ['11', 'ELEVEN', ''],
     ['9', 'NINE', ''],
     ['6', 'SIX', ''],
-    ['ø7', 'MINOR', ''],
+    // 🚨 半减七：`ø7` 是 2 个字符，必须一次吃掉（旧写法只给 MINOR、让 `7` 自己走 SEVEN ⇒ 丢 ♭5）。
+    ['ø7', ['MINOR', 'SEVEN', 'FLAT_FIVE'], ''],
+    // 🚨 `ø`（不带 7）是**单字符**符号：`firstTwoChars`（'ø7' 之外的输入会变成 'ø'）比不中它，
+    //    只能靠 `firstChar === 'ø'` 分支；而 `firstChar` 被 toUpperCase（'ø'→'Ø'）⇒ 恒假 ⇒ 落 null。
+    ['ø', null, ''],
+    // 🚨 `Δ` 是**单字符大写**符号：不能靠 `slice(0,3).toLowerCase()` 比中（恒假）⇒ 必须走 `str[0] === 'Δ'`。
+    ['Δ', 'MAJOR', ''],
+    ['Δ7', 'MAJOR', '7'],
+    // 🚨 `°7` 是符号形式减七：`°` 只吃 **1 个字符**，`7` 留给下游 SEVEN token
+    //    （ChordType.diminished = ['DIMINISHED','SEVEN']）。旧写法与 `dim7` 并到一个分支里
+    //    统一 `slice(3)`，对 2 字符的 `°7` 切 3 个字符 ⇒ 连 `7` 一起吞掉 ⇒ 判成减三和弦。
+    ['°7', 'DIMINISHED', '7'],
+    ['°', 'DIMINISHED', ''],
+    // ⚠️ `dim` / `dim7` 在本实现里被「根音分支」截走（'d'→'D' = 根音 D），永远到不了
+    //    DIMINISHED 分支 ⇒ 这里用**现状值**钉住（详细信息见下方「钉住现状」describe）。
+    ['dim', 'D', 'im'],
+    ['dim7', 'D', 'im7'],
   ]
 
   for (const [input, token, remaining] of CASES) {
@@ -358,8 +410,18 @@ describe('ChordTokenizer.nextToken：结构性不可达的分支（如实钉住�
     expect(ChordTokenizer.nextToken('alt')).toEqual({ token: 'A', remaining: 'lt' })
   })
 
-  it('Δ / ø 因大小写归一（Δ→δ、ø→Ø）永远比不中，落到最后的 null 兜底', () => {
-    expect(ChordTokenizer.nextToken('Δ')).toEqual({ token: null, remaining: '' })
+  it('Δ / ø 已按原始大小写单独分支处理（Δ→MAJOR、ø7→半减七）', () => {
+    // 🚨 曾经的 bug：`firstChar` 被 toUpperCase、`firstTwoChars/ThreeChars` 被 toLowerCase
+    //    ⇒ 'Δ'(单字符) 与 'δ' 都对不上字面量 ⇒ 恒落 null；`CΔ7` 的 Δ 被当未知字符跳过 ⇒ maj7 判成属七。
+    //    修复后 `Δ` / `ø7` 各有明确分支（见上一条 CASES）。
+    expect(ChordTokenizer.nextToken('Δ')).toEqual({ token: 'MAJOR', remaining: '' })
+    expect(ChordTokenizer.nextToken('ø7')).toEqual({
+      token: ['MINOR', 'SEVEN', 'FLAT_FIVE'],
+      remaining: '',
+    })
+    // ⚠️ 遗留：`ø`（不带 7）仍走 null —— `firstChar` 被 toUpperCase（'ø'→'Ø'）⇒ `firstChar === 'ø'` 恒假。
+    //    影响面：`Cø` 这种写法在本项目里不使用（本项目 m7♭5 的显示符号是 `ø7`，见 `minor7flat5Symbol`），
+    //    故保持现状、如实钉住，不在本轮改动。
     expect(ChordTokenizer.nextToken('ø')).toEqual({ token: null, remaining: '' })
   })
 

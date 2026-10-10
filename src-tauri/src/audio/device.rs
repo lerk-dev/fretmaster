@@ -1,7 +1,14 @@
 use serde::{Deserialize, Serialize};
 use cpal::traits::{HostTrait, DeviceTrait};
 
+/// 输入设备信息（跨 Tauri 边界发给前端）。
+///
+/// 🚨 `rename_all = "camelCase"` **必须保留**：Tauri 只把命令的顶层参数名转 camelCase，
+/// 返回值结构体字段由 serde 原样序列化 ⇒ 没有这行时线上发 `is_default`，而前端
+/// `AudioDeviceInfo.isDefault` 恒 undefined，「系统默认设备」语义静默失效
+/// （2026-10-10 全仓审查 P1-2）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AudioDeviceInfo {
     pub name: String,
     pub is_default: bool,

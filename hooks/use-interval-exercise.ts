@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 
 import { NOTES, INTERVALS } from '@/lib/page-theory-data'
 import { normalizeNoteName, getNoteIndex } from '@/lib/page-theory-functions'
+import { buildDirectionalQueue, shuffle } from '@/lib/interval-direction'
 import { useAppStore } from '@/lib/store'
 
 /**
@@ -64,42 +65,15 @@ export function useIntervalExercise() {
     }
     if (effectiveIntervals.length === 0) return []
     
-    let queue = [...effectiveIntervals]
-    
-    if (intervalDirection === "down") {
-      queue = queue.map(idx => {
-        const interval = INTERVALS[idx]
-        const downSemitones = (12 - interval.semitones) % 12
-        const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-        return downIndex !== -1 ? downIndex : idx
-      })
-    } else if (intervalDirection === "random") {
-      queue = queue.map(idx => {
-        if (Math.random() > 0.5) {
-          const interval = INTERVALS[idx]
-          const downSemitones = (12 - interval.semitones) % 12
-          const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-          return downIndex !== -1 ? downIndex : idx
-        }
-        return idx
-      })
-    } else if (intervalDirection === "either") {
-      // Either 模式：上行与下行同时入队，每个音程产生两个条目
-      const expanded: number[] = []
-      queue.forEach(idx => {
-        expanded.push(idx) // 上行
-        const interval = INTERVALS[idx]
-        const downSemitones = (12 - interval.semitones) % 12
-        const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-        expanded.push(downIndex !== -1 ? downIndex : idx) // 下行
-      })
-      queue = expanded
-    }
-    
+    // 方向映射 / 洗牌的唯一真相源在 lib/interval-direction.ts：
+    // 旧实现用 (12 - s) % 12 + 半音数反查，对复合音程取到负数、且异名同音判错边
+    // （2026-10-10 全仓审查 P1-1）。此处只负责「先找根音过滤」与编排。
+    let queue = buildDirectionalQueue(effectiveIntervals, intervalDirection)
+
     if (intervalRandomizeOrder) {
-      queue = queue.sort(() => Math.random() - 0.5)
+      queue = shuffle(queue)
     }
-    
+
     return queue
   }, [selectedIntervals, intervalRandomizeOrder, intervalDirection, findRootFirst])
 

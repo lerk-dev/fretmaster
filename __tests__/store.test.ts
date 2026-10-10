@@ -450,9 +450,11 @@ describe('action：自定义歌曲', () => {
 })
 
 describe('action：resetSettings 的范围', () => {
-  it('重置 6 个设置 slice，但不动收藏 / 自定义歌曲 / 分数', () => {
+  it('重置设置类 slice/字段，但不动收藏 / 自定义歌曲 / 分数', () => {
     S().setMicEnabled(true)
     S().setMetronomeBpm(150)
+    S().setDisplayScale(1.5)          // P2-4：设置类顶层字段，应回默认
+    S().setChordSymbolSettings({ useUnicode: false })
     S().toggleLevelFavorite('a')
     S().addCustomSong({
       id: 's1', name: 'T', composer: '', beatsPerMeasure: 4, beatSize: 4,
@@ -464,6 +466,8 @@ describe('action：resetSettings 的范围', () => {
 
     expect(S().audio.micEnabled).toBe(false) // 回默认
     expect(S().metronome.bpm).toBe(80)
+    expect(S().displayScale).toBe(1)          // 回默认（P2-4 修复）
+    expect(S().chordSymbols.useUnicode).toBe(true) // 回默认（P2-4 修复）
     expect(S().favorites.levelFavorites).toEqual(['a']) // 保留
     expect(S().customSongs).toHaveLength(1)
     expect(S().score).toEqual({ correct: 1, total: 1 })
@@ -471,16 +475,16 @@ describe('action：resetSettings 的范围', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 文末说明（两处「钉住现状」为何不直接改，留给产品决策）
+// 文末说明
 //
 // 1) migratePersistedState 的失败兜底与 resetSettings 都直接把**模块级 initialState**
 //    的 slice 交出去（同一对象引用，而非拷贝）。当前所有 setter 都是纯的（新建对象），
 //    所以不会真的污染默认值；但一旦将来有人在某个 setter 里原地改 slice，
 //    默认值会被永久改掉、并跨用例/跨会话扩散。低风险但不该默认放任。
-// 2) resetSettings 只回默认 6 个 slice（audio/practice/metronome/feedbackSound/
-//    focusMode/user），**不动** chordSymbols/scalePractice/intervalPractice/
-//    chordProgression/displayScale。UI 上是设置面板里的「重置」，语义是否应该
-//    覆盖全部设置属于产品决策，故先钉住现状。
+// 2) resetSettings 回默认 8 项：audio/practice/metronome/feedbackSound/focusMode/
+//    user + displayScale + chordSymbols（后两者 2026-10-10 P2-4 补齐：它们同样是
+//    设置弹窗里能改、且被持久化的顶层字段，漏掉会让「恢复所有设置」的文案失真）。
+//    **不动** scalePractice/intervalPractice/chordProgression（练习进度，非设置）。
 // 详见 __tests__/store-actions.test.ts 末尾同名说明。
 
 // ==================================================== micUserDisabled（音频输入默认开）

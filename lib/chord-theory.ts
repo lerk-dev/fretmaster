@@ -1290,7 +1290,10 @@ export class ChordTokenizer {
         let remaining = chordString.trim();
         while(remaining.length > 0){
             const result = this.nextToken(remaining);
-            if (result.token) {
+            if (Array.isArray(result.token)) {
+                // 单个书写形式对应多个 token 的情形（如 `ø7` ⇒ MINOR+SEVEN+FLAT_FIVE）
+                tokens.push(...result.token);
+            } else if (result.token) {
                 tokens.push(result.token);
             }
             remaining = result.remaining;
@@ -1300,7 +1303,7 @@ export class ChordTokenizer {
         }
         return tokens;
     }
-    static nextToken(str: string): { token: ChordToken | null; remaining: string } {
+    static nextToken(str: string): { token: ChordToken | ChordToken[] | null; remaining: string } {
         if (str.length === 0) {
             return {
                 token: null,
@@ -1386,10 +1389,19 @@ export class ChordTokenizer {
                 remaining: str.slice(3)
             };
         }
-        if (firstThreeChars === 'maj' || firstThreeChars === 'Δ') {
+        if (firstThreeChars === 'maj') {
             return {
                 token: "MAJOR",
                 remaining: str.slice(3)
+            };
+        }
+        // 🚨 `Δ` 是**单个字符**，且是大写的 —— 不能拿 `str.slice(0,3).toLowerCase()`
+        //    去比 `'Δ'`（长度对不上、大小写也被折叠）⇒ 旧写法恒假，`CΔ7` 的 Δ 被当
+        //    未知字符跳过 ⇒ maj7 判成属七。必须直接看首字符。
+        if (str[0] === 'Δ') {
+            return {
+                token: "MAJOR",
+                remaining: str.slice(1)
             };
         }
         if (firstThreeChars === 'min') {
@@ -1432,7 +1444,22 @@ export class ChordTokenizer {
                 remaining: str.slice(1)
             };
         }
-        if (firstFourChars === 'dim7' || firstFourChars === '°7') {
+        // 🚨 `°7` 是**符号形式**的减七和弦：`°` 只吃 1 个字符，`7` 留给下游 SEVEN token
+        //    （`ChordType.diminished` = `['DIMINISHED','SEVEN']`）。旧写法把它和 `dim7` 并到
+        //    一个分支里再统一 `slice(3)` ⇒ 对一个 2 字符的串切掉 3 个字符，把 `7` 一起吞了
+        //    ⇒ 只剩 DIMINISHED 一个 token（= 减三和弦），丢掉了减七音（`C°7` 判成 `C°`）。
+        if (firstTwoChars === '°7') {
+            return {
+                token: "DIMINISHED",
+                remaining: str.slice(1)
+            };
+        }
+        // ⚠️ `dim7` / `dim` 这两个分支**在本实现里永远不可达**：上面的「根音分支」
+        //    （`ROOT_NOTE_TOKENS` 的显示串含 'D'）会把首字符 `d`→`D` 当根音 D 截走
+        //    ⇒ `tokenize('Cdim7')` 得到 ['C','D','m'…] 的垃圾序列。这属于既有问题
+        //    （同类：aug→A、add9→A、alt→A），与本轮 P2-8 无关，故仅保留分支不再扩展；
+        //    测试侧用「钉住现状」用例如实记录，避免假装它可用。
+        if (firstFourChars === 'dim7') {
             return {
                 token: "DIMINISHED",
                 remaining: str.slice(3)
@@ -1504,9 +1531,13 @@ export class ChordTokenizer {
                 remaining: str.slice(1)
             };
         }
+        // 🚨 `ø7` 是**半减七和弦**（m7♭5）的惯用写法，必须产出 `MINOR + SEVEN + FLAT_FIVE`
+        //    三个 token；旧写法只给 MINOR 再让 `7` 走 SEVEN ⇒ 解析成**小三和弦**（甚至
+        //    后面的 7 被当 SEVEN 也只到 m7），丢掉了 ♭5 —— 而 `ø7` 正是本项目 m7♭5 的
+        //    默认显示符号（见 `minor7flat5Symbol`），显示与解析自相矛盾。
         if (firstTwoChars === 'ø7') {
             return {
-                token: "MINOR",
+                token: ["MINOR", "SEVEN", "FLAT_FIVE"],
                 remaining: str.slice(2)
             };
         }

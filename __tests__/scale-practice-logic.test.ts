@@ -16,6 +16,8 @@
  * 这个边界写在这里，是为了避免下次有人以为"有测试兜着"而放心删掉拷贝。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { generateScaleSequence, getNextKeyByMovement } from '@/lib/page-theory-functions'
 import { SCALE_MODES, NOTES } from '@/lib/page-theory-data'
 
@@ -261,5 +263,81 @@ describe('getNextKeyByMovement', () => {
     // 脏值/历史值可能落进来，故按归一化兜底。
     expect(getNextKeyByMovement('C#', 'bogus' as never)).toBe('C♯')
     expect(getNextKeyByMovement('Bb', 'bogus' as never)).toBe('B♭')
+  })
+
+  // 🚨 P3-5：`SHARP_KEYS` / `FLAT_KEYS` 若有「归一化后永不可命中」的死条目，
+  //    对应调会落进 `useSharps = Math.random() > 0.5` 的抛硬币分支 ⇒ 同一个调
+  //    从某些起点推进时在 ♯/♭ 之间随机跳（用户可感知的「写法忽左忽右」）。
+  //    注意：判据必须选**升半音后仍是变音音级**的起点，否则 ♯/♭ 两种写法同名、测不出漂移。
+  it('P3-5：♯ 列表里的调升半音后稳定用 ♯（不随随机数漂移）', () => {
+    // 起点 ∈ {C,D,G,A}（在 SHARP 列表）⇒ useSharps 恒真 ⇒ 升半音一律 ♯ 写法。
+    const driftCases: Array<[string, string]> = [
+      ['C', 'C♯'],
+      ['D', 'D♯'],
+      ['G', 'G♯'],
+      ['A', 'A♯'],
+    ]
+    for (const [key, expected] of driftCases) {
+      stubRandom(0)
+      const lo = getNextKeyByMovement(key, 'upSemiTone')
+      vi.restoreAllMocks()
+      stubRandom(0.999)
+      const hi = getNextKeyByMovement(key, 'upSemiTone')
+      vi.restoreAllMocks()
+      expect(lo, `调 ${key} 的升半音写法随随机数漂移`).toBe(expected)
+      expect(hi, `调 ${key} 的升半音写法随随机数漂移`).toBe(expected)
+    }
+  })
+
+  it('P3-5：♭ 列表里的调升半音后稳定用 ♭（不随随机数漂移）', () => {
+    // 起点 ∈ {F,B♭,E♭,A♭,D♭,G♭}（在 FLAT 列表）⇒ useSharps 恒假 ⇒ 一律 ♭ 写法。
+    const driftCases: Array<[string, string]> = [
+      ['F', 'G♭'],
+      ['B♭', 'B'],   // B 无变音，两种写法同名 —— 仅作一致性证据
+      ['E♭', 'E'],
+      ['A♭', 'A'],
+    ]
+    for (const [key, expected] of driftCases) {
+      stubRandom(0)
+      const lo = getNextKeyByMovement(key, 'upSemiTone')
+      vi.restoreAllMocks()
+      stubRandom(0.999)
+      const hi = getNextKeyByMovement(key, 'upSemiTone')
+      vi.restoreAllMocks()
+      expect(lo, `调 ${key} 的升半音写法随随机数漂移`).toBe(expected)
+      expect(hi, `调 ${key} 的升半音写法随随机数漂移`).toBe(expected)
+    }
+  })
+
+  it('P3-5 源码判据：SHARP_KEYS / FLAT_KEYS 无「归一化后永不可命中」的死条目', () => {
+    const src = readFileSync(resolve(__dirname, '../lib/page-theory-functions.ts'), 'utf8')
+    const m = src.match(/const SHARP_KEYS = \[([^\]]*)\][\s\S]*?const FLAT_KEYS = \[([^\]]*)\]/)
+    expect(m, '未能在源码里定位 SHARP_KEYS / FLAT_KEYS 字面量').not.toBeNull()
+    const parse = (body: string) =>
+      body
+        .split(',')
+        .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+        .filter((s) => s.length > 0)
+    const sharp = parse(m![1])
+    const flat = parse(m![2])
+    const entries = [...sharp, ...flat]
+    expect(entries.length).toBeGreaterThan(0)
+    for (const e of entries) {
+      // 判据 1：首字符必须是大写 A~G（归一化结果里音名首字母永远大写 ⇒ 小写条目是死的）。
+      expect(e, `死条目「${e}」：音名首字母必须大写`).toMatch(/^[A-G]/)
+      // 判据 2：降号必须写成 ♭（不能是 ASCII 'b'）。
+      expect(e, `死条目「${e}」：降号必须写成 ♭ 而非 ASCII b`).not.toContain('b')
+      // 判据 3：升号必须写成 ♯（不能是 ASCII '#'）。
+      expect(e, `死条目「${e}」：升号必须写成 ♯ 而非 ASCII #`).not.toContain('#')
+    }
+    // 判据 4：♯ 列表必须显式含全部 ♯ 调（旧写法漏了 C♯/G♯/D♯/A♯ ⇒ 这些调抛硬币）。
+    expect(sharp, 'SHARP_KEYS 应含 F♯').toContain('F♯')
+    for (const k of ['C♯', 'G♯', 'D♯', 'A♯']) {
+      expect(sharp, `SHARP_KEYS 漏了 ${k}（该调会抛硬币）`).toContain(k)
+    }
+    // 判据 5：♭ 列表必须含全部降号调。
+    for (const k of ['F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭']) {
+      expect(flat, `FLAT_KEYS 漏了 ${k}`).toContain(k)
+    }
   })
 })

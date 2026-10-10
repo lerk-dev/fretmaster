@@ -31,10 +31,10 @@ import {
   NOTES,
   NOTES_FLAT,
   CHORD_TYPES,
-  INTERVALS,
   SCALE_MODES,
 } from "@/lib/page-theory-data"
 import { resolveAvailableStringIndexes } from "@/lib/string-index"
+import { buildDirectionalQueue, shuffle } from "@/lib/interval-direction"
 import {
   normalizeNoteName,
   getNoteIndex,
@@ -691,11 +691,17 @@ export default function FretMasterPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const CACHE_VERSION = 'v3-20260716'  // v3: 清除路由器清理后残留的本地缓存
-    const stored = localStorage.getItem('fretmaster-stats-version')
-    if (stored !== CACHE_VERSION) {
-      localStorage.removeItem('fretmaster-stats')
-      localStorage.setItem('fretmaster-stats-version', CACHE_VERSION)
-      logger.info('已清除旧的统计数据缓存', { from: stored, to: CACHE_VERSION })
+    // P3-3：隐私模式 / 配额超限时 localStorage 读写会抛异常，而 error boundary 拦不住
+    // effect 内抛出的异常 ⇒ 整条 effect 崩掉、后续初始化静默不执行。必须整体包 try/catch。
+    try {
+      const stored = localStorage.getItem('fretmaster-stats-version')
+      if (stored !== CACHE_VERSION) {
+        localStorage.removeItem('fretmaster-stats')
+        localStorage.setItem('fretmaster-stats-version', CACHE_VERSION)
+        logger.info('已清除旧的统计数据缓存', { from: stored, to: CACHE_VERSION })
+      }
+    } catch (e) {
+      console.warn('Failed to migrate stats cache version:', e)
     }
   }, [])
 
@@ -797,6 +803,28 @@ export default function FretMasterPage() {
   // Tauri 调音器：pitch-detected 事件监听与 Rust 检测线程的拆除句柄（stopTuner 需要）
   const tunerUnlistenRef = useRef<(() => void) | null>(null)
   const tunerStreamRunningRef = useRef(false)
+  // 🚨 同步互斥锁 + 代际号（P2-5）。`startTuner` 里有多个 await（getUserMedia /
+  //    动态 import），若不用「第一个 await 之前就生效」的守卫，快速双击会并发两条
+  //    启动链：后写的句柄覆盖先写的 ⇒ `stopTuner` 只能拆掉一条，另一条（rAF 循环 /
+  //    MediaStream）永久泄漏：表针还跳、麦克风常亮、CPU 空转。
+  //    ref 不是 state ⇒ 同一 tick 内立即可见，能真正拦住重入。
+  const tunerStartingRef = useRef(false)
+  // Web 路径的 rAF 检测链是否「活着」。此前是 `startTuner` 里的局部 `let isActive`，
+  // 而唯一会翻转它的 `return () => { isActive = false }` 写在 async 函数里、返回值无人
+  // 接收 —— 死代码，兜底完全失效。改为 ref 持有，由 stopTuner 真正翻转。
+  const tunerActiveRef = useRef(false)
+
+  // 🚨 P3-2：`handleFretClick` 里两个「答完延迟清高亮 / 送 MIDI」的裸 `setTimeout`。
+  //    用户点完 100ms 内就停止练习（或切 tab、答案模式）时，旧闭包仍按 `isPlaying=true`
+  //    往下走 ⇒ 给已经结束的这局记分 +1、高亮状态被过期定时器改写。
+  //    这里统一持有句柄：新一轮点击先清上一轮，组件卸载时也清。
+  const fretClickTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([])
+  const clearFretClickTimers = useCallback(() => {
+    for (const timer of fretClickTimersRef.current) clearTimeout(timer)
+    fretClickTimersRef.current = []
+  }, [])
+  // 卸载时清掉在途的点击定时器（否则会在已卸载组件上 setState）。
+  useEffect(() => clearFretClickTimers, [clearFretClickTimers])
 
   // 浮动窗口拖动：state/ref 与拖拽回调均由 useStructureWindowDrag 提供（同名解构，正文用法不变）
   const {
@@ -1251,28 +1279,36 @@ export default function FretMasterPage() {
   // ==================== 调音器功能 ====================
   // 启动调音器
   const startTuner = useCallback(async () => {
-    // 若已有检测循环在跑（快速连点的情况），先取消，避免并存多条 rAF 检测链 / 事件监听
-    if (tunerAnimationRef.current) {
-      cancelAnimationFrame(tunerAnimationRef.current)
-      tunerAnimationRef.current = null
-    }
-    if (tunerUnlistenRef.current) {
-      tunerUnlistenRef.current()
-      tunerUnlistenRef.current = null
-    }
-    tunerStreamRunningRef.current = false
-    // 🚨 Web 路径才需要停掉「练习用的」MediaStream —— 调音器和练习共用同一个 AudioContext
-    //    时会出现两条检测链抢同一个流。Tauri 路径**不能**在这里关 micEnabled：
-    //    它是设置页「启用音频输入」的全局开关，调音器只是复用同一个 Rust 采集后端
-    //    （下面 startAudioCapture 会重建采集，stopTuner 再停）。
-    //    旧实现在这里无差别 `setMicEnabled(false)` ⇒ 用户从设置页开启音频后，
-    //    只要碰过一次调音器，全局开关就被悄悄关掉，回练习/调音页完全没反应
-    //    （Rust 采集已停、pipeline 守卫判定未采集而静默空转）。
-    if (!isTauri && micEnabled) {
-      await stopAudioInput()
-      setMicEnabled(false)
-    }
-    if (isTauri) {
+    // 🚨 同步互斥：必须在**任何 await 之前**置位，否则 `getUserMedia` 的 await 窗口里
+    //    第二次点击会再进一遍 ⇒ 并发的两条启动链互相覆盖句柄 ⇒ 泄漏（P2-5）。
+    //    `finally` 里释放，保证任何失败路径（含 catch）都不会把锁卡死。
+    if (tunerStartingRef.current) return
+    tunerStartingRef.current = true
+    try {
+      // 若已有检测循环在跑（快速连点的情况），先取消，避免并存多条 rAF 检测链 / 事件监听
+      if (tunerAnimationRef.current) {
+        cancelAnimationFrame(tunerAnimationRef.current)
+        tunerAnimationRef.current = null
+      }
+      if (tunerUnlistenRef.current) {
+        tunerUnlistenRef.current()
+        tunerUnlistenRef.current = null
+      }
+      tunerStreamRunningRef.current = false
+      // 上一轮 Web 检测链若还在（tunerActiveRef 为 true），先显式停掉，避免遗留 rAF 继续跑
+      tunerActiveRef.current = false
+      // 🚨 Web 路径才需要停掉「练习用的」MediaStream —— 调音器和练习共用同一个 AudioContext
+      //    时会出现两条检测链抢同一个流。Tauri 路径**不能**在这里关 micEnabled：
+      //    它是设置页「启用音频输入」的全局开关，调音器只是复用同一个 Rust 采集后端
+      //    （下面 startAudioCapture 会重建采集，stopTuner 再停）。
+      //    旧实现在这里无差别 `setMicEnabled(false)` ⇒ 用户从设置页开启音频后，
+      //    只要碰过一次调音器，全局开关就被悄悄关掉，回练习/调音页完全没反应
+      //    （Rust 采集已停、pipeline 守卫判定未采集而静默空转）。
+      if (!isTauri && micEnabled) {
+        await stopAudioInput()
+        setMicEnabled(false)
+      }
+      if (isTauri) {
       // Tauri环境：Rust 原生音频 + 事件流（pitch-detected 每 50ms 一帧，替代每帧一次 IPC 的 rAF 轮询）
       try {
         const { startAudioCapture, listenPitchDetected, startPitchStream } = await import('@/lib/native-audio')
@@ -1383,10 +1419,11 @@ export default function FretMasterPage() {
         setTunerActive(true)
         toast.success(t('tuner_start'))
 
-        let isActive = true
-        
+        // rAF 链的存活标志由 ref 持有（见 ref 声明处的说明），stopTuner 会翻转它。
+        tunerActiveRef.current = true
+
         const detectPitch = () => {
-          if (!isActive || !analyser || !audioContext) return
+          if (!tunerActiveRef.current || !analyser || !audioContext) return
 
           const buffer = new Float32Array(analyser.fftSize)
           analyser.getFloatTimeDomainData(buffer)
@@ -1494,14 +1531,14 @@ export default function FretMasterPage() {
         }
 
         tunerAnimationRef.current = requestAnimationFrame(detectPitch)
-        
-        return () => {
-          isActive = false
-        }
       } catch (err) {
         console.error('Failed to start tuner:', err)
         toast.error(t('tuner_need_mic'))
       }
+    }
+    } finally {
+      // 无论成功/失败都释放互斥锁 —— 保证失败路径不会把调音器永久锁死。
+      tunerStartingRef.current = false
     }
     // stopAudioInput 声明在本 hook 之后（TDZ）：deps 数组是立即求值的，加进来会在
     // 渲染期抛 "used before declaration"。而本函数体延迟执行（点调音器才跑），调用时
@@ -1511,6 +1548,8 @@ export default function FretMasterPage() {
 
   // 停止调音器
   const stopTuner = useCallback(async () => {
+    // 先翻转存活标志，再取消 rAF：否则正在执行的那一帧末尾会再排一次 rAF（自续命）。
+    tunerActiveRef.current = false
     if (tunerAnimationRef.current) {
       cancelAnimationFrame(tunerAnimationRef.current)
       tunerAnimationRef.current = null
@@ -1601,7 +1640,9 @@ export default function FretMasterPage() {
       node.port.postMessage({ type: 'updateParams', data: { noiseFloor: null } })
     }
     resetPitchDetectionState()
-    toast.success(t('reset_settings_hint'))
+    // P3-4：重置成功的提示必须用**结果**文案，不能复用按钮的前置说明
+    //（`reset_settings_hint` 是「点击重置按钮将恢复…」，出现在成功 toast 里语义矛盾）。
+    toast.success(t('settings_reset_done'))
   }, [resetSettingsAction, t])
 
   // 导出设置
@@ -3058,9 +3099,10 @@ export default function FretMasterPage() {
       else { // random
         candidateOffsets.push(12, -12, 0)
       }
-      // 打乱顺序，找到第一个在品区内的位置
-      candidateOffsets.sort(() => Math.random() - 0.5)
-      for (const offset of candidateOffsets) {
+      // 打乱顺序，找到第一个在品区内的位置（P3-6：改用 Fisher-Yates，`sort(()=>Math.random()-0.5)`
+      // 不是均匀洗牌 —— 部分排列概率系统性偏高且依赖引擎排序实现）。
+      const shuffledOffsets = shuffle(candidateOffsets)
+      for (const offset of shuffledOffsets) {
         const shiftedFret = baseFret + offset
         if (shiftedFret >= minFret && shiftedFret <= maxFret) {
           randomFret = shiftedFret
@@ -3832,20 +3874,23 @@ export default function FretMasterPage() {
       }
 
       playFeedbackSound(isCorrect)
-      
-      setTimeout(() => {
-        setHighlightedFrets(prev => {
-          const next = new Map(prev)
-          next.delete(key)
-          return next
-        })
-      }, 500)
-      
-      setTimeout(() => {
-        handleMIDINoteInput(clickedNote)
-      }, 100)
+
+      // P3-2：先清掉上一轮遗留的两个定时器，再挂新的；句柄存入 ref 以便 stop/tab 切换时清理。
+      clearFretClickTimers()
+      fretClickTimersRef.current = [
+        setTimeout(() => {
+          setHighlightedFrets(prev => {
+            const next = new Map(prev)
+            next.delete(key)
+            return next
+          })
+        }, 500),
+        setTimeout(() => {
+          handleMIDINoteInput(clickedNote)
+        }, 100),
+      ]
     }
-  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, selectedScale, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords])
+  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, selectedScale, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords, clearFretClickTimers])
 
   const updateLevelOptions = useCallback((levelId: string) => {
     const level = ALL_SOLO_LEVELS.find(l => l.id === levelId)
@@ -3920,44 +3965,15 @@ export default function FretMasterPage() {
       setIntervalPracticeStep("root")
       // 重置音程练习队列
       if (activeTab === "interval") {
-        // 使用函数式更新避免依赖循环
-        setIntervalExerciseQueue(() => {
-          if (selectedIntervals.length === 0) return []
-          let queue = [...selectedIntervals]
-          if (intervalDirection === "down") {
-            queue = queue.map(idx => {
-              const interval = INTERVALS[idx]
-              const downSemitones = (12 - interval.semitones) % 12
-              const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-              return downIndex !== -1 ? downIndex : idx
-            })
-          } else if (intervalDirection === "random") {
-            queue = queue.map(idx => {
-              if (Math.random() > 0.5) {
-                const interval = INTERVALS[idx]
-                const downSemitones = (12 - interval.semitones) % 12
-                const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-                return downIndex !== -1 ? downIndex : idx
-              }
-              return idx
-            })
-          } else if (intervalDirection === "either") {
-            // Either 模式：上行与下行同时入队
-            const expanded: number[] = []
-            queue.forEach(idx => {
-              expanded.push(idx)
-              const interval = INTERVALS[idx]
-              const downSemitones = (12 - interval.semitones) % 12
-              const downIndex = INTERVALS.findIndex(i => i.semitones === downSemitones)
-              expanded.push(downIndex !== -1 ? downIndex : idx)
-            })
-            queue = expanded
-          }
-          if (intervalRandomizeOrder) {
-            queue = queue.sort(() => Math.random() - 0.5)
-          }
-          return queue
-        })
+        // 队列在 updater **外面**算好再 set（铁律 1：updater 必须纯——
+        // random 方向与洗牌都含 Math.random，放进去会被 StrictMode 双调用成两份）。
+        if (selectedIntervals.length === 0) {
+          setIntervalExerciseQueue([])
+        } else {
+          let queue = buildDirectionalQueue(selectedIntervals, intervalDirection)
+          if (intervalRandomizeOrder) queue = shuffle(queue)
+          setIntervalExerciseQueue(queue)
+        }
         setIntervalCurrentQueueIndex(0)
         // 延迟执行以等待状态更新
         setTimeout(() => {
@@ -3985,8 +4001,12 @@ export default function FretMasterPage() {
       setHighlightedFrets(new Map())
       setHighlightedTargetPosition(null)
       setPracticeSessionStartTime(null)
+      // P3-2：结束练习时把「答完延迟」的两个定时器一并清掉 —— 否则它们仍会跑
+      //（100ms 那条会走 handleMIDINoteInput 记分），把这一局结束后才到达的点击
+      // 算进上一局。
+      clearFretClickTimers()
     }
-  }, [isPlaying, setScore, practiceTime, activeTab, generateNewTarget, setIntervalPracticeStep, setIsPlaying, setPracticeSessionStartTime, setPracticeElapsedTime, pitchFindingTime, showPracticeSuggestions, user.instrument, language, intervalPracticeDuration, setIntervalExerciseQueue, setIntervalCurrentQueueIndex, selectedIntervals, intervalDirection, intervalRandomizeOrder, generateIntervalExerciseRef, generateChordExercise, generateScaleExercise])
+  }, [isPlaying, setScore, practiceTime, activeTab, generateNewTarget, setIntervalPracticeStep, setIsPlaying, setPracticeSessionStartTime, setPracticeElapsedTime, pitchFindingTime, showPracticeSuggestions, user.instrument, language, intervalPracticeDuration, setIntervalExerciseQueue, setIntervalCurrentQueueIndex, selectedIntervals, intervalDirection, intervalRandomizeOrder, generateIntervalExerciseRef, generateChordExercise, generateScaleExercise, clearFretClickTimers])
 
   // 保持 togglePractice 的最新引用，供课程练习启动等延迟调用使用
   togglePracticeRef.current = togglePractice
@@ -4137,6 +4157,16 @@ export default function FretMasterPage() {
         return
       }
 
+      // 🚨 专注模式下，Space / Escape 归 FocusMode 面板所有（P2-7）。
+      //    两个 window 级 keydown 同时存活时：按 Space 既推进下一题**又**启停番茄钟、
+      //    按 Esc 既退出专注模式**又**停止练习 —— `preventDefault()` 拦不住另一个监听器
+      //    （它只挡浏览器默认行为，不挡同页其它 handler）。这里用「谁在场谁接管」的
+      //    约定做互斥：专注模式开着 ⇒ 页面这侧的 Space/Esc 让位。
+      //    （P/A/F 等其余快捷键不受影响，专注模式下仍可用。）
+      if (focusMode?.enabled && (event.key === 'Escape' || event.key === ' ' || event.key === 'Spacebar')) {
+        return
+      }
+
       // ESC - 退出全屏或停止练习
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -4284,7 +4314,7 @@ export default function FretMasterPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isFullscreen, isPlaying, togglePractice, activeTab, generateNewTarget, generateIntervalExercise, nextChordExercise, nextScaleExercise, nextChord, micEnabled, handleTabChange, setFullscreenMode, setIsPlaying, setMicUserPreference, isTauri, setSettingsOpen, generateIntervalExerciseRef, setTabFretboardFlag])
+  }, [isFullscreen, isPlaying, togglePractice, activeTab, generateNewTarget, generateIntervalExercise, nextChordExercise, nextScaleExercise, nextChord, micEnabled, handleTabChange, setFullscreenMode, setIsPlaying, setMicUserPreference, isTauri, setSettingsOpen, generateIntervalExerciseRef, setTabFretboardFlag, focusMode?.enabled])
 
   // 获取音符颜色
   // 获取音符颜色（判定已抽到 lib/fretboard-note-button-color.ts —— 那里可单测，
@@ -4343,7 +4373,15 @@ export default function FretMasterPage() {
       sequence: customChords
     }
     if (typeof window !== 'undefined') {
-      localStorage.setItem(CUSTOM_CHORD_STORAGE_KEY, JSON.stringify(data))
+      // P3-3：配额超限（和弦序列可能很长）时必须捕获，否则抛异常冒泡到调用方
+      // （onClick 之外还会经 React 事件系统重抛），用户侧表现为「点了没反应 + 控制台红字」。
+      try {
+        localStorage.setItem(CUSTOM_CHORD_STORAGE_KEY, JSON.stringify(data))
+      } catch (e) {
+        console.warn('Failed to persist custom chords:', e)
+        toast.error(t('custom_chord_save_failed'))
+        return
+      }
     }
     toast.success(t('custom_chord_saved'))
   }

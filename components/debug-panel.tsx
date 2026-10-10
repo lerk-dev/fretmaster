@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { isTauriEnv } from '@/lib/utils'
+import { getAudioStatus, type AudioStatus } from '@/lib/native-audio'
 
 interface DebugData {
   frequency: number
@@ -105,13 +106,6 @@ const DebugPanelInner = memo(function DebugPanelInner() {
         confidence: { yin: number; harmonic: number; temporal: number; overall: number }
       }
       
-      interface AudioStatus {
-        isCapturing: boolean
-        latencyMs: number
-        bufferSize: number
-        sampleRate: number
-      }
-      
       interface AudioLevel {
         rms: number
         db_spl: number
@@ -123,9 +117,11 @@ const DebugPanelInner = memo(function DebugPanelInner() {
       
       const [pitch, status, audioLevel] = await Promise.all([
         invoke('detect_pitch').catch(() => null) as Promise<PitchData | null>,
-        invoke('get_audio_status').catch(() => ({
-          isCapturing: false, latencyMs: 0, bufferSize: 0, sampleRate: 48000,
-        })) as Promise<AudioStatus>,
+        // 🚨 必须走 getAudioStatus()（含 snake_case→camelCase 归一化）：
+        // 若在此处直接裸调那条状态命令，拿到的是 Rust 原样序列化的 snake_case
+        // （is_capturing/latency_ms/...），按 camelCase 读会**全部 undefined 且不报错**，
+        // 面板恒显示「○ OFF / 延迟 0.0ms / Buffer 0」（2026-10-10 全仓审查 P1-3）。
+        getAudioStatus().catch((): AudioStatus => ({ isCapturing: false, latencyMs: 0, bufferSize: 0, sampleRate: 48000, backend: 'wasapi_shared' })),
         invoke('get_audio_level').catch(() => null) as Promise<AudioLevel | null>,
       ])
 

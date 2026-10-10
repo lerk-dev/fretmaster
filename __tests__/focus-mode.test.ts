@@ -205,15 +205,27 @@ describe('练习进度与正确率', () => {
     p.unmount()
   })
 
-  it('练习进度 = (总时长 - 剩余) / 总时长，且夹到 100%', () => {
-    const p = mount({ isPlaying: true, practiceTime: 5, timeLeft: 150 })
+  it('练习进度 = (总时长 - 剩余) / 总时长，单位均为**秒**，且夹到 100%', () => {
+    // 🚨 practiceTime 与 timeLeft 的单位都是**秒**（store 默认 300；
+    //    page.tsx 直接 setTimeLeft(practiceTime)，计时器每秒 −1）。
+    //    旧实现把 practiceTime 当分钟（分母 ×60）⇒ 300s 的练习在 150s 时显示
+    //    (300*60-150)/(300*60)=99%，全程卡在 98%~100%。本用例钉死「秒对秒」的口径。
+    const p = mount({ isPlaying: true, practiceTime: 300, timeLeft: 150 })
     expect(p.text()).toContain('50%') // (300-150)/300
     p.unmount()
+    // 与 page.tsx 的实际口径一致：5 分钟 = 300 秒的练习，剩 150 秒 ⇒ 50%（不是 99%）
+    const pMinutes = mount({ isPlaying: true, practiceTime: 5 * 60, timeLeft: 150 })
+    expect(pMinutes.text()).toContain('50%')
+    pMinutes.unmount()
     // 剩余为负（超出）时夹到 100%
-    const p2 = mount({ isPlaying: true, practiceTime: 5, timeLeft: -60 })
+    const p2 = mount({ isPlaying: true, practiceTime: 300, timeLeft: -60 })
     const pcts = (p2.text().match(/(\d+)%/g) ?? [])
     expect(pcts).toContain('100%')
     p2.unmount()
+    // 刚开始（剩余==总时长）时进度为 0%，绝不能是「已接近 100%」的假象
+    const p3 = mount({ isPlaying: true, practiceTime: 300, timeLeft: 300 })
+    expect(p3.text()).toContain('0%')
+    p3.unmount()
   })
 
   it('practiceTime=0（不限时）时进度为 0%', () => {
