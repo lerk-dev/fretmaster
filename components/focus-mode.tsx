@@ -21,9 +21,13 @@ export const FocusMode = memo(function FocusMode({
   practiceTime,
   onClose,
 }: FocusModeProps) {
-  const store = useAppStore()
-  const focusMode = store?.focusMode || {}
-  const setFocusModeSettings = store.setFocusModeSettings
+  // 🚨 P3-10：`useAppStore()` 全量订阅会把**整个 store** 拉成本组件依赖 ⇒ 练习中
+  //    音高检测每 ~20Hz 更新一次 state，本面板就跟着 20Hz 重渲染（并且若 `store`
+  //    被放进 effect deps，keydown 监听器会同频反复 remove/add）。
+  //    改为精确订阅两个用得到的字段（`focusMode` 是对象、但由 store 在写入时才换新引用，
+  //    故不会每次渲染都变）；setter 是稳定引用，单独取。
+  const focusMode = useAppStore((s) => s.focusMode) ?? {}
+  const setFocusModeSettings = useAppStore((s) => s.setFocusModeSettings)
 
   const [pomodoroTime, setPomodoroTime] = useState(0)
   const [pomodoroRunning, setPomodoroRunning] = useState(false)
@@ -171,7 +175,7 @@ export const FocusMode = memo(function FocusMode({
         return
       }
       if (e.key === 'Escape') {
-        store.setFocusModeSettings({ enabled: false })
+        setFocusModeSettings({ enabled: false })
         onClose?.()
       }
       if (e.key === ' ' || e.key === 'Spacebar') {
@@ -184,7 +188,7 @@ export const FocusMode = memo(function FocusMode({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [onClose, store, togglePomodoro])
+  }, [onClose, setFocusModeSettings, togglePomodoro])
 
   useEffect(() => {
     let cancelled = false
@@ -281,7 +285,7 @@ export const FocusMode = memo(function FocusMode({
           </button>
           <button
             onClick={() => {
-              store.setFocusModeSettings({ enabled: false })
+              setFocusModeSettings({ enabled: false })
               onClose?.()
             }}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"

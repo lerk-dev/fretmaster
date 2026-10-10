@@ -11,6 +11,7 @@
  * 本用例锁住两件事：
  *   ① 两个增强后端的**分支结构一致**（都有 `self.backend = WasapiShared` + 重试调用）
  *   ② `start_with_host` 里「置位 `is_capturing` 之后的失败路径」必须回滚标志位
+ *      （P3-14 起回滚到**进入时的快照值** `was_capturing`，而非硬编码 false）
  *
  * 为什么用源码断言而不是行为测试：`start_exclusive` / `start_asio` 都要碰真实
  * 音频设备与系统 API，vitest 跑不到；而这些是本仓库的核心约定，值得用源码钉死。
@@ -129,7 +130,12 @@ describe('音频后端回退契约（Rust 源码护栏）', () => {
     // 🚨 不能用 `rollbacks.length > 0` —— 那只保证「至少一处」，
     //    单独删掉 play() 那处时其它处还在，断言仍成立（实测 ZERO）。
     //    必须**逐条钉死每个失败出口**。
-    const rollbackCount = (after.match(/\*self\.is_capturing\.lock\(\)\s*=\s*false/g) ?? []).length
+    //
+    // 🚨 P3-14 起回滚目标是**进入时的快照值 `was_capturing`**，不再硬编码 `false`：
+    //    硬编码 false 在「重复 start（旧流仍活着）时建流失败」这一场景下会把标志位
+    //    错标成「未采集」，而旧流还在跑 ⇒ 守卫误判。硬编码 false 的**总量**由
+    //    `audio-capture-rollback-guard.test.ts` 单独钉住（全文件恰好 1 处、且在 stop() 内）。
+    const rollbackCount = (after.match(/\*self\.is_capturing\.lock\(\)\s*=\s*was_capturing/g) ?? []).length
     expect(
       rollbackCount,
       `置位点之后应有 2 处回滚（建流全部失败出口 + play()），实际 ${rollbackCount} 处 ⇒ ` +
@@ -147,7 +153,7 @@ describe('音频后端回退契约（Rust 源码护栏）', () => {
     expect(
       playBody,
       'play() 分支里没有回滚 is_capturing（删掉回滚语句即为回归）',
-    ).toContain('*self.is_capturing.lock() = false')
+    ).toContain('*self.is_capturing.lock() = was_capturing')
 
     // 建流全部失败的那条出口。
     // 🚨 这里**不再**断言 `.map_err(` —— 该函数在 ASIO 修复（10-02）后重构为
@@ -160,7 +166,7 @@ describe('音频后端回退契约（Rust 源码护栏）', () => {
     expect(
       builtFailBody,
       '建流全部失败时没有回滚 is_capturing（标志位泄漏，后续检测全部静默空转）',
-    ).toContain('*self.is_capturing.lock() = false')
+    ).toContain('*self.is_capturing.lock() = was_capturing')
   })
 
   it('负向：护栏锚点必须真实存在（防止改结构后静默空转）', () => {

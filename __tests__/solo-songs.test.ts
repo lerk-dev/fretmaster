@@ -160,6 +160,7 @@ describe('loadSoloSongs', () => {
   it('从 /data/songs.json 加载并转换', async () => {
     const load = await freshLoad()
     const fetchSpy = vi.fn(async () => ({
+      ok: true, // P3-7 起 loadSoloSongs 会校验 response.ok
       json: async () => ({
         songs: [{
           id: 7, name: 'S', composer: 'C', beatsPerMeasure: 4, beatSize: 4, tempo: 100,
@@ -179,6 +180,7 @@ describe('loadSoloSongs', () => {
   it('第二次调用复用缓存（不再 fetch、返回同一引用）', async () => {
     const load = await freshLoad()
     const fetchSpy = vi.fn(async () => ({
+      ok: true, // P3-7 起 loadSoloSongs 会校验 response.ok
       json: async () => ({ songs: [raw()] }),
     }) as unknown as Response)
     vi.stubGlobal('fetch', fetchSpy)
@@ -193,6 +195,23 @@ describe('loadSoloSongs', () => {
     const load = await freshLoad()
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down') }))
     await expect(load()).resolves.toEqual([])
+  })
+
+  it('P3-7：HTTP 非 2xx 视为失败（返回空数组，且不进解析路径）', async () => {
+    const load = await freshLoad()
+    const jsonSpy = vi.fn(async () => ({ songs: [raw()] }))
+    // 404/500 时服务端往往回 HTML 错误页 ⇒ response.json() 会抛 SyntaxError，
+    // 旧实现把它当「解析错误」吞掉，日志里看不到真实 HTTP 状态。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 500,
+        json: jsonSpy,
+      }) as unknown as Response)
+    )
+    await expect(load()).resolves.toEqual([])
+    expect(jsonSpy, '非 2xx 时不应尝试解析响应体').not.toHaveBeenCalled()
   })
 
   it('SOLO_SONGS 是恒空的占位导出', async () => {

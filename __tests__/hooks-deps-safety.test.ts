@@ -17,7 +17,7 @@
  *      （已用探针验证：zustand action 在 set 之后引用恒定。）
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 
 /** 抽出文件里所有 deps 数组所在的「行」（覆盖单行 `}, [...]` 与多行 `[a, b` 两种形态）。 */
 function depsLines(src: string): string[] {
@@ -58,5 +58,44 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     // startAudio / stopAudio 两个 useCallback 的 deps 都要带上它
     const n = src.split('setMicUserPreference]').length - 1
     expect(n, 'startAudio 与 stopAudio 两处 deps 都应含 setMicUserPreference').toBe(2)
+  })
+
+  // 🚨 P3-10：`focus-mode.tsx` 是渲染最敏感的面板 —— 它挂在练习主界面上方，
+  //    而练习中音高检测每 ~20Hz 更新一次 store state。若这里 `useAppStore()` 全量订阅，
+  //    面板会跟着 20Hz 重渲染，且 keydown 监听器（deps 含 store）会同频反复 remove/add。
+  it('focus-mode.tsx：不得 `useAppStore()` 全量订阅，且 keydown 的 deps 不得含裸 store', () => {
+    const src = readFileSync('components/focus-mode.tsx', 'utf8')
+    expect(
+      /const\s+\w+\s*=\s*useAppStore\(\s*\)/.test(src),
+      '禁止 `useAppStore()` 全量订阅（每次 state 变化都换新对象 ⇒ 20Hz 重渲染）；请单取字段'
+    ).toBe(false)
+    const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))
+    expect(bad, 'keydown effect 的 deps 不得含裸 store（会随 20Hz state 反复 remove/add）').toEqual([])
+    // 精确订阅的两个字段必须存在（防止有人「顺手」把订阅整段删掉而不再读 focusMode）
+    expect(src).toContain('useAppStore((s) => s.focusMode)')
+    expect(src).toContain('useAppStore((s) => s.setFocusModeSettings)')
+  })
+
+  it('全仓：组件/hooks 层不得 `useAppStore()` 全量订阅（只允许精确 selector 或 getState）', () => {
+    // 说明：`useAppStore.getState()`（非订阅）与 `useAppStore((s) => ...)`（精确订阅）都是允许的；
+    // 只有无参数的 `useAppStore()` 才会把整个 store 变成依赖。
+    const root = ['app', 'components', 'hooks']
+    const skip = new Set<string>()
+    const files: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory()) walk(`${dir}/${e.name}`)
+        else if (/\.tsx?$/.test(e.name)) files.push(`${dir}/${e.name}`)
+      }
+    }
+    root.forEach(walk)
+    // 🚨 必须剥注释：修复说明里大量出现「原来 `useAppStore()`」这样的**解释性文字**，
+    //    不剥就会把注释当代码、永远红（本轮实测踩到）。
+    const stripComments = (s: string) =>
+      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    const offenders = files
+      .filter((f) => !skip.has(f))
+      .filter((f) => /useAppStore\(\s*\)/.test(stripComments(readFileSync(f, 'utf8'))))
+    expect(offenders, `以下文件仍在使用 \`useAppStore()\` 全量订阅：\n${offenders.join('\n')}`).toEqual([])
   })
 })

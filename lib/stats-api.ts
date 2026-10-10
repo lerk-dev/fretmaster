@@ -3,6 +3,7 @@
 
 import { logger } from './logger'
 import { isTauriEnv, parseDbTimestamp, normalizeAccuracy } from './utils'
+import { STATS_STORAGE_KEYS } from './stats-storage-keys'
 
 const API_BASE_URL = '/cgi-bin';
 
@@ -268,7 +269,8 @@ export async function getStatsByExerciseType() {
 }
 
 // 本地备份（当网络不可用时使用）
-const LOCAL_BACKUP_KEY = 'fretmaster_stats_backup';
+// P3-11：键名统一走真相源 lib/stats-storage-keys.ts（禁止在此手写字面量）
+const LOCAL_BACKUP_KEY = STATS_STORAGE_KEYS.backup;
 
 function saveToLocalBackup(stats: PracticeStats) {
   try {
@@ -344,7 +346,7 @@ export async function clearAllPracticeStats(): Promise<void> {
   }
   try {
     localStorage.setItem(LOCAL_BACKUP_KEY, '[]');
-    localStorage.removeItem('fretmaster-stats');
+    localStorage.removeItem(STATS_STORAGE_KEYS.stats);
   } catch (e) {
     logger.error('清空本地备份失败:', e);
   }

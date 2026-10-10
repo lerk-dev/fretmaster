@@ -7,7 +7,18 @@ use std::sync::PoisonError;
 pub mod stats;
 
 static DB_CONNECTION: Lazy<Mutex<Connection>> = Lazy::new(|| {
-    let conn = init_db().expect("Failed to initialize database");
+    // 🚨 panic 信息必须带**路径 + 原始错误**（P3-15）：这是本应用唯一一次「数据库不可用」
+    //    的致命失败，只报 "Failed to initialize database" 会让排查完全无从下手
+    //    （是目录不可写？磁盘满？文件被另一个实例占用？还是 schema 迁移失败？）。
+    let path = get_db_path();
+    let conn = init_db().unwrap_or_else(|e| {
+        panic!(
+            "FretMaster 数据库初始化失败：{}（原始错误：{}）。\
+             常见原因：目录不可写 / 磁盘已满 / 文件被另一个实例占用。",
+            path.display(),
+            e
+        )
+    });
     Mutex::new(conn)
 });
 

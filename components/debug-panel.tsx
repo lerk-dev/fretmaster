@@ -85,8 +85,9 @@ const DebugPanelInner = memo(function DebugPanelInner() {
   const lastFpsTimeRef = useRef(Date.now())
   const invokeRef = useRef<((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | null>(null)
 
-  const store = useAppStore()
-  const audioSettings = store?.audio || { selectedAudioDevice: '', inputGain: 1 }
+  // 🚨 P3-10：改为精确订阅（原来 `useAppStore()` 全量订阅 ⇒ 每次 store 变化都重渲染；
+  //    调试面板开着时练习中的 20Hz 音高更新会让它疯狂重渲染，FPS 读数本身就被拖累）。
+  const audioSettings = useAppStore((s) => s.audio)
 
   const updateDebugData = useCallback(async () => {
     const startTime = performance.now()

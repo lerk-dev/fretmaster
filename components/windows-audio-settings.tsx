@@ -17,11 +17,24 @@ interface WindowsAudioSettingsProps {
 }
 
 export const WindowsAudioSettings = memo(function WindowsAudioSettings({ language }: WindowsAudioSettingsProps) {
-  const store = useAppStore()
+  // 🚨 P3-10：改为精确订阅 —— 原来 `useAppStore()` 全量订阅让本组件跟着整个 store 重渲染
+  //    （练习中 20Hz 的音高 state 更新会把这一整块设置面板连同 9 个 Setter 一起重算）。
+  //    `audio` 由 store 在写入时整体换引用，精确订阅它即可。
+  const audioSettingsRaw = useAppStore((s) => s.audio)
+  const audioSettings = audioSettingsRaw || {}
   const setMicUserPreference = useAppStore((s) => s.setMicUserPreference)
-  const audioSettings = store?.audio || {}
+  const setSelectedAudioDevice = useAppStore((s) => s.setSelectedAudioDevice)
+  const setAudioBackend = useAppStore((s) => s.setAudioBackend)
+  const setBufferSize = useAppStore((s) => s.setBufferSize)
+  const setSampleRate = useAppStore((s) => s.setSampleRate)
+  const setNoiseSuppression = useAppStore((s) => s.setNoiseSuppression)
+  const setEnableHighPass = useAppStore((s) => s.setEnableHighPass)
+  const setEnableLowPass = useAppStore((s) => s.setEnableLowPass)
+  const setEnableNotch50 = useAppStore((s) => s.setEnableNotch50)
+  const setEnableNotch60 = useAppStore((s) => s.setEnableNotch60)
+  const setInputGain = useAppStore((s) => s.setInputGain)
   // 音频设置的「有效值」（旧持久化缺字段时兜底）—— 显示与推送共用，唯一真相源
-  const eff = getEffectiveAudioSettings(store?.audio)
+  const eff = getEffectiveAudioSettings(audioSettingsRaw)
   
   const [devices, setDevices] = useState<AudioDeviceInfo[]>([])
   const [lastPitch, setLastPitch] = useState<PitchResult | null>(null)
@@ -31,6 +44,10 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   // 实际生效的后端（可能因设备不支持而回退，与用户所选不同）
   const [activeBackend, setActiveBackend] = useState<string>('')
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  // P3-9：`isCapturing` / `isInitializing` 都是 **state**，在 `await` 期间不会更新
+  // （闭包捕获旧值）⇒ 纯靠它们做守卫挡不住「双击/连点」。必须再加一个**同步**互斥 ref，
+  // 置位于首个 await 之前、在 finally 释放，封住异步窗口内的重入。
+  const startingRef = useRef(false)
   // 使用 store 中的 micEnabled 作为音频启用状态，避免组件卸载后状态丢失
   const isCapturing = audioSettings.micEnabled
   
@@ -131,6 +148,8 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   
   // 启动音频捕获
   const startAudio = useCallback(async () => {
+    // P3-9：同步互斥必须在**首个 await 之前**（state 守卫在 await 窗口内是失效的）
+    if (startingRef.current) return
     if (isCapturing || isInitializing) return
     
     // 检查是否选择了设备
@@ -139,6 +158,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
       return
     }
     
+    startingRef.current = true
     setIsInitializing(true)
     try {
       await nativeAudio.startAudioCaptureWithBackend(
@@ -157,6 +177,8 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
       } catch { /* 忽略：仅用于显示 */ }
       
       // 开始检测音高
+      // 这里不再做「先清旧句柄」的防御：`stopAudio` 已同步清 interval，且上面的
+      // 同步互斥封住了重入 ⇒ 旧句柄不可能存活（铁律 14：同一量不做两份判定）。
       intervalRef.current = setInterval(async () => {
         try {
           const pitch = await nativeAudio.detectPitch()
@@ -173,6 +195,8 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
       console.error('Failed to start audio:', error)
       toast.error(language === 'zh-CN' ? '启动音频失败: ' + error : 'Failed to start audio: ' + error)
     } finally {
+      // 无论成功/失败都释放互斥（失败路径不释放 ⇒ 永久锁死，正是「再点没反应」的成因）
+      startingRef.current = false
       setIsInitializing(false)
     }
   }, [isCapturing, isInitializing, audioSettings.selectedAudioDevice, audioSettings.sampleRate, audioSettings.audioBackend, language, t, setMicUserPreference])
@@ -310,7 +334,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         </div>
         <Select 
           value={audioSettings.selectedAudioDevice} 
-          onValueChange={store.setSelectedAudioDevice}
+          onValueChange={setSelectedAudioDevice}
           disabled={isCapturing}
         >
           <SelectTrigger>
@@ -407,7 +431,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
           </div>
           <Select
             value={audioSettings.audioBackend || 'wasapi_shared'}
-            onValueChange={(v) => store.setAudioBackend(v as 'wasapi_shared' | 'wasapi_exclusive' | 'asio')}
+            onValueChange={(v) => setAudioBackend(v as 'wasapi_shared' | 'wasapi_exclusive' | 'asio')}
             disabled={isCapturing}
           >
             <SelectTrigger>
@@ -437,7 +461,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             value={String(eff.bufferSize)} 
             onValueChange={(v) => {
               const n = Number(v)
-              store.setBufferSize(n)
+              setBufferSize(n)
               // 立即送达后端：未采集时只落配置字段，采集时会重建流。
               // 此前这里只写 store、全仓零调用方 ⇒ 下拉是装饰品（铁律 22）。
               void nativeAudio.setBufferSize(n)
@@ -465,7 +489,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             value={String(audioSettings.sampleRate || 48000)} 
             onValueChange={(v) => {
               const n = Number(v)
-              store.setSampleRate(n)
+              setSampleRate(n)
               // 立即送达后端：未采集时只落配置字段，采集时会按它建流。
               // 🚨 此前这里只写 store、不调 nativeAudio ⇒ 下拉是**装饰品**
               // （铁律 #22：UI 写 store ≠ 到达后端），改了采样率桌面端毫无变化。
@@ -501,7 +525,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
           <Slider
             value={[eff.noiseSuppression]}
             onValueChange={([v]) => {
-              store.setNoiseSuppression(v)
+              setNoiseSuppression(v)
               // 立即生效：Rust 映射为「噪声门相对底噪的倍数」（0 档=门关闭）
               void nativeAudio.setNoiseSuppression(v)
             }}
@@ -518,7 +542,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             <Switch 
               checked={eff.highPass} 
               onCheckedChange={(checked) => {
-                store.setEnableHighPass(checked)
+                setEnableHighPass(checked)
                 // setFilters 是整体接口：每次发全量 4 开关（顺带修复任何漂移）
                 void nativeAudio.setFilters({ highPass: checked, lowPass: eff.lowPass, notch50: eff.notch50, notch60: eff.notch60 })
               }}
@@ -529,7 +553,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             <Switch 
               checked={eff.lowPass} 
               onCheckedChange={(checked) => {
-                store.setEnableLowPass(checked)
+                setEnableLowPass(checked)
                 void nativeAudio.setFilters({ highPass: eff.highPass, lowPass: checked, notch50: eff.notch50, notch60: eff.notch60 })
               }}
             />
@@ -539,7 +563,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             <Switch 
               checked={eff.notch50} 
               onCheckedChange={(checked) => {
-                store.setEnableNotch50(checked)
+                setEnableNotch50(checked)
                 void nativeAudio.setFilters({ highPass: eff.highPass, lowPass: eff.lowPass, notch50: checked, notch60: eff.notch60 })
               }}
             />
@@ -549,7 +573,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             <Switch 
               checked={eff.notch60} 
               onCheckedChange={(checked) => {
-                store.setEnableNotch60(checked)
+                setEnableNotch60(checked)
                 void nativeAudio.setFilters({ highPass: eff.highPass, lowPass: eff.lowPass, notch50: eff.notch50, notch60: checked })
               }}
             />
@@ -566,7 +590,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         <Slider
           value={[eff.inputGain * 100]}
           onValueChange={([v]) => {
-            store.setInputGain(v / 100)
+            setInputGain(v / 100)
             // 立即生效（面板百分比 ÷100 = Rust 的增益倍率）
             void nativeAudio.setGain(v / 100)
           }}

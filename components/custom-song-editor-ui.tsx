@@ -96,13 +96,14 @@ export const CustomSongEditor = memo(function CustomSongEditor({
   language,
   onClose,
 }: CustomSongEditorProps) {
-  const store = useAppStore()
-  // 用 useMemo 固定引用：`store.customSongs || []` 在为空时每次渲染都会新建空数组，
-  // 会让下游 useCallback 的依赖每次都变（memo 子组件随之失效）。
-  const customSongs = useMemo(() => store.customSongs || [], [store.customSongs])
-  const addCustomSong = store.addCustomSong
-  const updateCustomSong = store.updateCustomSong
-  const deleteCustomSong = store.deleteCustomSong
+  // 🚨 P3-10：精确订阅（原来 `useAppStore()` 全量订阅会把整个 store 变成依赖）。
+  //    `useAppStore((s) => s.customSongs)` 的引用只在真正写入时才换（store 侧是
+  //    set({ customSongs: next })，不会每次渲染新建数组）⇒ 可以去掉那层 useMemo。
+  const customSongsRaw = useAppStore((s) => s.customSongs)
+  const customSongs = useMemo(() => customSongsRaw || [], [customSongsRaw])
+  const addCustomSong = useAppStore((s) => s.addCustomSong)
+  const updateCustomSong = useAppStore((s) => s.updateCustomSong)
+  const deleteCustomSong = useAppStore((s) => s.deleteCustomSong)
 
   const [editingSong, setEditingSong] = useState<CustomSong | null>(null)
   const [showSongList, setShowSongList] = useState(true)

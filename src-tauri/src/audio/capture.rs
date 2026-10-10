@@ -321,6 +321,9 @@ impl AudioCapture {
                 device_name
             );
         }
+        // 🚨 P3-14 快照（同 start_with_host）：独占失败回滚到快照值而非硬编码 false ——
+        //    若进入时旧的共享流仍在跑，硬编码 false 会让标志位与事实不符。
+        let was_capturing = *self.is_capturing.lock();
         *self.is_capturing.lock() = true;
         // 把设置里的缓冲区帧数传给独占模式，用于换算缓冲时长（与用户 bufferSize 设置联动）
         match crate::audio::wasapi_exclusive::WasapiExclusiveCapture::start(
@@ -347,7 +350,7 @@ impl AudioCapture {
                 Ok(())
             }
             Err(e) => {
-                *self.is_capturing.lock() = false;
+                *self.is_capturing.lock() = was_capturing;
                 Err(e)
             }
         }
@@ -402,6 +405,18 @@ impl AudioCapture {
     }
 
     fn start_with_host(&mut self, host: cpal::Host, device_name: Option<String>, target_sample_rate: Option<u32>) -> Result<()> {
+        // 🚨 P3-14 入口幂等守卫：已在采集且设备/采样率未变 ⇒ no-op（判据见 start_should_short_circuit）。
+        if start_should_short_circuit(
+            *self.is_capturing.lock(),
+            self.device_name.as_deref(),
+            device_name.as_deref(),
+            self.target_sample_rate,
+            target_sample_rate,
+        ) {
+            log::debug!("start_with_host: 已在采集且设备/采样率未变 ⇒ 幂等 no-op");
+            return Ok(());
+        }
+
         let device = if let Some(ref name) = device_name {
             host.input_devices()?
                 .find(|d| d.name().as_ref().map(|n| n == name).unwrap_or(false))
@@ -514,6 +529,12 @@ impl AudioCapture {
         let is_capturing_clone = self.is_capturing.clone();
         let gain = self.gain;
 
+        // 🚨 P3-14 快照进入时的采集态：失败回滚必须恢复到**快照值**、而不是硬编码 `false`。
+        //    硬编码 false 的坑：重复调用 start（旧流仍活着）时建流失败 ⇒ 标志位被错标 false
+        //    ⇒ 旧流还在跑，但 pipeline 的 `if !is_capturing()` 守卫认为「没在采集」
+        //    ⇒ 后续采集/检测操作全部静默空转（不报错，只是没反应）。
+        //    这是铁律 6 的变体 —— 回滚到**错误的值**比不回滚更隐蔽。
+        let was_capturing = *self.is_capturing.lock();
         *self.is_capturing.lock() = true;
 
         let err_fn = |err| log::error!("Audio stream error: {}", err);
@@ -591,10 +612,12 @@ impl AudioCapture {
         let stream = match built {
             Some(s) => s,
             None => {
-                // 🚨 全部尝试失败：必须回滚标志位，否则留下「永久 true」
-                // ⇒ pipeline.rs 的 `if !is_capturing()` 守卫误判为正在采集
-                //   ⇒ 后续采集/检测操作全部静默空转（不报错，只是没反应）。
-                *self.is_capturing.lock() = false;
+                // 🚨 全部尝试失败：必须回滚标志位到**进入时的快照值**（P3-14）。
+                //    不回滚 ⇒ 留下「永久 true」⇒ pipeline.rs 的 `if !is_capturing()`
+                //    守卫误判为正在采集 ⇒ 后续操作静默空转。
+                //    回滚到硬编码 false 也不行：若进入时已在采集（旧流仍活着），
+                //    会把标志位错标 false ⇒ 旧流还在跑但守卫认为没在采集。
+                *self.is_capturing.lock() = was_capturing;
                 return Err(anyhow::anyhow!(
                     "无法建立输入流（ch={}, sr={}, fmt={:?}）：{}",
                     channels,
@@ -606,8 +629,8 @@ impl AudioCapture {
         };
 
         if let Err(e) = stream.play() {
-            // 同理：play() 失败也要回滚，否则标志位泄漏。
-            *self.is_capturing.lock() = false;
+            // 同理：play() 失败也要回滚到快照值（不是硬编码 false）。
+            *self.is_capturing.lock() = was_capturing;
             return Err(anyhow::anyhow!("{}", e));
         }
         self.stream.lock().stream = Some(stream);
@@ -780,6 +803,24 @@ fn stream_buffer_frames(user_buffer_size: usize) -> u32 {
     user_buffer_size as u32
 }
 
+/// P3-14：重复 `start` 的**入口幂等判据**（抽成纯函数便于单测）。
+///
+/// 「已在采集 + 设备未变 + 目标采样率未变」⇒ 短路 no-op；任一变化都必须放行 ——
+/// 用户切设备 / 改采样率 / 切后端，前端就是靠**再调一次 start** 实现的。
+///
+/// 为什么要在 Rust 侧兜底：前端 `native-audio.ts::ensureCaptureRunning` 只读
+/// `getAudioStatus()` 的**快照**，两次并发 `start_audio_capture*` 之间没有互斥 ⇒
+/// 仍然重复建流；独占模式下反复重建 COM `IAudioClient` ⇒ 丢音。
+fn start_should_short_circuit(
+    is_capturing: bool,
+    current_device: Option<&str>,
+    requested_device: Option<&str>,
+    current_target_sr: Option<u32>,
+    requested_target_sr: Option<u32>,
+) -> bool {
+    is_capturing && current_device == requested_device && current_target_sr == requested_target_sr
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -804,6 +845,53 @@ mod tests {
     #[test]
     fn default_buffer_size_matches_frontend_default() {
         assert_eq!(DEFAULT_BUFFER_SIZE, 2048);
+    }
+
+    /// P3-14：重复 `start` 的入口幂等判据 —— 只有「已在采集 + 设备 + 采样率」三者全同才短路。
+    #[test]
+    fn start_short_circuits_only_for_identical_config() {
+        // 已在采集 + 设备/采样率都没变 ⇒ 短路（重复 start 不重建流）
+        assert!(start_should_short_circuit(
+            true,
+            Some("Mic A"),
+            Some("Mic A"),
+            Some(48000),
+            Some(48000)
+        ));
+        // 未在采集 ⇒ 永不短路（首次启动必须真的建流）
+        assert!(!start_should_short_circuit(
+            false,
+            Some("Mic A"),
+            Some("Mic A"),
+            Some(48000),
+            Some(48000)
+        ));
+        // 换设备 ⇒ 放行（用户切设备靠重复 start 实现）
+        assert!(!start_should_short_circuit(
+            true,
+            Some("Mic A"),
+            Some("Mic B"),
+            Some(48000),
+            Some(48000)
+        ));
+        // 改目标采样率 ⇒ 放行（必须重建流）
+        assert!(!start_should_short_circuit(
+            true,
+            Some("Mic A"),
+            Some("Mic A"),
+            Some(48000),
+            Some(44100)
+        ));
+        // 两侧都是 None（都用系统默认设备）⇒ 视为同一设备
+        assert!(start_should_short_circuit(true, None, None, None, None));
+        // 一侧 None 一侧 Some ⇒ 不同设备，放行
+        assert!(!start_should_short_circuit(
+            true,
+            None,
+            Some("Mic A"),
+            None,
+            None
+        ));
     }
 
     /// 未采集时 set_buffer_size 只改配置字段（真机测量由 example 负责，这里钉契约）。

@@ -90,8 +90,74 @@ describe('数据里引用的 i18n 键必须存在', () => {
   })
 })
 
-// ---------------------------------------------------- 内容质量
+// ---------------------------------------------------- 死键（P3-12）
 
+describe('死键：i18n 里不应有「定义了但全仓无调用方」的键', () => {
+  // 🚨 P3-12：本轮清掉了 5 类死键（ireal 成败 ×2 / device_count_detected /
+  //    stats_sync_success / error_boundary_* ×5，共 9 个键）。死键的危害是双重的：
+  //    ① 误导维护者以为某功能在用它（实际 UI 走了别的路径或组件内建词表）；
+  //    ② 改文案时白改，用户看不到任何变化。
+  //
+  // ⚠️ 现状：全仓仍存量 **大量** 无字面引用的键（本轮实测 604 个）。它们分两类：
+  //    ① 真死键（历史功能已删/未接线）；
+  //    ② 动态/间接引用（经 `nameKey` 字段、`t(\`level_${id}\`)` 模板、数据文件驱动）。
+  //    静态扫描无法区分两者 —— 所以**本轮不做批量删除**（风险面太大、收益不明）。
+  //    这里改为**回归钉死当前数量**：新增死键会立刻让数量上升而变红，逼迫新增者
+  //    要么真的接上调用方、要么显式把上限抬高（抬高动作本身就是一次人工复核）。
+  //    与其假装「零死键」，不如如实记录存量并阻止其增长。
+  const DEAD_KEY_BUDGET = 604
+
+  it('死键数量不超过已登记预算（新增死键会红；清理后可下调预算）', () => {
+    const root = path.resolve(__dirname, '..')
+    const exts = ['.ts', '.tsx']
+    const skipDirs = new Set(['node_modules', '.next', '.git', 'out', 'local-only', 'coverage', 'src-tauri', 'dist-tauri'])
+    const files: string[] = []
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory()) {
+          if (skipDirs.has(e.name) || e.name.startsWith('.')) continue
+          walk(path.join(dir, e.name))
+        } else if (exts.some(x => e.name.endsWith(x))) {
+          files.push(path.join(dir, e.name))
+        }
+      }
+    }
+    walk(root)
+    // 排除 i18n.ts 自身（定义处必然含键名）与测试文件（测试里的引用不算生产调用方）。
+    const corpus = files
+      .filter(f => !f.endsWith(path.join('lib', 'i18n.ts')))
+      .filter(f => !f.includes(`${path.sep}__tests__${path.sep}`))
+      .map(f => fs.readFileSync(f, 'utf8'))
+      .join('\n')
+
+    const dead: string[] = []
+    for (const k of Object.keys(zh)) {
+      // 判据：源码里出现 `'key'` 或 `"key"`（引号包裹的字面量）。
+      if (!corpus.includes(`'${k}'`) && !corpus.includes(`"${k}"`)) dead.push(k)
+    }
+    expect(
+      dead.length,
+      `死键数量 ${dead.length} 超过预算 ${DEAD_KEY_BUDGET}。新增的死键：请接上调用方，或（确认无害后）抬高 DEAD_KEY_BUDGET。\n前 40 个：\n${dead.slice(0, 40).join('\n')}`
+    ).toBeLessThanOrEqual(DEAD_KEY_BUDGET)
+  })
+
+  it('本轮清掉的 9 个死键不会再出现（P3-12 回归）', () => {
+    // 这 9 个键是**确证**死键：对应功能要么走了别的路径（ErrorBoundary 用组件内建词表、
+    // 和弦导入只用 title/help/btn），要么根本没有消费者（device_count_detected /
+    // stats_sync_success 在 UI 里被更具体的键取代）。它们不该被重新加回来。
+    for (const k of [
+      'ireal_import_success', 'ireal_import_error',
+      'device_count_detected', 'stats_sync_success',
+      'error_boundary_title', 'error_boundary_component', 'error_boundary_default',
+      'error_boundary_retry', 'error_boundary_details',
+    ]) {
+      expect(k in zh, `${k} 已被确证为死键并删除，不应重新加回`).toBe(false)
+      expect(k in en, `${k} 已被确证为死键并删除，不应重新加回`).toBe(false)
+    }
+  })
+})
+
+// ---------------------------------------------------- 内容质量
 describe('内容质量（防漏翻译）', () => {
   it('中文块里不应出现「整句英文」（符号/缩写类短值除外）', () => {
     // 曾有 'chord_scale_random_scale_tone' 的中文值是整句英文（本轮已修）。

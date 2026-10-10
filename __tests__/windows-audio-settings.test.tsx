@@ -724,3 +724,73 @@ describe('WindowsAudioSettings — 滤波器/增益控件必须同时到达后�
     expect(combos[1].textContent).toContain('2048')
   })
 })
+
+describe('WindowsAudioSettings — P3-9 启动重入（同步互斥）', () => {
+  // 判据：`isCapturing` / `isInitializing` 都是 state，在 await 期间不会更新，
+  // 所以「双击」时两次都看到旧值 ⇒ 两次都进入函数体。必须靠**同步** ref 互斥。
+  it('await 窗口内双击「启用」只启动一次采集，不会起第二条 50ms 轮询', async () => {
+    setAudio({ selectedAudioDevice: 'Mic A', micEnabled: false })
+
+    // 让首次启动挂起，制造 await 窗口（这正是互斥 ref 存在的唯一理由）
+    let release!: () => void
+    mockNative.startAudioCaptureWithBackend.mockImplementation(
+      () => new Promise<void>((res) => { release = res })
+    )
+    mockNative.detectPitch.mockResolvedValue(null)
+    mockNative.getLatencyMs.mockResolvedValue(0)
+    mockNative.getAudioStatus.mockResolvedValue({ backend: 'wasapi_shared' })
+
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval')
+    await mount()
+    const before = intervalSpy.mock.calls.length
+
+    const sw = enableSwitch()
+    expect(sw, '「启用音频输入」开关应存在').toBeTruthy()
+
+    // 两次点击都发生在上一次调用的 await 尚未返回时（同一个同步块内）
+    await act(async () => {
+      sw.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      sw.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    expect(
+      mockNative.startAudioCaptureWithBackend,
+      '同步互斥失效：await 窗口内的第二次点击又启动了一次采集'
+    ).toHaveBeenCalledTimes(1)
+
+    // 放行首次调用，让启动流程走完
+    await act(async () => {
+      release()
+      await Promise.resolve()
+    })
+    await settle()
+
+    expect(
+      intervalSpy.mock.calls.length - before,
+      '起了多条 50ms 轮询（句柄被覆盖 ⇒ 旧轮询永久泄漏）'
+    ).toBe(1)
+    intervalSpy.mockRestore()
+  })
+
+  it('首次启动失败后互斥必须释放（否则「再点没反应」）', async () => {
+    setAudio({ selectedAudioDevice: 'Mic A', micEnabled: false })
+    mockNative.startAudioCaptureWithBackend.mockRejectedValueOnce(new Error('device busy'))
+    mockNative.detectPitch.mockResolvedValue(null)
+    mockNative.getLatencyMs.mockResolvedValue(0)
+    mockNative.getAudioStatus.mockResolvedValue({ backend: 'wasapi_shared' })
+
+    await mount()
+    const sw = enableSwitch()
+    act(() => { sw.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
+    await settle()
+    expect(mockNative.startAudioCaptureWithBackend).toHaveBeenCalledTimes(1)
+
+    // 第二次点击必须能再次尝试（互斥已在 finally 释放）
+    mockNative.startAudioCaptureWithBackend.mockResolvedValueOnce(undefined)
+    act(() => { sw.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
+    await settle()
+    expect(
+      mockNative.startAudioCaptureWithBackend,
+      '失败路径未释放互斥 ⇒ 永久锁死，用户再点没反应'
+    ).toHaveBeenCalledTimes(2)
+  })
+})

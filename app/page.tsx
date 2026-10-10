@@ -159,6 +159,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { TRANSLATIONS } from '@/lib/i18n'
+import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
 
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
 
@@ -694,10 +695,10 @@ export default function FretMasterPage() {
     // P3-3：隐私模式 / 配额超限时 localStorage 读写会抛异常，而 error boundary 拦不住
     // effect 内抛出的异常 ⇒ 整条 effect 崩掉、后续初始化静默不执行。必须整体包 try/catch。
     try {
-      const stored = localStorage.getItem('fretmaster-stats-version')
+      const stored = localStorage.getItem(STATS_STORAGE_KEYS.version)
       if (stored !== CACHE_VERSION) {
-        localStorage.removeItem('fretmaster-stats')
-        localStorage.setItem('fretmaster-stats-version', CACHE_VERSION)
+        localStorage.removeItem(STATS_STORAGE_KEYS.stats)
+        localStorage.setItem(STATS_STORAGE_KEYS.version, CACHE_VERSION)
         logger.info('已清除旧的统计数据缓存', { from: stored, to: CACHE_VERSION })
       }
     } catch (e) {
@@ -968,8 +969,8 @@ export default function FretMasterPage() {
     const CLEANED_FLAG = 'fretmaster-tauri-localstorage-cleaned'
     if (isTauri && !localStorage.getItem(CLEANED_FLAG)) {
       try {
-        localStorage.removeItem('fretmaster-stats')
-        localStorage.removeItem('fretmaster_stats_backup')
+        // P3-11：两个键名统一由 clearStatsStorage() 清理（历史上此处漏过一个键 ⇒ 留脏数据）
+        clearStatsStorage()
         localStorage.setItem(CLEANED_FLAG, '1')
       } catch (e) {
         console.warn('Failed to clean legacy localStorage stats:', e)
@@ -1092,17 +1093,16 @@ export default function FretMasterPage() {
         if (!isTauri) {
           // 服务器记录为 0 时（例如管理员清空了数据库），同步清空 localStorage 旧缓存
           if (dedupedServerStats.length === 0) {
-            localStorage.removeItem('fretmaster-stats')
-            localStorage.removeItem('fretmaster_stats_backup')
+            clearStatsStorage()
           } else {
-            localStorage.setItem('fretmaster-stats', JSON.stringify(newStats))
+            localStorage.setItem(STATS_STORAGE_KEYS.stats, JSON.stringify(newStats))
           }
         }
       } catch (e) {
         console.error('Failed to load stats:', e)
         // Tauri 环境失败时返回空统计，不读 localStorage 备份（避免历史脏数据导致"未练习却有记录"）
         if (!isTauri) {
-          const savedStats = localStorage.getItem('fretmaster-stats')
+          const savedStats = localStorage.getItem(STATS_STORAGE_KEYS.stats)
           if (savedStats) {
             try {
               const stats = JSON.parse(savedStats)
@@ -1174,7 +1174,7 @@ export default function FretMasterPage() {
 
     if (!isTauri) {
       try {
-        localStorage.setItem('fretmaster-stats', JSON.stringify(practiceStats))
+        localStorage.setItem(STATS_STORAGE_KEYS.stats, JSON.stringify(practiceStats))
       } catch (e) {
         logger.error('保存练习统计到 localStorage 失败（可能超出配额）:', e)
       }
@@ -3914,7 +3914,13 @@ export default function FretMasterPage() {
       setIsPracticePaused(true)
       // practiceElapsedTime 的单位是【秒】（见 recordPractice 中 *1000 的使用），
       // 原实现直接累加毫秒差，导致恢复后时长被放大 1000 倍。
-      setPracticeElapsedTime(prev => prev + (Date.now() - (practiceSessionStartTime || Date.now())) / 1000)
+      // 🚨 P3-1：`Date.now()` 必须在 updater **外面**取（铁律 1：updater 必须纯）。
+      //    StrictMode 会双调用 updater，两次 `Date.now()` 不同 ⇒ 第二次的基准漂移，
+      //    且这个漂移在 dev 下才出现、生产不复现（最难查的一类）。
+      const now = Date.now()
+      const sessionStart = practiceSessionStartTime ?? now
+      const elapsedSeconds = (now - sessionStart) / 1000
+      setPracticeElapsedTime(prev => prev + elapsedSeconds)
     }
   }, [isPlaying, isPracticePaused, practiceSessionStartTime, setPracticeElapsedTime])
 
