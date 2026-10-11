@@ -139,6 +139,7 @@ describe('nativeAudio 聚合对象', () => {
       'detectPitch', 'getLatencyMs', 'getAudioStatus', 'setBufferSize', 'setSampleRate',
       'setNoiseSuppression', 'setFilters', 'setPitchThreshold', 'setGain', 'getAudioLevel',
       'startDevicePolling', 'stopDevicePolling', 'listenDeviceChanges', 'unlistenDeviceChanges',
+      'ensureDeviceMonitor',
       'startPitchStream', 'stopPitchStream', 'isPitchStreamRunning', 'listenPitchDetected',
       'setAgcEnabled', 'isAgcEnabled', 'getAgcGain',
     ]

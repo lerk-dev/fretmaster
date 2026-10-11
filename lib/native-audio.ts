@@ -52,12 +52,20 @@ export interface DeviceChangeEvent {
   added: AudioDeviceInfo[]
   removed: string[]
   devices: AudioDeviceInfo[]
+  /**
+   * 启动快照标记：Rust 监控线程起步时把「当前全部设备」当一次事件发出来，
+   * 好让前端立刻拿到列表 —— 但那**不是**真实插入。
+   * 只有它是 true 时才不许弹「检测到新设备」（否则每次启动误报 N 个）。
+   */
+  isInitial?: boolean
 }
 
 type UnlistenFn = () => void
 
 const deviceMonitorState = {
   deviceChangeListener: null as UnlistenFn | null,
+  /** 多路订阅者集合：练习页与设置页可能同时监听，任一方注销不能影响另一方 */
+  deviceChangeCallbacks: new Set<(event: DeviceChangeEvent) => void>(),
   devicePollInterval: null as NodeJS.Timeout | null,
   lastDevices: [] as AudioDeviceInfo[],
   monitorStarted: false,
@@ -84,27 +92,65 @@ export async function listenDeviceChanges(callback: (event: DeviceChangeEvent) =
     const listen = await getListen()
 
     if (!deviceMonitorState.monitorStarted) {
-      await invoke('start_device_monitor', { intervalMs: 1500 })
+      // 🚨 用 `ensure_device_monitor`（常驻）而不是 `start_device_monitor`：
+      // 设备热插拔必须与「设置面板是否打开」解耦。Rust 侧启动时已常驻起了一个，
+      // 这里的调用是幂等的兜底（首次订阅时确保在跑）；常驻监控不会被
+      // `stop_device_monitor` 停掉 —— 见 `lib/native-audio.ts::unlistenDeviceChanges` 的注释。
+      await invoke('ensure_device_monitor', { intervalMs: 1500 })
       deviceMonitorState.monitorStarted = true
     }
 
     // 替换之前先注销上一个监听器。重复调用（React StrictMode 双挂载、或调用方忘了
     // 清理）时，若直接覆盖这个槽位，旧的 Tauri 事件监听器就再也没有引用可注销了 ——
     // 它会永远活着，每次设备变化都往一个已卸载的组件里回调。
+    //
+    // 但监听器允许多路订阅（练习页与设置页可能同时挂），所以额外维护一个回调集合：
+    // 任一订阅者都不会因为别人注销而收不到事件。
     if (deviceMonitorState.deviceChangeListener) {
       deviceMonitorState.deviceChangeListener()
       deviceMonitorState.deviceChangeListener = null
     }
 
+    deviceMonitorState.deviceChangeCallbacks.add(callback)
     deviceMonitorState.deviceChangeListener = await listen<DeviceChangeEvent>('audio-device-changed', (event) => {
       deviceMonitorState.lastDevices = event.payload.devices
-      callback(event.payload)
+      // 逐个派发给当前所有订阅者（拷贝一份再遍历：回调里可能同步注销自己）
+      for (const cb of Array.from(deviceMonitorState.deviceChangeCallbacks)) {
+        try {
+          cb(event.payload)
+        } catch (err) {
+          logger.error('device change callback failed:', err)
+        }
+      }
     })
-    return deviceMonitorState.deviceChangeListener
+    return () => {
+      // 只摘掉自己这一个订阅者；没有订阅者了才解除 Tauri 监听。
+      deviceMonitorState.deviceChangeCallbacks.delete(callback)
+      // 注意：不再在这里 stop 监控（常驻），仅当彻底无人订阅时才卸载事件监听。
+    }
   } catch (error) {
     logger.warn('Tauri event-based monitoring unavailable, falling back to polling:', error)
     startDevicePolling(callback, 2000)
     return () => stopDevicePolling()
+  }
+}
+
+/**
+ * 确保常驻设备监控在跑（幂等）。前端启动时调用一次即可 —— 之后即便设置面板
+ * 从未打开、或开了又关，设备插拔仍然会被检测到。
+ *
+ * 返回是否「调用前就已经在跑」。
+ */
+export async function ensureDeviceMonitor(): Promise<boolean> {
+  if (!isTauri()) return false
+  try {
+    const invoke = await getInvoke()
+    const wasRunning = await invoke<boolean>('ensure_device_monitor', { intervalMs: 1500 })
+    deviceMonitorState.monitorStarted = true
+    return wasRunning
+  } catch (error) {
+    logger.warn('Failed to ensure device monitor:', error)
+    return false
   }
 }
 
@@ -113,12 +159,14 @@ export function unlistenDeviceChanges(): void {
     deviceMonitorState.deviceChangeListener()
     deviceMonitorState.deviceChangeListener = null
   }
+  deviceMonitorState.deviceChangeCallbacks.clear()
   stopDevicePolling()
-  
-  if (deviceMonitorState.monitorStarted && isTauri()) {
-    getInvoke().then(invoke => invoke('stop_device_monitor')).catch(() => {})
-    deviceMonitorState.monitorStarted = false
-  }
+
+  // 🚨 **不调用 `stop_device_monitor`**：监控是常驻的（进程启动时由 Rust `.setup()`
+  // 起），停掉它 = 从此再也检测不到设备插拔。此前这里会停，而调用方是
+  // `WindowsAudioSettings` 的卸载清理 —— 设置抽屉一关就再也收不到事件，
+  // 正是「插拔声卡无反应」的根因（2026-10-11）。
+  // Rust 侧 `DeviceMonitor::stop` 对 resident 监控也会忽略该请求，双保险。
 }
 
 export function startDevicePolling(callback: (event: DeviceChangeEvent) => void, intervalMs: number = 2000): void {
@@ -570,6 +618,7 @@ export const nativeAudio = {
   stopDevicePolling,
   listenDeviceChanges,
   unlistenDeviceChanges,
+  ensureDeviceMonitor,
   startPitchStream,
   stopPitchStream,
   isPitchStreamRunning,

@@ -346,14 +346,17 @@ describe('listenPitchDetected / listenDeviceChanges', () => {
     expect(await native.listenPitchDetected(() => {})).toBeNull()
   })
 
-  it('首次 listenDeviceChanges：先启动 Rust device_monitor(1500ms)，再注册事件监听', async () => {
+  it('首次 listenDeviceChanges：先 ensure 常驻 device_monitor(1500ms)，再注册事件监听', async () => {
     const unlisten = vi.fn()
     mocks.listen.mockResolvedValue(unlisten)
     const cb = vi.fn()
 
     const fn = await native.listenDeviceChanges(cb)
-    expect(fn).toBe(unlisten)
-    expect(mocks.invoke).toHaveBeenCalledWith('start_device_monitor', { intervalMs: 1500 })
+    // 🚨 返回的清理函数是「摘掉本订阅者」的包装，**不再是** Tauri 的 unlisten 本身
+    // （因为要支持多路订阅：任一方注销不能影响另一方）。
+    expect(typeof fn).toBe('function')
+    // 用 ensure_device_monitor（常驻、不可被 stop 停掉），而不是 start_device_monitor
+    expect(mocks.invoke).toHaveBeenCalledWith('ensure_device_monitor', { intervalMs: 1500 })
     expect(mocks.listen).toHaveBeenCalledWith('audio-device-changed', expect.any(Function))
 
     // 顺序：monitor 必须先起来，否则监听期间会漏事件
@@ -367,13 +370,34 @@ describe('listenPitchDetected / listenDeviceChanges', () => {
     expect(cb).toHaveBeenCalledWith(payload)
   })
 
-  it('第二次 listenDeviceChanges 不会重复启动 device_monitor（单例只起一次）', async () => {
+  it('第二次 listenDeviceChanges 不会重复 ensure device_monitor（单例只起一次）', async () => {
     mocks.listen.mockResolvedValue(vi.fn())
     await native.listenDeviceChanges(() => {})
     mocks.invoke.mockClear()
 
     await native.listenDeviceChanges(() => {})
-    expect(mocks.invoke).not.toHaveBeenCalledWith('start_device_monitor', expect.anything())
+    expect(mocks.invoke).not.toHaveBeenCalledWith('ensure_device_monitor', expect.anything())
+  })
+
+  it('多路订阅：注销其中一个不能影响另一个（练习页与设置页可能同时监听）', async () => {
+    const unlisten = vi.fn()
+    mocks.listen.mockResolvedValue(unlisten)
+    const a = vi.fn()
+    const b = vi.fn()
+
+    const offA = await native.listenDeviceChanges(a)
+    const offB = await native.listenDeviceChanges(b)
+    // 每次 subscribe 都会重新 listen（旧监听在内部先被注销），但回调集合保留两路
+    const lastHandler = mocks.listen.mock.calls[mocks.listen.mock.calls.length - 1][1] as
+      (e: { payload: DeviceChangeEvent }) => void
+
+    offA!()                       // A 注销
+    const payload: DeviceChangeEvent = { added: [], removed: [], devices: [] }
+    lastHandler({ payload })
+
+    expect(a).not.toHaveBeenCalled()   // A 已摘掉
+    expect(b).toHaveBeenCalledWith(payload)  // B 仍在收
+    offB!()
   })
 
   it('第二次 listenDeviceChanges 会先注销上一个监听器（避免 Tauri 监听泄漏）', async () => {
@@ -387,7 +411,7 @@ describe('listenPitchDetected / listenDeviceChanges', () => {
     expect(first).toHaveBeenCalledTimes(1)
   })
 
-  it('unlistenDeviceChanges 注销监听 + 停掉 Rust monitor；重复调用不再发命令', async () => {
+  it('unlistenDeviceChanges 注销事件监听，但**绝不停掉常驻 monitor**', async () => {
     const unlisten = vi.fn()
     mocks.listen.mockResolvedValue(unlisten)
     await native.listenDeviceChanges(() => {})
@@ -395,14 +419,50 @@ describe('listenPitchDetected / listenDeviceChanges', () => {
     mocks.invoke.mockClear()
     native.unlistenDeviceChanges()
     expect(unlisten).toHaveBeenCalledTimes(1)
-    await waitUntil(() => invokeCount('stop_device_monitor') === 1)
-    expect(mocks.invoke).toHaveBeenCalledWith('stop_device_monitor')
 
-    // 第二次：monitorStarted 已复位 → 不该再发 stop_device_monitor（幂等）
+    // 🚨 核心回归：停掉 monitor = 从此再也检测不到设备插拔。
+    // 此前这里会发 stop_device_monitor，而调用方是设置面板的卸载清理 ⇒
+    // 抽屉一关就永久聋掉（2026-10-11 定位到的根因）。
+    await sleep(30)
+    expect(mocks.invoke).not.toHaveBeenCalledWith('stop_device_monitor', expect.anything())
+    expect(mocks.invoke).not.toHaveBeenCalled()
+
+    // 再次调用仍不应发任何命令（幂等，且依然不停监控）
     mocks.invoke.mockClear()
     native.unlistenDeviceChanges()
     await sleep(20)
     expect(mocks.invoke).not.toHaveBeenCalled()
+  })
+
+  it('ensureDeviceMonitor 发 ensure_device_monitor 且返回「之前是否已在跑」', async () => {
+    mocks.invoke.mockResolvedValueOnce(true)
+    expect(await native.ensureDeviceMonitor()).toBe(true)
+    expect(mocks.invoke).toHaveBeenCalledWith('ensure_device_monitor', { intervalMs: 1500 })
+
+    mocks.invoke.mockResolvedValueOnce(false)
+    expect(await native.ensureDeviceMonitor()).toBe(false)
+  })
+
+  it('ensureDeviceMonitor 失败时返回 false 且不抛（供启动路径安全调用）', async () => {
+    mocks.invoke.mockRejectedValueOnce(new Error('boom'))
+    expect(await native.ensureDeviceMonitor()).toBe(false)
+  })
+
+  it('isInitial 快照事件原样透传给订阅者（由调用方决定不弹提示）', async () => {
+    mocks.listen.mockResolvedValue(vi.fn())
+    const cb = vi.fn()
+    await native.listenDeviceChanges(cb)
+
+    const handler = mocks.listen.mock.calls[0][1] as (e: { payload: DeviceChangeEvent }) => void
+    const snapshot: DeviceChangeEvent = {
+      added: [dev('Mic A')],
+      removed: [],
+      devices: [dev('Mic A')],
+      isInitial: true,
+    }
+    handler({ payload: snapshot })
+    expect(cb).toHaveBeenCalledWith(snapshot)
+    expect(cb.mock.calls[0][0].isInitial).toBe(true)
   })
 
   it('listen 不可用 → 回退到 2s 轮询，返回的清理函数能真正停掉轮询', async () => {

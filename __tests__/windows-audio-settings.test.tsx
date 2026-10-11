@@ -299,16 +299,18 @@ describe('WindowsAudioSettings — 设备热插拔', () => {
     })
   })
 
-  it('当前设备被移除 → 停止采集、弹提示并清空设备选择', async () => {
+  it('当前设备被移除 → 清空本组件的设备选择（停采集/提示已上移到全局层，不在此重复）', async () => {
     setAudio({ selectedAudioDevice: 'Mic A', micEnabled: true })
     await mount()
     expect(captured).not.toBeNull()
     await act(async () => {
       captured!({ devices: [], added: [], removed: ['Mic A'] })
     })
-    expect(mockNative.stopAudioCapture).toHaveBeenCalled()
+    // 🚨 职责已上移到 `app/page.tsx`（那里全局面板与设置面板无关）。
+    // 本组件只负责让下拉显示正确 —— 同一件事不做两份判定（铁律 12）。
+    // 若这里也调 stopAudioCapture，就会与全局处理互相打架。
+    expect(mockNative.stopAudioCapture).not.toHaveBeenCalled()
     expect(useAppStore.getState().audio.selectedAudioDevice).toBe('')
-    expect(mockToast.error).toHaveBeenCalledWith('当前音频设备已断开，音频输入已停止')
   })
 
   it('别的设备被移除 → 不停采集、不动当前选择', async () => {
@@ -354,7 +356,7 @@ describe('WindowsAudioSettings — 设备热插拔', () => {
     expect(unlisten).toHaveBeenCalledTimes(1)
   })
 
-  it('正常卸载 → 注销事件订阅与模块级监听', async () => {
+  it('正常卸载 → 注销本组件的订阅，但**不动**模块级监控（常驻）', async () => {
     const unlisten = vi.fn()
     mockNative.listenDeviceChanges.mockResolvedValue(unlisten)
     await mount()
@@ -362,7 +364,10 @@ describe('WindowsAudioSettings — 设备热插拔', () => {
       roots[roots.length - 1].unmount()
     })
     expect(unlisten).toHaveBeenCalledTimes(1)
-    expect(mockNative.unlistenDeviceChanges).toHaveBeenCalled()
+    // 🚨 核心回归：此前卸载会调 `unlistenDeviceChanges()`，而它当时会 stop 掉
+    // Rust 监控 ⇒ 设置抽屉一关，插拔声卡再也检测不到（2026-10-11 根因）。
+    // 现在组件只摘掉自己这一路订阅，全局监控与全局订阅在 `app/page.tsx`。
+    expect(mockNative.unlistenDeviceChanges).not.toHaveBeenCalled()
   })
 })
 

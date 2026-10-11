@@ -105,7 +105,10 @@ const FIELD_CONVENTION: Record<string, 'camelCase' | 'snake_case'> = {
   PracticeStats: 'snake_case',
   StatsSummary: 'snake_case',
   ExerciseTypeStats: 'snake_case',
-  DeviceChangeEvent: 'snake_case',
+  // ✅ 2026-10-11 补 rename_all：`is_initial` 需以 `isInitial` 发给前端
+  //    （此前无 rename ⇒ 前端读 event.isInitial 恒 undefined ⇒ 会把启动快照
+  //     误判成真实插入、每次启动误报 N 个设备）
+  DeviceChangeEvent: 'camelCase',
 }
 
 describe('穷举护栏：每一个跨边界 Serialize 结构体都必须登记线上字段口径', () => {

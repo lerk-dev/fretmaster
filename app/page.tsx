@@ -160,6 +160,7 @@ import {
 import { toast } from "sonner"
 import { TRANSLATIONS } from '@/lib/i18n'
 import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
+import type { AudioDeviceInfo } from '@/lib/native-audio'
 
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
 
@@ -1832,12 +1833,93 @@ export default function FretMasterPage() {
   // 音频输入设备的枚举与自动选择（实现见 hooks/use-audio-device-enumeration.ts）
   const { enumerateAudioDevices } = useAudioDeviceEnumeration()
 
-  // 初始加载和监听设备变化（仅限 Web 版本）
+  // 设备增删的**统一处理**（Web 与桌面共用）：
+  //  · 当前正在用的设备被拔掉 ⇒ 停采集 + 清选择 + 提示（否则采集线程对着不存在的设备空转，
+  //    练习中「怎么弹都没反应」且用户不知道为什么）
+  //  · 新设备接入 ⇒ 提示（此前是静默的，用户只能自己去设置里刷新才发现）
+  const handleGlobalDeviceChange = useCallback((
+    added: AudioDeviceInfo[],
+    removed: string[]
+  ) => {
+    const st = useAppStore.getState()
+    const currentSelected = st.audio?.selectedAudioDevice
+
+    if (currentSelected && removed.includes(currentSelected)) {
+      // 用「运行时状态」而不是「持久化意图」判定该怎么关（铁律 19）：
+      // 用户显式关过音频才写偏好，这里只是设备没了导致的降级。
+      if (isTauri) {
+        void import('@/lib/native-audio').then(m => m.stopAudioCapture()).catch(() => {})
+      }
+      st.setMicEnabled(false)
+      st.setSelectedAudioDevice('')
+      toast.error(
+        language === 'zh-CN'
+          ? '当前音频设备已断开，音频输入已停止'
+          : 'Current audio device disconnected, audio input stopped'
+      )
+      return
+    }
+
+    if (added.length > 0) {
+      const name = added[0]?.name
+      toast.success(
+        language === 'zh-CN'
+          ? `检测到音频设备${name ? `：${name}` : ''}`
+          : `Audio device detected${name ? `: ${name}` : ''}`
+      )
+    }
+
+    // 原本没选设备（例如启动时设备还没插），现在有了 ⇒ 自动选上，用户直接能练
+    if (!currentSelected && added.length > 0) {
+      const preferred = added.find(d => d.name) ?? added[0]
+      if (preferred?.name) st.setSelectedAudioDevice(preferred.name)
+    }
+  }, [language, isTauri])
+
+  // ============================================================================
+  // 设备热插拔检测 —— **全局**（两种形态），不依赖设置面板是否打开。
+  //
+  // 背景（2026-10-11）：此前只有 `WindowsAudioSettings`（桌面）与一段
+  // `isTauri ? return` 的 Web effect 在管这件事，前者挂在 Radix `SheetContent` 下、
+  // 抽屉一关子树即卸载 ⇒ 关掉设置后插拔声卡彻底无人察觉；且**两种形态都不给用户
+  // 任何可见反馈**（Web 只在 logger.debug 里记一行，桌面明确注释「不弹提示」）。
+  //
+  // 现在：桌面端监控由 Rust `.setup()` 常驻启动，这里订阅事件；Web 端监听
+  // `devicechange`。两边都走同一个处理函数，用户能看到「接入/断开」。
+  // ============================================================================
   useEffect(() => {
-    if (isTauri) return
+    if (isTauri) {
+      let unlisten: (() => void) | null = null
+      let cancelled = false
+
+      void (async () => {
+        const m = await import('@/lib/native-audio')
+        if (cancelled) return
+        // 双保险：Rust 已在 setup 常驻启动，这里再 ensure 一次（幂等），
+        // 以防运行在「setup 未覆盖」的旧二进制上。
+        await m.ensureDeviceMonitor().catch(() => {})
+        const fn = await m.listenDeviceChanges((event) => {
+          // 启动快照不是真实插入：只更新列表，不弹提示（否则每次启动误报 N 个设备）
+          if (event.isInitial) return
+          handleGlobalDeviceChange(event.added, event.removed)
+        })
+        if (!fn) return
+        if (cancelled) {
+          fn()
+          return
+        }
+        unlisten = fn
+      })().catch(() => {})
+
+      return () => {
+        cancelled = true
+        if (unlisten) unlisten()
+      }
+    }
+
+    // ---- Web ----
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) return
 
-    // 请求权限并枚举设备
     const requestPermissionAndGetDevices = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -1849,27 +1931,44 @@ export default function FretMasterPage() {
         await enumerateAudioDevices(false)
       }
     }
-    
-    // 初始加载时请求权限
+
     requestPermissionAndGetDevices()
-    
-    // 监听设备变化（插入/拔出USB音频设备）
+
+    // `devicechange` 只告诉我们「列表变了」，不说是谁进谁出 ⇒ 自己跟上一份快照求差集。
+    let lastIds: string[] | null = null
     const handleDeviceChange = (() => {
       let debounceTimer: NodeJS.Timeout | null = null
-      return async () => {
+      return () => {
         if (debounceTimer) clearTimeout(debounceTimer)
+        // USB 声卡插拔会连发多个事件，防抖聚合
         debounceTimer = setTimeout(async () => {
-          await enumerateAudioDevices(true)
+          const before = lastIds ?? []
+          await enumerateAudioDevices(false)
+          const after = (navigator.mediaDevices ? await navigator.mediaDevices.enumerateDevices() : [])
+            .filter(d => d.kind === 'audioinput' && d.deviceId)
+            .map(d => d.deviceId)
+          lastIds = after
+
+          // 首次（before 为空）不算变化，避免启动时误报
+          if (before.length === 0) return
+          const added = after.filter(id => !before.includes(id))
+          const removed = before.filter(id => !after.includes(id))
+          if (added.length > 0 || removed.length > 0) {
+            handleGlobalDeviceChange(
+              added.map(id => ({ name: id } as unknown as AudioDeviceInfo)),
+              removed
+            )
+          }
         }, 500)
       }
     })()
-    
+
     navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
-    
+
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
     }
-  }, [enumerateAudioDevices, isTauri])
+  }, [enumerateAudioDevices, isTauri, handleGlobalDeviceChange])
 
   // 当设置面板打开时，刷新设备列表
   useEffect(() => {

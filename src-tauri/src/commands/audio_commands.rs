@@ -305,6 +305,29 @@ pub async fn start_device_monitor(
     Ok(())
 }
 
+/// 常驻启动设备监控（热插拔检测的唯一入口）。
+///
+/// 与 `start_device_monitor` 的区别：**不可被 `stop_device_monitor` 停掉**。
+/// 由 `.setup()` 在进程启动时调用一次，使「插拔声卡」这类系统级事件
+/// 不依赖任何 UI 组件是否挂载（2026-10-11：设置抽屉一关就漏报的根因）。
+#[tauri::command]
+pub async fn ensure_device_monitor(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    interval_ms: Option<u64>,
+) -> Result<bool, String> {
+    let mut monitor = state.inner().device_monitor.lock();
+    let interval = interval_ms.unwrap_or(1500);
+    let was_running = monitor.is_running();
+    monitor.start_resident(app, interval);
+    log::info!(
+        "Device monitor ensured (resident), interval {}ms, already_running={}",
+        interval,
+        was_running
+    );
+    Ok(was_running)
+}
+
 #[tauri::command]
 pub async fn stop_device_monitor(
     state: State<'_, AppState>,

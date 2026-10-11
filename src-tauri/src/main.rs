@@ -24,6 +24,26 @@ fn main() {
                     let _ = window.set_background_color(Some(Color(11, 15, 20, 255)));
                 }
             }
+
+            // 🚨 设备热插拔监控**常驻启动**（2026-10-11）。
+            //
+            // 此前只在 `WindowsAudioSettings` 挂载时懒启动，而该组件挂在 Radix
+            // `SheetContent` 下、抽屉一关子树即卸载 ⇒ 其 cleanup 会把监控停掉，
+            // 于是「关掉设置后插拔声卡」永远不触发任何事件。
+            // 设备接入/移除属于系统级事件，不该依赖某个 UI 组件是否打开，
+            // 所以在进程启动时就起（`ensure_device_monitor` 标记为 resident，
+            // 前端后续的 stop 请求会被忽略）。
+            {
+                use tauri::Manager as _;
+                let state = app.state::<AppState>();
+                let monitor = state.inner().device_monitor.clone();
+                let handle = app.handle().clone();
+                // 锁只在这一小段持有（`start_resident` 内部仅 spawn 线程后立即返回，
+                // 不会阻塞 UI 线程等待设备枚举）。
+                monitor.lock().start_resident(handle, 1500);
+                log::info!("Device monitor started resident at startup (interval 1500ms)");
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -60,6 +80,7 @@ fn main() {
             fretmaster::commands::set_audio_filters,
             // Device monitor commands
             fretmaster::commands::start_device_monitor,
+            fretmaster::commands::ensure_device_monitor,
             fretmaster::commands::stop_device_monitor,
             fretmaster::commands::is_device_monitor_running,
             // Pitch stream commands

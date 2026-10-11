@@ -220,12 +220,6 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
     }
   }, [t, setMicUserPreference])
   
-  // 使用 ref 存储 stopAudio 以避免依赖循环
-  const stopAudioRef = useRef(stopAudio)
-  useEffect(() => {
-    stopAudioRef.current = stopAudio
-  }, [stopAudio])
-  
   // 切换音频状态
   const toggleAudio = useCallback(async () => {
     if (isCapturing) {
@@ -236,32 +230,34 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   }, [isCapturing, startAudio, stopAudio])
   
   // 处理设备变化 - 使用 ref 避免依赖循环
+  //
+  // 🚨 这里**只同步本组件的设备下拉**。设备的增删反馈（拔掉当前设备 → 停采集/清选择/提示，
+  // 插入新设备 → 提示）已上移到 `app/page.tsx` 的全局处理，因为面板一关本组件就卸载，
+  // 那时仍必须继续检测（2026-10-11）。此处保留 `setDevices` 是为了列表实时性。
   const handleDeviceChange = useCallback((event: DeviceChangeEvent) => {
     setDevices(event.devices)
 
-    // 静默更新设备列表，不弹出"检测到新设备"提示（Rust device_monitor 启动时会 emit 所有设备作为 added 事件，易误报）
-
-    if (event.removed.length > 0) {
-      // 如果当前使用的设备被移除，停止音频捕获
-      const currentSelected = useAppStore.getState().audio?.selectedAudioDevice
-      if (currentSelected && event.removed.includes(currentSelected)) {
-        // 使用 ref 调用 stopAudio 避免依赖循环
-        stopAudioRef.current()
-        toast.error(language === 'zh-CN' ? '当前音频设备已断开，音频输入已停止' : 'Current audio device disconnected, audio input stopped')
-        // 清除设备选择
-        useAppStore.getState().setSelectedAudioDevice('')
-      }
+    // 当前选中的设备被拔掉时，把下拉的选择也清掉（全局处理已停采集并给了提示）；
+    // 但**不能**在这里再 stopAudio 一次 —— 同一件事两份判定会互相打架（铁律 12）。
+    const currentSelected = useAppStore.getState().audio?.selectedAudioDevice
+    if (currentSelected && event.removed.includes(currentSelected)) {
+      useAppStore.getState().setSelectedAudioDevice('')
+      return
     }
 
     // 如果有默认设备且当前没有选择设备，自动选择
-    const currentSelected = useAppStore.getState().audio?.selectedAudioDevice
     if (!currentSelected && event.devices.length > 0) {
       const defaultDevice = event.devices.find(d => d.isDefault) || event.devices[0]
       useAppStore.getState().setSelectedAudioDevice(defaultDevice.name)
     }
-  }, [language])
+  }, [])
   
-  // 启动设备热插拔检测（使用 Rust 后端事件驱动）
+  // 订阅设备变化，仅用于刷新本组件的设备下拉列表。
+  //
+  // 🚨 **绝不能在这里 stop 监控**：此前清理里调了 `unlistenDeviceChanges()`，而本组件
+  // 挂在 Radix `SheetContent` 下、设置抽屉一关子树即卸载 ⇒ 监控被停、此后插拔声卡
+  // 再无事件（2026-10-11 定位到的根因）。现在 `unlistenDeviceChanges` 也不停监控
+  // （Rust 侧同时把监控标为 resident，双保险）。
   useEffect(() => {
     let unlisten: (() => void) | null = null
     let cancelled = false
@@ -270,7 +266,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
       if (!fn) return
       if (cancelled) {
         // 组件在 promise 落地前已卸载：此时清理函数已经跑过，必须在这里补注销，
-        // 否则 Tauri 事件监听器与 Rust device_monitor（每 1.5s 一发）会一直挂着
+        // 否则会往一个已卸载的组件里回调。
         fn()
         return
       }
@@ -279,8 +275,9 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
 
     return () => {
       cancelled = true
+      // 只注销自己这一路订阅（`unlisten` 已是「摘掉单个回调」的语义），
+      // 不触碰全局监控 —— 全局订阅在 page.tsx，监控由 Rust 常驻持有。
       if (unlisten) unlisten()
-      nativeAudio.unlistenDeviceChanges()
     }
   }, [handleDeviceChange])
   
