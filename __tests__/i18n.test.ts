@@ -105,7 +105,12 @@ describe('死键：i18n 里不应有「定义了但全仓无调用方」的键',
   //    这里改为**回归钉死当前数量**：新增死键会立刻让数量上升而变红，逼迫新增者
   //    要么真的接上调用方、要么显式把上限抬高（抬高动作本身就是一次人工复核）。
   //    与其假装「零死键」，不如如实记录存量并阻止其增长。
-  const DEAD_KEY_BUDGET = 604
+  // 2026-10-15（乐理审查 #20）：604 → 597。本轮把 7 个确证死键处理掉了 ——
+  //   接入 6 个（theory_caged_shape / theory_quality / theory_degree /
+  //   theory_role_root / theory_role_third / theory_role_fifth，全部用在乐理面板的
+  //   CAGED 图例、性质分组与指型列表的可访问名上），删除 1 个冗余键
+  //   （theory_notes 与既有 scale_notes / theory_show_notes 语义重复）。
+  const DEAD_KEY_BUDGET = 597
 
   it('死键数量不超过已登记预算（新增死键会红；清理后可下调预算）', () => {
     const root = path.resolve(__dirname, '..')

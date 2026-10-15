@@ -87,7 +87,11 @@ interface TheoryPanelProps {
 // pitch class: C=0 … B=11
 const CIRCLE_MAJOR_PC = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5]
 const CIRCLE_MAJOR_NAMES = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'D♭', 'A♭', 'E♭', 'B♭', 'F']
-const CIRCLE_MINOR_NAMES = ['Am', 'Em', 'Bm', 'F♯m', 'C♯m', 'G♯m', 'D♯m', 'B♭m', 'G♭m', 'E♭m', 'Cm', 'Gm']
+// 🚨 每一项都必须是同行大调的**关系小调**（大调根音下小三度 = -3 半音）。
+// 末 4 项曾写成 G♭m/E♭m/Cm/Gm —— 既不是关系小调（A♭ 的关系小调是 Fm、E♭ 的是 Cm、
+// B♭ 的是 Gm、F 的是 Dm），又让 pc6(G♭m≡F♯m)、pc3(E♭m≡D♯m) 重复、pc5(Fm)、pc2(Dm) 缺失。
+// 由「修正五度圈小调名」测试钉住：每项 pc 必须等于 CIRCLE_MAJOR_PC - 3。
+const CIRCLE_MINOR_NAMES = ['Am', 'Em', 'Bm', 'F♯m', 'C♯m', 'G♯m', 'D♯m', 'B♭m', 'Fm', 'Cm', 'Gm', 'Dm']
 // 大调调号（正 = 升号数，负 = 降号数）
 const CIRCLE_MAJOR_KEY_SIG = [0, 1, 2, 3, 4, 5, 6, -5, -4, -3, -2, -1]
 
@@ -270,12 +274,17 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
 
   // ===== 五度圈详情 =====
   const circleDetail = useMemo(() => {
-    const pc = CIRCLE_MAJOR_PC[circleIndex]
+    const majorPc = CIRCLE_MAJOR_PC[circleIndex]
     const keySig = CIRCLE_MAJOR_KEY_SIG[circleIndex]
     const majorName = CIRCLE_MAJOR_NAMES[circleIndex]
     const minorName = CIRCLE_MINOR_NAMES[circleIndex]
+    // 🚨 小调侧必须用**关系小调的根音**（大调根音下小三度 = -3 半音 ≡ +9 mod 12），
+    // 而不是大调根音本身。修前不论 major/minor 都取 CIRCLE_MAJOR_PC ⇒
+    // 标签写 `Am`、实际渲染的是 **C 自然小调**（C D D♯ F G G♯ A♯），把乐理直接教错。
+    const isMinor = circleMode === 'minor'
+    const pc = isMinor ? (majorPc + 9) % 12 : majorPc
     // 音阶音符（负调号用降号显示）
-    const scaleType = circleMode === 'major' ? ScaleType.major : ScaleType.naturalMinor
+    const scaleType = isMinor ? ScaleType.naturalMinor : ScaleType.major
     const scale = getScaleNotes(pc as Note, scaleType)
     return {
       pc,
@@ -556,7 +565,11 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                 {/* 音阶音符 */}
                 <div>
                   <div className="text-xs text-muted-foreground mb-1.5">
-                    {t('scale_notes')}（{circleMode === 'major' ? t('theory_circle_major') : t('theory_circle_minor')}）
+                    {/* 🚨 括号必须跟着语言走：修前写死全角 `（）`，
+                        英文界面会出现 `Scale Notes（Major）`（#18）。 */}
+                    {t('theory_scale_notes_with_mode')
+                      .replace('{notes}', t('scale_notes'))
+                      .replace('{mode}', circleMode === 'major' ? t('theory_circle_major') : t('theory_circle_minor'))}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {circleDetail.scale.map((n, i) => (
@@ -599,7 +612,10 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                   <SelectContent>
                     {COMMON_CHORD_TYPES.map(ct => (
                       <SelectItem key={ct} value={ct} className="text-xs">
-                        {getChordTypeUnicodeDisplayString(ct)}
+                        {/* 🚨 `majorTriad` 的 unicode 显示串是**空串**（大三和弦约定不写后缀）
+                            ⇒ 首项曾整行空白、`SelectValue` 也随之空白，用户以为控件坏了。
+                            空串时回落到「大三」文案。 */}
+                        {getChordTypeUnicodeDisplayString(ct) || t('theory_quality_major')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -634,7 +650,9 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
 
             {/* 整指板和弦音位图（展示方式参考 myfretboardtrainer.com 的 Include chords） */}
             <div className="space-y-2 pt-1">
-              <div className="text-xs font-medium text-muted-foreground">{t('theory_chord_map')}</div>
+              {/* 小节标题统一用 h4（与「把位教学」「CAGED」两处一致）——
+                  此前这里是 div.text-xs，与另两处层级不同，读屏也读不出「这是一节」（#18）。 */}
+              <h4 className="text-sm font-medium text-muted-foreground">{t('theory_chord_map')}</h4>
               <div className="overflow-x-auto pb-1">
                 <MiniFretboard
                   stringCount={config.stringCount}
@@ -722,7 +740,10 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                 </div>
               )}
               <p className="text-2xs text-muted-foreground">
-                {t('theory_fingering')}: 1 = {lang === 'en' ? 'index' : '食指'}, 2 = {lang === 'en' ? 'middle' : '中指'}, 3 = {lang === 'en' ? 'ring' : '无名指'}, 4 = {lang === 'en' ? 'pinky' : '小指'}
+                {/* 指法说明整句走一个带占位符的键：修前是**内联三元** + 硬编码全角冒号
+                    （`lang === 'en' ? 'index' : '食指'`），英文界面会漏出中文（#18）。
+                    分隔符只用 `=` / `·` 这类语言中立符号，不再出现全角标点。 */}
+                {t('theory_fingering_hint').replace('{label}', t('theory_fingering'))}
               </p>
             </div>
 
@@ -749,10 +770,19 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                   {/* 整幅样式自带一组「性质」切换（且它还管着基础音集），所以外层这组只在分图时显示，
                       否则同一个区块里会出现两组功能重叠又互不同步的按钮 */}
                   {cagedView === 'split' && (
-                    <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5">
+                    <div
+                      role="group"
+                      // 这组按钮此前既没有可见标签、也没有可访问名（读屏只念到「大三/小三」），
+                      // 顺手接上一直闲置的 theory_quality 键（#20）。
+                      aria-label={t('theory_quality')}
+                      className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5"
+                    >
                       {(['major', 'minor'] as ChordQuality[]).map(q => (
                         <button
                           key={q}
+                          type="button"
+                          // 分段按钮的选中态必须能被读屏感知（此前只有背景色，键盘/读屏用户无从判断）
+                          aria-pressed={cagedQuality === q}
                           onClick={() => setCagedQuality(q)}
                           className={`px-2.5 h-6 rounded text-xs transition-colors ${
                             cagedQuality === q ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -768,6 +798,21 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
               <p className="text-xs text-muted-foreground">
                 {cagedView === 'split' ? t('theory_caged_hint') : t('trainer_hint')}
               </p>
+
+              {/* 音级图例（#18 / #20）：分图里的格子只写 R / 3 / 5，此前没有任何地方解释它们是什么。
+                  这里同时把一直闲置的 theory_degree / theory_role_* 四个键接上。
+                  🚨 三音的拼写跟随和弦性质（小三和弦是 ♭3）—— 与格子里那一处必须同源（#12）。 */}
+              {cagedView === 'split' && isStandardSixStringGuitar(config) && (
+                <p className="text-2xs text-muted-foreground">
+                  <span className="font-medium">{t('theory_degree')}</span>
+                  <span className="mx-1">·</span>
+                  <span className="font-mono">R</span> = {t('theory_role_root')}
+                  <span className="mx-1">·</span>
+                  <span className="font-mono">{cagedQuality === 'minor' ? '♭3' : '3'}</span> = {t('theory_role_third')}
+                  <span className="mx-1">·</span>
+                  <span className="font-mono">5</span> = {t('theory_role_fifth')}
+                </p>
+              )}
 
               {isStandardSixStringGuitar(config) ? (
                 cagedView === 'merged' ? (
@@ -786,13 +831,21 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                 ) : cagedShapes.length === 0 ? (
                   <p className="text-xs text-muted-foreground">{t('stats_no_data')}</p>
                 ) : (
-                  <div className="flex flex-wrap gap-3">
+                  <div
+                    role="group"
+                    // 「指型」列表此前没有可访问名（读屏只念到 C / A / G / E / D 五个字母）；
+                    // 顺手接上一直闲置的 theory_caged_shape 键（#20）。
+                    aria-label={t('theory_caged_shape')}
+                    className="flex flex-wrap gap-3"
+                  >
                     {cagedShapes.map(shape => {
                       // 和弦指法格子
                       const chordCells = new Map<string, { label: string; isRoot: boolean }>()
                       shape.chordTones.forEach(ct => {
                         chordCells.set(`${ct.stringIndex}-${ct.fret}`, {
-                          label: ct.role === 'root' ? 'R' : ct.role === 'third' ? '3' : '5',
+                          // 🚨 三音标签必须跟随和弦性质：小三和弦的三音是 **♭3**。
+                          // 此前无差别写 '3'，切到「小三」时与大三和弦完全无从区分（教错乐理）。
+                          label: ct.role === 'root' ? 'R' : ct.role === 'third' ? (cagedQuality === 'minor' ? '♭3' : '3') : '5',
                           isRoot: ct.role === 'root',
                         })
                       })
@@ -812,7 +865,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                       return (
                         <div key={`${shape.form}-${shape.rootFret}`} className="bg-card/50 rounded-lg p-2.5 border border-border/30 space-y-2">
                           <div className="flex items-center gap-2 text-xs">
-                            <Badge variant="default">{shape.form}</Badge>
+                            <Badge variant="default" title={`${t('theory_caged_shape')} ${shape.form}`}>{shape.form}</Badge>
                             <span className="text-muted-foreground tabular-nums">{shape.windowStart}–{shape.windowEnd}</span>
                           </div>
                           <div>
@@ -853,11 +906,12 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
                 <div className="text-2xs text-muted-foreground leading-3">{t('theory_modes_family')}</div>
-                <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5">
+                <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5" role="group" aria-label={t('theory_modes_family')}>
                   {MODE_FAMILIES.map((family, i) => (
                     <button
                       key={family.id}
                       type="button"
+                      aria-pressed={familyIdx === i}
                       onClick={() => { setFamilyIdx(i); setModeIndex(0) }}
                       className={`px-2.5 h-6 rounded text-xs transition-colors ${
                         familyIdx === i ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -881,10 +935,11 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
               </div>
               <div className="space-y-1">
                 <div className="text-2xs text-muted-foreground leading-3">{t('theory_modes_spelling')}</div>
-                <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5">
+                <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5" role="group" aria-label={t('theory_modes_spelling')}>
                   <button
                     type="button"
                     aria-label={t('theory_spelling_sharps')}
+                    aria-pressed={!modesPreferFlat}
                     onClick={() => setModesPreferFlat(false)}
                     className={`px-2.5 h-6 rounded text-xs transition-colors ${
                       !modesPreferFlat ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -895,6 +950,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                   <button
                     type="button"
                     aria-label={t('theory_spelling_flats')}
+                    aria-pressed={modesPreferFlat}
                     onClick={() => setModesPreferFlat(true)}
                     className={`px-2.5 h-6 rounded text-xs transition-colors ${
                       modesPreferFlat ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -906,9 +962,10 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
               </div>
               <div className="space-y-1">
                 <div className="text-2xs text-muted-foreground leading-3">{t('theory_modes_display')}</div>
-                <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5">
+                <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5" role="group" aria-label={t('theory_modes_display')}>
                   <button
                     type="button"
+                    aria-pressed={modesShowIntervals}
                     onClick={() => setModesShowIntervals(true)}
                     className={`px-2.5 h-6 rounded text-xs transition-colors ${
                       modesShowIntervals ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -918,6 +975,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                   </button>
                   <button
                     type="button"
+                    aria-pressed={!modesShowIntervals}
                     onClick={() => setModesShowIntervals(false)}
                     className={`px-2.5 h-6 rounded text-xs transition-colors ${
                       !modesShowIntervals ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -935,6 +993,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                 <button
                   key={m.name}
                   type="button"
+                  aria-pressed={modeIndex === i}
                   onClick={() => setModeIndex(i)}
                   className={`px-2.5 h-7 rounded-md text-xs border transition-colors ${
                     modeIndex === i
@@ -952,12 +1011,20 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-lg font-bold">{modeDisplayName}</span>
                 <Badge variant="secondary">{t(modeFamily.nameKey)}</Badge>
-                <span className="text-xs font-mono text-muted-foreground">{formatDegree(modeScaleDef.formula)}</span>
+                {/* 🚨 公式与下方整指板的音级标注是**同一组信息**：修前它是一段与标题同字号的
+                    font-mono 文本，两处一样抢眼、密度偏高（#18）。改成低权重的 outline 徽章，
+                    并把完整读数放进 title —— 想让指板说话时不必再把公式读一遍。 */}
+                <Badge variant="outline" className="font-mono" title={`${t('theory_modes_display')}: ${formatDegree(modeScaleDef.formula)}`}>
+                  {formatDegree(modeScaleDef.formula)}
+                </Badge>
               </div>
               <p className="text-xs leading-5">{lang === 'en' ? modeInfo.descEn : modeInfo.descZh}</p>
               <p className="text-xs leading-5 text-muted-foreground">
-                <span className="font-medium">{t('theory_modes_usage')}：</span>
-                {lang === 'en' ? modeInfo.usageEn : modeInfo.usageZh}
+                {/* 冒号跟着语言走（修前硬编码全角 `：`，英文界面会漏出中文标点，#18）。
+                    占位符模式与同文件的 theory_modes_parent 一致。 */}
+                {t('theory_modes_usage_fmt')
+                  .replace('{label}', t('theory_modes_usage'))
+                  .replace('{text}', lang === 'en' ? modeInfo.usageEn : modeInfo.usageZh)}
               </p>
               {modeIndex > 0 && (
                 <p className="text-xs text-primary/90">
@@ -998,9 +1065,10 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
               </div>
               <div className="space-y-1">
                 <div className="text-2xs text-muted-foreground leading-3">{t('theory_modes_display')}</div>
-                <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5">
+                <div className="flex items-center gap-1 bg-card/30 rounded-md border border-border/30 p-0.5" role="group" aria-label={t('theory_modes_display')}>
                   <button
                     type="button"
+                    aria-pressed={intShowIntervals}
                     onClick={() => setIntShowIntervals(true)}
                     className={`px-2.5 h-6 rounded text-xs transition-colors ${
                       intShowIntervals ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -1010,6 +1078,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                   </button>
                   <button
                     type="button"
+                    aria-pressed={!intShowIntervals}
                     onClick={() => setIntShowIntervals(false)}
                     className={`px-2.5 h-6 rounded text-xs transition-colors ${
                       !intShowIntervals ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'

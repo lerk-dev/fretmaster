@@ -33,7 +33,7 @@ import { getCagedShapes, generateScalePositions } from '@/lib/fretboard-position
 import { getScaleDisplayName, ScaleType } from '@/lib/scale-theory'
 // ⚠️ 与上一行同名但**不同函数**：这个吃「音阶英文名」，调式图鉴的按钮名/父调提示走它。
 // 用错那个（吃 ScaleType 的）会直接渲染崩或退化成英文名 —— 本文件有专门用例钉住。
-import { getScaleDisplayName as getScaleDisplayNameByName } from '@/lib/page-theory-functions'
+import { getScaleDisplayName as getScaleDisplayNameByName, getNoteIndex } from '@/lib/page-theory-functions'
 import { MODE_FAMILIES, INTERVAL_GROUPS, chordToneLabel } from '@/lib/theory-mode-guide'
 import { INSTRUMENT_CONFIG } from '@/lib/practice-suggestions'
 
@@ -219,8 +219,25 @@ describe('五度圈：选中与拼写', () => {
       ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'D♭', 'A♭', 'E♭', 'B♭', 'F'],
     )
     expect(nodes.slice(12).map((n) => n.getAttribute('aria-label'))).toEqual(
-      ['Am', 'Em', 'Bm', 'F♯m', 'C♯m', 'G♯m', 'D♯m', 'B♭m', 'G♭m', 'E♭m', 'Cm', 'Gm'],
+      // ⚠️ 末 4 项修过：`A♭/E♭/B♭/F` 的关系小调是 `Fm/Cm/Gm/Dm`，
+      // 旧数组写成 `G♭m/E♭m/Cm/Gm` —— 既不是关系小调，又让 pc6 / pc3 重复、pc5 / pc2 缺失。
+      ['Am', 'Em', 'Bm', 'F♯m', 'C♯m', 'G♯m', 'D♯m', 'B♭m', 'Fm', 'Cm', 'Gm', 'Dm'],
     )
+    p.unmount()
+  })
+
+  it('🚨 关系小调名 = 该大调根音下小三度（穷举 12 个位置，防止数组再次漂移）', () => {
+    // 不依赖上面那份手写数组：「关系小调」的**定义**就是大调根音下小三度，
+    // 故用 pitch class 独立算一遍。任何人把某个位置写错都会立刻挂。
+    const MAJOR_NAMES = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'D♭', 'A♭', 'E♭', 'B♭', 'F']
+    const p = mount()
+    for (const majorName of MAJOR_NAMES) {
+      p.click(p.nodeByLabel(majorName))
+      const minorName = p.detailRow('关系小调')
+      const minorRoot = minorName.slice(0, -1)
+      const expectedPc = (getNoteIndex(majorName) - 3 + 12) % 12
+      expect(getNoteIndex(minorRoot), `${majorName} 的关系小调应为 ${minorName}`).toBe(expectedPc)
+    }
     p.unmount()
   })
 
@@ -269,6 +286,9 @@ describe('五度圈：选中与拼写', () => {
     expect(p.modeBadge()).toBe('小调')
     expect(p.text()).toContain('Am')
     expect(p.text()).not.toContain('(+1)')             // A 小调无调号
+    // 🚨 必须钉**音集**：修前小调侧仍用大调根音（C）算音阶 ⇒ 标签写 Am、实际渲染
+    // C 自然小调（C D D♯ F G G♯ A♯）。只断言标签的旧用例抓不到这个错。
+    expect(p.scaleNoteTokens()).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G'])
     p.unmount()
   })
 
@@ -883,5 +903,142 @@ describe('和弦音阶：整指板和弦音位图', () => {
     // %12 折叠会显示成 2 / 6 —— 正是这条用例要挡的
     expect(p.cellText(0, 5, 10)).not.toBe(chordToneLabel(2))
     p.unmount()
+  })
+})
+
+// ==================== #18 信息层级 / 可访问性 / 标点（乐理审查遗留项） ====================
+
+describe('#18 分段控件的选中态能被读屏感知', () => {
+  /** 按 aria-label 取 role=group 的分段控件组 */
+  const groupByLabel = (p: ReturnType<typeof mount>, label: string) =>
+    [...p.container.querySelectorAll('[role="group"]')].find(
+      (g) => g.getAttribute('aria-label') === label,
+    ) as HTMLElement | undefined
+
+  /** 组内每个按钮都必须有 aria-pressed，且恰好一个为 true */
+  const expectSingleSelection = (group: HTMLElement | undefined, label: string) => {
+    expect(group, `${label} 分组应存在`).toBeTruthy()
+    const btns = [...group!.querySelectorAll('button')]
+    expect(btns.length, `${label} 组内按钮数`).toBeGreaterThanOrEqual(2)
+    const missing = btns.filter((b) => !b.hasAttribute('aria-pressed')).map((b) => b.textContent)
+    expect(missing, `${label} 组内这些按钮没有 aria-pressed（只有背景色，读屏感知不到选中）`).toEqual([])
+    expect(
+      btns.filter((b) => b.getAttribute('aria-pressed') === 'true'),
+      `${label} 组内选中态应恰好一个`,
+    ).toHaveLength(1)
+  }
+
+  it('把位教学：性质分组（大三/小三）', () => {
+    const p = mount()
+    p.switchTab('把位教学')
+    expectSingleSelection(groupByLabel(p, '和弦性质'), '和弦性质')
+    p.unmount()
+  })
+
+  it('调式图鉴：调式族 / 拼写 / 显示三组 + 7 个调式按钮', () => {
+    const p = mount()
+    p.switchTab('调式图鉴')
+    for (const label of ['调式族', '拼写', '显示']) expectSingleSelection(groupByLabel(p, label), label)
+
+    for (const mode of MODE_FAMILIES[0].modes) {
+      const btn = p.buttonByText(getScaleDisplayNameByName(mode.name, 'chinese'))
+      expect(btn, `${mode.name} 按钮应存在`).toBeTruthy()
+      expect(btn!.getAttribute('aria-pressed'), `${mode.name} 缺 aria-pressed`).not.toBeNull()
+    }
+    expect(
+      p.buttonByText(getScaleDisplayNameByName('Ionian', 'chinese'))!.getAttribute('aria-pressed'),
+      '默认调式应是选中态',
+    ).toBe('true')
+    p.unmount()
+  })
+
+  it('音程探索：显示（音级/音名）分组的按钮同样有 aria-pressed', () => {
+    const p = mount()
+    p.switchTab('音程探索')
+    expectSingleSelection(groupByLabel(p, '显示'), '显示')
+    p.unmount()
+  })
+})
+
+describe('#18 CAGED 音级图例（并接上一直闲置的 theory_degree / theory_role_* 键）', () => {
+  it('分图给出 R / 3 / 5 的含义', () => {
+    const p = mount()
+    p.switchTab('把位教学')
+    expect(p.text()).toContain('音级')
+    expect(p.text()).toContain('R = 根音')
+    expect(p.text()).toContain('3 = 三音')
+    expect(p.text()).toContain('5 = 五音')
+    p.unmount()
+  })
+
+  it('三音拼写跟随和弦性质：小三 ⇒ ♭3（与格子里的标注同源）', () => {
+    const p = mount()
+    p.switchTab('把位教学')
+    expect(p.text(), '大三和弦不该出现 ♭3').not.toContain('♭3 = 三音')
+    p.click(p.buttonByText('小三'))
+    expect(p.text()).toContain('♭3 = 三音')
+    p.unmount()
+  })
+
+  it('指型列表与性质分组都有可访问名（此前读屏只念到字母与「大三/小三」）', () => {
+    const p = mount()
+    p.switchTab('把位教学')
+    const groups = [...p.container.querySelectorAll('[role="group"]')].map((g) => g.getAttribute('aria-label'))
+    expect(groups).toContain('指型')
+    expect(groups).toContain('和弦性质')
+    p.unmount()
+  })
+})
+
+describe('#18 调式公式降权（不再与指板抢注意力）', () => {
+  it('公式以 outline 徽章呈现，完整读数放进 title', () => {
+    const p = mount()
+    p.switchTab('调式图鉴')
+    const badges = [...p.container.querySelectorAll('[data-slot="badge"]')]
+    const formula = badges.find((b) => (b.textContent ?? '').trim() === '1 2 3 4 5 6 7')
+    expect(formula, 'Ionian 的公式应作为徽章渲染').toBeTruthy()
+    expect(formula!.getAttribute('title'), '完整读数应在 title 里').toContain('1 2 3 4 5 6 7')
+    // 旧实现是一段与标题同字号的 font-mono 文本（text-xs font-mono text-muted-foreground）
+    expect((formula as HTMLElement).className, '不应再是大字号等宽文本块').not.toContain('text-xs font-mono')
+    p.unmount()
+  })
+})
+
+describe('#18 英文界面：标点必须跟着语言走（括号 / 冒号 / 指法说明）', () => {
+  /** 全角标点与汉字都不该出现在英文界面 */
+  const CJK_OR_FULLWIDTH = /[\u4e00-\u9fff（）【】：，、；「」]/
+
+  it('五度圈：Scale Notes (Major) 用半角括号', () => {
+    const p = mount({ language: 'en' })
+    expect(p.text()).toContain('Scale Notes (Major)')
+    expect(p.text()).not.toMatch(CJK_OR_FULLWIDTH)
+    p.unmount()
+  })
+
+  it('把位教学：指法说明整句英文，且不含全角冒号', () => {
+    const p = mount({ language: 'en' })
+    // ⚠️ 英文界面的 tab 标签也是英文（Positions / Modes / Interval Explorer / Chord-Scale）
+    p.switchTab('Positions')
+    expect(p.text()).toContain('Fingering: 1 = index, 2 = middle, 3 = ring, 4 = pinky')
+    expect(p.text()).not.toContain('食指')
+    expect(p.text()).not.toMatch(CJK_OR_FULLWIDTH)
+    p.unmount()
+  })
+
+  it('调式图鉴：用法行用半角冒号，整页无汉字', () => {
+    const p = mount({ language: 'en' })
+    p.switchTab('Modes')
+    expect(p.text()).toContain('Usage:')
+    expect(p.text()).not.toMatch(CJK_OR_FULLWIDTH)
+    p.unmount()
+  })
+
+  it('音程探索与和弦音阶：整页无汉字（覆盖其余 tab）', () => {
+    for (const label of ['Interval Explorer', 'Chord-Scale']) {
+      const p = mount({ language: 'en' })
+      p.switchTab(label)
+      expect(p.text(), `${label} tab 漏出中文`).not.toMatch(CJK_OR_FULLWIDTH)
+      p.unmount()
+    }
   })
 })
