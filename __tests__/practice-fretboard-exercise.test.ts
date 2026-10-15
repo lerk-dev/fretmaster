@@ -395,8 +395,8 @@ describe('音阶练习（scale）：按调性与音阶成员判定', () => {
  * GuitarRun 皮肤直接用它。经典皮肤（本组件）原本**自带第二份实现**（`getCellDisplay`），
  * 两份已经分叉：
  *   · **音阶分支**：经典皮肤用一张**手写**的「半音 → 音级」表，GuitarRun 用音阶自带的
- *     `intervals[i] ↔ notes[i]` 对齐表。穷举 76 个音阶 × 每个音（532 对）实测：
- *     **53 对 / 29 个音阶**上手写表给的是**错标签** —— Phrygian 的 ♭2 写成 `b9`、
+ *     `intervals[i] ↔ notes[i]` 对齐表。穷举 57 个音阶 × 每个音（396 对）实测：
+ *     **44 对 / 28 个音阶**上手写表给的是**错标签** —— Phrygian 的 ♭2 写成 `b9`、
  *     Altered 的 #2 写成 `b3`、Locrian 的 b5 写成 `#4`、Lydian Augmented 的 #5 写成 `b6`…
  *   · **音程分支**：经典皮肤只按 `selectedIntervals` 判，漏了「根音单独成 `1`」这一层
  *     （而它自己的**配色**层和 GuitarRun 都有这一层 ⇒ 蓝格子写着 `E`）。
@@ -499,10 +499,11 @@ describe('经典皮肤与共享真相源（GuitarRun 用的 resolveFretCellRole�
     expect(src).toMatch(/threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells,/)
   })
 
-  it('音阶练习：全部 76 个音阶 × 全部格子，经典皮肤 = resolveFretCellRole', () => {
+  it('音阶练习：全部 57 个音阶 × 全部格子，经典皮肤 = resolveFretCellRole', () => {
     setStore({ activeTab: 'scale' })
     // 音阶库扩容/改名时回来看一眼：下面的 covers 断言会跟着失效，逼你确认护栏还在测东西
-    expect(ALL_SCALES.length).toBe(76)
+    // （2026-10-15：删 5 个旧分组，76 → 57）
+    expect(ALL_SCALES.length).toBe(57)
 
     let cells = 0
     let degreeCells = 0
@@ -532,12 +533,13 @@ describe('经典皮肤与共享真相源（GuitarRun 用的 resolveFretCellRole�
     }
 
     expect(wrong.slice(0, 8)).toEqual([])
-    expect(cells).toBe(76 * 6 * (FRET_COUNT + 1))
+    expect(cells).toBe(57 * 6 * (FRET_COUNT + 1))
     // 探针自检：真的在比对音级，不是两边全空导致的「假通过」
+    // （2026-10-15 实测 2573；旧基数 76 音阶时约 3400，删分组后仍远高于阈值）
     expect(degreeCells).toBeGreaterThan(1500)
   }, 60000)
 
-  it('共享真相源必须取**音阶自带**的对齐表，而不是手写兜底表（穷举 76 音阶 × 532 对）', () => {
+  it('共享真相源必须取**音阶自带**的对齐表，而不是手写兜底表（穷举 57 音阶 × 396 对）', () => {
     let pairs = 0
     let differentFromFallback = 0
     for (const scale of ALL_SCALES) {
@@ -552,14 +554,15 @@ describe('经典皮肤与共享真相源（GuitarRun 用的 resolveFretCellRole�
         ).toBe(intervals[k])
       }
     }
-    expect(pairs).toBe(532)
-    // 🚨 证据：手写兜底表在 **59 对 / 35 个音阶**上与音阶自带标签不同 ⇒「优先自带表」不是可有可无的偏好。
-    //    （2026-10-15 由 53 对 / 29 个音阶重算：本次把「同一中文显示名却两种音级拼写」的条目收敛，
-    //      涉及 `Altered`/`Augmented`/`Half-Whole`/`Whole-Half Diminished` 等，
-    //      它们改用升号侧拼法后与兜底表（降号侧）的差异对数增加 —— 条目数仍是 76、对数仍是 532。）
+    expect(pairs).toBe(396)
+    // 🚨 证据：手写兜底表在 **44 对 / 28 个音阶**上与音阶自带标签不同 ⇒「优先自带表」不是可有可无的偏好。
+    //    （2026-10-15 由 59 对 / 35 个音阶重算：删除 church / minor / other / bebop / jazz
+    //      五个旧分组后，音阶 76 → 57、音级对 532 → 396；差异同步降到 44 对 / 28 个音阶，
+    //      剩余差异集中在 exotic / harmonicMinorScaleModes / melodicMinorScaleModes 等
+    //      仍在用的分组 —— 说明这条护栏咬的是**现行数据**，不是已删数据的影子。）
     // 这条同时是「把 scaleDegreeLabel 改成只用兜底表」这类改动的护栏 —— 上一条差分用例抓不到它
     // （两边会同向变错、仍然相等），只有这里对**音阶数据本身**做断言才咬得住。
-    expect(differentFromFallback).toBe(59)
+    expect(differentFromFallback).toBe(44)
   })
 
   it('全部 tab × isPlaying 两态：经典皮肤屏幕上的字 = resolveFretCellRole 的结论', () => {

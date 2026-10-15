@@ -10,7 +10,7 @@
  *
  * ## 本文件的三层断言
  *  ① **两处实测缺口**（`#2` 缺失 / `#6` 记错）——直接、可读的回归钉子；
- *  ② **穷举不变量**：全部 76 个音阶 × 每个音级，解析结果必须等于该音阶 `notes[i]`；
+ *  ② **穷举不变量**：全部 57 个音阶 × 每个音级，解析结果必须等于该音阶 `notes[i]`；
  *  ③ **盲区清单**：断言兜底表与对齐表不一致的位置**恰好只有** `#2`/`#6`。
  *     这一条是给未来的人看的：往 `SCALE_MODES` 里加音阶、或改兜底表，都会让它挂，
  *     于是必须回来重读这两处注释、判断是「顺手修好」还是「确实需要这个盲区」。
@@ -67,18 +67,18 @@ describe('resolveScaleDegreeSemitone —— 实测缺口（这两条就是当初
     expect(wholeTone.notes[wholeTone.intervals.indexOf('#6')]).toBe(10)
   })
 
-  it('含 `#2` 的可选音阶不止一个（Altered / Augmented / Diminished 族 / Lydian #9 …）', () => {
+  it('含 `#2` 的可选音阶不止一个（Altered / Augmented / 减音阶族 / Lydian #9 …）', () => {
     const names = [...new Set(ALL_SCALES.filter((s) => s.intervals.includes('#2')).map((s) => s.name))].sort()
     // 2026-10-15：#17 把「同一中文显示名却两种音级拼写」的条目收敛到升号侧，
-    // 故 dim HW 族（Half-Whole Diminished / Diminished Half Whole / Diminished）
-    // 与 Augmented 也都改用 `#2` 了 => 名单从 5 个变成 8 个。
+    // dim HW 族（Diminished Half Whole）与 Augmented 也都改用 `#2` 了 => 名单变成 6 个。
+    // （此前是 8 个：`Diminished` 与 `Half-Whole Diminished` 两条连同
+    //   church / minor / other / bebop / jazz 五个旧分组一起被删除，见
+    //   `__tests__/deleted-scale-groups.test.ts`。）
     expect(names).toEqual([
       'Altered',
       'Augmented',
       'Augmented Scale',
-      'Diminished',
       'Diminished Half Whole',
-      'Half-Whole Diminished',
       'Lydian #9',
       'Lydian Augmented #2',
     ])
@@ -91,7 +91,7 @@ describe('resolveScaleDegreeSemitone —— 实测缺口（这两条就是当初
 })
 
 describe('resolveScaleDegreeSemitone —— 穷举不变量', () => {
-  it('76 个音阶 × 每个音级：解析结果恒等于该音阶对齐表里的 notes[i]', () => {
+  it('57 个音阶 × 每个音级：解析结果恒等于该音阶对齐表里的 notes[i]', () => {
     let compared = 0
     for (const s of ALL_SCALES) {
       s.intervals.forEach((iv, i) => {
@@ -100,8 +100,10 @@ describe('resolveScaleDegreeSemitone —— 穷举不变量', () => {
       })
     }
     // 防止循环被写空（"恒真的护栏"）
-    expect(compared).toBeGreaterThan(400)
-    expect(new Set(ALL_SCALES.map((s) => s.name)).size).toBeGreaterThanOrEqual(60)
+    // 2026-10-15：删 5 个旧分组，音级对 532 → 396（音阶 76 → 57）
+    expect(compared).toBe(396)
+    // 删分组后跨分组重名归零 ⇒ 唯一名字数恰等于音阶条数
+    expect(new Set(ALL_SCALES.map((s) => s.name)).size).toBe(57)
   })
 
   it('所有音阶的 notes 都在 0..11（这是"查表得到的就是 mod 12 半音数"的前提）', () => {

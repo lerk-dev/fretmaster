@@ -3,6 +3,7 @@
 import { CHORD_TYPES, DISPLAY_NAMES, NOTES, NOTES_FLAT , SCALE_MODES } from "@/lib/page-theory-data"
 import { ALL_PRACTICE_LEVELS, type PracticeLevel } from "@/lib/practice-levels"
 import { getStringTuning } from "@/lib/string-tuning"
+import { DEGREE_SEMITONE_MOD12, degreeToSemitone } from "@/lib/degree-semitone"
 
 
 export function normalizeNoteName(note: string): string {
@@ -105,17 +106,50 @@ export function getScaleDisplayName(scaleName: string, displayMode: 'chinese' | 
   return scaleTypes[scaleName] || scaleName
 }
 
-// 将音程度数中的 # 和 b 转换为 ♯ 和 ♭
-export function formatDegree(degree: string): string {
-  return degree.replace(/#/g, '♯').replace(/b/g, '♭')
+/**
+ * ASCII 变音记号 → Unicode（`#`→`♯`、`b`→`♭`）。
+ *
+ * ## 🚨 为什么不能全局 `.replace(/b/g, '♭')`
+ *
+ * 入参有**三种**形态，旧实现靠「全局替换」碰巧全对，但没有任何东西钉住它：
+ *   ① 单个音级        `b3` / `#4` / `bb7`
+ *   ② 空格/逗号分隔串 `1 b3 4 #4 5 b7`（`SCALE_MODES[].formula`）、`1, b3, 4`
+ *   ③ **音名**        `Bb` / `C#` / `F##` / `Ebb`（`practice-fretboard.tsx` 的
+ *                     `displayText` 命中题目时是音级、未命中时是音名）
+ *
+ * 而典型的误用是和弦名 `bm7` —— 行首 `b` 后跟字母 `m`，全局替换会把它渲染成 `♭m7`。
+ * 本函数一旦被人拿去处理和弦名（`formatChordShape` 才是那条路），界面立刻出错。
+ *
+ * 所以改成**只替换两个合法位置**的变音记号：
+ *   - 串首或分隔符（空格/逗号）之后、且后跟数字 ⇒ 音级前缀（`b3`/`#4`/`bb7`）
+ *   - 紧跟音名字母 `A-G` 之后 ⇒ 音名变音（`Bb`/`F##`/`Ebb`）
+ * 其余位置的 `b`/`#` 一律原样保留。三种现有形态行为不变，误用不再静默出错。
+ *
+ * 护栏：`__tests__/page-theory-functions.test.ts` 的「formatDegree 只动合法位置」。
+ */
+const ACCIDENTAL_TO_UNICODE: Record<string, string> = { b: '♭', '#': '♯' }
+
+const spellAccidentals = (acc: string): string =>
+  acc.split('').map((c) => ACCIDENTAL_TO_UNICODE[c] ?? c).join('')
+
+export function formatDegree(text: string): string {
+  return text
+    // ① 音级前缀：串首或分隔符之后、后跟数字
+    .replace(/(^|[\s,])(b{1,2}|#{1,2})(?=\d)/g, (_m, lead: string, acc: string) => lead + spellAccidentals(acc))
+    // ② 音名变音：紧跟音名字母 A-G 之后
+    .replace(/([A-G])(b{1,2}|#{1,2})/g, (_m, letter: string, acc: string) => letter + spellAccidentals(acc))
 }
 
 
-export const intervalToSemitones: Record<string, number> = {
-  "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8,
-  "b6": 8, "6": 9, "bb7": 9, "#6": 10, "b7": 10, "7": 11,
-  "b9": 1, "9": 2, "#9": 3, "11": 5, "#11": 6, "b13": 8, "13": 9
-}
+/**
+ * 「音级 → 半音」（mod-12）—— 由 `lib/degree-semitone.ts` 单一真相源派生。
+ *
+ * 🚨 不要再在这里手写第二份字面量表：历史上这里与 `DEGREE_TO_SEMITONE`、
+ * `SCALE_DEGREE_SEMITONE_FALLBACK`、`degreeToSemitone()` 以及 `app/page.tsx` 里的
+ * 两份内联 Record 共**六份**并存，各有各的洞（`#2`/`b4`/`bb7`/双变音记号覆盖不一致），
+ * 导致「解析得了却查不到半音 ⇒ 静默返回空音名」。详见 `lib/degree-semitone.ts` 头注释。
+ */
+export const intervalToSemitones: Readonly<Record<string, number>> = DEGREE_SEMITONE_MOD12
 
 export const noteToSemitones: Record<string, number> = {
   "C": 0, "C#": 1, "C♯": 1, "Cb": 11, "C♭": 11, "Db": 1, "D♭": 1, "D": 2, "D#": 3, "D♯": 3, "Eb": 3, "E♭": 3, "E": 4, "F": 5,
@@ -828,7 +862,12 @@ export function getScaleNoteNames(rootNote: string, intervals: string[]): string
   
   return intervals.map(interval => {
     // 解析音级，如 "b3", "#4", "5"
-    const match = interval.match(/^(b|#)?(\d+)$/)
+    // 🚨 必须认**双变音记号**（`bb7`/`bb4`/`##5`）：`semitonesToDegree` 的 degreeMap
+    // 对减和弦的 9 半音就是返回 `bb7`（`degree-system.test.ts` 钉住），而本函数
+    // 旧正则 `^(b|#)?(\d+)$` 解析不了 ⇒ 静默返回空串 ⇒ `app/page.tsx` 把
+    // `getScaleNoteNames(...).join(', ')` 直接渲染，音名列表里出现空项。
+    // 这里是「产出方与消费方能力不对称」：源头能产出，这里接不住。
+    const match = interval.match(/^(b{0,2}|#{0,2})(\d+)$/)
     if (!match) return ''
     
     const degree = parseInt(match[2]) // 1, 2, 3, 4, 5, 6, 7, etc.
@@ -877,20 +916,16 @@ export function getScaleNoteNames(rootNote: string, intervals: string[]): string
   })
 }
 
-// 音级到半音数的映射
-export function degreeToSemitone(degree: string): number | undefined {
-  const degreeMap: Record<string, number> = {
-    '1': 0, 'b2': 1, '2': 2, '#2': 3, 'b3': 3, '3': 4, '4': 5,
-    // `b4`（4 半音，与 `3` 同音高）—— `SCALE_INTERVAL_DISPLAY[alteredDominantFlatFlat7]` 在用，
-    // 缺键会让 `getScaleNoteNames` 对该音级返回空串。
-    'b4': 4,
-    'b5': 6, '#4': 6, '5': 7, '#5': 8, 'b6': 8,
-    '6': 9, 'bb7': 9, '#6': 10, 'b7': 10, '7': 11, 'maj7': 11,
-    'b9': 13, '9': 14, '#9': 15, '11': 17, '#11': 18,
-    'b13': 20, '13': 21
-  }
-  return degreeMap[degree]
-}
+/**
+ * 音级 → 半音数，**复合音程**语义（`'9' → 14`、`'13' → 21`）。
+ *
+ * 🚨 与 mod-12 的 `degreeSemitoneMod12` **不要混用**：混用会让音阶练习整体高一个八度
+ * （表现为「目标音名对不上但音级看着没错」）。
+ *
+ * 实现改为从 `lib/degree-semitone.ts` 的单一真相源推导（复合度数 = 同名单八度 +12），
+ * 不再手写第二份字面量表 —— 历史上有六份并存，各有各的洞。
+ */
+export { degreeToSemitone }
 
 /**
  * 音级标签 → 半音数的**兜底**表（**mod 12**）。
@@ -908,13 +943,7 @@ export function degreeToSemitone(degree: string): number | undefined {
  * 补 `#2`(3)、`bb7`(9) 与 `b4`(4)。改动前它与 76 个音阶的对齐表在两处冲突（`#2` 缺失、`#6` 偏半音）。
  * 现由 `__tests__/scale-degree-semitone.test.ts` 的「盲区清单」用例钉成**空集**。
  */
-export const SCALE_DEGREE_SEMITONE_FALLBACK: Record<string, number> = {
-  '1': 0, 'b2': 1, '2': 2, '#2': 3, 'b3': 3, '3': 4, '4': 5,
-  'b4': 4,
-  '#4': 6, 'b5': 6, '5': 7, '#5': 8, 'b6': 8, '6': 9,
-  '#6': 10, 'bb7': 9, 'b7': 10, '7': 11,
-  'b9': 1, '9': 2, '#9': 3, '11': 5, '#11': 6, 'b13': 8, '13': 9,
-}
+export const SCALE_DEGREE_SEMITONE_FALLBACK: Readonly<Record<string, number>> = DEGREE_SEMITONE_MOD12
 
 /**
  * 音阶练习：把练习序列里的**音级标签**解析成半音数（0..11）。

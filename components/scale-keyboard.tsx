@@ -36,7 +36,10 @@ export const ScaleKeyboard = memo(function ScaleKeyboard({
       rootNote={scaleKey}
       highlightedNotes={(() => {
         const keyIdx = getNoteIndex(scaleKey)
-        const scale = SCALE_MODES[selectedScaleCategory].find(s => s.name === selectedScale.name)
+        // 🚨 `?? []`：`selectedScaleCategory` 来自 store 的 `scalePractice`（**会**被持久化），
+        // 而 SCALE_MODES 的 church / minor / other / bebop / jazz 五组已于 2026-10-15 删除
+        // ⇒ 老用户的本地存储里可能还留着这些旧键，直接索引会拿到 undefined 然后 `.find` 抛错。
+        const scale = (SCALE_MODES[selectedScaleCategory] ?? []).find(s => s.name === selectedScale.name)
         if (!scale) return []
         return scale.notes.map(interval => {
           const noteIdx = (keyIdx + interval) % 12

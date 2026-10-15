@@ -86,7 +86,11 @@ describe('#17 同名音阶必须同定义（第二真相源护栏）', () => {
     const byName = new Map<string, number>()
     for (const e of ALL_ENTRIES) byName.set(e.name, (byName.get(e.name) ?? 0) + 1)
     const dup = [...byName.entries()].filter(([, n]) => n > 1)
-    expect(dup.length).toBeGreaterThanOrEqual(8)
+    // 2026-10-15：旧实现下实测 8 组跨分组重名（Diminished / Whole Tone / Blues /
+    // Augmented … 同一 name 出现在多个分组）。随 B3 删除 church / minor / other /
+    // bebop / jazz 五个分组后，重名降为 **0** —— 这正是审查清单 #9「彻底无重名」
+    // 的目标态，所以探针从「>= 8」反转为「=== 0」：以后任何新重名都会直接红。
+    expect(dup.length, `又出现了跨分组重名：${dup.map(([n, c]) => `${n}×${c}`).join(', ')}`).toBe(0)
   })
 })
 
@@ -184,13 +188,12 @@ describe('#17 紧凑表内部自洽（音级标签 ↔ 半音集合）', () => {
  */
 const ALLOWED_CROSS_TABLE_SPELLING_DIFFS: ReadonlyArray<{ pair: string; why: string }> = [
   { pair: 'blues->otherScales/Blues', why: '蓝调的蓝音：紧凑表 ♭5 vs 完整表 ♯4（两者都通行）' },
-  { pair: 'blues->other/Blues', why: '同上，旧分组存量数据' },
   { pair: 'wholeTone->otherScales/Whole Tone', why: '全音阶第 6 音：紧凑表 ♭7 vs 完整表 ♯6（两者都通行）' },
-  { pair: 'wholeTone->other/Whole Tone', why: '同上，旧分组存量数据' },
   {
     pair: 'alteredDominantFlatFlat7->harmonicMinorScaleModes/Superlocrian bb7',
-    why: '同一音高集合两个名字（变化属音阶bb7 / 超洛克里亚bb7）；且 `bb7`/`b4` 这类双变音记号 ' +
-      '`getScaleNoteNames` 的正则还解析不了，收敛需先扩解析器，超出本次范围',
+    why: '同一音高集合两个名字（变化属音阶bb7 / 超洛克里亚bb7）。音级标签 bb7 在紧凑表里没有对应项，' +
+      '而 `getScaleNoteNames` 过去解析不了 bb7 —— 该解析器已于 2026-10-15 放宽到双变音记号，' +
+      '但两表的**标签串**本身不同（一个是 bb7、一个没有等价标签），收敛需先统一命名，超出本次范围',
   },
 ]
 
@@ -215,8 +218,9 @@ describe('#17 紧凑表 ↔ 完整表：同一音阶的音级标签必须一致�
       const semis = JSON.stringify(SCALE_INTERVALS[t])
       for (const e of ALL_ENTRIES) if (JSON.stringify(e.notes) === semis) matched++
     }
-    // 实测 53 对（2026-10-15）。数字骤降说明 notes 被改成对不上了，骤升说明加了重复条目。
-    expect(matched).toBeGreaterThanOrEqual(50)
+    // 2026-10-15 实测 35 对（删除 5 个旧分组前是 53 对）。数字骤降说明 notes 被改成
+    // 对不上了，骤升说明加了重复条目。
+    expect(matched).toBe(35)
     expect(matched).toBeGreaterThan(ALLOWED_CROSS_TABLE_SPELLING_DIFFS.length * 5)
   })
 

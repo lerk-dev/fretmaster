@@ -1,13 +1,13 @@
 /**
  * lib/page-theory-data.ts 的契约测试（数据表）。
  *
- * 该模块是乐理数据的真相源：音名表 / 度数映射 / 65 种和弦类型 / 音程表 / 76 个音阶模式 /
+ * 该模块是乐理数据的真相源：音名表 / 度数映射 / 65 种和弦类型 / 音程表 / 57 个音阶模式 /
  * 显示名。chord-type-registry.test.ts 已覆盖 CHORD_TYPES ↔ DISPLAY_NAMES 的显示名一致性；
  * 本文件补的是**其余表内部与表之间的对齐**——尤其 SCALE_MODES 里每个音阶的
  * `notes`（半音数组）与 `intervals`（音级字符串数组）是两份并行手写数据，一旦错位
  * 不会抛异常、只会安静画错音阶。
  *
- * 探针结论：76 个音阶的 notes ↔ intervals ↔ formula 全部自洽，65 个和弦类型的
+ * 探针结论：57 个音阶的 notes ↔ intervals ↔ formula 全部自洽，65 个和弦类型的
  * name/symbol 唯一、group 与 groupName/groupZh 一一对应 —— 故本轮为**纯护栏**。
  */
 import { describe, it, expect } from 'vitest'
@@ -50,8 +50,8 @@ describe('SCALE_MODES：notes 与 intervals 必须一一对应', () => {
       ...s,
     })))
 
-  it('至少含 70 个音阶，每组的 name 都非空且组内不重名', () => {
-    expect(allScales.length).toBeGreaterThanOrEqual(70)
+  it('恰好 57 个音阶（2026-10-15 删 5 个旧分组前的基数是 76），每组的 name 都非空且组内不重名', () => {
+    expect(allScales.length).toBe(57)
     for (const [group, scales] of Object.entries(SCALE_MODES)) {
       const list = scales as Array<{ name: string }>
       expect(list.length, group).toBeGreaterThan(0)
@@ -184,11 +184,12 @@ describe('度数映射表的一致性', () => {
       }
     }
     expect(diffs, diffs.join(' | ')).toEqual([])
-    // 反向：data 里多出的键应恰好是这 3 个（各自用于不同场景）
-    // `b4` 于 2026-10-15 补入：`scale-theory.SCALE_INTERVAL_DISPLAY[alteredDominantFlatFlat7]`
-    // 用它当第 4 个音级，缺键会让「音级 → 半音」查表返回 undefined。
+    // 2026-10-15 B4：`DEGREE_TO_SEMITONE` / `intervalToSemitones` /
+    // `SCALE_DEGREE_SEMITONE_FALLBACK` 三张表现已收敛成同一对象
+    //（`lib/degree-semitone.ts::DEGREE_SEMITONE_MOD12`），差集因此必须是空集。
+    // 收敛前 data 侧多出的 `#2`/`b4`/`maj7` 三个键正是「另起一张表」的产物。
     const onlyData = Object.keys(DEGREE_TO_SEMITONE).filter(k => !(k in intervalToSemitones)).sort()
-    expect(onlyData).toEqual(['#2', 'b4', 'maj7'])
+    expect(onlyData).toEqual([])
   })
 
   it('两套「延伸音表示」在取模 12 后一致（单八度派 vs 含八度派）', () => {
@@ -237,9 +238,10 @@ describe('SCALE_PRACTICE_SEQUENCES', () => {
  * 一旦分叉，界面按分组选出来的音阶就会与「和弦→音阶」推导出的音阶不是同一个东西，
  * 而两处都「能跑」—— 不报错、只画错。
  *
- * 本轮的处理是「只从 UI 下线旧分组、**不从数据删除**」（存量用户的持久化
- * `selectedScaleCategory` 可能仍指向旧分组键，删数据会让它读到 undefined）。
- * 故这里同时钉住两件事：旧分组键仍在、且同名条目已收敛为一份。
+ * 2026-10-15 的处理升级为「**连数据一起删除**」：church / minor / other / bebop /
+ * jazz 五个分组整体下线（`__tests__/deleted-scale-groups.test.ts` 钉住它们不许复活），
+ * 跨分组重名随之归零。故这里的探针从「必须 > 0」反转为「必须 === 0」：
+ * 以后任何新重名都会直接红，而不是等它分叉。
  */
 describe('#9 同名音阶跨分组必须逐字一致（收敛「第二真相源」）', () => {
   const GROUPS = Object.entries(SCALE_MODES) as Array<
@@ -273,15 +275,9 @@ describe('#9 同名音阶跨分组必须逐字一致（收敛「第二真相源�
     expect(failures, '同名音阶在不同分组里定义不一致').toEqual([])
   })
 
-  it('确实存在跨分组重名（否则上面那条断言恒真，等于没测）', () => {
+  it('不得再有跨分组重名（删除 5 个旧分组后重名已归零）', () => {
     const duplicated = [...byName.entries()].filter(([, defs]) => defs.length > 1).map(([name]) => name)
-    expect(duplicated.length, '没有任何重名音阶 ⇒ 护栏退化为空转').toBeGreaterThan(0)
-  })
-
-  it('已从 UI 下线的旧分组仍保留在数据里（删了会让存量用户的分类键读到 undefined）', () => {
-    for (const retired of ['church', 'minor', 'other', 'bebop', 'jazz']) {
-      expect(Object.keys(SCALE_MODES), `旧分组 ${retired} 被删了`).toContain(retired)
-    }
+    expect(duplicated, '又出现了跨分组重名 ⇒ 第二真相源复发').toEqual([])
   })
 })
 

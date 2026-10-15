@@ -17,9 +17,15 @@ import { getScaleDisplayName } from '@/lib/page-theory-functions'
  * 就会出现「下拉写着 A、标题写着 B」）。
  *
  * 🚨 这里**只列「新分组」**：`SCALE_MODES` 里的 church / minor / bebop / other / jazz
- * 与这些分组逐条重复（同一音阶在两个分组出现 = 典型「第二真相源」，用户会困惑），已从 UI 下线；
- * 它们独有的音阶（Bebop Mixolydian / Bebop Minor / Hungarian Minor）已迁入 bebopScales / exotic。
- * 数据本身保留（存量用户持久化的选择可能仍指向旧键），故组件里用 `resolvedCategory` 兜底。
+ * 与这些分组逐条重复（同一音阶在两个分组出现 = 典型「第二真相源」，用户会困惑）。
+ * 那五个分组已于 2026-10-15 **连同数据一起删除**（删除前逐条证明 19 条都能在新分组
+ * 找到同音高集合的对应，见 `__tests__/page-theory-data.test.ts` 的「旧分组零信息损失」）。
+ * 它们独有的音阶此前已迁入 bebopScales / exotic。
+ *
+ * `resolvedCategory` 兜底仍然必要，但**不是为了迁就旧数据** —— 是因为
+ * `scalePractice.selectedScaleCategory` 会被持久化，老用户的本地存储里可能还留着
+ * `'church'` 这类已删除的键（索引 SCALE_MODES 会拿到 undefined）。
+ * 另一处防御在 `scale-keyboard.tsx` 的 `SCALE_MODES[cat] ?? []`。
  */
 export const SCALE_CATEGORY_OPTIONS: ReadonlyArray<{
   value: keyof typeof SCALE_MODES

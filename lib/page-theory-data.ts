@@ -1,17 +1,21 @@
 // 乐理数据表（从 app/page.tsx 抽出）：音级映射 / 和弦类型 / 音程 / 音阶模式 / 显示名称
 
+import { DEGREE_SEMITONE_MOD12 } from "./degree-semitone"
+
 export const NOTES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
 export const NOTES_FLAT = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]
 
-export const DEGREE_TO_SEMITONE: Record<string, number> = {
-  "1": 0, "b2": 1, "2": 2, "#2": 3, "b3": 3, "3": 4, "4": 5,
-  // 🚨 补 `b4`：`scale-theory.SCALE_INTERVAL_DISPLAY[alteredDominantFlatFlat7]` 用它当第 4 个音级
-  // （= 4 半音，与 `3` 同音高），缺键会让「音级 → 半音」查表返回 undefined。
-  "b4": 4,
-  "#4": 6, "b5": 6, "5": 7, "#5": 8, "b6": 8, "6": 9,
-  "#6": 10, "b7": 10, "7": 11, "maj7": 11, "bb7": 9,
-  "b9": 1, "9": 2, "#9": 3, "b13": 8, "13": 9, "11": 5, "#11": 6
-}
+/**
+ * 「音级 → 半音」（mod-12）—— 由 `lib/degree-semitone.ts` 单一真相源派生。
+ *
+ * 🚨 不要再在这里手写第二份字面量表。历史上 `DEGREE_TO_SEMITONE` /
+ * `intervalToSemitones` / `SCALE_DEGREE_SEMITONE_FALLBACK` / `degreeToSemitone()`
+ * 以及 `app/page.tsx` 里的两份内联 Record 共**六份**并存，各有各的洞
+ * （`#2` 只有三份有、`b4` 只有一份补了、双变音记号一份都没有），
+ * 导致「解析得了却查不到半音 ⇒ 静默返回空音名 / 高亮缺失」。
+ * 详见 `lib/degree-semitone.ts` 头注释与 `__tests__/degree-semitone.test.ts`。
+ */
+export const DEGREE_TO_SEMITONE: Readonly<Record<string, number>> = DEGREE_SEMITONE_MOD12
 
 // Chord types with intervals - 完整62种和弦类型，与SOLO保持一致
 
@@ -243,43 +247,21 @@ export const SCALE_MODES = {
     { name: "Major", notes: [0, 2, 4, 5, 7, 9, 11], intervals: ["1", "2", "3", "4", "5", "6", "7"], formula: "1 2 3 4 5 6 7" },
     { name: "Minor", notes: [0, 2, 3, 5, 7, 8, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "b7"], formula: "1 2 b3 4 5 b6 b7" },
   ],
-  church: [
-    { name: "Ionian", notes: [0, 2, 4, 5, 7, 9, 11], intervals: ["1", "2", "3", "4", "5", "6", "7"], formula: "1 2 3 4 5 6 7" },
-    { name: "Dorian", notes: [0, 2, 3, 5, 7, 9, 10], intervals: ["1", "2", "b3", "4", "5", "6", "b7"], formula: "1 2 b3 4 5 6 b7" },
-    { name: "Phrygian", notes: [0, 1, 3, 5, 7, 8, 10], intervals: ["1", "b2", "b3", "4", "5", "b6", "b7"], formula: "1 b2 b3 4 5 b6 b7" },
-    { name: "Lydian", notes: [0, 2, 4, 6, 7, 9, 11], intervals: ["1", "2", "3", "#4", "5", "6", "7"], formula: "1 2 3 #4 5 6 7" },
-    { name: "Mixolydian", notes: [0, 2, 4, 5, 7, 9, 10], intervals: ["1", "2", "3", "4", "5", "6", "b7"], formula: "1 2 3 4 5 6 b7" },
-    { name: "Aeolian", notes: [0, 2, 3, 5, 7, 8, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "b7"], formula: "1 2 b3 4 5 b6 b7" },
-    { name: "Locrian", notes: [0, 1, 3, 5, 6, 8, 10], intervals: ["1", "b2", "b3", "4", "b5", "b6", "b7"], formula: "1 b2 b3 4 b5 b6 b7" },
-  ],
-  // ⚠️ 下面 4 个分组（minor / other / bebop / jazz）以及上面的 church 已**从 UI 下拉下线**
-  // ——它们与「新分组」（majorScaleModes / harmonicMinorScaleModes / melodicMinorScaleModes /
-  // otherScales / bebopScales / exotic …）逐条重复，曾是典型「第二真相源」：
+  // ⚠️ 这里**曾经**还有 church / minor / other / bebop / jazz 五个分组（2026-10-15 删除）。
+  // 它们与「新分组」（majorScaleModes / harmonicMinorScaleModes / melodicMinorScaleModes /
+  // otherScales / bebopScales / exotic …）逐条重复，是典型的「第二真相源」：
   // 用户在两个分组里选到同一音阶却看到不同音级。
-  // 之所以**只从 UI 下线、不从数据删除**：存量用户的 `scalePractice.selectedScaleCategory`
-  // 可能仍指向这些键，删掉会让下拉落空。它们独有的音阶已迁入新分组
-  // （Bebop Mixolydian / Bebop Minor → bebopScales，Hungarian Minor → exotic），故零信息损失。
-  // 同名一致性由 __tests__/page-theory-data.test.ts 的护栏钉住。
-  minor: [
-    { name: "Harmonic Minor", notes: [0, 2, 3, 5, 7, 8, 11], intervals: ["1", "2", "b3", "4", "5", "b6", "7"], formula: "1 2 b3 4 5 b6 7" },
-    { name: "Melodic Minor", notes: [0, 2, 3, 5, 7, 9, 11], intervals: ["1", "2", "b3", "4", "5", "6", "7"], formula: "1 2 b3 4 5 6 7" },
-  ],
-  other: [
-    { name: "Blues", notes: [0, 3, 5, 6, 7, 10], intervals: ["1", "b3", "4", "#4", "5", "b7"], formula: "1 b3 4 #4 5 b7" },
-    { name: "Whole Tone", notes: [0, 2, 4, 6, 8, 10], intervals: ["1", "2", "3", "#4", "#5", "#6"], formula: "1 2 3 #4 #5 #6" },
-    { name: "Diminished", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "#2", "3", "#4", "5", "6", "b7"], formula: "1 b2 #2 3 #4 5 6 b7" },
-  ],
-  bebop: [
-    { name: "Bebop Major", notes: [0, 2, 4, 5, 7, 8, 9, 11], intervals: ["1", "2", "3", "4", "5", "b6", "6", "7"], formula: "1 2 3 4 5 b6 6 7" },
-    { name: "Bebop Dorian", notes: [0, 2, 3, 4, 5, 7, 9, 10], intervals: ["1", "2", "b3", "3", "4", "5", "6", "b7"], formula: "1 2 b3 3 4 5 6 b7" },
-  ],
-  jazz: [
-    { name: "Lydian Dominant", notes: [0, 2, 4, 6, 7, 9, 10], intervals: ["1", "2", "3", "#4", "5", "6", "b7"], formula: "1 2 3 #4 5 6 b7" },
-    { name: "Altered", notes: [0, 1, 3, 4, 6, 8, 10], intervals: ["1", "b2", "#2", "3", "b5", "#5", "b7"], formula: "1 b2 #2 3 b5 #5 b7" },
-    { name: "Half-Whole Diminished", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "#2", "3", "#4", "5", "6", "b7"], formula: "1 b2 #2 3 #4 5 6 b7" },
-    { name: "Whole-Half Diminished", notes: [0, 2, 3, 5, 6, 8, 9, 11], intervals: ["1", "2", "b3", "4", "b5", "#5", "6", "7"], formula: "1 2 b3 4 b5 #5 6 7" },
-    { name: "Harmonic Major", notes: [0, 2, 4, 5, 7, 8, 11], intervals: ["1", "2", "3", "4", "5", "b6", "7"], formula: "1 2 3 4 5 b6 7" },
-  ],
+  //
+  // 删除前的安全证明（`__tests__/page-theory-data.test.ts` 的「旧分组零信息损失」护栏）：
+  // 五个分组共 **19 条**，逐条比对音高集合后**每一条**都能在新分组找到对应
+  // （church 7 条 / minor 2 / bebop 2 / other 3 / jazz 5，零孤儿）。
+  // 独有的音阶此前已迁入新分组（Bebop Mixolydian / Bebop Minor → bebopScales，
+  // Hungarian Minor → exotic）。
+  //
+  // 之所以当时「只下线不删」是怕 `scalePractice.selectedScaleCategory`（**会**被持久化）
+  // 指向旧键让下拉落空 —— 实际消除这个风险靠的是两处兜底，不是留数据：
+  //   ① `scale-controls.tsx` 的 `resolvedCategory`：旧键不在选项里就回落到首项；
+  //   ② `scale-keyboard.tsx` 用 `SCALE_MODES[cat] ?? []` 防索引 undefined。
 }
 
 export const SCALE_PRACTICE_SEQUENCES = [

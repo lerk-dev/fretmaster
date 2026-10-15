@@ -64,6 +64,27 @@ describe('formatDegree', () => {
     expect(formatDegree('#4')).toBe('♯4')
     expect(formatDegree('5')).toBe('5')
   })
+
+  it('🚨 只动两个合法位置：音级前缀 / 音名变音（旧实现是全局 replace，会把和弦名 bm7 变成 ♭m7）', () => {
+    // ① 音级前缀：串首或分隔符之后、后跟数字
+    expect(formatDegree('bb7')).toBe('♭♭7')
+    expect(formatDegree('##5')).toBe('♯♯5')
+    expect(formatDegree('1 b3 4 #4 5 b7')).toBe('1 ♭3 4 ♯4 5 ♭7')   // SCALE_MODES[].formula
+    expect(formatDegree('1, b3, 4')).toBe('1, ♭3, 4')               // scaleDegreeLabels().join(', ')
+    // ② 音名变音：紧跟音名字母 A-G 之后（practice-fretboard 的 displayText 会喂音名进来）
+    expect(formatDegree('Bb')).toBe('B♭')
+    expect(formatDegree('F##')).toBe('F♯♯')
+    expect(formatDegree('Ebb')).toBe('E♭♭')
+    expect(formatDegree('C#m7')).toBe('C♯m7')                      // 和弦名：只有音名部分该动
+  })
+
+  it('🚨 非合法位置的 b/# 一律原样保留 —— 这是「误喂和弦名」时的护栏', () => {
+    // 行首 b 后跟字母 ⇒ 不是音级前缀。旧实现会渲染成 `♭m7`。
+    expect(formatDegree('bm7')).toBe('bm7')
+    expect(formatDegree('b5sus4')).toBe('♭5sus4')                  // 行首 b 后跟数字 ⇒ **应该**动
+    expect(formatDegree('maj7')).toBe('maj7')                      // 无变音记号
+    expect(formatDegree('Bbm')).toBe('B♭m')                        // 字母后的 b 是音名变音 ⇒ 动
+  })
 })
 
 describe('findNoteIndexInArray', () => {
@@ -432,6 +453,24 @@ describe('getScaleNoteNames：兜底与变音', () => {
     // 永远 ≠ -1，故这条 `if (diff === -1)` 是**死分支**（早先 `diff > 6` 已把 diff 压到 ≤6）。
     // 这里钉住可达的那半：结果是不带变音记号的音名。
     expect(getScaleNoteNames('A#', ['#6'])).toEqual(['F'])
+  })
+
+  it('🚨 双变音记号（bb7 / bb4 / ##5 / ##1）必须被解析，不能静默返回空串', () => {
+    // `semitonesToDegree` 的 degreeMap 对减和弦的 9 半音就返回 `bb7`
+    // （`degree-system.test.ts` 钉住 getNoteDegreeInChord('A','C','dim7') === 'bb7'）。
+    // 本函数旧正则 `^(b|#)?(\d+)$` 解析不了 ⇒ 空串 ⇒ `app/page.tsx` 直接
+    // `.join(', ')` 渲染，音名列表里出现空项。这是「产出方/消费方能力不对称」。
+    // bb7 = 9 半音；C 的 bb7 音高落在 A(9)，字母位取 7 ⇒ B，B 自然 11、目标 9 ⇒ 重降 ⇒ Bbb
+    expect(getScaleNoteNames('C', ['1', 'b3', 'b5', 'bb7'])).toEqual(['C', 'Eb', 'Gb', 'Bbb'])
+    // bb4 = **3** 半音（4=5、b4=4、bb4=3）；C 的 bb4 音高落在 Eb(3)，字母位取 4 ⇒ F，
+    // F 自然 5、目标 3 ⇒ diff 10 ⇒ 减 12 得 -2 ⇒ 重降 ⇒ Fbb
+    expect(getScaleNoteNames('C', ['bb4'])).toEqual(['Fbb'])
+    // ##5 = **9** 半音（5=7、#5=8、##5=9）；字母位取 5 ⇒ G，G 自然 7、目标 9 ⇒ 重升 ⇒ G##
+    expect(getScaleNoteNames('C', ['##5'])).toEqual(['G##'])
+    // ##1 = **2** 半音；字母位取 1 ⇒ C，C 自然 0、目标 2 ⇒ 重升 ⇒ C##
+    expect(getScaleNoteNames('C', ['##1'])).toEqual(['C##'])
+    // 仍不认识的标签照旧返空（不因为放宽正则而把垃圾当音级）
+    expect(getScaleNoteNames('C', ['?', 'b3b3', 'b#3'])).toEqual(['', '', ''])
   })
 })
 

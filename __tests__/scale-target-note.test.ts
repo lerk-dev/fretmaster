@@ -11,7 +11,8 @@
  * 表里只有降号侧（`b5`/`b6`/`b3`…）。而音级标签是**异名同音**的，升号侧
  * （`#4`/`#5`/`#2`…）永远比不上 ⇒ 弹对了判错，且不报任何错。
  * 实测 76 个音阶里 **22 个**受影响，含最常用的 Lydian 与 Blues
- * （2026-10-15 数据经 #17 音级拼写收敛后为 **25 个**，见文末反向钉子的重算说明）。
+ * （2026-10-15 数据经 #17 音级拼写收敛后为 **25 个**；同日再删 church / minor /
+ *  other / bebop / jazz 五个旧分组后为 **17 个**，见文末反向钉子的重算说明）。
  *
  * 例子钉不住这类 bug（补一个例子就能绿），只有穷举能：
  * 「对每个音阶，点它自己 `notes[i]` 那个音必须判对」覆盖了全部同音异名的组合。
@@ -109,12 +110,14 @@ describe('反向钉子：老反查表在这些音阶上确实会判错', () => {
     }
     // 实测 76 个音阶里 22 个受影响（2026-10-07）。修好之后**不再有人走老表**，
     // 但这条断言留着：如果哪天有人把老表请回来，它立刻红。
-    // 🚨 2026-10-15 重算基线 22 → 25：音阶数据显示被有意改动过（条目数仍是 76、配对数仍是 532）——
-    //    + `exotic/Hungarian Minor`（由 jazz 旧分组复制进新分组，旧分组那条仅从 UI 下线、仍在数据里）
-    //    + `symmetrical/Augmented`、`jazz/Altered`、`jazz/Whole-Half Diminished`
-    //      （#17 收敛「同一显示名两种拼写」，这三条改用升号侧 `#2`/`#5` ⇒ 老反查表必然判错 —— 正是本条要证明的）
-    //    − `jazz/Hungarian Minor`（该条目从 jazz 分组移除，改由 exotic 承载）
-    expect(broken.length, '受影响音阶数偏离基线 25 —— 数据源或被改').toBe(25)
+    // 🚨 2026-10-15 重算基线 25 → 17：删掉 church / minor / other / bebop / jazz
+    //    五个旧分组（音阶 76 → 57），原先挂在这些分组里的
+    //    `jazz/Altered`、`jazz/Whole-Half Diminished`、`jazz/Hungarian Minor` 等
+    //    随之消失。剩下来的 17 个全部位于**仍在用的分组**里，其中：
+    //    + Lydian 族（majorScaleModes/Lydian、melodicMinorScaleModes/Lydian Dominant …）
+    //    + 升号侧拼法的音阶（Altered #2、Diminished Half Whole #2、Augmented #2 …）
+    //    —— 两类都是老反查表（只有降号侧）必然判错的，正是本条要证明的。
+    expect(broken.length, '受影响音阶数偏离基线 17 —— 数据源或被改').toBe(17)
     expect(broken).toContain('majorScaleModes/Lydian:#4')
     expect(broken).toContain('otherScales/Blues:#4')
     // Whole Tone 的 #4/#5/#6 三个音全错（break 只记第一个，故按前缀断言）
