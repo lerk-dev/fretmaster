@@ -20,10 +20,18 @@ import { createRoot } from 'react-dom/client'
 import { SettingsMetronomeSection } from '@/components/settings-metronome-section'
 import { Accordion } from '@/components/ui/accordion'
 import { TRANSLATIONS } from '@/lib/i18n'
+import { METRONOME_BEATS_DEFAULT, METRONOME_BEATS_OPTIONS } from '@/lib/store'
 
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 class ResizeObserverStub { observe() {} unobserve() {} disconnect() {} }
 ;(globalThis as unknown as Record<string, unknown>).ResizeObserver = ResizeObserverStub
+
+// radix Select 展开要用的 jsdom 缺口（补齐后才能驱动 onBeatsPerMeasureChange）：
+// 少了 hasPointerCapture 会在点选项时抛 TypeError（用例本身仍算过，但留下 uncaught error）。
+;(Element.prototype as unknown as Record<string, unknown>).hasPointerCapture ||= () => false
+;(Element.prototype as unknown as Record<string, unknown>).setPointerCapture ||= () => { /* noop */ }
+;(Element.prototype as unknown as Record<string, unknown>).releasePointerCapture ||= () => { /* noop */ }
+;(Element.prototype as unknown as Record<string, unknown>).scrollIntoView ||= () => { /* noop */ }
 
 const zh = TRANSLATIONS['zh-CN'] as Record<string, string>
 const t = (k: string) => zh[k] ?? k
@@ -32,6 +40,7 @@ function mount(overrides: Record<string, unknown> = {}) {
   const handlers = {
     onEnabledChange: vi.fn(),
     onBpmChange: vi.fn(),
+    onBeatsPerMeasureChange: vi.fn(),
     onSoundChange: vi.fn(),
     onFlashChange: vi.fn(),
     onVisualizeChange: vi.fn(),
@@ -43,6 +52,7 @@ function mount(overrides: Record<string, unknown> = {}) {
     t,
     enabled: false,
     bpm: 120,
+    beatsPerMeasure: METRONOME_BEATS_DEFAULT,
     sound: false,
     flash: false,
     visualize: false,
@@ -65,21 +75,33 @@ function mount(overrides: Record<string, unknown> = {}) {
     switches: () => [...container.querySelectorAll('[role="switch"]')] as HTMLElement[],
     slider: () => container.querySelector('[role="slider"]') as HTMLElement | null,
     text: () => container.textContent ?? '',
+    /** 拍号下拉（选项 portal 到 body，故打开时查 document） */
+    openBeats: () => {
+      const c = container.querySelector('[role="combobox"]') as HTMLElement | null
+      expect(c, '拍号 combobox 应存在').toBeTruthy()
+      act(() => {
+        c!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }))
+        c!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+      return [...document.querySelectorAll('[role="option"]')] as HTMLElement[]
+    },
     unmount() { act(() => root.unmount()); container.remove() },
   }
 }
 
 describe('结构', () => {
-  it('渲染 4 个开关 + 1 个速度滑块', () => {
+  it('渲染 4 个开关 + 1 个速度滑块 + 1 个拍号下拉', () => {
     const p = mount()
     expect(p.switches()).toHaveLength(4)
     expect(p.slider()).not.toBeNull()
+    // 拍号（#14 新增）是 Select 而不是第 5 个 Switch —— 拍号是离散选项，不是开关
+    expect(p.container.querySelectorAll('[role="combobox"]')).toHaveLength(1)
     p.unmount()
   })
 
-  it('折叠标题与四个标签文案都走 t()', () => {
+  it('折叠标题与五个标签文案都走 t()', () => {
     const p = mount()
-    for (const key of ['device_metronome', 'device_tempo', 'metronome_sound', 'metronome_flash', 'metronome_visualize']) {
+    for (const key of ['device_metronome', 'device_tempo', 'metronome_beats', 'metronome_sound', 'metronome_flash', 'metronome_visualize']) {
       expect(p.text(), `缺 ${key}`).toContain(t(key))
     }
     p.unmount()
@@ -145,5 +167,42 @@ describe('速度滑块', () => {
       expect(Number(s.getAttribute('aria-valuemax'))).toBeGreaterThanOrEqual(bpm)
       p.unmount()
     }
+  })
+})
+
+describe('拍号（#14 新增：重音落在哪一拍、可视化画几个圆点）', () => {
+  it('触发区显示「{拍数}/4」，随 props 变', () => {
+    const p = mount({ beatsPerMeasure: 3 })
+    expect(p.container.querySelector('[role="combobox"]')!.textContent).toContain('3/4')
+    p.unmount()
+    const q = mount({ beatsPerMeasure: 6 })
+    expect(q.container.querySelector('[role="combobox"]')!.textContent).toContain('6/4')
+    q.unmount()
+  })
+
+  it('选项集合与 store 的白名单常量**逐项一致**（不许在这里另写一份列表）', () => {
+    const p = mount()
+    const labels = p.openBeats().map((o) => o.textContent)
+    expect(labels).toEqual(METRONOME_BEATS_OPTIONS.map((b) => `${b}/4`))
+    p.unmount()
+  })
+
+  it('选中某一项 → 以数字回调（不是字符串，组件负责转换）', () => {
+    const p = mount()
+    const opts = p.openBeats()
+    const target = opts.find((o) => o.textContent === '3/4')!
+    act(() => { target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
+    expect(p.onBeatsPerMeasureChange).toHaveBeenCalledTimes(1)
+    expect(p.onBeatsPerMeasureChange).toHaveBeenCalledWith(3)
+    p.unmount()
+  })
+
+  it('拍号行的标签用 aria-labelledby 关联可见文案（读屏能念出用途）', () => {
+    const p = mount()
+    const combo = p.container.querySelector('[role="combobox"]') as HTMLElement
+    const labelledby = combo.getAttribute('aria-labelledby')
+    expect(labelledby).toBe('metronome-beats-label')
+    expect(p.container.querySelector(`#${labelledby}`)!.textContent).toBe(t('metronome_beats'))
+    p.unmount()
   })
 })

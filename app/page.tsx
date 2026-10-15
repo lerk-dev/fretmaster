@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
 import { deduplicateStats } from "@/lib/export-utils"
 import { getLocalDateString, dbTimestampToLocalDate, getLocalDaysAgoStart } from "@/lib/utils"
-import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useDisplayScale, useUser, useChordSymbols } from "@/lib/store"
+import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useDisplayScale, useUser, useChordSymbols, clampMetronomeBpm, clampMetronomeBeats } from "@/lib/store"
 import { getEffectiveAudioSettings } from "@/lib/audio-settings-effective"
 import { useChordExercise } from "@/hooks/use-chord-exercise"
 import { useIntervalExercise } from "@/hooks/use-interval-exercise"
@@ -14,6 +14,7 @@ import { useFullscreen } from "@/hooks/use-fullscreen"
 import { usePracticeStats } from "@/hooks/use-practice-stats"
 import { useAudioDeviceEnumeration } from "@/hooks/use-audio-device-enumeration"
 import { useFeedbackSound } from "@/hooks/use-feedback-sound"
+import { useMetronomeScheduler } from "@/hooks/use-metronome-scheduler"
 import { logger } from "@/lib/logger"
 import { SONG_PROGRESSIONS } from "@/lib/page-songs"
 import { transposeSongChords, parseIrealPro, parseIrealUrl } from "@/lib/song-chords"
@@ -738,8 +739,22 @@ export default function FretMasterPage() {
   const metronomeEnabled = metronomeSettings.enabled
   const metronomeBpm = metronomeSettings.bpm
   const setMetronomeBpm = store.setMetronomeBpm
+  const setMetronomeBeatsPerMeasure = store.setMetronomeBeatsPerMeasure
   const metronomeSound = metronomeSettings.sound
   const metronomeFlash = metronomeSettings.flash
+  const metronomeBeats = metronomeSettings.beatsPerMeasure
+
+  // 节拍器的**单一**调度器（#14）：由音频时钟 lookahead 排程，并把拍事件广播给可视化。
+  // 放在这里（而不是页面下方的效果块里）是为了让声音与画面共用同一个时钟 —— 见 hook 注释。
+  useMetronomeScheduler({
+    enabled: metronomeEnabled,
+    isPlaying,
+    bpm: metronomeBpm,
+    beatsPerMeasure: metronomeBeats,
+    sound: metronomeSound,
+    flash: metronomeFlash,
+    visualize: metronomeSettings.visualize ?? false,
+  })
   
   // 音频输入状态 - 从 Store 获取
   const micEnabled = audioSettings.micEnabled
@@ -844,7 +859,6 @@ export default function FretMasterPage() {
 
   // Refs
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const metronomeRef = useRef<NodeJS.Timeout | null>(null)
   const pitchDetectionRef = useRef<number | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const cooldownRef = useRef<NodeJS.Timeout | null>(null)
@@ -1658,6 +1672,7 @@ export default function FretMasterPage() {
       practiceTime,
       fretCount,
       metronomeBpm,
+      metronomeBeats,
       inputGain,
       cooldownEnabled,
       cooldownDuration,
@@ -1673,7 +1688,7 @@ export default function FretMasterPage() {
     a.click()
     URL.revokeObjectURL(url)
     toast.success(t('export_settings'))
-  }, [language, chordScaleDisplay, noteAccidentalDisplay, theme, practiceTime, fretCount, metronomeBpm, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, customChords, t])
+  }, [language, chordScaleDisplay, noteAccidentalDisplay, theme, practiceTime, fretCount, metronomeBpm, metronomeBeats, inputGain, cooldownEnabled, cooldownDuration, confidenceThreshold, sensitivity, customChords, t])
 
   // 导入设置
   const importSettings = useCallback((file: File) => {
@@ -1700,7 +1715,10 @@ export default function FretMasterPage() {
         setTheme(str(settings.theme, 'dark'))
         setPracticeTime(num(settings.practiceTime, 60))
         setFretCount(num(settings.fretCount, 15))
-        setMetronomeBpm(num(settings.metronomeBpm, 80))
+        setMetronomeBpm(clampMetronomeBpm(num(settings.metronomeBpm, 80)))
+        // 拍号（#14）：走 store 的白名单校验 —— 旧版导出的设置文件里没有这个字段，
+        // 手改过的文件也可能塞进 0 / NaN（会让可视化算出 NaN 拍号），这里统一收敛。
+        setMetronomeBeatsPerMeasure(clampMetronomeBeats(num(settings.metronomeBeats, 4)))
         setInputGain(num(settings.inputGain, 1))
         setCooldownEnabled(bool(settings.cooldownEnabled, false))
         setCooldownDuration(num(settings.cooldownDuration, 1000))
@@ -1713,7 +1731,7 @@ export default function FretMasterPage() {
       }
     }
     reader.readAsText(file)
-  }, [setChordScaleDisplay, setConfidenceThreshold, setCooldownDuration, setCooldownEnabled, setFretCount, setInputGain, setLanguage, setMetronomeBpm, setNoteAccidentalDisplay, setPracticeTime, setSensitivity, setTheme, t])
+  }, [setChordScaleDisplay, setConfidenceThreshold, setCooldownDuration, setCooldownEnabled, setFretCount, setInputGain, setLanguage, setMetronomeBpm, setMetronomeBeatsPerMeasure, setNoteAccidentalDisplay, setPracticeTime, setSensitivity, setTheme, t])
 
   // 计时器效果：仅负责递减 timeLeft；暂停时挂起（原实现未把 isPracticePaused 纳入依赖）
   useEffect(() => {
@@ -1741,67 +1759,11 @@ export default function FretMasterPage() {
     }
   }, [isPlaying, practiceTime, scoreRef, setIsPlaying, timeLeft])
 
-  const metronomeAudioCtxRef = useRef<AudioContext | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (metronomeAudioCtxRef.current) {
-        metronomeAudioCtxRef.current.close()
-        metronomeAudioCtxRef.current = null
-      }
-    }
-  }, [])
-
-  // 节拍器效果
-  useEffect(() => {
-    if (metronomeEnabled && isPlaying) {
-      const interval = 60000 / metronomeBpm
-      metronomeRef.current = setInterval(() => {
-        if (metronomeSound) {
-          try {
-            if (!metronomeAudioCtxRef.current || metronomeAudioCtxRef.current.state === 'closed') {
-              const AudioCtx = getAudioContextClass()
-              metronomeAudioCtxRef.current = new AudioCtx()
-            }
-            const ctx = metronomeAudioCtxRef.current
-            if (ctx.state === 'suspended') {
-              ctx.resume().catch(() => {})
-            }
-            const oscillator = ctx.createOscillator()
-            const gainNode = ctx.createGain()
-            oscillator.connect(gainNode)
-            gainNode.connect(ctx.destination)
-            oscillator.frequency.value = 800
-            oscillator.type = "sine"
-            gainNode.gain.setValueAtTime(0.3, ctx.currentTime)
-            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1)
-            oscillator.start(ctx.currentTime)
-            oscillator.stop(ctx.currentTime + 0.1)
-          } catch (e) {
-            console.error('Metronome audio error:', e)
-          }
-        }
-        if (metronomeFlash) {
-          const flashLayer = document.getElementById('metronome-flash-layer')
-          if (flashLayer) {
-            flashLayer.style.opacity = '1'
-            setTimeout(() => {
-              if (flashLayer) flashLayer.style.opacity = '0'
-            }, 100)
-          }
-        }
-      }, interval)
-    } else {
-      // 仅在节拍器关闭或停止练习时关闭 AudioContext，BPM 变化时不会触发此分支
-      if (metronomeAudioCtxRef.current) {
-        metronomeAudioCtxRef.current.close().catch(() => {})
-        metronomeAudioCtxRef.current = null
-      }
-    }
-    return () => {
-      if (metronomeRef.current) clearInterval(metronomeRef.current)
-    }
-  }, [metronomeEnabled, isPlaying, metronomeBpm, metronomeSound, metronomeFlash])
+  // 🚨 节拍器发声/闪光的效果块已整体抽到 `hooks/use-metronome-scheduler.ts`（#14）。
+  // 抽走的理由不只是「太长」：修前这里是「`setInterval(60000/bpm)` 里直接 createOscillator」，
+  // 是**声音自己的时钟**，而可视化组件另有一个时钟 —— 两者启动时刻与漂移速率都不同，
+  // 圆点与「咔哒」会逐渐错开。现在只有一个调度器（音频时钟 lookahead），
+  // 拍事件经 `lib/metronome-clock.ts` 广播给可视化。**不要**在这里重新起定时器。
 
   // 音程练习指板自动推进效果
   useEffect(() => {
@@ -3956,8 +3918,10 @@ export default function FretMasterPage() {
               const normalizedType = normalizeChordType(currentChord.type)
               const chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === currentChord.type || ct.symbol === currentChord.type)
               if (chordType) {
+                // 🚨 和弦音程含复合音程（9→14、13→21…），interval 恒 0..11 ⇒ 必须各自取模，
+                // 否则含 9/11/13 的和弦点击扩展音会被判错（且与弹奏路径判定相反）。
                 const interval = (noteIdx - rootIdx + 12) % 12
-                isCorrect = chordType.intervals.includes(interval)
+                isCorrect = chordType.intervals.some(i => i % 12 === interval)
               }
             }
           }
@@ -5507,7 +5471,7 @@ export default function FretMasterPage() {
           bpm={metronomeBpm}
           enabled={metronomeSettings.visualize ?? false}
           isPlaying={isPlaying}
-          beatsPerMeasure={4}
+          beatsPerMeasure={metronomeBeats}
           language={language as 'zh-CN' | 'en'}
         />
       </div>

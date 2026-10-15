@@ -18,7 +18,15 @@
  * 一旦有 updater 原地改旧对象，before 会被污染，差异集合立刻不对。
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useAppStore } from '@/lib/store'
+import {
+  useAppStore,
+  clampMetronomeBeats,
+  clampMetronomeBpm,
+  METRONOME_BEATS_DEFAULT,
+  METRONOME_BEATS_OPTIONS,
+  METRONOME_BPM_MAX,
+  METRONOME_BPM_MIN,
+} from '@/lib/store'
 import type { CustomSong } from '@/lib/custom-song-editor'
 
 const S = () => useAppStore.getState()
@@ -177,6 +185,7 @@ const CASES: Case[] = [
   // ---- 节拍器
   { label: 'setMetronomeEnabled → metronome.enabled', call: () => S().setMetronomeEnabled(true), changed: [{ path: 'metronome.enabled', to: true }] },
   { label: 'setMetronomeBpm → metronome.bpm', call: () => S().setMetronomeBpm(120), changed: [{ path: 'metronome.bpm', to: 120 }] },
+  { label: 'setMetronomeBeatsPerMeasure → metronome.beatsPerMeasure（#14 新增）', call: () => S().setMetronomeBeatsPerMeasure(3), changed: [{ path: 'metronome.beatsPerMeasure', to: 3 }] },
   { label: 'setMetronomeSound → metronome.sound', call: () => S().setMetronomeSound(false), changed: [{ path: 'metronome.sound', to: false }] },
   { label: 'setMetronomeFlash → metronome.flash', call: () => S().setMetronomeFlash(true), changed: [{ path: 'metronome.flash', to: true }] },
   { label: 'setMetronomeVisualize → metronome.visualize（原本缺省，需新建键）', call: () => S().setMetronomeVisualize(true), changed: [{ path: 'metronome.visualize', to: true }] },
@@ -284,6 +293,7 @@ describe('resetSettings 的作用范围（对用户承诺「恢复所有设置�
 
     expect(S().audio.micEnabled).toBe(false)
     expect(S().metronome.bpm).toBe(80)
+    expect(S().metronome.beatsPerMeasure).toBe(4)
     expect(S().focusMode.enabled).toBe(false)
     expect(S().user.language).toBe('zh-CN')
     expect(S().feedbackSound.enabled).toBe(true)
@@ -317,5 +327,65 @@ describe('resetSettings 的作用范围（对用户承诺「恢复所有设置�
     S().resetSettings()
 
     expect(S().audio).toBe(first)
+  })
+})
+
+describe('节拍器参数的钳制（#4 / #14：脏值会把调度器退化成忙循环 / NaN 拍号）', () => {
+  const DEFAULTS = INIT.metronome as { bpm: number; beatsPerMeasure: number }
+
+  it('setMetronomeBpm 把 bpm 夹到合法区间', () => {
+    const cases: [number, number][] = [
+      [0, METRONOME_BPM_MIN],
+      [-100, METRONOME_BPM_MIN],
+      [METRONOME_BPM_MIN - 1, METRONOME_BPM_MIN],
+      [METRONOME_BPM_MAX + 1, METRONOME_BPM_MAX],
+      [1000, METRONOME_BPM_MAX],
+      [120, 120],
+    ]
+    for (const [input, expected] of cases) {
+      S().setMetronomeBpm(input)
+      expect(S().metronome.bpm, `bpm=${input}`).toBe(expected)
+    }
+  })
+
+  it('setMetronomeBpm 对非有限值回落默认（`60000 / NaN` 会让 setTimeout 立即触发）', () => {
+    const bads: unknown[] = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 'abc', undefined, null]
+    for (const bad of bads) {
+      S().setMetronomeBpm(bad as number)
+      expect(S().metronome.bpm, `bpm=${String(bad)}`).toBe(DEFAULTS.bpm)
+    }
+  })
+
+  it('setMetronomeBeatsPerMeasure 只接受白名单取值，其余回落默认', () => {
+    for (const ok of METRONOME_BEATS_OPTIONS) {
+      S().setMetronomeBeatsPerMeasure(ok)
+      expect(S().metronome.beatsPerMeasure, `beats=${ok}`).toBe(ok)
+    }
+    // 🚨 0 是最关键的一个：`x % 0` 是 NaN ⇒ 可视化的圆点计数变 NaN（渲染出 "NaN"、永不命中）。
+    const bads: unknown[] = [0, -1, 1, 5, 7, 2.5, Number.NaN, Number.POSITIVE_INFINITY, '4']
+    for (const bad of bads) {
+      S().setMetronomeBeatsPerMeasure(bad as number)
+      expect(S().metronome.beatsPerMeasure, `beats=${String(bad)}`).toBe(DEFAULTS.beatsPerMeasure)
+    }
+  })
+
+  it('setMetronomeSettings 的 Partial 分支同样钳制（只钳制显式传入的键）', () => {
+    S().setMetronomeBpm(120)
+    S().setMetronomeBeatsPerMeasure(3)
+    S().setMetronomeSettings({ bpm: -5, beatsPerMeasure: 0 })
+    expect(S().metronome.bpm).toBe(METRONOME_BPM_MIN)
+    expect(S().metronome.beatsPerMeasure).toBe(DEFAULTS.beatsPerMeasure)
+    // 未传入的键不受影响
+    S().setMetronomeSound(false)
+    S().setMetronomeSettings({ bpm: 90 })
+    expect(S().metronome.sound).toBe(false)
+    expect(S().metronome.beatsPerMeasure).toBe(DEFAULTS.beatsPerMeasure)
+  })
+
+  it('clampMetronomeBeats / clampMetronomeBpm 是纯函数（可被非 store 调用方复用）', () => {
+    expect(clampMetronomeBeats(6)).toBe(6)
+    expect(clampMetronomeBeats(9)).toBe(METRONOME_BEATS_DEFAULT)
+    expect(clampMetronomeBpm(400)).toBe(METRONOME_BPM_MAX)
+    expect(clampMetronomeBpm(Number.NaN)).toBe(DEFAULTS.bpm)
   })
 })

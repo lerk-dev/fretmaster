@@ -5,7 +5,18 @@
 import { Activity } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+// BPM 合法区间与 store 的钳制逻辑同源 —— 别在这里写死 40/240，
+// 否则改一处漏一处会让「滑块范围」与「实际钳制范围」分叉。
+// 拍号同理：选项必须来自 store 的白名单常量（见其注释）。
+import { METRONOME_BEATS_OPTIONS, METRONOME_BPM_MAX, METRONOME_BPM_MIN } from '@/lib/store'
 
 interface SettingsMetronomeSectionProps {
   t: (key: string) => string
@@ -14,6 +25,9 @@ interface SettingsMetronomeSectionProps {
   bpm: number
   /** Slider 回传的是数组，取首值 */
   onBpmChange: (v: number[]) => void
+  /** 拍号：每小节几拍（决定重音与可视化圆点数） */
+  beatsPerMeasure: number
+  onBeatsPerMeasureChange: (v: number) => void
   sound: boolean
   onSoundChange: (v: boolean) => void
   flash: boolean
@@ -28,6 +42,8 @@ export function SettingsMetronomeSection({
   onEnabledChange,
   bpm,
   onBpmChange,
+  beatsPerMeasure,
+  onBeatsPerMeasureChange,
   sound,
   onSoundChange,
   flash,
@@ -56,10 +72,28 @@ export function SettingsMetronomeSection({
         <Slider
           value={[bpm]}
           onValueChange={onBpmChange}
-          min={40}
-          max={240}
+          min={METRONOME_BPM_MIN}
+          max={METRONOME_BPM_MAX}
           step={1}
         />
+      </div>
+      {/* 拍号（#14）：决定重音落在哪一拍、可视化画几个圆点。
+          选项来自 store 的白名单常量 —— 别在这里另写一份列表，
+          否则「下拉能选的」与「store 校验认的」会分叉。 */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground" id="metronome-beats-label">{t('metronome_beats')}</span>
+        <Select value={String(beatsPerMeasure)} onValueChange={(v) => onBeatsPerMeasureChange(Number(v))}>
+          <SelectTrigger className="h-8 w-[76px] text-xs" aria-labelledby="metronome-beats-label">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {METRONOME_BEATS_OPTIONS.map((b) => (
+              <SelectItem key={b} value={String(b)} className="text-xs">
+                {b}/4
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{t('metronome_sound')}</span>

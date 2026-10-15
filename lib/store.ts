@@ -215,10 +215,55 @@ export interface PracticeSettings {
   weaknessWeightedEnabled: boolean  // 弱点加权出题开关
 }
 
+// 节拍器 BPM 合法区间。
+// 🚨 这是**唯一真相源**：UI 滑块（components/settings-metronome-section.tsx）、
+// store setter、设置导入、持久化迁移四处都必须引用它。
+// 为什么必须是硬边界：声音路径是 `60000 / bpm` 直接喂 `setInterval`
+//（app/page.tsx）。`bpm = 0` ⇒ Infinity、`bpm < 0` ⇒ 负间隔、`bpm = NaN` ⇒ NaN，
+// 三者都会让 setInterval 退化成 **~1ms** 的高频循环（实测 0.93–1.10ms），
+// 每毫秒 `createOscillator` ⇒ 音频线程过载/界面卡死/爆音，
+// 而可视化组件自带 `bpm <= 0` 守卫不动 ⇒ 声音与画面行为互相矛盾。
+export const METRONOME_BPM_MIN = 40
+export const METRONOME_BPM_MAX = 240
+const METRONOME_BPM_DEFAULT = 80
+
+/**
+ * 把任意输入夹到合法 BPM 区间。非有限值（NaN / Infinity / 非数字）回落默认值。
+ * 见上方常量注释：这不是「防手滑」，而是防 `setInterval` 退化成 ~1ms 忙循环。
+ */
+export function clampMetronomeBpm(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return METRONOME_BPM_DEFAULT
+  return Math.min(METRONOME_BPM_MAX, Math.max(METRONOME_BPM_MIN, value))
+}
+
+/**
+ * 可选拍号（每小节拍数）。**唯一真相源**：设置面板的下拉项、store 的校验
+ * （`clampMetronomeBeats`）、持久化迁移三处都引用它。
+ *
+ * 为什么是个白名单而不是区间：拍号是「离散的乐理选择」（2/4、3/4、4/4、6/8），
+ * 不是可插值的量。用区间会让持久化里出现 5 这种没人选过的值，
+ * 而 UI 下拉里没有对应项 ⇒ Radix Select 显示空白（scale-controls 踩过同一个坑）。
+ */
+export const METRONOME_BEATS_OPTIONS = [2, 3, 4, 6] as const
+export const METRONOME_BEATS_DEFAULT = 4
+
+/**
+ * 把任意输入收敛到合法拍号。非白名单值（含 0 / 负数 / NaN / 小数）回落默认 4。
+ * 🚨 这不是防手滑：`x % 0` 是 `NaN`，会让可视化的圆点计数变 NaN（渲染出 "NaN" 且永不命中）；
+ * 负数拍号则会让小节位置算成负下标。见 `components/metronome-visualizer.tsx` 的 `safeBeats`。
+ */
+export function clampMetronomeBeats(value: unknown): number {
+  return typeof value === 'number' && (METRONOME_BEATS_OPTIONS as readonly number[]).includes(value)
+    ? value
+    : METRONOME_BEATS_DEFAULT
+}
+
 // 节拍器设置
 export interface MetronomeSettings {
   enabled: boolean
   bpm: number
+  /** 拍号：每小节几拍（决定重音位置与可视化圆点数） */
+  beatsPerMeasure: number
   sound: boolean
   flash: boolean
   visualize?: boolean
@@ -416,6 +461,7 @@ export interface AppActions {
   // 节拍器操作
   setMetronomeEnabled: (enabled: boolean) => void
   setMetronomeBpm: (bpm: number) => void
+  setMetronomeBeatsPerMeasure: (beatsPerMeasure: number) => void
   setMetronomeSound: (sound: boolean) => void
   setMetronomeFlash: (flash: boolean) => void
   setMetronomeVisualize: (visualize: boolean) => void
@@ -597,7 +643,8 @@ const initialState: AppState = {
   
   metronome: {
     enabled: false,
-    bpm: 80,
+    bpm: METRONOME_BPM_DEFAULT,
+    beatsPerMeasure: METRONOME_BEATS_DEFAULT,
     sound: true,
     flash: false,
   },
@@ -757,6 +804,19 @@ export function migratePersistedState(persistedState: any, version: number): any
     if (persistedState.audio && persistedState.audio.micUserDisabled === undefined) {
       persistedState.audio.micUserDisabled = false
     }
+    // metronome：与 user/audio 同理，嵌套对象不随顶层浅合并补默认值 ⇒ 老 blob 必须在这里补齐。
+    // 另外 bpm 一律过钳制：持久化里的 0/负数/NaN（手改 localStorage、旧版导入校验只认「有限数」）
+    // 会让声音路径的 `setInterval(60000/bpm)` 退化成 ~1ms 忙循环。见 METRONOME_BPM_MIN 注释。
+    if (!persistedState.metronome || typeof persistedState.metronome !== 'object') {
+      persistedState.metronome = initialState.metronome
+    } else {
+      persistedState.metronome.bpm = clampMetronomeBpm(persistedState.metronome.bpm)
+      // 拍号是 #14 新增字段：老 blob 没有它 ⇒ 必须补默认值（嵌套对象不随顶层浅合并）。
+      persistedState.metronome.beatsPerMeasure = clampMetronomeBeats(persistedState.metronome.beatsPerMeasure)
+      if (typeof persistedState.metronome.enabled !== 'boolean') persistedState.metronome.enabled = false
+      if (typeof persistedState.metronome.sound !== 'boolean') persistedState.metronome.sound = true
+      if (typeof persistedState.metronome.flash !== 'boolean') persistedState.metronome.flash = false
+    }
     if (persistedState.fullscreenMode !== undefined) {
       persistedState.isFullscreen = persistedState.fullscreenMode
       delete persistedState.fullscreenMode
@@ -898,11 +958,27 @@ export const useAppStore = create<AppState & AppActions>()(
       
       // 节拍器操作
       setMetronomeEnabled: (enabled) => set((state) => ({ metronome: { ...state.metronome, enabled } })),
-      setMetronomeBpm: (bpm) => set((state) => ({ metronome: { ...state.metronome, bpm } })),
+      // 🚨 必须钳制：见 METRONOME_BPM_MIN 注释 —— bpm<=0/NaN 会让声音路径的
+      // `setInterval(60000/bpm)` 退化成 ~1ms 忙循环。
+      setMetronomeBpm: (bpm) => set((state) => ({ metronome: { ...state.metronome, bpm: clampMetronomeBpm(bpm) } })),
+      // 🚨 同上必须收敛到白名单：`x % 0` = NaN 会让可视化的圆点计数变 NaN。
+      setMetronomeBeatsPerMeasure: (beatsPerMeasure) => set((state) => ({
+        metronome: { ...state.metronome, beatsPerMeasure: clampMetronomeBeats(beatsPerMeasure) }
+      })),
       setMetronomeSound: (sound) => set((state) => ({ metronome: { ...state.metronome, sound } })),
       setMetronomeFlash: (flash) => set((state) => ({ metronome: { ...state.metronome, flash } })),
       setMetronomeVisualize: (visualize) => set((state) => ({ metronome: { ...state.metronome, visualize } })),
-      setMetronomeSettings: (settings) => set((state) => ({ metronome: { ...state.metronome, ...settings } })),
+      // 部分更新：只有显式带了 bpm / beatsPerMeasure 才钳制（`undefined` 表示「本次不改」）。
+      setMetronomeSettings: (settings) => set((state) => ({
+        metronome: {
+          ...state.metronome,
+          ...settings,
+          ...(settings.bpm !== undefined ? { bpm: clampMetronomeBpm(settings.bpm) } : {}),
+          ...(settings.beatsPerMeasure !== undefined
+            ? { beatsPerMeasure: clampMetronomeBeats(settings.beatsPerMeasure) }
+            : {}),
+        }
+      })),
       
       // 反馈音操作
       setFeedbackSoundEnabled: (enabled) => set((state) => ({ feedbackSound: { ...state.feedbackSound, enabled } })),
