@@ -11,7 +11,9 @@ import {
   semitonesToDegree,
   getNoteDegreeInChord,
   getChordDegrees,
+  getNoteIndex,
 } from '@/lib/page-theory-functions'
+import { CHORD_TYPES, NOTES } from '@/lib/page-theory-data'
 
 describe('degreeToSemitone —— 度数 → 半音（乐理真值）', () => {
   it.each([
@@ -186,5 +188,88 @@ describe('getChordDegrees —— 出题用的音级序列', () => {
 
   it('未知和弦类型回退为仅根音', () => {
     expect(getChordDegrees('这不是和弦')).toEqual(['1'])
+  })
+})
+
+/**
+ * #1 回归护栏：扩展音（9/11/13/♭9/♯9/♯11/♭13）在和弦判定里曾经**恒判错**。
+ *
+ * 根因：`CHORD_TYPES[].intervals` 把 9/11/13 族存成**复合音程**（9→14、11→17、13→21、
+ * ♭9→13、♯9→15、♯11→18、♭13→20），而判定里的 `interval` 是 `(note - root + 12) % 12`，
+ * 恒在 0..11 ⇒ `intervals.includes(interval)` 对扩展音**永远 false**：
+ * 扩展音在指板上不亮、点击被判错。修法是逐个取模后再比（`.some(i => i % 12 === interval)`）。
+ *
+ * 这里做的是**穷举**而非举例：65 种和弦类型的**每一个**音程都要能被自己认出来，
+ * 否则「新增一种带扩展音的和弦」时又会静默漏掉。判据取自和弦自身的数据，不写死音名。
+ */
+describe('#1 扩展音判定：和弦自己的每个音程都必须被认出来（穷举 CHORD_TYPES）', () => {
+  const C = getNoteIndex('C')
+
+  it('每个和弦类型的每个音程，落在根音上都能得到一个非空音级', () => {
+    const failures: string[] = []
+    for (const ct of CHORD_TYPES) {
+      for (const interval of ct.intervals) {
+        const note = NOTES[(C + interval) % 12]
+        if (getNoteDegreeInChord(note, 'C', ct.name) === null) {
+          failures.push(`${ct.name}: interval=${interval} → 音名 ${note}`)
+        }
+      }
+    }
+    expect(failures, '这些和弦音被判成了「不属于该和弦」').toEqual([])
+  })
+
+  it('每个和弦类型的每个音程，换个根音（升号根音 F♯ / 降号根音 B♭）同样成立', () => {
+    const failures: string[] = []
+    for (const root of ['F#', 'Bb']) {
+      const r = getNoteIndex(root)
+      for (const ct of CHORD_TYPES) {
+        for (const interval of ct.intervals) {
+          const note = NOTES[(r + interval) % 12]
+          if (getNoteDegreeInChord(note, root, ct.name) === null) {
+            failures.push(`${ct.name} root=${root}: interval=${interval} → ${note}`)
+          }
+        }
+      }
+    }
+    expect(failures).toEqual([])
+  })
+
+  it('取模不会把判定放宽：大三和弦仍然只认 C / E / G 三个音', () => {
+    const recognized = NOTES.filter((n) => getNoteDegreeInChord(n, 'C', 'Major') !== null)
+    expect(recognized).toEqual(['C', 'E', 'G'])
+  })
+
+  it('扩展音得到的是**复合度数**（9/11/13 族），不是取模后的 2/4/6', () => {
+    // 与 getChordDegrees 的出题序列同口径 —— 否则提示卡片写「9」、指板标「2」，对不上。
+    expect(getNoteDegreeInChord('D', 'C', '9')).toBe('9')
+    expect(getNoteDegreeInChord('F', 'C', '11')).toBe('11')
+    expect(getNoteDegreeInChord('A', 'C', '13')).toBe('13')
+    expect(getNoteDegreeInChord('Db', 'C', '7b9')).toBe('b9')
+    expect(getNoteDegreeInChord('D#', 'C', '7#9')).toBe('#9')
+    expect(getNoteDegreeInChord('F#', 'C', '7#11')).toBe('#11')
+    expect(getNoteDegreeInChord('Ab', 'C', '7b13')).toBe('b13')
+    // 自然音程仍是自然音程（没被「扩展化」）
+    expect(getNoteDegreeInChord('E', 'C', '9')).toBe('3')
+    expect(getNoteDegreeInChord('G', 'C', '9')).toBe('5')
+    expect(getNoteDegreeInChord('A#', 'C', '9')).toBe('b7')
+  })
+
+  it('与 getChordDegrees 互为逆运算：和弦序列里的每个音级，都能在指板上找回同一个音级', () => {
+    const failures: string[] = []
+    for (const ct of CHORD_TYPES) {
+      for (const degree of getChordDegrees(ct.name)) {
+        const semi = degreeToSemitone(degree)
+        if (semi === undefined) {
+          failures.push(`${ct.name}: 音级「${degree}」不认识`)
+          continue
+        }
+        const note = NOTES[(C + semi) % 12]
+        const back = getNoteDegreeInChord(note, 'C', ct.name)
+        if (back !== degree) {
+          failures.push(`${ct.name}: 出题写「${degree}」，指板算出「${back}」`)
+        }
+      }
+    }
+    expect(failures, '出题序列与指板音级不一致').toEqual([])
   })
 })

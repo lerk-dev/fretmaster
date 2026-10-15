@@ -186,12 +186,26 @@ export function getNoteIndex(note: string): number {
   return NOTES_FLAT.indexOf(normalized)
 }
 
+/**
+ * 「目标调是降号调」的判定表（归一化后的 ♯/♭ 写法，与文件末尾 `FLAT_KEYS` 同集合）。
+ * F 大调虽没有带 ♭ 的调名，但它有 1 个降号（IV 级 B♭）⇒ 必须算进来。
+ */
+const TRANSPOSE_FLAT_MAJOR_KEYS = ['F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭']
+
 export function transposeChord(chord: string, fromKey: string, toKey: string): string {
   const fromIndex = getNoteIndex(fromKey)
   const toIndex = getNoteIndex(toKey)
   if (fromIndex === -1 || toIndex === -1) return chord
 
   const diff = (toIndex - fromIndex + 12) % 12
+
+  // 🚨 音符表必须由**目标调**的调号决定，不能恒用升号表 NOTES：
+  // 转入降号调时会拼出非法调内音 ——
+  //   transposeChord('F','C','B♭')：newRootIndex=3 ⇒ 旧实现给 'D♯'，B♭ 大调的 IV 级应记作 **E♭**；
+  //   transposeChord('F','C','F') ：NOTES[10]='A♯'，F 大调的 IV 级应记作 **B♭**。
+  // 对乐理教学而言这是错误示范。根音与斜杠低音统一走同一张表。
+  const useFlats = TRANSPOSE_FLAT_MAJOR_KEYS.includes(normalizeNoteName(toKey))
+  const noteTable = useFlats ? NOTES_FLAT : NOTES
 
   // Extract root note（兼容 #/♯ 和 b/♭）
   const rootMatch = chord.match(/^([A-G][#♯b♭]?)/)
@@ -202,7 +216,7 @@ export function transposeChord(chord: string, fromKey: string, toKey: string): s
   if (rootIndex === -1) return chord
 
   const newRootIndex = (rootIndex + diff) % 12
-  const newRoot = NOTES[newRootIndex]
+  const newRoot = noteTable[newRootIndex]
 
   let transposed = chord.replace(/^([A-G][#♯b♭]?)/, newRoot)
 
@@ -213,7 +227,7 @@ export function transposeChord(chord: string, fromKey: string, toKey: string): s
   transposed = transposed.replace(/\/([A-G][#♯b♭]?)$/, (whole, bass: string) => {
     const bassIndex = getNoteIndex(bass)
     if (bassIndex === -1) return whole
-    return '/' + NOTES[(bassIndex + diff) % 12]
+    return '/' + noteTable[(bassIndex + diff) % 12]
   })
 
   return transposed
@@ -434,13 +448,20 @@ export function getScaleForChord(type: string, forceNaturalFive?: boolean, seven
   if (['m7', 'm9', 'm11', 'm13'].includes(type)) return 'dorian'
   if (['m7b5', 'm9b5'].includes(type)) return 'locrian'
   if (['m7b5nat9'].includes(type)) return 'locrianNat2'
-  if (['m7b6'].includes(type)) return 'dorian' // Solo: line 298-300 (不是 aeolian)
+  // 🚨 m7b6 必须走 aeolian（含 ♭6），不能走 dorian（只有自然 6）：
+  // m7b6 的构成是 [0,3,7,10,8]「1 ♭3 5 ♭7 ♭6」，特征音正是 ♭6 ⇒
+  // 走 dorian 会让「带 level」的练习**永远弹不出 ♭6**（实际练成了 m7），
+  // 而「无 level」路径（extendedChordMap 兜底）又会列出 ♭6 —— 两条路径结论打架。
+  // 与 lib/scale-theory.ts 的 CHORD_SCALE_OPTIONS[minorSevenFlatSix] = [aeolian] 对齐。
+  if (['m7b6'].includes(type)) return 'aeolian'
   if (['m6', 'm6add9'].includes(type)) return 'melodicMinor' // Solo: line 274 否定检查 → line 328 (不是 dorian)
   if (['mMaj7', 'mMaj9', 'mMaj13'].includes(type)) return 'melodicMinor'
   if (['madd9'].includes(type)) return 'dorian'
   // 减和弦
   if (['Dim', 'dim', 'dim7'].includes(type)) return 'diminishedWholeHalf'
-  if (['dimMaj7'].includes(type)) return 'harmonicMinor' // Solo 算法选择
+  // 🚨 dimMaj7 = 1 ♭3 ♭5 7，特征音是 ♭5 ⇒ 必须走含 ♭5 的 diminishedWholeHalf，
+  // 不能走 harmonicMinor（自然 5）。与 CHORD_SCALE_OPTIONS[diminishedMajorSeven] 对齐。
+  if (['dimMaj7'].includes(type)) return 'diminishedWholeHalf'
   // 增和弦
   if (['Aug', 'aug'].includes(type)) return 'wholeTone'
   // 挂留和弦
@@ -666,23 +687,11 @@ export function getChordDegrees(type: string, level?: string, options?: {
     return ["1", "b3", "b5", "b7"]
   }
   
-  const extendedChordMap: Record<string, string[]> = {
-    '9': ['1', '3', '5', 'b7', '9'],
-    'Maj9': ['1', '3', '5', '7', '9'],
-    'm9': ['1', 'b3', '5', 'b7', '9'],
-    '7#9': ['1', '3', '5', 'b7', '#9'],
-    '7b9': ['1', '3', '5', 'b7', 'b9'],
-    '11': ['1', '3', '5', 'b7', '9', '11'],
-    'm11': ['1', 'b3', '5', 'b7', '9', '11'],
-    '7#11': ['1', '3', '5', 'b7', '9', '#11'],
-    '13': ['1', '3', '5', 'b7', '9', '11', '13'],
-    'm13': ['1', 'b3', '5', 'b7', '9', '11', '13'],
-  }
-  
-  if (extendedChordMap[type]) {
-    return extendedChordMap[type]
-  }
-  
+  // 🚨 不要恢复硬编码的 extendedChordMap：它**凭空补出了和弦定义里没有的音** ——
+  //   `7#11` 的 intervals = [0,4,7,10,18] 并没有 9，却列了 '9'；
+  //   `13` 的 intervals = [0,4,7,10,14,21] 并没有 11，却列了 '11'；`m13` 同理。
+  // 于是 `getChordDegrees('13')` 列出 7 个音，而和弦定义只有 6 个、指板高亮又是另一套 ⇒ 三方打架。
+  // 直接由和弦自身的 intervals 推导 ⇒ 与 CHORD_TYPES 定义、与指板判定**同源**。
   return chordType.intervals.map(interval => {
     return semitonesToDegree(interval, type)
   })
@@ -790,10 +799,23 @@ export function getNoteDegreeInChord(note: string, chordRoot: string, chordType:
   const noteIdx = getNoteIndex(note)
   const interval = (noteIdx - rootIdx + 12) % 12
 
-  // 检查这个音程是否在和弦中
-  if (!chordTypeData.intervals.includes(interval)) return null
+  // 检查这个音程是否在和弦中。
+  // 🚨 必须对和弦音程**各自取模**再比：CHORD_TYPES 把 9/11/13/♭9/♯9/♯11/♭13 存成
+  // **复合音程**（9→14、11→17、13→21、♭9→13、♯9→15、♯11→18、♭13→20），
+  // 而 `interval` 恒在 0..11 ⇒ 直接 `includes(interval)` 对扩展音**永远为 false**：
+  // 扩展音在指板上不亮、点击被判错，而 MIDI/弹奏路径用的是复合音程表 ⇒ 两条路径判定相反。
+  // 例：C9 的九音 D 得 interval=2，`[0,4,7,10,14].includes(2)` = false，改后 `14 % 12 = 2` = true。
+  if (!chordTypeData.intervals.some(i => i % 12 === interval)) return null
 
-  return semitonesToDegree(interval, chordType)
+  // 定名要用**与该音同音高的那个和弦音程**，而不是取模后的 0..11 值：
+  // 同一音高在和弦里可能有更扩展的写法（`add9` 的 [0,4,7,14]、`13` 的 [0,4,7,10,14,21]），
+  // 取模值 2 / 9 会让 degreeMap 返回 `2` / `6` —— 而 `getChordDegrees`（出题序列）
+  // 走的是**复合音程** ⇒ 提示卡片写「9」、指板上却标「2」，用户按提示找不着。
+  // 多个同音高写法并存时取最大的那个（= 最扩展的写法），与 getChordDegrees 的口径一致。
+  const samePitchIntervals = chordTypeData.intervals.filter(i => i % 12 === interval)
+  const spelledInterval = samePitchIntervals.length ? Math.max(...samePitchIntervals) : interval
+
+  return semitonesToDegree(spelledInterval, chordType)
 }
 
 // 根据音级和根音生成正确的音名
@@ -859,6 +881,9 @@ export function getScaleNoteNames(rootNote: string, intervals: string[]): string
 export function degreeToSemitone(degree: string): number | undefined {
   const degreeMap: Record<string, number> = {
     '1': 0, 'b2': 1, '2': 2, '#2': 3, 'b3': 3, '3': 4, '4': 5,
+    // `b4`（4 半音，与 `3` 同音高）—— `SCALE_INTERVAL_DISPLAY[alteredDominantFlatFlat7]` 在用，
+    // 缺键会让 `getScaleNoteNames` 对该音级返回空串。
+    'b4': 4,
     'b5': 6, '#4': 6, '5': 7, '#5': 8, 'b6': 8,
     '6': 9, 'bb7': 9, '#6': 10, 'b7': 10, '7': 11, 'maj7': 11,
     'b9': 13, '9': 14, '#9': 15, '11': 17, '#11': 18,
@@ -878,11 +903,16 @@ export function degreeToSemitone(degree: string): number | undefined {
  * 它**不是**音阶练习的真相源：真相源是音阶自己的 `intervals[i] ↔ notes[i]` 对齐表。
  * 之所以保留，是因为 `generateScaleSequence` 在音阶 `intervals` 为空时会退化成用
  * `b5`/`b6` 这类写法合成标签 —— 那些标签不在 `intervals` 里，只能查这张表。
+ *
+ * 🚨 本表已与对齐表**逐项收敛**：`#6` 由 9 改为 10（`#6` 升六度 = 10，9 是 ♮6）、
+ * 补 `#2`(3)、`bb7`(9) 与 `b4`(4)。改动前它与 76 个音阶的对齐表在两处冲突（`#2` 缺失、`#6` 偏半音）。
+ * 现由 `__tests__/scale-degree-semitone.test.ts` 的「盲区清单」用例钉成**空集**。
  */
 export const SCALE_DEGREE_SEMITONE_FALLBACK: Record<string, number> = {
-  '1': 0, 'b2': 1, '2': 2, 'b3': 3, '3': 4, '4': 5,
+  '1': 0, 'b2': 1, '2': 2, '#2': 3, 'b3': 3, '3': 4, '4': 5,
+  'b4': 4,
   '#4': 6, 'b5': 6, '5': 7, '#5': 8, 'b6': 8, '6': 9,
-  '#6': 9, 'b7': 10, '7': 11,
+  '#6': 10, 'bb7': 9, 'b7': 10, '7': 11,
   'b9': 1, '9': 2, '#9': 3, '11': 5, '#11': 6, 'b13': 8, '13': 9,
 }
 
@@ -891,13 +921,14 @@ export const SCALE_DEGREE_SEMITONE_FALLBACK: Record<string, number> = {
  *
  * 优先查音阶自身对齐表（`intervals.indexOf(degree)` → `notes[idx]`），查不到才回落兜底表。
  *
- * 🚨 为什么必须优先对齐表 —— 兜底表有两处会**静默出错**，都是实测出来的（见
- * `__tests__/scale-degree-semitone.test.ts` 的穷举用例，覆盖 76 个音阶）：
- *  ① 兜底表**缺** `#2`。含 `#2` 的音阶有 5 个（Altered / Lydian #9 / Lydian Augmented #2 /
- *     Diminished Half Whole / Augmented Scale），且都在可选列表里。查不到 ⇒ 返回 `undefined`
- *     ⇒ 调用方 `break` ⇒ **当前题永远不推进，也不报错**（表现为「弹对了没反应」）。
- *  ② 兜底表把 `#6` 记成 9，而 `Whole Tone` 与 `Augmented Scale` 里的 `#6` 是 **10**
- *     ⇒ 判定要求弹**低半音**的那个音。比 ① 更隐蔽：练习照常推进，只是判错。
+ * 🚨 为什么必须**优先**对齐表 —— 兜底表结构上不可能完整：它是「音级 → 半音」的固定字典，
+ * 而（a）不同音阶会用别的音阶不用的标签（旧版字典就漏了 `#2`，
+ * 含 `#2` 的 5 个音阶解析成 `undefined` ⇒ 调用方 `break` ⇒ **当前题永远不推进、也不报错**，
+ * 表现为「弹对了没反应」）；（b）同一标签在不同音阶里语义可能不同。对齐表是
+ * 「这个音阶自己怎么定义」，永远是对的。
+ *
+ * 本表已与对齐表**逐项收敛**（`#6` 由 9 改为 10、补 `#2` 与 `bb7`），
+ * 两表一致性由 `__tests__/scale-degree-semitone.test.ts` 的「盲区清单」用例钉住（现已为空）。
  *
  * 返回 `undefined` 表示「这个标签两边都认不出」，调用方应当拒绝推进并告警，而不是当作 0。
  */
@@ -949,16 +980,47 @@ export function generateChordSequence(
 
   // 应用低音音符（旋转序列使指定音级排在最前）
   if (bass && bass !== "root") {
-    const bassDegreeMap: Record<string, string> = {
-      "3rd": "3", "5th": "5", "7th": "7",
-      "b3": "b3", "b5": "b5", "bb7": "bb7", "#5": "#5"
-    }
-    const targetDegree = bassDegreeMap[bass]
-    if (targetDegree) {
-      const bassIdx = sequence.indexOf(targetDegree)
-      if (bassIdx > 0) {
-        sequence = [...sequence.slice(bassIdx), ...sequence.slice(0, bassIdx)]
+    /** 序列里第一个「音高等于给定半音」的音级（同音异名也算），找不到返回 null */
+    const findBySemitone = (semitone: number): string | null =>
+      sequence.find(d => {
+        const s = degreeToSemitone(d)
+        return s !== undefined && s % 12 === semitone % 12
+      }) ?? null
+
+    const wantDegreeNumber = bass === "3rd" ? 3 : bass === "5th" ? 5 : bass === "7th" ? 7 : null
+    let targetDegree: string | null = null
+
+    if (wantDegreeNumber !== null) {
+      // 🚨 不能只按「度数数字」在序列里找（`indexOf('3')` / `'5'` / `'7'`）：
+      // 序列的音级来自**和弦对应音阶**（`getScaleForChord`）—— 小调走 dorian ⇒ 三音是 `b3`、
+      // 属七走 mixolydian ⇒ 七音是 `b7`、减/半减走 locrian ⇒ 五音是 `b5`。
+      // 写死自然音级字面量会让 `indexOf` 恒 **-1**、旋转不生效（用户选了转位却听到原位）。
+      //
+      // 🚨 但「按度数数字找（`b3`/`bb7` 都算）」也还不够：序列的**拼写**与和弦自身的
+      // 音级表未必一致 —— dim7 的减七音（半音 9）在 whole-half 减音阶里写作 `6`，
+      // 按数字找 `7` 依然找不到（减和弦转位仍然失效）。
+      // 故改为：先用**和弦自身的音级表**把 3/5/7 换算成**音高（半音）**，再按音高在序列里定位。
+      const chordDegreeLabel = getChordDegrees(chordType).find(
+        d => parseInt(d.replace(/[^0-9]/g, ""), 10) === wantDegreeNumber
+      )
+      const targetSemitone = chordDegreeLabel === undefined ? undefined : degreeToSemitone(chordDegreeLabel)
+      if (targetSemitone !== undefined) targetDegree = findBySemitone(targetSemitone)
+      // 退路：和弦音级表里没有该度数（如 sus4 没有三音）时，仍按度数数字找一次
+      if (targetDegree === null) {
+        targetDegree = sequence.find(d => parseInt(d.replace(/[^0-9]/g, ""), 10) === wantDegreeNumber) ?? null
       }
+    } else {
+      // bass 已是音级标签本身（如持久化数据里的 'b3'/'b5'/'bb7'/'#5'）：
+      // 同样按**音高**定位，避免「旧数据存的拼写与当前音阶拼写不一致」时静默不转。
+      const semitone = degreeToSemitone(bass)
+      targetDegree = semitone === undefined
+        ? (sequence.includes(bass) ? bass : null)
+        : findBySemitone(semitone)
+    }
+
+    const bassIdx = targetDegree ? sequence.indexOf(targetDegree) : -1
+    if (bassIdx > 0) {
+      sequence = [...sequence.slice(bassIdx), ...sequence.slice(0, bassIdx)]
     }
   }
 

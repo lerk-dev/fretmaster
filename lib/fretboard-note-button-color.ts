@@ -185,8 +185,10 @@ export function getNoteButtonColor(
         if (chordType) {
           const interval = (noteIdx - rootIdx + 12) % 12
           
-          // 检查这个音是否在当前和弦中
-          if (!chordType.intervals.includes(interval)) {
+          // 检查这个音是否在当前和弦中。
+          // 🚨 和弦音程含**复合音程**（9→14、13→21…），interval 恒 0..11 ⇒ 必须各自取模再比，
+          // 否则扩展音（9/11/13 族）永远不亮。与 getNoteDegreeInChord 同一口径。
+          if (!chordType.intervals.some(i => i % 12 === interval)) {
             return "hover:bg-muted/50"
           }
 
@@ -316,7 +318,8 @@ export function getNoteButtonColor(
       if (!chordType) return "hover:bg-muted/50"
 
       const interval = (noteIdx - rootIdx + 12) % 12
-      if (!chordType.intervals.includes(interval)) {
+      // 🚨 同 chord_exercise 分支：和弦音程是复合音程，必须各自取模再比（见上方注释）。
+      if (!chordType.intervals.some(i => i % 12 === interval)) {
         // 不在和弦中的音，只显示 hover 效果
         return "hover:bg-muted/50"
       }
