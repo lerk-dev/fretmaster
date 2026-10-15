@@ -1,4 +1,4 @@
-// 音阶练习控制面板：调性（随机调）· 调式分类 14 类 · 方向 segmented · 根音移动 ·
+// 音阶练习控制面板：调性（随机调）· 调式分类 10 类 · 方向 segmented · 根音移动 ·
 // 显示选项（指板/键盘/结构）· 练习序列 · 音阶类型多选（至少保留一个）
 "use client"
 
@@ -10,6 +10,37 @@ import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { NOTES, SCALE_MODES, SCALE_PRACTICE_SEQUENCES } from '@/lib/page-theory-data'
 import { getScaleDisplayName } from '@/lib/page-theory-functions'
+
+/**
+ * 音阶分类下拉的选项。**这是分类 UI 的唯一真相源** —— 下拉选项与详情区标题都由它生成
+ *（旧写法是「SelectItem 列表 + 15 路三元链标题」两份手写数据，加一个分类要改两处、漏改一处
+ * 就会出现「下拉写着 A、标题写着 B」）。
+ *
+ * 🚨 这里**只列「新分组」**：`SCALE_MODES` 里的 church / minor / bebop / other / jazz
+ * 与这些分组逐条重复（同一音阶在两个分组出现 = 典型「第二真相源」，用户会困惑），已从 UI 下线；
+ * 它们独有的音阶（Bebop Mixolydian / Bebop Minor / Hungarian Minor）已迁入 bebopScales / exotic。
+ * 数据本身保留（存量用户持久化的选择可能仍指向旧键），故组件里用 `resolvedCategory` 兜底。
+ */
+export const SCALE_CATEGORY_OPTIONS: ReadonlyArray<{
+  value: keyof typeof SCALE_MODES
+  /** 下拉选项里的短标签 */
+  labelZh: string
+  labelEn: string
+  /** 详情区标题（比短标签更完整） */
+  titleZh: string
+  titleEn: string
+}> = [
+  { value: 'pentatonic', labelZh: '五声音阶', labelEn: 'Pentatonic', titleZh: '五声音阶', titleEn: 'Pentatonic Scales' },
+  { value: 'majorScaleModes', labelZh: '大调模式', labelEn: 'Major Modes', titleZh: '大调音阶模式', titleEn: 'Major Scale Modes' },
+  { value: 'melodicMinorScaleModes', labelZh: '旋律小调模式', labelEn: 'Melodic Minor Modes', titleZh: '旋律小调模式', titleEn: 'Melodic Minor Scale Modes' },
+  { value: 'harmonicMinorScaleModes', labelZh: '和声小调模式', labelEn: 'Harmonic Minor Modes', titleZh: '和声小调模式', titleEn: 'Harmonic Minor Scale Modes' },
+  { value: 'harmonicMajorScaleModes', labelZh: '和声大调模式', labelEn: 'Harmonic Major Modes', titleZh: '和声大调模式', titleEn: 'Harmonic Major Scale Modes' },
+  { value: 'otherScales', labelZh: '其他音阶', labelEn: 'Other Scales', titleZh: '其他音阶', titleEn: 'Other Scales' },
+  { value: 'bebopScales', labelZh: 'Bebop音阶', labelEn: 'Bebop Scales', titleZh: 'Bebop音阶', titleEn: 'Bebop Scales' },
+  { value: 'exotic', labelZh: '异域音阶', labelEn: 'Exotic', titleZh: '异域音阶', titleEn: 'Exotic Scales' },
+  { value: 'symmetrical', labelZh: '对称音阶', labelEn: 'Symmetrical', titleZh: '对称音阶', titleEn: 'Symmetrical Scales' },
+  { value: 'basic', labelZh: '基础', labelEn: 'Basic', titleZh: '基础音阶', titleEn: 'Basic Scales' },
+]
 
 interface ScaleControlsProps {
   /** 翻译函数 */
@@ -107,6 +138,15 @@ export const ScaleControls = memo(function ScaleControls({
   // 说明它不是安全网，只是冗余（见 `.workbuddy/tmp/mut-3nps.json` 的 M19 记录）。
   // `threeNpsActive` 由页面按「序列是 3nps 且至少有一个七声音阶」算出，取反即所需条件。
   const threeNpsBlocked = !threeNpsActive
+
+  // 🚨 存量用户的 `selectedScaleCategory` 可能指向已从 UI 下线的旧分组
+  //（church / minor / bebop / other / jazz）—— 直接喂给 Radix Select 会让 value 落空、
+  // 触发区显示空白。故兜底回落到首项；数据仍在 SCALE_MODES 里，不会报错。
+  const resolvedCategory = SCALE_CATEGORY_OPTIONS.some((o) => o.value === selectedScaleCategory)
+    ? selectedScaleCategory
+    : SCALE_CATEGORY_OPTIONS[0].value
+  const categoryOption = SCALE_CATEGORY_OPTIONS.find((o) => o.value === resolvedCategory)!
+
   return (
 <div 
   data-onboarding="scale-exercise"
@@ -144,7 +184,7 @@ export const ScaleControls = memo(function ScaleControls({
     {/* 调式分类 */}
     <div className="w-[120px] sm:w-[140px] space-y-0.5">
       <div className="text-2xs text-muted-foreground leading-3">{t('scale_mode')}</div>
-      <Select value={selectedScaleCategory} onValueChange={(v: keyof typeof SCALE_MODES) => {
+      <Select value={resolvedCategory} onValueChange={(v: keyof typeof SCALE_MODES) => {
         onSelectedScaleCategoryChange(v)
         onSelectedScaleChange(SCALE_MODES[v][0])
       }}>
@@ -152,21 +192,11 @@ export const ScaleControls = memo(function ScaleControls({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="pentatonic" className="text-xs">{language === 'zh-CN' ? '五声音阶' : 'Pentatonic'}</SelectItem>
-          <SelectItem value="majorScaleModes" className="text-xs">{language === 'zh-CN' ? '大调模式' : 'Major Modes'}</SelectItem>
-          <SelectItem value="melodicMinorScaleModes" className="text-xs">{language === 'zh-CN' ? '旋律小调模式' : 'Melodic Minor Modes'}</SelectItem>
-          <SelectItem value="harmonicMinorScaleModes" className="text-xs">{language === 'zh-CN' ? '和声小调模式' : 'Harmonic Minor Modes'}</SelectItem>
-          <SelectItem value="harmonicMajorScaleModes" className="text-xs">{language === 'zh-CN' ? '和声大调模式' : 'Harmonic Major Modes'}</SelectItem>
-          <SelectItem value="otherScales" className="text-xs">{language === 'zh-CN' ? '其他音阶' : 'Other Scales'}</SelectItem>
-          <SelectItem value="bebopScales" className="text-xs">{language === 'zh-CN' ? 'Bebop音阶' : 'Bebop Scales'}</SelectItem>
-          <SelectItem value="exotic" className="text-xs">{language === 'zh-CN' ? '异域音阶' : 'Exotic'}</SelectItem>
-          <SelectItem value="symmetrical" className="text-xs">{language === 'zh-CN' ? '对称音阶' : 'Symmetrical'}</SelectItem>
-          <SelectItem value="basic" className="text-xs">{language === 'zh-CN' ? '基础' : 'Basic'}</SelectItem>
-          <SelectItem value="church" className="text-xs">{language === 'zh-CN' ? '教会调式' : 'Church'}</SelectItem>
-          <SelectItem value="minor" className="text-xs">{language === 'zh-CN' ? '小调变体' : 'Minor'}</SelectItem>
-          <SelectItem value="bebop" className="text-xs">{language === 'zh-CN' ? 'Bebop(旧)' : 'Bebop(Old)'}</SelectItem>
-          <SelectItem value="jazz" className="text-xs">{language === 'zh-CN' ? '爵士' : 'Jazz'}</SelectItem>
-          <SelectItem value="other" className="text-xs">{language === 'zh-CN' ? '其他(旧)' : 'Other(Old)'}</SelectItem>
+          {SCALE_CATEGORY_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+              {language === 'zh-CN' ? opt.labelZh : opt.labelEn}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>
@@ -278,26 +308,12 @@ export const ScaleControls = memo(function ScaleControls({
     <div className="bg-card/30 rounded-md p-2 border border-border/30 flex-1 min-w-0">
       <div className="flex items-center justify-between mb-1.5">
         <div className="text-2xs text-muted-foreground leading-3">
-          {selectedScaleCategory === 'pentatonic' ? (language === 'zh-CN' ? '五声音阶' : 'Pentatonic Scales') :
-           selectedScaleCategory === 'majorScaleModes' ? (language === 'zh-CN' ? '大调音阶模式' : 'Major Scale Modes') :
-           selectedScaleCategory === 'melodicMinorScaleModes' ? (language === 'zh-CN' ? '旋律小调模式' : 'Melodic Minor Scale Modes') :
-           selectedScaleCategory === 'harmonicMinorScaleModes' ? (language === 'zh-CN' ? '和声小调模式' : 'Harmonic Minor Scale Modes') :
-           selectedScaleCategory === 'harmonicMajorScaleModes' ? (language === 'zh-CN' ? '和声大调模式' : 'Harmonic Major Scale Modes') :
-           selectedScaleCategory === 'otherScales' ? (language === 'zh-CN' ? '其他音阶' : 'Other Scales') :
-           selectedScaleCategory === 'bebopScales' ? (language === 'zh-CN' ? 'Bebop音阶' : 'Bebop Scales') :
-           selectedScaleCategory === 'basic' ? (language === 'zh-CN' ? '基础音阶' : 'Basic Scales') :
-           selectedScaleCategory === 'church' ? (language === 'zh-CN' ? '教会调式' : 'Church Modes') :
-           selectedScaleCategory === 'minor' ? (language === 'zh-CN' ? '小调变体' : 'Minor Variants') :
-           selectedScaleCategory === 'bebop' ? (language === 'zh-CN' ? 'Bebop音阶(旧)' : 'Bebop Scales(Old)') :
-           selectedScaleCategory === 'jazz' ? (language === 'zh-CN' ? '爵士音阶' : 'Jazz Scales') :
-           selectedScaleCategory === 'exotic' ? (language === 'zh-CN' ? '异域音阶' : 'Exotic Scales') :
-           selectedScaleCategory === 'symmetrical' ? (language === 'zh-CN' ? '对称音阶' : 'Symmetrical Scales') :
-           (language === 'zh-CN' ? '其他音阶(旧)' : 'Other Scales(Old)')}
+          {language === 'zh-CN' ? categoryOption.titleZh : categoryOption.titleEn}
           <span className="ml-1 text-3xs text-muted-foreground/70">({t('multi_select_hint')})</span>
         </div>
       </div>
       <div className="flex flex-wrap gap-1">
-        {SCALE_MODES[selectedScaleCategory].map((scale) => (
+        {SCALE_MODES[resolvedCategory].map((scale) => (
           <Button
             key={scale.name}
             variant={selectedScales.some(s => s.name === scale.name) ? "default" : "outline"}

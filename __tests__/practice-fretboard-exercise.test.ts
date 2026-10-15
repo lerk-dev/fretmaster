@@ -553,10 +553,13 @@ describe('经典皮肤与共享真相源（GuitarRun 用的 resolveFretCellRole�
       }
     }
     expect(pairs).toBe(532)
-    // 🚨 证据：手写兜底表在 **53 对 / 29 个音阶**上与音阶自带标签不同 ⇒「优先自带表」不是可有可无的偏好。
+    // 🚨 证据：手写兜底表在 **59 对 / 35 个音阶**上与音阶自带标签不同 ⇒「优先自带表」不是可有可无的偏好。
+    //    （2026-10-15 由 53 对 / 29 个音阶重算：本次把「同一中文显示名却两种音级拼写」的条目收敛，
+    //      涉及 `Altered`/`Augmented`/`Half-Whole`/`Whole-Half Diminished` 等，
+    //      它们改用升号侧拼法后与兜底表（降号侧）的差异对数增加 —— 条目数仍是 76、对数仍是 532。）
     // 这条同时是「把 scaleDegreeLabel 改成只用兜底表」这类改动的护栏 —— 上一条差分用例抓不到它
     // （两边会同向变错、仍然相等），只有这里对**音阶数据本身**做断言才咬得住。
-    expect(differentFromFallback).toBe(53)
+    expect(differentFromFallback).toBe(59)
   })
 
   it('全部 tab × isPlaying 两态：经典皮肤屏幕上的字 = resolveFretCellRole 的结论', () => {

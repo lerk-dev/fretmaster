@@ -16,6 +16,7 @@ import {
   NOTES_FLAT,
   DEGREE_TO_SEMITONE,
   CHORD_TYPES,
+  DISPLAY_NAMES,
   INTERVALS,
   SCALE_MODES,
   SCALE_PRACTICE_SEQUENCES,
@@ -183,9 +184,11 @@ describe('度数映射表的一致性', () => {
       }
     }
     expect(diffs, diffs.join(' | ')).toEqual([])
-    // 反向：data 里多出的键应恰好是这两个（各自用于不同场景）
+    // 反向：data 里多出的键应恰好是这 3 个（各自用于不同场景）
+    // `b4` 于 2026-10-15 补入：`scale-theory.SCALE_INTERVAL_DISPLAY[alteredDominantFlatFlat7]`
+    // 用它当第 4 个音级，缺键会让「音级 → 半音」查表返回 undefined。
     const onlyData = Object.keys(DEGREE_TO_SEMITONE).filter(k => !(k in intervalToSemitones)).sort()
-    expect(onlyData).toEqual(['#2', 'maj7'])
+    expect(onlyData).toEqual(['#2', 'b4', 'maj7'])
   })
 
   it('两套「延伸音表示」在取模 12 后一致（单八度派 vs 含八度派）', () => {
@@ -223,5 +226,101 @@ describe('SCALE_PRACTICE_SEQUENCES', () => {
 
   it('包含 random 项（UI 用 id==="random" 分支处理）', () => {
     expect(SCALE_PRACTICE_SEQUENCES.some(s => s.id === 'random')).toBe(true)
+  })
+})
+
+/**
+ * #9 「第二真相源」护栏：同一个音阶在多个分组里重复定义时，**必须逐字一致**。
+ *
+ * 背景：历史上有 76 条音阶分布在 15 个分组里，同一个音阶（如 `Bebop Dorian`、
+ * `Altered`、`Hungarian Minor`）在新旧分组各有一份。两份数据的 `notes`/`intervals`
+ * 一旦分叉，界面按分组选出来的音阶就会与「和弦→音阶」推导出的音阶不是同一个东西，
+ * 而两处都「能跑」—— 不报错、只画错。
+ *
+ * 本轮的处理是「只从 UI 下线旧分组、**不从数据删除**」（存量用户的持久化
+ * `selectedScaleCategory` 可能仍指向旧分组键，删数据会让它读到 undefined）。
+ * 故这里同时钉住两件事：旧分组键仍在、且同名条目已收敛为一份。
+ */
+describe('#9 同名音阶跨分组必须逐字一致（收敛「第二真相源」）', () => {
+  const GROUPS = Object.entries(SCALE_MODES) as Array<
+    [string, Array<{ name: string; notes: number[]; intervals: string[] }>]
+  >
+
+  /** name → 该名字在各分组的全部定义 */
+  const byName = new Map<string, Array<{ group: string; notes: number[]; intervals: string[] }>>()
+  for (const [group, entries] of GROUPS) {
+    for (const entry of entries) {
+      const list = byName.get(entry.name) ?? []
+      list.push({ group, notes: entry.notes, intervals: entry.intervals })
+      byName.set(entry.name, list)
+    }
+  }
+
+  it('每个同名的多份定义，intervals 与 notes 完全相同', () => {
+    const failures: string[] = []
+    for (const [name, defs] of byName) {
+      if (defs.length < 2) continue
+      const first = defs[0]
+      for (const def of defs.slice(1)) {
+        if (JSON.stringify(def.intervals) !== JSON.stringify(first.intervals) ||
+            JSON.stringify(def.notes) !== JSON.stringify(first.notes)) {
+          failures.push(
+            `${name}: [${first.group}] ${first.intervals.join(' ')} vs [${def.group}] ${def.intervals.join(' ')}`,
+          )
+        }
+      }
+    }
+    expect(failures, '同名音阶在不同分组里定义不一致').toEqual([])
+  })
+
+  it('确实存在跨分组重名（否则上面那条断言恒真，等于没测）', () => {
+    const duplicated = [...byName.entries()].filter(([, defs]) => defs.length > 1).map(([name]) => name)
+    expect(duplicated.length, '没有任何重名音阶 ⇒ 护栏退化为空转').toBeGreaterThan(0)
+  })
+
+  it('已从 UI 下线的旧分组仍保留在数据里（删了会让存量用户的分类键读到 undefined）', () => {
+    for (const retired of ['church', 'minor', 'other', 'bebop', 'jazz']) {
+      expect(Object.keys(SCALE_MODES), `旧分组 ${retired} 被删了`).toContain(retired)
+    }
+  })
+})
+
+/**
+ * #10 `DISPLAY_NAMES` 四段的 `scaleTypes` 键集合必须一致且**覆盖全部音阶名**。
+ *
+ * 修前的实际状态：`chinese` 60 键、`english`/`english_short`/`jazz` 各 57 键，
+ * 且四段**都缺** `Diminished`。而消费方 `getScaleDisplayName` 是
+ * `scaleTypes[scaleName] || scaleName` —— **缺键即回退成英文键名**
+ *（项目铁律 1 的实例），中文界面会直接漏出 `Diminished` 这种原料键。
+ */
+describe('#10 DISPLAY_NAMES 四段的 scaleTypes 必须同集合且全覆盖', () => {
+  const SEGMENTS = ['chinese', 'english', 'english_short', 'jazz'] as const
+  const keysOf = (seg: typeof SEGMENTS[number]) =>
+    Object.keys((DISPLAY_NAMES[seg] as { scaleTypes: Record<string, string> }).scaleTypes).sort()
+
+  const allScaleNames = [...new Set(
+    Object.values(SCALE_MODES).flat().map((s) => (s as { name: string }).name),
+  )].sort()
+
+  it('四段的键集合完全相同', () => {
+    const base = keysOf('chinese')
+    for (const seg of SEGMENTS.slice(1)) {
+      expect(keysOf(seg), `DISPLAY_NAMES.${seg}.scaleTypes 与 chinese 不一致`).toEqual(base)
+    }
+  })
+
+  it('覆盖 SCALE_MODES 里出现的每一个音阶名（不留任何回退成键名的机会）', () => {
+    for (const seg of SEGMENTS) {
+      const missing = allScaleNames.filter((n) => !keysOf(seg).includes(n))
+      expect(missing, `DISPLAY_NAMES.${seg} 缺这些音阶的译文`).toEqual([])
+    }
+  })
+
+  it('没有空译文（空串同样会渲染成「看不见的标签」）', () => {
+    for (const seg of SEGMENTS) {
+      const table = (DISPLAY_NAMES[seg] as { scaleTypes: Record<string, string> }).scaleTypes
+      const empties = Object.entries(table).filter(([, v]) => !v || !v.trim()).map(([k]) => k)
+      expect(empties, `DISPLAY_NAMES.${seg} 有空译文`).toEqual([])
+    }
   })
 })

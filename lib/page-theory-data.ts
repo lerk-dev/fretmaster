@@ -5,6 +5,9 @@ export const NOTES_FLAT = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A�
 
 export const DEGREE_TO_SEMITONE: Record<string, number> = {
   "1": 0, "b2": 1, "2": 2, "#2": 3, "b3": 3, "3": 4, "4": 5,
+  // 🚨 补 `b4`：`scale-theory.SCALE_INTERVAL_DISPLAY[alteredDominantFlatFlat7]` 用它当第 4 个音级
+  // （= 4 半音，与 `3` 同音高），缺键会让「音级 → 半音」查表返回 undefined。
+  "b4": 4,
   "#4": 6, "b5": 6, "5": 7, "#5": 8, "b6": 8, "6": 9,
   "#6": 10, "b7": 10, "7": 11, "maj7": 11, "bb7": 9,
   "b9": 1, "9": 2, "#9": 3, "b13": 8, "13": 9, "11": 5, "#11": 6
@@ -48,7 +51,10 @@ export const CHORD_TYPES = [
   { name: "7b5b9", intervals: [0, 4, 6, 10, 13], symbol: "7♭5♭9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
   { name: "7b5#9", intervals: [0, 4, 6, 10, 15], symbol: "7♭5♯9", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
   { name: "7b9b13", intervals: [0, 4, 7, 10, 13, 20], symbol: "7♭9♭13", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
-  { name: "7alt", intervals: [0, 4, 8, 10, 13, 15, 20], symbol: "7alt", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
+  // 🚨 7alt = 1 3 ♭7 ♭9 ♯9 ♯11 ♭13（`chord-theory.ts` 的 CHORD_INTERVALS 同值）。
+  // 旧值 [0,4,8,10,13,15,20] 同时含 8(♯5) 与 20(♭13) —— 8 % 12 == 20 % 12 ⇒ **同一音高写了两遍**，
+  // 且缺 18(♯11)。改为与权威实现一致：去掉 ♯5、补回 ♯11。
+  { name: "7alt", intervals: [0, 4, 10, 13, 15, 18, 20], symbol: "7alt", group: "dominant", groupName: "Dominant 7th", groupZh: "属七和弦" },
   
   // 属九和弦类 (4种)
   { name: "9", intervals: [0, 4, 7, 10, 14], symbol: "9", group: "dominant9", groupName: "Dominant 9th", groupZh: "属九和弦" },
@@ -188,7 +194,10 @@ export const SCALE_MODES = {
   otherScales: [
     { name: "Blues", notes: [0, 3, 5, 6, 7, 10], intervals: ["1", "b3", "4", "#4", "5", "b7"], formula: "1 b3 4 #4 5 b7" },
     { name: "Major Blues", notes: [0, 2, 3, 4, 7, 9], intervals: ["1", "2", "b3", "3", "5", "6"], formula: "1 2 b3 3 5 6" },
-    { name: "Diminished Half Whole", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "#2", "3", "b5", "5", "6", "b7"], formula: "1 b2 #2 3 b5 5 6 b7" },
+    // 🚨 #17：显示名与 `jazz.Half-Whole Diminished` / `other.Diminished` 同为「半全减音阶」，
+    // 但这里写 `b5` 而那两处写 `#4`（同半音 6）⇒ 同名音阶两种读法。
+    // 统一到 `#4`（与 `scale-theory.SCALE_INTERVAL_DISPLAY[diminishedHalfWhole]` 一致）。
+    { name: "Diminished Half Whole", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "#2", "3", "#4", "5", "6", "b7"], formula: "1 b2 #2 3 #4 5 6 b7" },
     { name: "Diminished Whole Half", notes: [0, 2, 3, 5, 6, 8, 9, 11], intervals: ["1", "2", "b3", "4", "b5", "#5", "6", "7"], formula: "1 2 b3 4 b5 #5 6 7" },
     { name: "Whole Tone", notes: [0, 2, 4, 6, 8, 10], intervals: ["1", "2", "3", "#4", "#5", "#6"], formula: "1 2 3 #4 #5 #6" },
     { name: "Augmented Scale", notes: [0, 3, 4, 7, 8, 11], intervals: ["1", "#2", "3", "5", "#5", "7"], formula: "1 #2 3 5 #5 7" },
@@ -199,7 +208,18 @@ export const SCALE_MODES = {
     { name: "Bebop Dom7b9b13", notes: [0, 1, 4, 5, 7, 8, 10, 11], intervals: ["1", "b2", "3", "4", "5", "b6", "b7", "7"], formula: "1 b2 3 4 5 b6 b7 7" },
     { name: "Bebop Tonic Minor Melodic", notes: [0, 2, 3, 5, 7, 8, 9, 11], intervals: ["1", "2", "b3", "4", "5", "b6", "6", "7"], formula: "1 2 b3 4 5 b6 6 7" },
     { name: "Bebop Tonic Minor Dorian", notes: [0, 2, 3, 5, 7, 8, 9, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "6", "b7"], formula: "1 2 b3 4 5 b6 6 b7" },
-    { name: "Bebop Dorian", notes: [0, 2, 3, 5, 7, 9, 10, 11], intervals: ["1", "2", "b3", "4", "5", "6", "b7", "7"], formula: "1 2 b3 4 5 6 b7 7" },
+    // 🚨 修前是 [0,2,3,5,7,9,10,11]（Dorian + ♮7），与同名旧分组条目 `bebop` 的
+    // [0,2,3,4,5,7,9,10]（Dorian + ♮3）**音高集合不同** —— 标准 Bebop Dorian 是后者
+    // （在 ♭3 与 4 之间插入 ♮3 作经过音），前者没有标准名字。统一到后者。
+    { name: "Bebop Dorian", notes: [0, 2, 3, 4, 5, 7, 9, 10], intervals: ["1", "2", "b3", "3", "4", "5", "6", "b7"], formula: "1 2 b3 3 4 5 6 b7" },
+    // 由 `bebop` 旧分组迁入（该分组已从 UI 下线）—— 这条是新分组里独有的音阶。
+    { name: "Bebop Mixolydian", notes: [0, 2, 4, 5, 7, 9, 10, 11], intervals: ["1", "2", "3", "4", "5", "6", "b7", "7"], formula: "1 2 3 4 5 6 b7 7" },
+    // 🚨 #17 + #9：迁移时直接照搬了旧分组的值 [0,2,3,5,7,8,9,10]，而它与本组已有的
+    // `Bebop Tonic Minor Dorian` **逐字重复**（同名音阶两条定义 ⇒ 第二真相源），
+    // 且与 `scale-theory.SCALE_INTERVAL_DISPLAY[bebopMinor]`（显示名同为「Bebop小调」）
+    // 的音高集合 [0,2,3,5,7,8,10,11] 不一致 —— 同一名字在两处是两个音阶。
+    // 按 David Baker 的定义，Bebop Minor = 自然小调 + ♮7（即本条下方的新值）。
+    { name: "Bebop Minor", notes: [0, 2, 3, 5, 7, 8, 10, 11], intervals: ["1", "2", "b3", "4", "5", "b6", "b7", "7"], formula: "1 2 b3 4 5 b6 b7 7" },
   ],
   exotic: [
     { name: "Japanese", notes: [0, 1, 5, 7, 10], intervals: ["1", "b2", "4", "5", "b7"], formula: "1 b2 4 5 b7" },
@@ -207,10 +227,16 @@ export const SCALE_MODES = {
     { name: "Spanish Phrygian", notes: [0, 1, 4, 5, 7, 8, 10], intervals: ["1", "b2", "3", "4", "5", "b6", "b7"], formula: "1 b2 3 4 5 b6 b7" },
     { name: "Hijaz", notes: [0, 1, 4, 5, 7, 8, 10], intervals: ["1", "b2", "3", "4", "5", "b6", "b7"], formula: "1 b2 3 4 5 b6 b7" },
     { name: "Double Harmonic", notes: [0, 1, 4, 5, 7, 8, 11], intervals: ["1", "b2", "3", "4", "5", "b6", "7"], formula: "1 b2 3 4 5 b6 7" },
+    // 由 `jazz` 旧分组迁入（该分组已从 UI 下线）—— 这条是新分组里独有的音阶。
+    { name: "Hungarian Minor", notes: [0, 2, 3, 6, 7, 8, 11], intervals: ["1", "2", "b3", "#4", "5", "b6", "7"], formula: "1 2 b3 #4 5 b6 7" },
   ],
   symmetrical: [
     { name: "Chromatic", notes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], intervals: ["1", "b2", "2", "b3", "3", "4", "b5", "5", "b6", "6", "b7", "7"], formula: "1 b2 2 b3 3 4 b5 5 b6 6 b7 7" },
-    { name: "Augmented", notes: [0, 3, 4, 7, 8, 11], intervals: ["1", "b3", "3", "5", "b6", "7"], formula: "1 b3 3 5 b6 7" },
+    // 🚨 #17：本条与 `otherScales.'Augmented Scale'` 是**同一个音高集合** [0,3,4,7,8,11]，
+    // 中文显示名也都是「增音阶」，但音级标签一个写 `b3 3 5 b6 7`、一个写 `#2 3 5 #5 7`
+    // ⇒ 用户在两个分组里选到同一音阶却看到两种读法（报告点名的原始缺陷）。
+    // 统一到增音阶的规范拼法 `1 #2 3 5 #5 7`（= 两个增三和弦 1-3-#5 + #1-#3-##5 叠置）。
+    { name: "Augmented", notes: [0, 3, 4, 7, 8, 11], intervals: ["1", "#2", "3", "5", "#5", "7"], formula: "1 #2 3 5 #5 7" },
     { name: "Tritone", notes: [0, 1, 4, 6, 7, 10], intervals: ["1", "b2", "3", "b5", "5", "b7"], formula: "1 b2 3 b5 5 b7" },
   ],
   basic: [
@@ -226,6 +252,14 @@ export const SCALE_MODES = {
     { name: "Aeolian", notes: [0, 2, 3, 5, 7, 8, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "b7"], formula: "1 2 b3 4 5 b6 b7" },
     { name: "Locrian", notes: [0, 1, 3, 5, 6, 8, 10], intervals: ["1", "b2", "b3", "4", "b5", "b6", "b7"], formula: "1 b2 b3 4 b5 b6 b7" },
   ],
+  // ⚠️ 下面 4 个分组（minor / other / bebop / jazz）以及上面的 church 已**从 UI 下拉下线**
+  // ——它们与「新分组」（majorScaleModes / harmonicMinorScaleModes / melodicMinorScaleModes /
+  // otherScales / bebopScales / exotic …）逐条重复，曾是典型「第二真相源」：
+  // 用户在两个分组里选到同一音阶却看到不同音级。
+  // 之所以**只从 UI 下线、不从数据删除**：存量用户的 `scalePractice.selectedScaleCategory`
+  // 可能仍指向这些键，删掉会让下拉落空。它们独有的音阶已迁入新分组
+  // （Bebop Mixolydian / Bebop Minor → bebopScales，Hungarian Minor → exotic），故零信息损失。
+  // 同名一致性由 __tests__/page-theory-data.test.ts 的护栏钉住。
   minor: [
     { name: "Harmonic Minor", notes: [0, 2, 3, 5, 7, 8, 11], intervals: ["1", "2", "b3", "4", "5", "b6", "7"], formula: "1 2 b3 4 5 b6 7" },
     { name: "Melodic Minor", notes: [0, 2, 3, 5, 7, 9, 11], intervals: ["1", "2", "b3", "4", "5", "6", "7"], formula: "1 2 b3 4 5 6 7" },
@@ -233,21 +267,18 @@ export const SCALE_MODES = {
   other: [
     { name: "Blues", notes: [0, 3, 5, 6, 7, 10], intervals: ["1", "b3", "4", "#4", "5", "b7"], formula: "1 b3 4 #4 5 b7" },
     { name: "Whole Tone", notes: [0, 2, 4, 6, 8, 10], intervals: ["1", "2", "3", "#4", "#5", "#6"], formula: "1 2 3 #4 #5 #6" },
-    { name: "Diminished", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "b3", "3", "#4", "5", "6", "b7"], formula: "1 b2 b3 3 #4 5 6 b7" },
+    { name: "Diminished", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "#2", "3", "#4", "5", "6", "b7"], formula: "1 b2 #2 3 #4 5 6 b7" },
   ],
   bebop: [
     { name: "Bebop Major", notes: [0, 2, 4, 5, 7, 8, 9, 11], intervals: ["1", "2", "3", "4", "5", "b6", "6", "7"], formula: "1 2 3 4 5 b6 6 7" },
     { name: "Bebop Dorian", notes: [0, 2, 3, 4, 5, 7, 9, 10], intervals: ["1", "2", "b3", "3", "4", "5", "6", "b7"], formula: "1 2 b3 3 4 5 6 b7" },
-    { name: "Bebop Mixolydian", notes: [0, 2, 4, 5, 7, 9, 10, 11], intervals: ["1", "2", "3", "4", "5", "6", "b7", "7"], formula: "1 2 3 4 5 6 b7 7" },
-    { name: "Bebop Minor", notes: [0, 2, 3, 5, 7, 8, 9, 10], intervals: ["1", "2", "b3", "4", "5", "b6", "6", "b7"], formula: "1 2 b3 4 5 b6 6 b7" },
   ],
   jazz: [
     { name: "Lydian Dominant", notes: [0, 2, 4, 6, 7, 9, 10], intervals: ["1", "2", "3", "#4", "5", "6", "b7"], formula: "1 2 3 #4 5 6 b7" },
-    { name: "Altered", notes: [0, 1, 3, 4, 6, 8, 10], intervals: ["1", "b2", "b3", "3", "b5", "b6", "b7"], formula: "1 b2 b3 3 b5 b6 b7" },
-    { name: "Half-Whole Diminished", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "b3", "3", "#4", "5", "6", "b7"], formula: "1 b2 b3 3 #4 5 6 b7" },
-    { name: "Whole-Half Diminished", notes: [0, 2, 3, 5, 6, 8, 9, 11], intervals: ["1", "2", "b3", "4", "b5", "b6", "6", "7"], formula: "1 2 b3 4 b5 b6 6 7" },
+    { name: "Altered", notes: [0, 1, 3, 4, 6, 8, 10], intervals: ["1", "b2", "#2", "3", "b5", "#5", "b7"], formula: "1 b2 #2 3 b5 #5 b7" },
+    { name: "Half-Whole Diminished", notes: [0, 1, 3, 4, 6, 7, 9, 10], intervals: ["1", "b2", "#2", "3", "#4", "5", "6", "b7"], formula: "1 b2 #2 3 #4 5 6 b7" },
+    { name: "Whole-Half Diminished", notes: [0, 2, 3, 5, 6, 8, 9, 11], intervals: ["1", "2", "b3", "4", "b5", "#5", "6", "7"], formula: "1 2 b3 4 b5 #5 6 7" },
     { name: "Harmonic Major", notes: [0, 2, 4, 5, 7, 8, 11], intervals: ["1", "2", "3", "4", "5", "b6", "7"], formula: "1 2 3 4 5 b6 7" },
-    { name: "Hungarian Minor", notes: [0, 2, 3, 6, 7, 8, 11], intervals: ["1", "2", "b3", "#4", "5", "b6", "7"], formula: "1 2 b3 #4 5 b6 7" },
   ],
 }
 
@@ -360,8 +391,10 @@ export const DISPLAY_NAMES = {
       "Altered": "变化音阶",
       "Half-Whole Diminished": "半全减音阶",
       "Whole-Half Diminished": "全半减音阶",
-      "Diminished Half Whole": "减音阶半全",
-      "Diminished Whole Half": "减音阶全半",
+      // 🚨 减音阶曾有 4 种措辞（半全减音阶 / 全半减音阶 / 减音阶半全 / 减音阶全半），
+      // 同一音阶在不同分组里读起来像两种东西 ⇒ 统一为「半全减音阶 / 全半减音阶」。
+      "Diminished Half Whole": "半全减音阶",
+      "Diminished Whole Half": "全半减音阶",
       "Harmonic Major": "和声大调",
       "Hungarian Minor": "匈牙利小调",
       "Japanese": "日本音阶",
@@ -397,7 +430,11 @@ export const DISPLAY_NAMES = {
       "Bebop Tonic Minor Dorian": "Bebop主小调(多利亚)",
       "Bebop Tonic Minor Melodic": "Bebop主小调(旋律)",
       "Bebop Mixolydian": "Bebop混合利底亚",
-      "Bebop Minor": "Bebop小调"
+      "Bebop Minor": "Bebop小调",
+      // 🚨 四段都必须有这个键：SCALE_MODES.other 组里有个音阶就叫 "Diminished"，
+      // 而 getScaleDisplayName 缺键时会**原样返回英文键名**（项目铁律 1 的实例）⇒
+      // 中文界面会漏出 "Diminished"。护栏见 __tests__/page-theory-data.test.ts。
+      "Diminished": "减音阶"
     }
   },
   "english": {
@@ -530,7 +567,11 @@ export const DISPLAY_NAMES = {
       "Bebop Dorian": "Bebop Dorian",
       "Bebop Tonic Minor": "Bebop Tonic Minor",
       "Bebop Dom7b9b13": "Bebop Dom7b9b13",
-      "Bebop Tonic Minor Dorian": "Bebop Tonic Minor (Dorian)"
+      "Bebop Tonic Minor Dorian": "Bebop Tonic Minor (Dorian)",
+      "Bebop Tonic Minor Melodic": "Bebop Tonic Minor (Melodic)",
+      "Bebop Mixolydian": "Bebop Mixolydian",
+      "Bebop Minor": "Bebop Minor",
+      "Diminished": "Diminished"
     }
   },
   "english_short": {
@@ -663,7 +704,11 @@ export const DISPLAY_NAMES = {
       "Bebop Dorian": "Bebop Dor",
       "Bebop Tonic Minor": "Bebop Ton Min",
       "Bebop Dom7b9b13": "Bebop Dom7b9b13",
-      "Bebop Tonic Minor Dorian": "Bebop Ton Min (Dor)"
+      "Bebop Tonic Minor Dorian": "Bebop Ton Min (Dor)",
+      "Bebop Tonic Minor Melodic": "Bebop Ton Min (Mel)",
+      "Bebop Mixolydian": "Bebop Mix",
+      "Bebop Minor": "Bebop Min",
+      "Diminished": "Diminished"
     }
   },
   "jazz": {
@@ -796,7 +841,11 @@ export const DISPLAY_NAMES = {
       "Bebop Dorian": "Bebop Dor",
       "Bebop Tonic Minor": "Bebop Ton Min",
       "Bebop Dom7b9b13": "Bebop Dom7b9b13",
-      "Bebop Tonic Minor Dorian": "Bebop Ton Min (Dor)"
+      "Bebop Tonic Minor Dorian": "Bebop Ton Min (Dor)",
+      "Bebop Tonic Minor Melodic": "Bebop Ton Min (Mel)",
+      "Bebop Mixolydian": "Bebop Mix",
+      "Bebop Minor": "Bebop Min",
+      "Diminished": "Diminished"
     }
   }
 }

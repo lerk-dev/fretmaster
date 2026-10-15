@@ -71,6 +71,15 @@ export const SCALE_INTERVALS: Record<ScaleType, number[]> = {
 }
 
 // ==================== 音阶显示名称 ====================
+/**
+ * 音阶显示名。**用途分工**（避免与 `page-theory-data.DISPLAY_NAMES.*.scaleTypes` 混淆）：
+ *  - 本表是**紧凑短名**（`大调` / `多利亚`），给空间受限的上下文用：把位/caged 迷你图、
+ *    和弦音阶选择器（theory-panel 的 chordscale tab）；
+ *  - `DISPLAY_NAMES.*.scaleTypes` 是**完整名**（`大调音阶` / `多利亚调式`），
+ *    给音阶练习下拉、调式图鉴用。
+ * 二者键空间不同（这里是 ScaleType 枚举，那边是音阶名字符串），**不要求逐字相同**；
+ * 但同一概念的措辞必须能对上（见 `__tests__/scale-display-names.test.ts` 的对应关系用例）。
+ */
 export const SCALE_DISPLAY_NAMES: Record<ScaleType, { standard: string; unicode: string; chinese: string }> = {
   [ScaleType.major]: { standard: 'Major', unicode: 'Major', chinese: '大调' },
   [ScaleType.naturalMinor]: { standard: 'Natural Minor', unicode: 'Natural Minor', chinese: '自然小调' },
@@ -90,8 +99,10 @@ export const SCALE_DISPLAY_NAMES: Record<ScaleType, { standard: string; unicode:
   [ScaleType.phrygianDominant]: { standard: 'Phrygian Dominant', unicode: 'Phrygian Dominant', chinese: '弗里几亚属' },
   [ScaleType.altered]: { standard: 'Altered', unicode: 'Altered', chinese: '变化音阶' },
   [ScaleType.alteredDominantFlatFlat7]: { standard: 'Altered Dominant bb7', unicode: 'Altered Dominant 𝄫7', chinese: '变化属音阶bb7' },
-  [ScaleType.diminishedHalfWhole]: { standard: 'Diminished H/W', unicode: 'Diminished H/W', chinese: '减音阶(半全)' },
-  [ScaleType.diminishedWholeHalf]: { standard: 'Diminished W/H', unicode: 'Diminished W/H', chinese: '减音阶(全半)' },
+  // 🚨 减音阶的中文措辞必须与 DISPLAY_NAMES 统一为「半全/全半减音阶」——
+  // 此前这里是「减音阶(半全)」、DISPLAY_NAMES 又是「减音阶半全」，同一音阶有 4 种写法。
+  [ScaleType.diminishedHalfWhole]: { standard: 'Diminished H/W', unicode: 'Diminished H/W', chinese: '半全减音阶' },
+  [ScaleType.diminishedWholeHalf]: { standard: 'Diminished W/H', unicode: 'Diminished W/H', chinese: '全半减音阶' },
   [ScaleType.wholeTone]: { standard: 'Whole Tone', unicode: 'Whole Tone', chinese: '全音阶' },
   [ScaleType.majorPentatonic]: { standard: 'Major Pentatonic', unicode: 'Major Pentatonic', chinese: '大调五声' },
   [ScaleType.minorPentatonic]: { standard: 'Minor Pentatonic', unicode: 'Minor Pentatonic', chinese: '小调五声' },
@@ -121,7 +132,13 @@ export const SCALE_INTERVAL_DISPLAY: Record<ScaleType, string[]> = {
   [ScaleType.lydianAugmented]: ['1', '2', '3', '#4', '#5', '6', '7'],
   [ScaleType.lydianDominant]: ['1', '2', '3', '#4', '5', '6', 'b7'],
   [ScaleType.phrygianDominant]: ['1', 'b2', '3', '4', '5', 'b6', 'b7'],
-  [ScaleType.altered]: ['1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'],
+  // 🚨 #17：本表是「音级拼写」的**紧凑真相源**（把位教学 / CAGED 迷你图用）。
+  // `altered` 旧值为 ['1','b2','b3','b4','b5','b6','b7'] —— 与 `SCALE_MODES` 里同中文名
+  // 「变化音阶」的两条（melodicMinorScaleModes.Altered / jazz.Altered）的 `#2 3 b5 #5 b7`
+  // 拼法不同 ⇒ 把位 tab 显示 ♭3/♭4/♭6、调式图鉴显示 ♯2/♮3/♯5，同一音阶两种读法。
+  // 收敛到后者（两处显示名相同 ⇒ 必须逐字一致，护栏见 __tests__/scale-display-names.test.ts）。
+  // 顺带避开 `b4`：`degreeToSemitone()` 不认它，会让 `getScaleNoteNames` 返回空音名。
+  [ScaleType.altered]: ['1', 'b2', '#2', '3', 'b5', '#5', 'b7'],
   [ScaleType.alteredDominantFlatFlat7]: ['1', 'b2', 'b3', 'b4', 'b5', 'b6', 'bb7'],
   [ScaleType.diminishedHalfWhole]: ['1', 'b2', '#2', '3', '#4', '5', '6', 'b7'],
   [ScaleType.diminishedWholeHalf]: ['1', '2', 'b3', '4', 'b5', '#5', '6', '7'],
@@ -132,7 +149,11 @@ export const SCALE_INTERVAL_DISPLAY: Record<ScaleType, string[]> = {
   [ScaleType.bebopDominant]: ['1', '2', '3', '4', '5', '6', 'b7', '7'],
   [ScaleType.bebopMajor]: ['1', '2', '3', '4', '5', 'b6', '6', '7'],
   [ScaleType.bebopMinor]: ['1', '2', 'b3', '4', '5', 'b6', 'b7', '7'],
-  [ScaleType.lydianSharp9]: ['1', '#9', '3', '#4', '5', '6', '7'],
+  // 🚨 #17：`#9` 是**复合音程**（♯9 = 15 半音），拿它当音阶的**音级**标签是错的
+  // （同 #1「复合音程 vs 取模音程」）；`SCALE_MODES` 里同中文名「利底亚#9」的
+  // harmonicMinorScaleModes.'Lydian #9' 写的是 `#2`。且本表的 `notes` 是 [0,3,4,6,7,9,11]，
+  // 第 2 个音相对根音 3 个半音 = ♯2（不是 ♯9）。
+  [ScaleType.lydianSharp9]: ['1', '#2', '3', '#4', '5', '6', '7'],
   [ScaleType.mixolydianFlat6]: ['1', '2', '3', '4', '5', 'b6', 'b7'],
 }
 
@@ -216,7 +237,7 @@ export interface Key {
 
 export function getScaleNotes(rootNote: Note, scaleType: ScaleType): Note[] {
   const intervals = SCALE_INTERVALS[scaleType] ?? []
-  return intervals.map(interval => noteFromToneId(rootNote + interval, false))
+  return intervals.map(interval => noteFromToneId(rootNote + interval))
 }
 
 export function getScaleDisplayName(scaleType: ScaleType, useUnicode: boolean = true, language: 'zh' | 'en' = 'zh'): string {

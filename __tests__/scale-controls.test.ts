@@ -386,6 +386,9 @@ describe('下拉框：三个 Select 的 onValueChange（此前零覆盖）', () 
  * ⇒ 用「完整文本精确相等」比对，contains 会让「其他音阶(旧)」冒充「其他音阶」。
  */
 describe('内联译文矩阵（分类标题 + 下拉选项名）', () => {
+  /** 已从 UI 下线的旧分组：数据仍留在 SCALE_MODES 里，但不再出现在分组下拉中。 */
+  const RETIRED_CATEGORIES = ['church', 'minor', 'bebop', 'other', 'jazz']
+
   const TITLES: Array<[keyof typeof SCALE_MODES, string, string]> = [
     ['pentatonic', '五声音阶', 'Pentatonic Scales'],
     ['majorScaleModes', '大调音阶模式', 'Major Scale Modes'],
@@ -395,18 +398,15 @@ describe('内联译文矩阵（分类标题 + 下拉选项名）', () => {
     ['otherScales', '其他音阶', 'Other Scales'],
     ['bebopScales', 'Bebop音阶', 'Bebop Scales'],
     ['basic', '基础音阶', 'Basic Scales'],
-    ['church', '教会调式', 'Church Modes'],
-    ['minor', '小调变体', 'Minor Variants'],
-    ['bebop', 'Bebop音阶(旧)', 'Bebop Scales(Old)'],
-    ['jazz', '爵士音阶', 'Jazz Scales'],
     ['exotic', '异域音阶', 'Exotic Scales'],
     ['symmetrical', '对称音阶', 'Symmetrical Scales'],
-    ['other', '其他音阶(旧)', 'Other Scales(Old)'],   // 落到三元链的 else 分支
   ]
 
-  it('矩阵本身覆盖 SCALE_MODES 的全部 key（新增分类时本例会失败，提醒补译文）', () => {
-    expect(TITLES).toHaveLength(Object.keys(SCALE_MODES).length)
-    expect(new Set(TITLES.map((c) => c[0]))).toEqual(new Set(Object.keys(SCALE_MODES)))
+  it('矩阵覆盖 SCALE_MODES 里除已下线分组外的全部 key（新增分类时本例会失败，提醒补译文）', () => {
+    const expected = Object.keys(SCALE_MODES)
+      .filter((k) => !RETIRED_CATEGORIES.includes(k))
+      .sort()
+    expect(TITLES.map((c) => c[0]).sort()).toEqual(expected)
   })
 
   for (const [key, zhTitle, enTitle] of TITLES) {
@@ -427,13 +427,12 @@ describe('内联译文矩阵（分类标题 + 下拉选项名）', () => {
     })
   }
 
-  const OPT_ZH = ['五声音阶', '大调模式', '旋律小调模式', '和声小调模式', '和声大调模式', '其他音阶',
-    'Bebop音阶', '异域音阶', '对称音阶', '基础', '教会调式', '小调变体', 'Bebop(旧)', '爵士', '其他(旧)']
+  const OPT_ZH = ['五声音阶', '大调模式', '旋律小调模式', '和声小调模式', '和声大调模式',
+    '其他音阶', 'Bebop音阶', '异域音阶', '对称音阶', '基础']
   const OPT_EN = ['Pentatonic', 'Major Modes', 'Melodic Minor Modes', 'Harmonic Minor Modes',
-    'Harmonic Major Modes', 'Other Scales', 'Bebop Scales', 'Exotic', 'Symmetrical', 'Basic',
-    'Church', 'Minor', 'Bebop(Old)', 'Jazz', 'Other(Old)']
+    'Harmonic Major Modes', 'Other Scales', 'Bebop Scales', 'Exotic', 'Symmetrical', 'Basic']
 
-  it('调式分类下拉的 15 个选项名按顺序与语言一致（顺序错/文案错都会挂）', () => {
+  it('调式分类下拉的 10 个选项名按顺序与语言一致（顺序错/文案错都会挂）', () => {
     for (const [lang, t, want] of [['zh-CN', tZh, OPT_ZH], ['en', tEn, OPT_EN]] as const) {
       const p = mount({ language: lang, t })
       expect(p.openSelect(1).map((o) => o.textContent)).toEqual(want)

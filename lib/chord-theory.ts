@@ -239,7 +239,15 @@ export const NOTE_UNICODE_NAMES_FLAT: Record<number, string> = {
     [11]: 'B'
 };
 
-export function noteFromToneId(toneId: number, _preferFlat: boolean = false): number {
+/**
+ * 把任意 toneId 归一化到 0..11 的 pitch class（支持负数与超过 12 的输入，如 `root + 21`）。
+ *
+ * 🚨 **不收 `preferFlat`**：返回值是 pitch class（0..11 的整数），结构上表达不了升降拼写。
+ * 旧签名带过一个 `_preferFlat: boolean` 参数却完全不使用，让调用方（getScaleNotes /
+ * applyAccidental / getChordNotes）误以为「传 true 就能拿到降号拼写」—— 实际要拼写
+ * 必须走 `getNoteName(toneId, preferFlat)`。故删掉该误导性参数。
+ */
+export function noteFromToneId(toneId: number): number {
     const normalizedToneId = (toneId % 12 + 12) % 12;
     return normalizedToneId;
 }
@@ -1621,9 +1629,9 @@ export class ChordParser {
     static applyAccidental(note: number, accidental: ChordToken): number {
         const toneId = note;
         if (accidental === "SHARP") {
-            return noteFromToneId(toneId + 1, false);
+            return noteFromToneId(toneId + 1);
         } else if (accidental === "FLAT") {
-            return noteFromToneId(toneId - 1, true);
+            return noteFromToneId(toneId - 1);
         }
         return note;
     }
@@ -1693,7 +1701,7 @@ export function getChordNotes(rootNote: number, chordType: ChordType): number[] 
     const cached = chordNotesCache.get(cacheKey);
     if (cached !== undefined) return cached;
     const intervals = CHORD_INTERVALS[chordType] ?? [];
-    const result = intervals.map((interval)=>noteFromToneId(rootNote + interval, false));
+    const result = intervals.map((interval)=>noteFromToneId(rootNote + interval));
     setCacheWithLRU(chordNotesCache, cacheKey, result);
     return result;
 }

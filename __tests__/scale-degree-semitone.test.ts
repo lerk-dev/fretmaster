@@ -50,26 +50,35 @@ describe('resolveScaleDegreeSemitone —— 实测缺口（这两条就是当初
     expect(wholeTone.intervals).toContain('#6')
   })
 
-  it('🚨 缺口①：`#2` 兜底表里根本没有 ⇒ 旧实现返回 undefined ⇒ 题目永不推进', () => {
-    // 旧实现在这里就是 undefined，然后 break —— 于是 Altered 这个音阶的练习一题都过不去
-    expect(SCALE_DEGREE_SEMITONE_FALLBACK['#2']).toBeUndefined()
+  it('`#2` 已在兜底表里（= 3）；对齐表与兜底表一致', () => {
+    // 历史：兜底表曾**缺** `#2` ⇒ 含 `#2` 的 5 个音阶解析成 undefined ⇒ 调用方 break
+    // ⇒ 这些音阶的练习一题都过不去（表现为「弹对了没反应」）。现已补齐。
+    expect(SCALE_DEGREE_SEMITONE_FALLBACK['#2']).toBe(3)
     // 新实现走对齐表，拿得到
     expect(resolveScaleDegreeSemitone(altered, '#2')).toBe(3)
     expect(altered.notes[altered.intervals.indexOf('#2')]).toBe(3)
   })
 
-  it('🚨 缺口②：`#6` 兜底表记成 9，Whole Tone 里实际是 10 ⇒ 旧实现要求弹低半音的音', () => {
-    expect(SCALE_DEGREE_SEMITONE_FALLBACK['#6']).toBe(9)
+  it('`#6` 已在兜底表里改为正确的 10（升六度）；对齐表与兜底表一致', () => {
+    // 历史：兜底表曾把 `#6` 记成 9（那是 ♮6）⇒ Whole Tone / Augmented Scale 的判定
+    // 会要求弹**低半音**的那个音。现已改为 10。
+    expect(SCALE_DEGREE_SEMITONE_FALLBACK['#6']).toBe(10)
     expect(resolveScaleDegreeSemitone(wholeTone, '#6')).toBe(10)
     expect(wholeTone.notes[wholeTone.intervals.indexOf('#6')]).toBe(10)
   })
 
-  it('含 `#2` 的可选音阶不止一个（Altered / Lydian #9 / Lydian Augmented #2 / Diminished Half Whole / Augmented Scale）', () => {
+  it('含 `#2` 的可选音阶不止一个（Altered / Augmented / Diminished 族 / Lydian #9 …）', () => {
     const names = [...new Set(ALL_SCALES.filter((s) => s.intervals.includes('#2')).map((s) => s.name))].sort()
+    // 2026-10-15：#17 把「同一中文显示名却两种音级拼写」的条目收敛到升号侧，
+    // 故 dim HW 族（Half-Whole Diminished / Diminished Half Whole / Diminished）
+    // 与 Augmented 也都改用 `#2` 了 => 名单从 5 个变成 8 个。
     expect(names).toEqual([
       'Altered',
+      'Augmented',
       'Augmented Scale',
+      'Diminished',
       'Diminished Half Whole',
+      'Half-Whole Diminished',
       'Lydian #9',
       'Lydian Augmented #2',
     ])
@@ -105,14 +114,16 @@ describe('resolveScaleDegreeSemitone —— 穷举不变量', () => {
     expect(bad).toEqual([])
   })
 
-  it('兜底表与对齐表不一致的位置**恰好只有** `#2` 与 `#6`（盲区清单，故意钉住）', () => {
+  it('兜底表与对齐表**完全一致**（盲区清单已清空：`#2` 补齐、`#6` 改为 10、补 `bb7`）', () => {
+    // 收敛前这里恰好有 `#2` 与 `#6` 两处冲突；两表收敛后应为空集。
+    // 若将来新增音阶用到兜底表没有的音级，这条会立刻报出来。
     const disagree = new Set<string>()
     for (const s of ALL_SCALES) {
       s.intervals.forEach((iv, i) => {
         if (SCALE_DEGREE_SEMITONE_FALLBACK[iv] !== s.notes[i]) disagree.add(iv)
       })
     }
-    expect([...disagree].sort()).toEqual(['#2', '#6'])
+    expect([...disagree].sort()).toEqual([])
   })
 })
 
@@ -135,7 +146,9 @@ describe('resolveScaleDegreeSemitone —— 兜底路径与边界', () => {
 
   it('两边都不认识 ⇒ undefined（调用方据此 break + 告警，绝不能当 0 用）', () => {
     const ionian = SCALE_MODES.basic.find((s) => s.name === 'Major')!
-    expect(resolveScaleDegreeSemitone(ionian, 'bb7')).toBeUndefined()
+    // ⚠️ 不能用 `bb7`：兜底表**已补上** `bb7`（= 9，重降七度），它现在两边都认识。
+    // 换一个两处都不存在的标签来测「都不认识」的路径。
+    expect(resolveScaleDegreeSemitone(ionian, 'bb9')).toBeUndefined()
     expect(resolveScaleDegreeSemitone(ionian, '')).toBeUndefined()
     expect(resolveScaleDegreeSemitone(ionian, '不存在的音级')).toBeUndefined()
   })
