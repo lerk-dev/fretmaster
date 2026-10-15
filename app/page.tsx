@@ -159,7 +159,7 @@ import {
   BookOpen,
 } from "lucide-react"
 import { toast } from "sonner"
-import { TRANSLATIONS } from '@/lib/i18n'
+import { createTranslator } from '@/lib/i18n'
 import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
 import type { AudioDeviceInfo } from '@/lib/native-audio'
 
@@ -315,11 +315,10 @@ export default function FretMasterPage() {
   const setChordScaleDisplay = store.setChordScaleDisplay
   const setNoteAccidentalDisplay = store.setNoteAccidentalDisplay
 
-  const t = useCallback((key: string) => {
-    const lang = language || 'zh-CN'
-    const translations = TRANSLATIONS[lang] as Record<string, string>
-    return translations?.[key] || key
-  }, [language])
+  // 🚨 不要再在这里手写一份查表实现（历史上这里是 `TRANSLATIONS` + `|| key` 的第三份拷贝，
+  // 与 `lib/i18n.ts` 的 `createTranslator` 重复，各自腐烂）。统一走 `createTranslator`，
+  // 顺带让 `translateOr` 拿到精确的缺键判据 `t.hasKey`。
+  const t = useMemo(() => createTranslator(language), [language])
 
   // 侧边栏菜单 - useMemo缓存避免每次渲染重新创建
   const sidebarMenuItems = useMemo(() => [

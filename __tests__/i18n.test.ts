@@ -1,7 +1,8 @@
 /**
  * lib/i18n.ts 的契约测试（此前零测试）。
  *
- * i18n 表是「所有界面文案」的真相源（两个语言块各 1143 个键）。
+ * i18n 表是「所有界面文案」的真相源（两个语言块各 632 个键）。
+ * 2026-10-15 清掉 540 个确证死键，从 1172 降到 632。
  * 最要紧的两条：
  *  ① 两种语言的**键集必须完全一致** —— 少一个键，该语言下就会回退显示 key 本身；
  *  ② 数据里被 `t(level.nameKey)` 引用的键必须真实存在 —— 否则等级选择器会显示
@@ -10,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import { TRANSLATIONS, createTranslator, translateOr } from '@/lib/i18n'
+import { TRANSLATIONS, createTranslator, hasTranslation, translateOr } from '@/lib/i18n'
 import { ALL_PRACTICE_LEVELS } from '@/lib/practice-levels'
 import { SCALE_PRACTICE_SEQUENCES } from '@/lib/page-theory-data'
 
@@ -32,8 +33,10 @@ describe('i18n 表结构', () => {
   })
 
   it('没有重复键（对象字面量重复键会被静默覆盖）', () => {
-    // 以源码为准无法直接检测（对象已去重）；此处保证规模量级，防止误删整段
-    expect(Object.keys(zh).length).toBeGreaterThan(1000)
+    // 以源码为准无法直接检测（对象已去重）；此处保证规模量级，防止误删整段。
+    // 基线 632 = 2026-10-15 清理 540 个死键后的真实规模（原 1172）。
+    // 故意用 `>` 而非 `===`：新增键不该红，只有**整段被删**才会红。
+    expect(Object.keys(zh).length).toBeGreaterThan(600)
     expect(Object.keys(en).length).toBe(Object.keys(zh).length)
   })
 
@@ -110,9 +113,14 @@ describe('死键：i18n 里不应有「定义了但全仓无调用方」的键',
   //   theory_role_root / theory_role_third / theory_role_fifth，全部用在乐理面板的
   //   CAGED 图例、性质分组与指型列表的可访问名上），删除 1 个冗余键
   //   （theory_notes 与既有 scale_notes / theory_show_notes 语义重复）。
-  const DEAD_KEY_BUDGET = 597
-
-  it('死键数量不超过已登记预算（新增死键会红；清理后可下调预算）', () => {
+  // 真实死键预算：**0**。
+  //
+  // 2026-10-15 清理：删掉 540 个确证死键（`lib/i18n.ts` 2576 → 1496 行）。
+  // 清理前静态判据算出 597 个「死键」，其中 **57 个是假阳性** ——
+  // `translateOr(t, \`level_desc_${level.id}\`, ...)` 在 11 处使用，而 `level.id`
+  // 的取值域在 `lib/practice-levels.ts` 里，静态 grep 抓不到模板拼接。
+  // 所以判据必须先把这些动态键展开成白名单（见下），再判死。
+  it('死键数量为 0（新增死键立刻红）', () => {
     const root = path.resolve(__dirname, '..')
     const exts = ['.ts', '.tsx']
     const skipDirs = new Set(['node_modules', '.next', '.git', 'out', 'local-only', 'coverage', 'src-tauri', 'dist-tauri'])
@@ -135,15 +143,24 @@ describe('死键：i18n 里不应有「定义了但全仓无调用方」的键',
       .map(f => fs.readFileSync(f, 'utf8'))
       .join('\n')
 
+    // 🚨 白名单：模板拼接可产生的键。`translateOr(t, \`level_desc_${level.id}\`, ...)`
+    // 的 `level.id` 取自 practice-levels.ts（练习项 id 与分组 id 都要展开）。
+    // 新增别的 `\`prefix_${x}\`` 动态键时，必须同步加到这里，否则会误报成死键。
+    const levelsSrc = fs.readFileSync(path.resolve(root, 'lib', 'practice-levels.ts'), 'utf8')
+    const dynamicKeys = new Set(
+      [...levelsSrc.matchAll(/id: ["']([a-zA-Z_0-9]+)["']/g)].map(m => `level_desc_${m[1]}`)
+    )
+
     const dead: string[] = []
     for (const k of Object.keys(zh)) {
+      if (dynamicKeys.has(k)) continue
       // 判据：源码里出现 `'key'` 或 `"key"`（引号包裹的字面量）。
       if (!corpus.includes(`'${k}'`) && !corpus.includes(`"${k}"`)) dead.push(k)
     }
     expect(
-      dead.length,
-      `死键数量 ${dead.length} 超过预算 ${DEAD_KEY_BUDGET}。新增的死键：请接上调用方，或（确认无害后）抬高 DEAD_KEY_BUDGET。\n前 40 个：\n${dead.slice(0, 40).join('\n')}`
-    ).toBeLessThanOrEqual(DEAD_KEY_BUDGET)
+      dead,
+      `死键 ${dead.length} 个。请接上调用方，或确认无害后加进上面的 dynamicKeys 白名单。\n${dead.slice(0, 40).join('\n')}`
+    ).toEqual([])
   })
 
   it('本轮清掉的 9 个死键不会再出现（P3-12 回归）', () => {
@@ -212,6 +229,29 @@ describe('translateOr —— t() 的真兜底（别再用 `t(k) || fallback`）'
     expect(translateOr(createTranslator(''), 'level_root', 'FALLBACK')).toBe(zh['level_root'])
     expect(translateOr(createTranslator(null), 'level_root', 'FALLBACK')).toBe(zh['level_root'])
     expect(translateOr(createTranslator('fr'), 'level_root', 'FALLBACK')).toBe('FALLBACK')
+  })
+
+  it('🚨 缺键判据用 hasKey，不是「译文是否等于键名」—— 后者会把「译文恰为键名」误判成缺键', () => {
+    // 构造一个「译文恰好等于键名」的语言表，模拟那种万一。
+    const weird = createTranslator('zh-CN')
+    expect(weird.hasKey('level_root')).toBe(true)
+    expect(weird.hasKey('no_such_key_xyz')).toBe(false)
+    // 空串译文同样算「没有」（与 translate() 的 `|| key` 口径一致）
+    expect(hasTranslation('zh-CN', 'level_root')).toBe(true)
+    expect(hasTranslation('zh-CN', '')).toBe(false)
+    expect(hasTranslation('fr', 'level_root')).toBe(false)
+  })
+
+  it('🚨 传入裸函数（测试替身/旧调用方）时退回旧判据，不炸', () => {
+    const bare = ((key: string) => (key === 'k1' ? 'v1' : key)) as Parameters<typeof translateOr>[0]
+    expect(translateOr(bare, 'k1', 'FB')).toBe('v1')
+    expect(translateOr(bare, 'k2', 'FB')).toBe('FB')
+  })
+
+  it('🚨 app/page.tsx 不许再有第三份查表实现（同一段逻辑多处实现必然各自腐烂）', () => {
+    const src = fs.readFileSync(path.resolve(__dirname, '..', 'app', 'page.tsx'), 'utf8')
+    expect(src).not.toContain('TRANSLATIONS[')
+    expect(src).toContain('createTranslator')
   })
 })
 
