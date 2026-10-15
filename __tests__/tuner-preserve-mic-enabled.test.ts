@@ -32,7 +32,11 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const PAGE_SRC = readFileSync('app/page.tsx', 'utf8')
+// U0001f6a8 调音器代码横跨这两个文件（2026-10-15 拆分）。少读任何一个都会让锚点自检报错。
+const TUNER_SRC = [
+  readFileSync('app/page.tsx', 'utf8'),
+  readFileSync('hooks/use-tuner.ts', 'utf8'),
+].join('\n')
 
 /** 剥注释：说明性注释里会提到 `setMicEnabled(false)`（在解释为什么不能乱调），不剥会误判 */
 function stripComments(src: string): string {
@@ -42,12 +46,12 @@ function stripComments(src: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-const SRC = stripComments(PAGE_SRC)
+const SRC = stripComments(TUNER_SRC)
 
 /** 取一个函数/回调的源码段（从 `const <name> = useCallback(` 到下一个 `}, [...])` 收尾） */
 function sliceCallback(name: string): string {
   const start = SRC.indexOf(`const ${name} = useCallback(`)
-  expect(start, `page.tsx 里找不到 ${name} —— 护栏会静默空转`).toBeGreaterThan(-1)
+  expect(start, `hooks/use-tuner.ts 里找不到 ${name} —— 护栏会静默空转`).toBeGreaterThan(-1)
   const end = SRC.indexOf('\n  }, [', start)
   expect(end, `${name} 的 useCallback 收尾没找到`).toBeGreaterThan(start)
   return SRC.slice(start, end)
@@ -121,7 +125,7 @@ describe('调音器不得关闭全局「启用音频输入」开关', () => {
     }
 
     const hits = [...SRC.matchAll(/setMicEnabled\(false\)/g)].map((m) => m.index!)
-    expect(hits.length, 'page.tsx 里 setMicEnabled(false) 的调用点数量异常').toBeGreaterThanOrEqual(3)
+    expect(hits.length, 'page.tsx + use-tuner.ts 里 setMicEnabled(false) 的调用点数量异常').toBeGreaterThanOrEqual(3)
 
     for (const at of hits) {
       // ① stopAudioInput 的实现体：它的职责就是关，跳过

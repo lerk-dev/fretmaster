@@ -30,11 +30,39 @@ function depsLines(src: string): string[] {
 }
 
 describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议的两处）', () => {
-  it('page.tsx：stopAudioInput 不得进任何 deps 数组，且必须保留 TDZ 说明 + disable', () => {
+  it('useTuner 调用点必须晚于 stopAudioInput 声明（否则 options 立即求值会 TDZ）', () => {
+    // 2026-10-15：调音器域抽到 hooks/use-tuner.ts 后，`stopAudioInput` 作为 option
+    // 传进 hook —— 而 **options 对象是立即求值的**。调用点若摆在 `stopAudioInput`
+    // 声明之前，拿到的是 undefined，点调音器时才炸。
+    // 拆分初期先用过「ref 中转」绕开，后来直接把调用点移到声明之后 —— 更简单，
+    // 也不用多一层间接。本用例钉住这个顺序，防止回归。
     const src = readFileSync('app/page.tsx', 'utf8')
-    const bad = depsLines(src).filter((l) => /\bstopAudioInput\b/.test(l))
-    expect(bad, 'stopAudioInput 声明在 startTuner 之后，deps 立即求值 ⇒ 会抛 TDZ').toEqual([])
-    expect(src).toContain('stopAudioInput 声明在本 hook 之后（TDZ）')
+    const declIdx = src.indexOf('const stopAudioInput = useCallback(')
+    const callIdx = src.indexOf('const tuner = useTuner(')
+    expect(declIdx, 'page.tsx 里找不到 stopAudioInput 声明').toBeGreaterThan(-1)
+    expect(callIdx, 'page.tsx 里找不到 useTuner 调用').toBeGreaterThan(-1)
+    expect(
+      callIdx,
+      'useTuner 调用点在 stopAudioInput 声明之前 ⇒ options 立即求值拿到 undefined（TDZ）'
+    ).toBeGreaterThan(declIdx)
+  })
+
+  it('startTuner 的 deps 里必须有 stopAudioInput（它确实在函数体里被 await）', () => {
+    // 与上一条配套：调用点既然在声明之后，exhaustive-deps 就**要求**它进场 ——
+    // 否则改了设置后 `startTuner` 仍在用旧的 `stopAudioInput` 闭包。
+    // （拆分前这里是「deps 里绝不能出现」，因为那时调用点在声明之前。）
+    const src = readFileSync('hooks/use-tuner.ts', 'utf8')
+    const start = src.indexOf('const startTuner = useCallback(')
+    expect(start, 'hooks/use-tuner.ts 里找不到 startTuner').toBeGreaterThan(-1)
+    const end = src.indexOf('\n  }, [', start)
+    const body = src.slice(start, end)
+    expect(/\bstopAudioInput\b/.test(body), 'startTuner 函数体没有 await stopAudioInput？').toBe(true)
+    // `end` 指向收尾行前的那个换行符，故从 end + 1 起取才是 deps 行本身
+    const depsLine = src.slice(end + 1, src.indexOf('\n', end + 1))
+    expect(
+      /\bstopAudioInput\b/.test(depsLine),
+      `startTuner 的 deps 里没有 stopAudioInput（deps 行：${depsLine.trim()}）`
+    ).toBe(true)
   })
 
   it('page.tsx：startPitchDetectionWithNodes 不得进任何 deps 数组，且必须保留 TDZ 说明', () => {

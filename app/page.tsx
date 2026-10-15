@@ -15,6 +15,7 @@ import { usePracticeStats } from "@/hooks/use-practice-stats"
 import { useAudioDeviceEnumeration } from "@/hooks/use-audio-device-enumeration"
 import { useFeedbackSound } from "@/hooks/use-feedback-sound"
 import { useMetronomeScheduler } from "@/hooks/use-metronome-scheduler"
+import { useTuner } from "@/hooks/use-tuner"
 import { logger } from "@/lib/logger"
 import { SONG_PROGRESSIONS } from "@/lib/page-songs"
 import { transposeSongChords, parseIrealPro, parseIrealUrl } from "@/lib/song-chords"
@@ -33,6 +34,7 @@ import {
   NOTES_FLAT,
   CHORD_TYPES,
   SCALE_MODES,
+  DEGREE_TO_SEMITONE,
 } from "@/lib/page-theory-data"
 import { resolveAvailableStringIndexes } from "@/lib/string-index"
 import { buildDirectionalQueue, shuffle } from "@/lib/interval-direction"
@@ -70,7 +72,7 @@ const ALL_SOLO_LEVELS = ALL_PRACTICE_LEVELS
 const LOCAL_PRACTICE_MODE_GROUPS = PRACTICE_MODE_GROUPS
 import { resolveInstrumentConfig, PRACTICE_SUGGESTIONS } from "@/lib/practice-suggestions"
 import { recordPositionResult, getPositionWeight, loadPositionStats } from "@/lib/position-stats"
-import { calculateRMS, frequencyToNoteName, frequencyToNote, getSOLOYinAnalyser, YINPitchDetection, setMinDetectFreq, getMinDetectFreq, detectFloorForLowestHz, resetPitchDetectionState, resolveYinThreshold, seedPitchDetectionNoiseFloor, updateOnsetGate, getOnsetGate } from "@/lib/pitch-detection"
+import { calculateRMS, frequencyToNoteName, getSOLOYinAnalyser, YINPitchDetection, setMinDetectFreq, getMinDetectFreq, detectFloorForLowestHz, resetPitchDetectionState, resolveYinThreshold, seedPitchDetectionNoiseFloor, updateOnsetGate, getOnsetGate } from "@/lib/pitch-detection"
 import {
   runNoiseFloorCalibration,
   onsetGateFromNoiseFloor,
@@ -802,33 +804,8 @@ export default function FretMasterPage() {
   const sensitivity = audioSettings.sensitivity
   const setSensitivity = store.setSensitivity
 
-  // 调音器状态
-  const [tunerOpen, setTunerOpen] = useState(false)
-  const [tunerActive, setTunerActive] = useState(false)
-  const [detectedNote, setDetectedNote] = useState<string>("-")
-  const [detectedFrequency, setDetectedFrequency] = useState<number>(0)
-  const [cents, setCents] = useState<number>(0)
   const referenceFrequency = practiceSettings.referenceFrequency
   const setReferenceFrequency = store.setReferenceFrequency
-  const tunerAudioContextRef = useRef<AudioContext | null>(null)
-  const tunerAnalyserRef = useRef<AnalyserNode | null>(null)
-  const tunerStreamRef = useRef<MediaStream | null>(null)
-  const tunerGainNodeRef = useRef<GainNode | null>(null)
-  const tunerAnimationRef = useRef<number | null>(null)
-  const tunerHistoryRef = useRef<{ frequency: number; note: string; cents: number }[]>([])
-  // Tauri 调音器：pitch-detected 事件监听与 Rust 检测线程的拆除句柄（stopTuner 需要）
-  const tunerUnlistenRef = useRef<(() => void) | null>(null)
-  const tunerStreamRunningRef = useRef(false)
-  // 🚨 同步互斥锁 + 代际号（P2-5）。`startTuner` 里有多个 await（getUserMedia /
-  //    动态 import），若不用「第一个 await 之前就生效」的守卫，快速双击会并发两条
-  //    启动链：后写的句柄覆盖先写的 ⇒ `stopTuner` 只能拆掉一条，另一条（rAF 循环 /
-  //    MediaStream）永久泄漏：表针还跳、麦克风常亮、CPU 空转。
-  //    ref 不是 state ⇒ 同一 tick 内立即可见，能真正拦住重入。
-  const tunerStartingRef = useRef(false)
-  // Web 路径的 rAF 检测链是否「活着」。此前是 `startTuner` 里的局部 `let isActive`，
-  // 而唯一会翻转它的 `return () => { isActive = false }` 写在 async 函数里、返回值无人
-  // 接收 —— 死代码，兜底完全失效。改为 ref 持有，由 stopTuner 真正翻转。
-  const tunerActiveRef = useRef(false)
 
   // 🚨 P3-2：`handleFretClick` 里两个「答完延迟清高亮 / 送 MIDI」的裸 `setTimeout`。
   //    用户点完 100ms 内就停止练习（或切 tab、答案模式）时，旧闭包仍按 `isPlaying=true`
@@ -1290,350 +1267,6 @@ export default function FretMasterPage() {
     }
   }, [handleDragMove, handleDragEnd])
 
-  // ==================== 调音器功能 ====================
-  // 启动调音器
-  const startTuner = useCallback(async () => {
-    // 🚨 同步互斥：必须在**任何 await 之前**置位，否则 `getUserMedia` 的 await 窗口里
-    //    第二次点击会再进一遍 ⇒ 并发的两条启动链互相覆盖句柄 ⇒ 泄漏（P2-5）。
-    //    `finally` 里释放，保证任何失败路径（含 catch）都不会把锁卡死。
-    if (tunerStartingRef.current) return
-    tunerStartingRef.current = true
-    try {
-      // 若已有检测循环在跑（快速连点的情况），先取消，避免并存多条 rAF 检测链 / 事件监听
-      if (tunerAnimationRef.current) {
-        cancelAnimationFrame(tunerAnimationRef.current)
-        tunerAnimationRef.current = null
-      }
-      if (tunerUnlistenRef.current) {
-        tunerUnlistenRef.current()
-        tunerUnlistenRef.current = null
-      }
-      tunerStreamRunningRef.current = false
-      // 上一轮 Web 检测链若还在（tunerActiveRef 为 true），先显式停掉，避免遗留 rAF 继续跑
-      tunerActiveRef.current = false
-      // 🚨 Web 路径才需要停掉「练习用的」MediaStream —— 调音器和练习共用同一个 AudioContext
-      //    时会出现两条检测链抢同一个流。Tauri 路径**不能**在这里关 micEnabled：
-      //    它是设置页「启用音频输入」的全局开关，调音器只是复用同一个 Rust 采集后端
-      //    （下面 startAudioCapture 会重建采集，stopTuner 再停）。
-      //    旧实现在这里无差别 `setMicEnabled(false)` ⇒ 用户从设置页开启音频后，
-      //    只要碰过一次调音器，全局开关就被悄悄关掉，回练习/调音页完全没反应
-      //    （Rust 采集已停、pipeline 守卫判定未采集而静默空转）。
-      if (!isTauri && micEnabled) {
-        await stopAudioInput()
-        setMicEnabled(false)
-      }
-      if (isTauri) {
-      // Tauri环境：Rust 原生音频 + 事件流（pitch-detected 每 50ms 一帧，替代每帧一次 IPC 的 rAF 轮询）
-      try {
-        const { startAudioCapture, listenPitchDetected, startPitchStream } = await import('@/lib/native-audio')
-
-        await startAudioCapture(selectedAudioDevice || undefined)
-        setTunerActive(true)
-        toast.success(t('tuner_start'))
-
-        const off = await listenPitchDetected((event) => {
-          try {
-            const result = event.pitch
-
-            if (result && result.frequency > 0 && (result.confidence?.yin ?? 0) > confidenceThresholdRef.current) {
-              const noteName = frequencyToNoteName(result.frequency)
-              const noteResult = frequencyToNote(result.frequency, referenceFrequency)
-
-              tunerHistoryRef.current.push({
-                frequency: result.frequency,
-                note: noteName || "-",
-                cents: noteResult.cents
-              })
-
-              if (tunerHistoryRef.current.length > 5) {
-                tunerHistoryRef.current.shift()
-              }
-
-              if (tunerHistoryRef.current.length >= 3) {
-                const weights = [0.1, 0.2, 0.3, 0.4]
-                let weightedFreq = 0
-                let totalWeight = 0
-
-                tunerHistoryRef.current.forEach((item, index) => {
-                  const weight = weights[Math.min(index, weights.length - 1)]
-                  weightedFreq += item.frequency * weight
-                  totalWeight += weight
-                })
-
-                const smoothedFreq = weightedFreq / totalWeight
-                const smoothedNote = frequencyToNoteName(smoothedFreq)
-                const smoothedResult = frequencyToNote(smoothedFreq, referenceFrequency)
-
-                setDetectedNote(smoothedNote || "-")
-                setDetectedFrequency(Math.round(smoothedFreq))
-                setCents(smoothedResult.cents)
-              } else {
-                setDetectedNote(noteName || "-")
-                setDetectedFrequency(Math.round(result.frequency))
-                setCents(noteResult.cents)
-              }
-            }
-          } catch (e) {
-            console.error('Native pitch event error:', e)
-          }
-        })
-
-        tunerUnlistenRef.current = off
-        await startPitchStream(NATIVE_PITCH_INTERVAL_MS)
-        tunerStreamRunningRef.current = true
-      } catch (err) {
-        console.error('Failed to start native tuner:', err)
-        toast.error(t('tuner_need_mic'))
-      }
-    } else {
-      // Web环境：使用Web Audio API
-      try {
-        const constraints: MediaStreamConstraints = {
-          audio: selectedAudioDevice 
-            ? { 
-                deviceId: { ideal: selectedAudioDevice },
-                echoCancellation: false,
-                autoGainControl: false,
-                noiseSuppression: false
-              }
-            : {
-                echoCancellation: false,
-                autoGainControl: false,
-                noiseSuppression: false
-              }
-        }
-        const stream = await navigator.mediaDevices.getUserMedia(constraints)
-        tunerStreamRef.current = stream
-
-        const audioContext = new (getAudioContextClass())({
-          sampleRate: 48000,
-          latencyHint: 'interactive'
-        })
-        tunerAudioContextRef.current = audioContext
-        // Tauri WebView2 / autoplay policy 下 AudioContext 可能挂起，需显式 resume
-        if (audioContext.state === 'suspended') {
-          audioContext.resume().catch(() => {})
-        }
-
-        const source = audioContext.createMediaStreamSource(stream)
-        
-        const gainNode = audioContext.createGain()
-        gainNode.gain.value = inputGain
-        tunerGainNodeRef.current = gainNode
-        
-        const analyser = audioContext.createAnalyser()
-        analyser.fftSize = 4096
-        tunerAnalyserRef.current = analyser
-
-        source.connect(gainNode)
-        gainNode.connect(analyser)
-
-        tunerHistoryRef.current = []
-        
-        setTunerActive(true)
-        toast.success(t('tuner_start'))
-
-        // rAF 链的存活标志由 ref 持有（见 ref 声明处的说明），stopTuner 会翻转它。
-        tunerActiveRef.current = true
-
-        const detectPitch = () => {
-          if (!tunerActiveRef.current || !analyser || !audioContext) return
-
-          const buffer = new Float32Array(analyser.fftSize)
-          analyser.getFloatTimeDomainData(buffer)
-
-          const currentAlgorithm = pitchAlgorithmRef.current
-          // YIN 门限与练习路径同源（见 lib/pitch-detection 的 resolveYinThreshold）
-          const yinThreshold = resolveYinThreshold(instrumentConfig.lowestStringHz)
-          let yinResult: { frequency: number; probability: number } | null = null
-
-          // 使用完整缓冲区（与练习模式一致），低频需要更多周期才能准确检测
-          if (currentAlgorithm === 'solo') {
-            const soloAnalyser = getSOLOYinAnalyser(buffer.length, audioContext.sampleRate, yinThreshold)
-            const soloResult = soloAnalyser.analyze(buffer)
-            if (soloResult && soloResult.valid) {
-              yinResult = {
-                frequency: soloResult.frequency,
-                probability: soloResult.probability
-              }
-            }
-          } else {
-            yinResult = YINPitchDetection(buffer, audioContext.sampleRate, yinThreshold, 0.1)
-          }
-
-          if (!yinResult || !yinResult.frequency) {
-            tunerAnimationRef.current = requestAnimationFrame(detectPitch)
-            return
-          }
-
-          // 调音表是**独立**的收音路径：自己的 AudioContext + MediaStream + rAF 轮询，
-          // 既不经过 worklet/ScriptProcessor，也没有环境噪声校准（底噪只有本模块级的初值）。
-          // 所以这里保留固定阈值，**不要**照搬练习路径的 `getOnsetGate()` —— 那条门限
-          // 反映的是练习流的环境底噪，与调音表这条流的房间噪声无关。
-          const rms = calculateRMS(buffer)
-          const energyThreshold = yinResult.frequency < 110 ? 0.001 : 0.002
-          if (rms < energyThreshold) {
-            tunerAnimationRef.current = requestAnimationFrame(detectPitch)
-            return
-          }
-
-          // 谐波增强处理 - 针对低频（与练习模式一致）
-          let detectedFreq = yinResult.frequency
-          if (detectedFreq < 110) {
-            const possibleFundamental = detectedFreq / 2
-            let fundamentalResult: { frequency: number; probability: number } | null = null
-
-            if (currentAlgorithm === 'solo') {
-              const soloAnalyser2 = getSOLOYinAnalyser(buffer.length, audioContext.sampleRate, yinThreshold)
-              const soloResult2 = soloAnalyser2.analyze(buffer)
-              if (soloResult2 && soloResult2.valid) {
-                fundamentalResult = {
-                  frequency: soloResult2.frequency,
-                  probability: soloResult2.probability
-                }
-              }
-            } else {
-              fundamentalResult = YINPitchDetection(buffer, audioContext.sampleRate, yinThreshold, 0.1)
-            }
-
-            if (fundamentalResult && fundamentalResult.frequency &&
-                Math.abs(fundamentalResult.frequency - possibleFundamental) < 5) {
-              detectedFreq = possibleFundamental
-            }
-          }
-
-          if (detectedFreq > 0 && yinResult.probability > confidenceThresholdRef.current) {
-            const noteName = frequencyToNoteName(detectedFreq)
-            const result = frequencyToNote(detectedFreq, referenceFrequency)
-
-            tunerHistoryRef.current.push({
-              frequency: detectedFreq,
-              note: noteName || "-",
-              cents: result.cents
-            })
-
-            if (tunerHistoryRef.current.length > 5) {
-              tunerHistoryRef.current.shift()
-            }
-
-            if (tunerHistoryRef.current.length >= 3) {
-              const weights = [0.1, 0.2, 0.3, 0.4]
-              let weightedFreq = 0
-              let totalWeight = 0
-
-              tunerHistoryRef.current.forEach((item, index) => {
-                const weight = weights[Math.min(index, weights.length - 1)]
-                weightedFreq += item.frequency * weight
-                totalWeight += weight
-              })
-
-              const smoothedFreq = weightedFreq / totalWeight
-              const smoothedNote = frequencyToNoteName(smoothedFreq)
-              const smoothedResult = frequencyToNote(smoothedFreq, referenceFrequency)
-
-              setDetectedNote(smoothedNote || "-")
-              setDetectedFrequency(Math.round(smoothedFreq))
-              setCents(smoothedResult.cents)
-            } else {
-              setDetectedNote(noteName || "-")
-              setDetectedFrequency(Math.round(detectedFreq))
-              setCents(result.cents)
-            }
-          }
-
-          tunerAnimationRef.current = requestAnimationFrame(detectPitch)
-        }
-
-        tunerAnimationRef.current = requestAnimationFrame(detectPitch)
-      } catch (err) {
-        console.error('Failed to start tuner:', err)
-        toast.error(t('tuner_need_mic'))
-      }
-    }
-    } finally {
-      // 无论成功/失败都释放互斥锁 —— 保证失败路径不会把调音器永久锁死。
-      tunerStartingRef.current = false
-    }
-    // stopAudioInput 声明在本 hook 之后（TDZ）：deps 数组是立即求值的，加进来会在
-    // 渲染期抛 "used before declaration"。而本函数体延迟执行（点调音器才跑），调用时
-    // 它早已初始化，故省略该依赖是安全的。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTauri, micEnabled, setMicEnabled, selectedAudioDevice, t, referenceFrequency, inputGain, instrumentConfig.lowestStringHz])
-
-  // 停止调音器
-  const stopTuner = useCallback(async () => {
-    // 先翻转存活标志，再取消 rAF：否则正在执行的那一帧末尾会再排一次 rAF（自续命）。
-    tunerActiveRef.current = false
-    if (tunerAnimationRef.current) {
-      cancelAnimationFrame(tunerAnimationRef.current)
-      tunerAnimationRef.current = null
-    }
-
-    if (isTauri) {
-      // 拆除事件监听与 Rust 检测线程（事件驱动改造新增）
-      if (tunerUnlistenRef.current) {
-        tunerUnlistenRef.current()
-        tunerUnlistenRef.current = null
-      }
-      if (tunerStreamRunningRef.current) {
-        tunerStreamRunningRef.current = false
-        try {
-          const { stopPitchStream } = await import('@/lib/native-audio')
-          await stopPitchStream()
-        } catch (e) {
-          console.error('Failed to stop pitch stream:', e)
-        }
-      }
-      // 🚨 只在「设置里也没开音频输入」时才拆掉 Rust 采集。
-      //    stopTuner 是「退出调音」，不是「关闭音频输入」—— 两者是不同层级的意图。
-      //    旧实现无条件 stopAudioCapture() ⇒ 调音器一关，练习模式的收音也一起死，
-      //    且 `pipeline.rs` 的 `if !is_capturing()` 守卫会让后续检测**静默空转**
-      //    （不报错、只是没反应），正是用户看到的现象。
-      //    调音器复用的是同一个采集后端，退出时把它留着交给练习模式继续用。
-      if (!useAppStore.getState().audio.micEnabled) {
-        try {
-          const { stopAudioCapture } = await import('@/lib/native-audio')
-          await stopAudioCapture()
-        } catch (e) {
-          console.error('Failed to stop native audio:', e)
-        }
-      }
-    }
-
-    if (tunerStreamRef.current) {
-      tunerStreamRef.current.getTracks().forEach(track => track.stop())
-      tunerStreamRef.current = null
-    }
-
-    if (tunerAudioContextRef.current) {
-      tunerAudioContextRef.current.close()
-      tunerAudioContextRef.current = null
-    }
-
-    tunerAnalyserRef.current = null
-    tunerGainNodeRef.current = null
-    setTunerActive(false)
-    setDetectedNote("-")
-    setDetectedFrequency(0)
-    setCents(0)
-    toast.success(t('tuner_stop'))
-  }, [t, isTauri])
-
-  // 切换调音器状态
-  const toggleTuner = useCallback(() => {
-    if (tunerActive) {
-      stopTuner()
-    } else {
-      startTuner()
-    }
-  }, [tunerActive, startTuner, stopTuner])
-
-  // 关闭调音器面板时停止调音
-  useEffect(() => {
-    if (!tunerOpen && tunerActive) {
-      stopTuner()
-    }
-  }, [tunerOpen, tunerActive, stopTuner])
 
   const saveSettings = useCallback(() => {
     toast.success(t('save_success'))
@@ -2325,8 +1958,10 @@ export default function FretMasterPage() {
     // startPitchDetectionWithNodes 声明在本 hook 之后（TDZ）：deps 数组是立即求值的，
     // 加进来会在渲染期抛 "used before declaration"。而本函数体延迟执行（点麦才跑），
     // 调用时它早已初始化，故省略该依赖是安全的。
+    // 同理 `tunerActive` / `stopTuner` 也已随调音器搬到 hooks/use-tuner.ts、声明在本
+    // 回调之后 —— 且本函数体并不使用它们（历史上它们在 deps 里只是摆设），故一并删掉。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noiseFloor, tunerActive, audioContext, setAudioInitializing, setAudioError, stopTuner, selectedAudioDevice, inputGain, useAudioWorklet, language, syncWorkletYinParams, setMicEnabled])
+  }, [noiseFloor, audioContext, setAudioInitializing, setAudioError, selectedAudioDevice, inputGain, useAudioWorklet, language, syncWorkletYinParams, setMicEnabled])
 
   // 处理 AudioWorklet 消息
 
@@ -2469,21 +2104,47 @@ export default function FretMasterPage() {
         audioContextRef.current.close().catch(() => {})
         audioContextRef.current = null
       }
-      // 调音器链路
-      if (tunerAnimationRef.current) {
-        cancelAnimationFrame(tunerAnimationRef.current)
-        tunerAnimationRef.current = null
-      }
-      if (tunerStreamRef.current) {
-        tunerStreamRef.current.getTracks().forEach(track => track.stop())
-        tunerStreamRef.current = null
-      }
-      if (tunerAudioContextRef.current) {
-        tunerAudioContextRef.current.close().catch(() => {})
-        tunerAudioContextRef.current = null
-      }
+      // 调音器链路 —— 它是一条**独立**的收音路径（自己的 AudioContext + rAF），
+      // 但停止练习收音时也必须一起拆掉，否则两条检测链会抢同一个流 / 各自空转。
+      // 具体清理逻辑已随调音器搬进 hooks/use-tuner.ts，这里只发号施令
+      // （经 ref 调用，避免把 `disposeTunerChain` 放进本回调的 `[]` deps 而连锁重建）。
+      tunerDisposeChainRef.current()
     }
   }, [])
+
+  // 调音器 —— 独立功能域，已抽到 hooks/use-tuner.ts（自己的 AudioContext + rAF，
+  // 或 Tauri 的 Rust 事件流）。返回对象与原有局部变量同名同型，故下面零改动。
+  // 🚨 本调用点必须留在 `stopAudioInput` 声明**之后**：options 对象是立即求值的，
+  //    放前面会 TDZ（拿到 undefined，点调音器时才炸）。解构出的变量只被 4300 行
+  //    之后的 JSX 与若干回调用到，晚声明无妨。
+  const tuner = useTuner({
+    isTauri,
+    micEnabled,
+    setMicEnabled,
+    selectedAudioDevice,
+    t,
+    referenceFrequency,
+    inputGain,
+    lowestStringHz: instrumentConfig.lowestStringHz,
+    pitchAlgorithm: audioSettings.pitchAlgorithm,
+    confidenceThreshold,
+    stopAudioInput,
+  })
+  const {
+    tunerOpen,
+    setTunerOpen,
+    tunerActive,
+    detectedNote,
+    detectedFrequency,
+    cents,
+    stopTuner,
+    toggleTuner,
+  } = tuner
+  // `disposeTunerChain` 用 ref 接住：`stopAudioInput` 的 deps 是 `[]`，
+  // 直接放 `tuner.disposeTunerChain` 会让它每次渲染重建并连锁触发下游回调重建。
+  const tunerDisposeChainRef = useRef<() => void>(() => {})
+  tunerDisposeChainRef.current = tuner.disposeTunerChain
+
 
   // 当 micEnabled 为 true 时自动启动音频输入（仅限 Web 版本）
   useEffect(() => {
@@ -3686,14 +3347,11 @@ export default function FretMasterPage() {
           if (!chordType) break
 
           const rootIdx = getNoteIndex(chordExerciseTargetChord.root)
-          const degreeToSemitone: Record<string, number> = {
-            "1": 0, "b2": 1, "2": 2, "#2": 3,
-            "b9": 1, "9": 2, "#9": 3,
-            "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8,
-            "b6": 8, "6": 9, "#6": 10, "7": 11, "b7": 10, "maj7": 11, "bb7": 9,
-            "b13": 8, "13": 9, "11": 5, "#11": 6
-          }
-          const semitone = degreeToSemitone[currentDegree]
+          // 🚨 音级 → 半音一律走 `DEGREE_TO_SEMITONE`（单一真相源）。
+          //    这里原有一份内联 Record —— 全仓第六份「音级 → 半音」字面量，
+          //    与 lib 里的几份各有各的洞（`#2`/`b4`/`bb7`/双变音记号覆盖不一致），
+          //    正是「同一个量多处判定」的活证。详见 lib/degree-semitone.ts 头注释。
+          const semitone = DEGREE_TO_SEMITONE[currentDegree]
           if (semitone === undefined) break
 
           const targetNoteIdx = (rootIdx + semitone) % 12
@@ -3851,13 +3509,9 @@ export default function FretMasterPage() {
             const normalizedType = normalizeChordType(chordExerciseTargetChord.type)
             const chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === chordExerciseTargetChord.type)
             if (chordType && currentDegree) {
-              const degreeToSemitone: Record<string, number> = {
-                "1": 0, "b2": 1, "2": 2, "#2": 3,
-                "b9": 1, "9": 2, "#9": 3, "b3": 3, "3": 4, "4": 5, "#4": 6, "b5": 6, "5": 7, "#5": 8,
-                "b6": 8, "6": 9, "#6": 10, "7": 11, "b7": 10, "maj7": 11, "bb7": 9,
-                "b13": 8, "13": 9, "11": 5, "#11": 6
-              }
-              const targetInterval = degreeToSemitone[currentDegree]
+              // 🚨 同上一处：音级 → 半音走 `DEGREE_TO_SEMITONE` 单一真相源，
+              //    不再内联第二份 Record（历史上全仓共六份，各有各的洞）。
+              const targetInterval = DEGREE_TO_SEMITONE[currentDegree]
               const clickedInterval = (noteIdx - rootIdx + 12) % 12
               isCorrect = clickedInterval === targetInterval
             }
