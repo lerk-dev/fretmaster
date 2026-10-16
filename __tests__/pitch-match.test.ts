@@ -414,7 +414,7 @@ describe('findBestIntervalMatch', () => {
     expect(r.matchedIndex).toBe(1)
   })
 
-  it('等价矩阵：与页面里的旧循环逐点相同', () => {
+  it('等价矩阵：与页面里的旧循环逐点相同 —— 除「串里无根音却开了先找根音」这一处有意修复', () => {
     const degreeSets = [
       ['1', '3', '5'],
       ['1', 'b3', '5', 'b7'],
@@ -422,6 +422,10 @@ describe('findBestIntervalMatch', () => {
     ]
     const completedSets = [[], [0], [0, 1]]
     let checked = 0
+    // 旧实现在这类组合下把**全部**候选跳过 ⇒ 永远不命中（练习卡死、且不报错）。
+    // 新实现走 lib/answer-judge.ts 的退化处理（「先找根音」但串里没有根音 ⇒ 顺序推进）。
+    let repairedCases = 0
+
     for (const degrees of degreeSets) {
       for (const completedIndexes of completedSets) {
         for (const findRootFirst of [false, true]) {
@@ -440,16 +444,42 @@ describe('findBestIntervalMatch', () => {
                 }
                 const oldR = oldFindBestIntervalMatch(input)
                 const newR = findBestIntervalMatch(input)
+                checked++
+
+                if (findRootFirst && !degrees.includes('1')) {
+                  // 差异点：旧式没有 `degrees.includes('1')` 约束
+                  expect(oldR.matchedIndex, '旧实现必然全跳过').toBeNull()
+                  if (newR.matchedIndex !== null) repairedCases++
+                  continue
+                }
+
                 expect(newR.matchedIndex).toBe(oldR.matchedIndex)
                 expect(newR.bestCents).toBe(oldR.bestCents)
-                checked++
               }
             }
           }
         }
       }
     }
+
     expect(checked).toBeGreaterThan(500)
+    // 自检：确实走到了差异点，否则上面那条 `continue` 是空转
+    expect(repairedCases, '新实现应在旧实现卡死的组合上命中').toBeGreaterThan(0)
+  })
+
+  it('反向钉子：旧循环在「无根音 + 先找根音」下恒不命中（证明修复点真实存在）', () => {
+    const input = {
+      frequency: 164.81, // E4，恰好是 degrees[0]='3' 的目标音（root C）
+      probability: 0.9,
+      rootSemitone: 0,
+      degrees: ['3', '5'],
+      completedIndexes: [],
+      findRootFirst: true,
+      sensitivity: 0.5,
+      confidenceThreshold: 0.8,
+    }
+    expect(oldFindBestIntervalMatch(input).matchedIndex).toBeNull() // 卡死
+    expect(findBestIntervalMatch(input).matchedIndex).toBe(0) // 修复后正常推进
   })
 
   it('noteToSemitones 能解析根音（抽出的函数依赖它）', () => {

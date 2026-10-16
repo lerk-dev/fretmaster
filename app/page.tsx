@@ -22,7 +22,14 @@ import { transposeSongChords, parseIrealPro, parseIrealUrl } from "@/lib/song-ch
 import { CUSTOM_CHORD_STORAGE_KEY, parseStoredCustomChords, buildCustomChordsExport } from "@/lib/custom-chords-io"
 import { filterAndGroupSongs } from "@/lib/song-filters"
 import { setStringTuning } from "@/lib/string-tuning"
-import { resolveExpectedIntervalDegree } from "@/lib/interval-expected-degree"
+import {
+  buildIntervalExpectation,
+  buildChordMembershipExpectation,
+  buildSingleTargetExpectation,
+  judgeExpectation,
+  noteNameToPitchClass,
+  scoreDeltaFor,
+} from "@/lib/answer-judge"
 import type {
   PracticeType,
   PracticeStats,
@@ -51,7 +58,6 @@ import {
   normalizeChordType,
   parseChord,
   getScaleDisplayName,
-  isEquivalentNote,
   applyVoiceLeading,
   getScaleNoteNames,
   findNoteIndexInArray,
@@ -2234,6 +2240,8 @@ export default function FretMasterPage() {
         findRootFirst: findRootFirstRef.current,
         sensitivity: currentSensitivity,
         confidenceThreshold: currentConfidenceThreshold,
+        // 候选半音优先取题目自带的音级表 —— 与 MIDI / 点击路径同一来源
+        allIntervals: exercise.allIntervals,
       })
 
       if (matchedIndex !== null) {
@@ -3156,56 +3164,56 @@ export default function FretMasterPage() {
     }
     
     switch (activeTab) {
-      case "practice":
+      case "practice": {
         // 辨音模式下通过按钮答题，不自动匹配（使用 ref 避免闭包延迟）
         if (practiceAnswerModeRef.current === "buttons") break
+
+        // 🚨 半音比对，不用字符串相等：MIDI / 指板给的音名可能与目标音**异名同音**
+        //    （目标 `C#`、弹的是 `Db`；或目标 `Cb`、弹的是 `B`）⇒ 字面量比较会判错。
+        //    抽取前这里就是 `note === targetNote`。
+        const practiceTargetIdx = getNoteIndex(targetNote)
+        const practicePlayedIdx = noteNameToPitchClass(note)
+        if (practiceTargetIdx < 0 || practicePlayedIdx < 0) break
+
+        const practiceVerdict = judgeExpectation(
+          buildSingleTargetExpectation({ label: targetNote, targetSemitone: practiceTargetIdx }),
+          practicePlayedIdx,
+        )
         // 逐位置掌握度统计：指板点击路径优先用点击位置，否则用目标位置
-        recordPositionStat(note === targetNote)
-        if (note === targetNote) {
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-          // 音高识别统计改为按会话记录，不在此处累加 —— 见 pitchFindingSession 统计 effect
-          generateNewTarget()
-        } else {
-          setScore(prev => ({ ...prev, total: prev.total + 1 }))
-        }
+        recordPositionStat(practiceVerdict.hit)
+        const practiceDelta = scoreDeltaFor(practiceVerdict.hit)
+        setScore(prev => ({ correct: prev.correct + practiceDelta.correct, total: prev.total + practiceDelta.total }))
+        // 音高识别统计改为按会话记录，不在此处累加 —— 见 pitchFindingSession 统计 effect
+        if (practiceVerdict.hit) generateNewTarget()
         break
-      case "interval":
+      }
+      case "interval": {
         // Handle interval practice
         if (!currentIntervalExercise || currentIntervalExercise.answered) break
-        
+
         const exercise = currentIntervalExercise
+        const playedIdx = noteNameToPitchClass(note)
+        if (playedIdx < 0) break
+
+        // 🚨 「这一步该弹哪些音」交给 `lib/answer-judge.ts` —— 音频 / MIDI / 点击三条路径共用。
+        //    抽取前这里是一段手写 for 循环，遍历**全部**未完成候选并 `break` 命中第一个匹配上的，
+        //    于是在 display `"b3 1"`（回弹根音）里 step 0 弹根音也能推进；而点击路径的
+        //    `resolveExpectedIntervalDegree` 判它是错的 ⇒ **点了显示红色、练习却悄悄前进了一步**。
+        //    另外原来查题目自带的 `allIntervals` 时**没有取模**，复合音程会错开一个八度。
+        const expectation = buildIntervalExpectation({
+          display: exercise.currentIntervalDisplay,
+          completedIndexes: exercise.completedIntervals,
+          findRootFirst,
+          rootSemitone: getNoteIndex(exercise.rootNote),
+          strictOrder: true,
+          allIntervals: exercise.allIntervals,
+          fallbackSemitoneOf: (label) => DEGREE_TO_SEMITONE[label],
+        })
+        const verdict = judgeExpectation(expectation, playedIdx)
+        const matchedIndex = verdict.matchedIndex
         const intervals = exercise.currentIntervalDisplay.split(' ')
-        const rootNote = exercise.rootNote
 
-        // 检查弹对的音符是哪个音级
-        let matchedIndex: number | null = null
-
-        for (let idx = 0; idx < intervals.length; idx++) {
-          const interval = intervals[idx]
-          // 跳过已经完成的音级（按索引）
-          if (exercise.completedIntervals.includes(idx)) continue
-          // 先找根音模式：根音未完成时只接受根音
-          const rootCompleted = intervals.some((intv, i) => intv === '1' && exercise.completedIntervals.includes(i))
-          if (findRootFirst && !rootCompleted && interval !== '1') continue
-
-          // 计算该音程对应的目标音符
-          const intervalObj = interval === '1'
-            ? { semitones: 0, symbol: '1' }
-            : exercise.allIntervals.find(i => i.symbol === interval)
-
-          if (!intervalObj) continue
-
-          const rootIdx = getNoteIndex(rootNote)
-          const targetIndex = (rootIdx + intervalObj.semitones) % 12
-          const targetNoteName = NOTES[targetIndex]
-
-          if (isEquivalentNote(note, targetNoteName)) {
-            matchedIndex = idx
-            break
-          }
-        }
-
-        if (matchedIndex !== null) {
+        if (verdict.hit && matchedIndex !== null) {
           const matchedInterval = intervals[matchedIndex]
           // 添加到已完成列表
           const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
@@ -3239,10 +3247,12 @@ export default function FretMasterPage() {
             }
           }
         } else {
-          // 答错了
-          setScore(prev => ({ ...prev, total: prev.total + 1 }))
+          // 答错了 —— 口径见 lib/answer-judge.ts::scoreDeltaFor（答错也要进分母）
+          const delta = scoreDeltaFor(false)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
         }
         break
+      }
       case "chord":
         // Handle chord practice (和弦转换练习)
         {
@@ -3259,8 +3269,8 @@ export default function FretMasterPage() {
           if (!level) break
 
           const rootIdx = getNoteIndex(currentChord.root)
-          const noteIdx = getNoteIndex(note)
-          const interval = (noteIdx - rootIdx + 12) % 12
+          const noteIdx = noteNameToPitchClass(note)
+          if (noteIdx < 0) break
 
           // 用 getChordDegrees 获取当前和弦在该 level 下的音级字符串数组
           // 然后把音级字符串转成半音数，判断当前音符是否匹配
@@ -3270,17 +3280,30 @@ export default function FretMasterPage() {
           if (shouldVoiceLeadRef.current && lastChordNoteRef.current) {
             degrees = applyVoiceLeading(degrees, currentChord.root, lastChordNoteRef.current)
           }
-          const validSemitones = degrees
-            .map(d => intervalToSemitones[d])
-            .filter((s): s is number => s !== undefined)
-          const isCorrect = validSemitones.includes(interval)
+
+          // 🚨 音级 → 半音走 `DEGREE_TO_SEMITONE` 单一真相源；「哪些音算和弦内音」
+          //    交给 `buildChordMembershipExpectation`（内部完成复合音程取模与八度去重）。
+          //    抽取前这里是 `validSemitones.includes(interval)`：复合音程（9/11/13）
+          //    不取模 ⇒ 含扩展音的和弦在这里必然判错。
+          // 🚨 已知分叉（未收敛，改动前需确认产品语义）：本路径用 **level 的 voicing**
+          //    （`degrees`），而点击路径用**完整和弦定义**（`chordType.intervals`）
+          //    ⇒ 点击弹中任一和弦内音即绿，MIDI 只认当前 voicing。见 __tests__/answer-judge.test.ts。
+          const expectation = buildChordMembershipExpectation({
+            rootSemitone: rootIdx,
+            intervals: degrees
+              .map(d => DEGREE_TO_SEMITONE[d])
+              .filter((s): s is number => s !== undefined),
+          })
+          const isCorrect = judgeExpectation(expectation, noteIdx).hit
 
           if (isCorrect) {
             // 完成当前和弦，记录最后一个音用于 voice leading（与 audio 路径一致）
             lastChordNoteRef.current = note
-            setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+            const delta = scoreDeltaFor(true)
+            setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
           } else {
-            setScore(prev => ({ ...prev, total: prev.total + 1 }))
+            const delta = scoreDeltaFor(false)
+            setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
           }
         }
         break
@@ -3304,10 +3327,17 @@ export default function FretMasterPage() {
             logger.warn('[scale] 未知音级标签，练习无法推进', currentDegree, selectedScale.name)
             break
           }
-          
-          const playedNoteIdx = getNoteIndex(note)
-          
-          if (playedNoteIdx === targetNoteIdx) {
+
+          const playedNoteIdx = noteNameToPitchClass(note)
+          if (playedNoteIdx < 0) break
+
+          // 单目标判定（与点击路径同一 builder）。
+          const scaleVerdict = judgeExpectation(
+            buildSingleTargetExpectation({ label: currentDegree, targetSemitone: targetNoteIdx }),
+            playedNoteIdx,
+          )
+
+          if (scaleVerdict.hit) {
             // 答对了
             const nextStep = scaleExerciseCurrentStep + 1
             // 连击：ref 记账 + 同步 state（一弦三音面板显示；普通音阶模式下不显示）
@@ -3319,20 +3349,23 @@ export default function FretMasterPage() {
             }
             if (nextStep >= scaleExerciseSequence.length) {
               // 完成当前序列，使用预览的下一题
-              setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+              const delta = scoreDeltaFor(true)
+              setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
               // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
 
               nextScaleExercise()
             } else {
               // 继续下一个音
               setScaleExerciseCurrentStep(nextStep)
-              setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+              const delta = scoreDeltaFor(true)
+              setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
             }
           } else {
             // 答错了
             scaleComboRef.current = 0
             setScaleCombo(0)
-            setScore(prev => ({ ...prev, total: prev.total + 1 }))
+            const delta = scoreDeltaFor(false)
+            setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
           }
         }
         break
@@ -3354,26 +3387,38 @@ export default function FretMasterPage() {
           const semitone = DEGREE_TO_SEMITONE[currentDegree]
           if (semitone === undefined) break
 
-          const targetNoteIdx = (rootIdx + semitone) % 12
-          const playedNoteIdx = getNoteIndex(note)
+          const playedNoteIdx = noteNameToPitchClass(note)
+          if (playedNoteIdx < 0) break
 
-          if (playedNoteIdx === targetNoteIdx) {
+          // 单目标判定（与音阶、点击路径同一个 builder）。
+          const exerciseVerdict = judgeExpectation(
+            buildSingleTargetExpectation({
+              label: currentDegree,
+              targetSemitone: (rootIdx + semitone) % 12,
+            }),
+            playedNoteIdx,
+          )
+
+          if (exerciseVerdict.hit) {
             // 答对了
             const nextStep = chordExerciseCurrentStep + 1
             if (nextStep >= chordExerciseSequence.length) {
               // 完成当前和弦，使用预览的下一题
-              setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+              const delta = scoreDeltaFor(true)
+              setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
               // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
 
               nextChordExercise()
             } else {
               // 继续下一个音
               setChordExerciseCurrentStep(nextStep)
-              setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+              const delta = scoreDeltaFor(true)
+              setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
             }
           } else {
             // 答错了
-            setScore(prev => ({ ...prev, total: prev.total + 1 }))
+            const delta = scoreDeltaFor(false)
+            setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
           }
         }
         break
@@ -3490,95 +3535,122 @@ export default function FretMasterPage() {
       const key = `${stringIndex}-${fret}`
       
       // 判断答案是否正确（用于显示颜色）
+      //
+      // 🚨 本判定**只决定红/绿**，真正的状态推进在随后的 `handleMIDINoteInput(clickedNote)`。
+      //    因此这里必须与那条路径用**同一套** builder —— 否则会出现「显示红色、练习却前进」
+      //    （抽取前正是如此：本处用 `interval.semitones` 当期望半音，而 MIDI 路径遍历全部候选）。
       let isCorrect = false
-      
+
       switch (activeTab) {
-        case "practice":
-          // 找音练习：点击的音等于目标音
-          isCorrect = clickedNote === targetNote
+        case "practice": {
+          // 找音练习：半音比对（异名同音也算对，如目标 `C#` 点 `Db`）
+          const targetIdx = getNoteIndex(targetNote)
+          const clickedIdx = noteNameToPitchClass(clickedNote)
+          isCorrect =
+            targetIdx >= 0 &&
+            clickedIdx >= 0 &&
+            judgeExpectation(
+              buildSingleTargetExpectation({ label: targetNote, targetSemitone: targetIdx }),
+              clickedIdx,
+            ).hit
           // 逐位置统计：暂存点击位置，供随后 handleMIDINoteInput 记录
           lastFretClickPositionRef.current = { stringIndex, fret }
           break
-          
-        case "chord_exercise":
-          // 和弦练习：点击的音是当前需要答的音
+        }
+
+        case "chord_exercise": {
+          // 和弦练习：与 MIDI 路径同一 builder
           if (chordExerciseTargetChord && chordExerciseSequence.length > 0) {
             const currentDegree = chordExerciseSequence[chordExerciseCurrentStep]
-            const noteIdx = getNoteIndex(clickedNote)
             const rootIdx = getNoteIndex(chordExerciseTargetChord.root)
-            const normalizedType = normalizeChordType(chordExerciseTargetChord.type)
-            const chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === chordExerciseTargetChord.type)
-            if (chordType && currentDegree) {
-              // 🚨 同上一处：音级 → 半音走 `DEGREE_TO_SEMITONE` 单一真相源，
-              //    不再内联第二份 Record（历史上全仓共六份，各有各的洞）。
-              const targetInterval = DEGREE_TO_SEMITONE[currentDegree]
-              const clickedInterval = (noteIdx - rootIdx + 12) % 12
-              isCorrect = clickedInterval === targetInterval
+            const clickedIdx = noteNameToPitchClass(clickedNote)
+            // 音级 → 半音走 `DEGREE_TO_SEMITONE` 单一真相源（历史上全仓共六份内联表）
+            const semitone = DEGREE_TO_SEMITONE[currentDegree]
+            if (semitone !== undefined && rootIdx >= 0 && clickedIdx >= 0) {
+              isCorrect = judgeExpectation(
+                buildSingleTargetExpectation({
+                  label: currentDegree,
+                  targetSemitone: rootIdx + semitone,
+                }),
+                clickedIdx,
+              ).hit
             }
           }
           break
-          
-        case "scale":
-          // 音阶练习：点击的音是当前需要答的音
+        }
+
+        case "scale": {
+          // 音阶练习：与 MIDI / 音频两条路径共用 `resolveScaleTargetNoteIndex` 这一个真相源。
+          // 🚨 禁止再手写「半音 → 音级标签」反查表：音级标签是**异名同音**的
+          //    （#4/b5、#5/b6、#2/b3…），反查表只能表达其中一侧，另一侧永远比不上 ⇒ 弹对了判错。
+          //    正向比较（标签 → 半音 → 音名下标）从根上不需要「选哪一侧」。
           if (scaleExerciseSequence.length > 0) {
             const currentDegree = scaleExerciseSequence[scaleExerciseCurrentStep]
-            const noteIdx = getNoteIndex(clickedNote)
-            // 🚨 与 MIDI 路径共用真相源 `resolveScaleTargetNoteIndex`，**禁止**再手写
-            // 「半音 → 音级标签」反查表：音级标签是**异名同音**的（#4/b5、#5/b6、#2/b3…），
-            // 反查表只能表达其中一侧，另一侧永远比不上 ⇒ 弹对了判错。
-            // 实测（76 个音阶穷举）22 个音阶受影响，含最常用的 Lydian（#4 被反查成 b5）
-            // 与 Blues（#4）；Whole Tone 的 #4/#5/#6 三个音全错。
-            // 正向比较（标签 → 半音 → 音名下标）从根上不需要「选哪一侧」。
-            // 与 MIDI 路径共用 `lib/scale-target-note.ts` 这一个真相源。
+            const clickedIdx = noteNameToPitchClass(clickedNote)
             const targetNoteIdx = resolveScaleTargetNoteIndex(selectedScale, currentDegree, scaleKey)
             if (targetNoteIdx === undefined) {
               logger.warn('[scale] 未知音级标签，练习无法推进', currentDegree, selectedScale.name)
               break
             }
-            isCorrect = noteIdx === targetNoteIdx
+            isCorrect =
+              clickedIdx >= 0 &&
+              judgeExpectation(
+                buildSingleTargetExpectation({ label: currentDegree, targetSemitone: targetNoteIdx }),
+                clickedIdx,
+              ).hit
           }
           break
-          
-        case "interval":
-          // 音程练习：点击的音 = 序列里当前该弹的那个音级
-          // （含「回弹根音」收尾的 1；推导见 lib/interval-expected-degree.ts）
+        }
+
+        case "interval": {
+          // 音程练习：候选推导与音频 / MIDI 两条路径共用 `buildIntervalExpectation`。
+          // 🚨 抽取前这里把 `currentIntervalExercise.interval?.semitones`（**本题目音程**）
+          //    当成「当前期望半音」⇒ display 含多个不同音级时（如 `"3 5"`）必然判错；
+          //    只有「恰好等于本题音程的那一个音级」才判得对。
           if (currentIntervalExercise) {
-            const noteIdx = getNoteIndex(clickedNote)
-            const rootIdx = getNoteIndex(currentIntervalExercise.rootNote)
-            const clickedInterval = (noteIdx - rootIdx + 12) % 12
-            const expectedDegree = resolveExpectedIntervalDegree(
-              currentIntervalExercise.currentIntervalDisplay,
-              currentIntervalExercise.completedIntervals,
+            const clickedIdx = noteNameToPitchClass(clickedNote)
+            const expectation = buildIntervalExpectation({
+              display: currentIntervalExercise.currentIntervalDisplay,
+              completedIndexes: currentIntervalExercise.completedIntervals,
               findRootFirst,
-            )
-            const expectedSemitone = expectedDegree === null
-              ? undefined
-              : expectedDegree === '1'
-                ? 0
-                : currentIntervalExercise.interval?.semitones % 12
-            isCorrect = expectedSemitone !== undefined && clickedInterval === expectedSemitone
+              rootSemitone: getNoteIndex(currentIntervalExercise.rootNote),
+              strictOrder: true,
+              allIntervals: currentIntervalExercise.allIntervals,
+              fallbackSemitoneOf: (label) => DEGREE_TO_SEMITONE[label],
+            })
+            isCorrect = clickedIdx >= 0 && judgeExpectation(expectation, clickedIdx).hit
           }
           break
-          
-        case "chord":
-          // 和弦转换练习：点击的音在当前和弦中
-          {
-            const chords = transposedChords
-            const currentChord = chords[currentChordIndex]
-            if (currentChord) {
-              const noteIdx = getNoteIndex(clickedNote)
-              const rootIdx = getNoteIndex(currentChord.root)
-              const normalizedType = normalizeChordType(currentChord.type)
-              const chordType = CHORD_TYPES.find(ct => ct.name === normalizedType || ct.symbol === normalizedType || ct.name === currentChord.type || ct.symbol === currentChord.type)
-              if (chordType) {
-                // 🚨 和弦音程含复合音程（9→14、13→21…），interval 恒 0..11 ⇒ 必须各自取模，
-                // 否则含 9/11/13 的和弦点击扩展音会被判错（且与弹奏路径判定相反）。
-                const interval = (noteIdx - rootIdx + 12) % 12
-                isCorrect = chordType.intervals.some(i => i % 12 === interval)
-              }
+        }
+
+        case "chord": {
+          // 和弦转换练习：与音频 / MIDI 两条路径同一 builder。
+          // 🚨 这里原用 `chordType.intervals`（**和弦的完整定义**，弹中任一和弦内音即绿），
+          //    而音频与 MIDI 两条路径用 `getChordDegrees(...)`（**当前 level 的 voicing**，
+          //    并叠加 voice leading）⇒ 点击比实际推进宽松。现统一到 voicing 侧。
+          const chords = transposedChords
+          const currentChord = chords[currentChordIndex]
+          if (currentChord) {
+            const rootIdx = getNoteIndex(currentChord.root)
+            const clickedIdx = noteNameToPitchClass(clickedNote)
+            let degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
+            if (shouldVoiceLeadRef.current && lastChordNoteRef.current) {
+              degrees = applyVoiceLeading(degrees, currentChord.root, lastChordNoteRef.current)
+            }
+            if (rootIdx >= 0 && clickedIdx >= 0) {
+              isCorrect = judgeExpectation(
+                buildChordMembershipExpectation({
+                  rootSemitone: rootIdx,
+                  intervals: degrees
+                    .map((d) => DEGREE_TO_SEMITONE[d])
+                    .filter((s): s is number => s !== undefined),
+                }),
+                clickedIdx,
+              ).hit
             }
           }
           break
+        }
       }
       
       setHighlightedFrets(prev => new Map(prev).set(key, isCorrect))
@@ -3606,7 +3678,7 @@ export default function FretMasterPage() {
         }, 100),
       ]
     }
-  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, selectedScale, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords, clearFretClickTimers])
+  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, selectedScale, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords, clearFretClickTimers, practiceLevel, getLevelOptions])
 
   const updateLevelOptions = useCallback((levelId: string) => {
     const level = ALL_SOLO_LEVELS.find(l => l.id === levelId)

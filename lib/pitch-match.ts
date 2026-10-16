@@ -10,6 +10,7 @@
 
 import { getAdjustedCents } from '@/lib/pitch-detection'
 import { intervalToSemitones } from '@/lib/page-theory-functions'
+import { buildExpectationFromLabels } from '@/lib/answer-judge'
 
 /** 十二平均律：音级半音数（相对 C=0 的 0~11）→ 频率（A4 = 440Hz） */
 export function semitoneToFrequency(semitone: number): number {
@@ -109,6 +110,11 @@ export interface IntervalMatchInput {
   findRootFirst: boolean
   sensitivity: number
   confidenceThreshold: number
+  /**
+   * 题目自带的音级表（`currentIntervalExercise.allIntervals`）—— 候选半音的**首选**来源。
+   * 省略时退回 `intervalToSemitones`（`lib/degree-semitone.ts` 的真相源表）。
+   */
+  allIntervals?: ReadonlyArray<{ symbol: string; semitones: number }>
 }
 
 export interface IntervalMatchResult {
@@ -119,30 +125,46 @@ export interface IntervalMatchResult {
 }
 
 /**
- * 音程练习的"候选里挑最准的一个"。
+ * 音程练习的"候选里挑最准的一个"（音频路径专用）。
  *
- * 与原实现的差异仅一处**可证等价**的整理：`rootCompleted` 原本写在循环体内，
- * 但它只依赖 degrees 与 completedIndexes（循环中都不变），故提到循环外。
+ * **候选集来自唯一真相源** `lib/answer-judge.ts::buildExpectationFromLabels`
+ * —— 与点击、MIDI 两条路径同一份推导（`strictOrder: false`：音频要拿到全部候选
+ * 才能挑音分差最小的那个）。
+ *
+ * 抽取前这里自行推导候选，有两处与其余路径不一致：
+ *  ① 漏了「先找根音但串里没有根音」的退化处理（原式没有 `degrees.includes('1')` 约束）
+ *     ⇒ 那种题目下**所有**候选被跳过 ⇒ 永远不命中，表现为「弹对了没反应」且不报错；
+ *  ② 半音只查 `intervalToSemitones`，不用题目自带的 `allIntervals`，
+ *     而 MIDI / 点击路径优先用题目自带的 ⇒ 同一音级可能算出两个目标音。
+ *
+ * 门限策略与 `matchThresholdCents` 一致（`degree === '1'` 走 25 音分档）。
  */
 export function findBestIntervalMatch(input: IntervalMatchInput): IntervalMatchResult {
-  const { degrees, completedIndexes } = input
-  const rootCompleted = degrees.some((d, i) => d === '1' && completedIndexes.includes(i))
+  const expectation = buildExpectationFromLabels({
+    labels: input.degrees,
+    completed: input.completedIndexes,
+    findRootFirst: input.findRootFirst,
+    rootSemitone: input.rootSemitone,
+    strictOrder: false,
+    semitoneOf: (label) => {
+      if (label === '1') return 0
+      const own = input.allIntervals?.find((i) => i.symbol === label)
+      if (own) return own.semitones
+      return intervalToSemitones[label]
+    },
+  })
 
+  const byIndex = new Map(expectation.candidates.map((c) => [c.index, c]))
   let matchedIndex: number | null = null
   let bestCents = Infinity
 
-  for (let idx = 0; idx < degrees.length; idx++) {
-    const degree = degrees[idx]
-    if (completedIndexes.includes(idx)) continue
-    if (input.findRootFirst && !rootCompleted && degree !== '1') continue
+  for (const index of expectation.activeIndexes) {
+    const candidate = byIndex.get(index)
+    if (!candidate) continue
 
-    const intervalSemitone = intervalToSemitones[degree]
-    if (intervalSemitone === undefined) continue
-
-    const targetSemitone = targetSemitoneOf(input.rootSemitone, intervalSemitone)
-    const targetFrequency = semitoneToFrequency(targetSemitone)
+    const targetFrequency = semitoneToFrequency(candidate.semitone)
     const adjustedCents = getAdjustedCents(input.frequency, targetFrequency)
-    const matchThreshold = matchThresholdCents(input.frequency, degree, input.sensitivity)
+    const matchThreshold = matchThresholdCents(input.frequency, candidate.label, input.sensitivity)
 
     if (
       adjustedCents <= matchThreshold &&
@@ -150,7 +172,7 @@ export function findBestIntervalMatch(input: IntervalMatchInput): IntervalMatchR
       input.probability > input.confidenceThreshold
     ) {
       bestCents = adjustedCents
-      matchedIndex = idx
+      matchedIndex = index
     }
   }
 

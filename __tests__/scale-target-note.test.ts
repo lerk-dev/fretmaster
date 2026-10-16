@@ -183,12 +183,17 @@ describe('源码级护栏：麦克风（音阶）路径也必须走真相源', (
     expect(branch).not.toContain('intervalToSemitones')
   })
 
-  it('intervalToSemitones 只剩和弦三处（音阶那处已迁走）', () => {
+  it('intervalToSemitones 只剩音频路径的和弦两处（音阶与 MIDI 那两处已迁走）', () => {
     const page = fs.readFileSync(path.join(ROOT, 'app/page.tsx'), 'utf8')
     const uses = page.match(/intervalToSemitones\[/g) ?? []
-    // 铁律 #20：断言**具体数字**。和弦三处（和弦序列 / 和弦音级 / 练习等级度数映射）
-    // 经穷举确认**不含** `#2`/`maj7`，所以用 `intervalToSemitones` 是安全的；
-    // 数字变 4 ⇒ 有人又在音阶处用了它。
-    expect(uses.length, 'intervalToSemitones[ 的调用点数应为 3（全是和弦路径）').toBe(3)
+    // 铁律 #20：断言**具体数字**。剩下的两处都在 `processPracticeMatch`（音频路径）的
+    // 和弦族分支里：它们只需要一个**标量**目标半音去喂 `evaluatePitchMatch` 做音准校验，
+    // 不适合套 `buildSingleTargetExpectation`（那是「给一个确定音名判对错」的语义）。
+    //
+    // 记账：原为 3 处，2026-10-16 第 3 处（`handleMIDINoteInput` 的和弦分支
+    // `intervalToSemitones[d]`）已并入 `lib/answer-judge.ts` 的
+    // `buildChordMembershipExpectation`（顺带修了复合音程不取模）。
+    // 数字变 3 ⇒ 有人又在音阶 / MIDI 处用了它。
+    expect(uses.length, 'intervalToSemitones[ 的调用点数应为 2（都在音频路径的和弦分支）').toBe(2)
   })
 })

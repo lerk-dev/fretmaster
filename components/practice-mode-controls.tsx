@@ -9,7 +9,12 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { NOTES } from '@/lib/page-theory-data'
-import { getNoteAtPosition, isEquivalentNote } from '@/lib/page-theory-functions'
+import { getNoteAtPosition } from '@/lib/page-theory-functions'
+import {
+  buildSingleTargetExpectation,
+  judgeExpectation,
+  noteNameToPitchClass,
+} from '@/lib/answer-judge'
 
 interface PracticeModeControlsProps {
   /** 翻译函数 */
@@ -60,7 +65,7 @@ interface PracticeModeControlsProps {
 
 /**
  * 找音练习控制面板（从 app/page.tsx 原样搬出，行为不变）。
-含按钮答题模式的判定与计分逻辑（isEquivalentNote 等音判定、recordPositionStat 逐位置统计）。
+含按钮答题模式的判定与计分逻辑（等音判定走 `lib/answer-judge.ts` 真相源、recordPositionStat 逐位置统计）。
  */
 export const PracticeModeControls = memo(function PracticeModeControls({
   t,
@@ -241,11 +246,21 @@ export const PracticeModeControls = memo(function PracticeModeControls({
             variant="outline"
             size="sm"
             onClick={() => {
-              // 检查答案是否正确（使用 isEquivalentNote 处理等音，如 C♯ = D♭）
+              // 检查答案是否正确 —— 走 `lib/answer-judge.ts` 唯一真相源（半音比对，
+              // 天然处理等音，如 C♯ = D♭）。这里原用 `isEquivalentNote` 自算一份，
+              // 是全仓第五处「答对判定」实现。
               if (highlightedTargetPosition) {
                 const { stringIndex, fret } = highlightedTargetPosition
                 const correctNote = getNoteAtPosition(stringIndex, fret)
-                const isCorrect = isEquivalentNote(note, correctNote)
+                const correctIdx = noteNameToPitchClass(correctNote)
+                const clickedIdx = noteNameToPitchClass(note)
+                const isCorrect =
+                  correctIdx >= 0 &&
+                  clickedIdx >= 0 &&
+                  judgeExpectation(
+                    buildSingleTargetExpectation({ label: correctNote, targetSemitone: correctIdx }),
+                    clickedIdx,
+                  ).hit
 
                 // 显示反馈
                 onHighlightedFretsChange(new Map([[`${stringIndex}-${fret}`, isCorrect]]))
