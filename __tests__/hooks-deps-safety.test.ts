@@ -30,21 +30,37 @@ function depsLines(src: string): string[] {
 }
 
 describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议的两处）', () => {
-  it('useTuner 调用点必须晚于 stopAudioInput 声明（否则 options 立即求值会 TDZ）', () => {
-    // 2026-10-15：调音器域抽到 hooks/use-tuner.ts 后，`stopAudioInput` 作为 option
-    // 传进 hook —— 而 **options 对象是立即求值的**。调用点若摆在 `stopAudioInput`
-    // 声明之前，拿到的是 undefined，点调音器时才炸。
-    // 拆分初期先用过「ref 中转」绕开，后来直接把调用点移到声明之后 —— 更简单，
-    // 也不用多一层间接。本用例钉住这个顺序，防止回归。
+  it('两条收音域的装配顺序：稳定壳 → useTuner → useAudioInput → 壳落值', () => {
+    // 2026-10-16（C2）：`use-tuner` 与 `use-audio-input` 互相需要对方的一个函数 ——
+    //   - 调音器开播前要 `stopAudioInput`（先停练习收音，两者抢同一个麦克风）
+    //   - 收音域开麦前要 `stopTuner` / `tunerActive` / `disposeTunerChain`
+    //   而 **options 对象是立即求值的** ⇒ 直接互传必然有一侧 TDZ。
+    // 采用的解法是「单向壳 + 反向正常传」：
+    //   1. 先声明 `stopAudioInputRef`（初值空实现）与壳 `stopPracticeAudio`（函数体只读 ref）
+    //   2. `useTuner` 拿壳 —— 此刻 ref 里还是空实现，但调音器只会在用户**点开时**延迟调用它
+    //   3. `useAudioInput` 拿真实的 `tunerActive` / `stopTuner` / `tunerDisposeChain`
+    //   4. `useAudioInput` 之后把 ref 指向真实的 `stopAudioInput`
+    // 顺序错了有两种坏法：TDZ 直接崩，或**静默失效**（壳永远停在空实现 ⇒ 开调音器停不掉
+    // 练习收音，两个 AudioContext 抢麦）。本用例把这条装配顺序钉死。
     const src = readFileSync('app/page.tsx', 'utf8')
-    const declIdx = src.indexOf('const stopAudioInput = useCallback(')
-    const callIdx = src.indexOf('const tuner = useTuner(')
-    expect(declIdx, 'page.tsx 里找不到 stopAudioInput 声明').toBeGreaterThan(-1)
-    expect(callIdx, 'page.tsx 里找不到 useTuner 调用').toBeGreaterThan(-1)
-    expect(
-      callIdx,
-      'useTuner 调用点在 stopAudioInput 声明之前 ⇒ options 立即求值拿到 undefined（TDZ）'
-    ).toBeGreaterThan(declIdx)
+    const at = (needle: string, label: string) => {
+      const i = src.indexOf(needle)
+      expect(i, `page.tsx 里找不到：${label}`).toBeGreaterThan(-1)
+      return i
+    }
+    const refDecl = at('const stopAudioInputRef = useRef<() => void>(() => {})', 'stopAudioInputRef 声明')
+    const shellDecl = at('const stopPracticeAudio = useCallback(() => stopAudioInputRef.current(), [])', 'stopPracticeAudio 壳')
+    const tunerCall = at('const tuner = useTuner(', 'useTuner 调用')
+    const audioCall = at('= useAudioInput({', 'useAudioInput 调用')
+    const shellAssign = at('stopAudioInputRef.current = stopAudioInput', '壳落值')
+
+    expect(refDecl, '壳闭包读 `stopAudioInputRef` ⇒ ref 必须在壳之前声明').toBeLessThan(shellDecl)
+    expect(shellDecl, 'useTuner 的 options 立即求值 ⇒ 壳必须在调用点之前声明').toBeLessThan(tunerCall)
+    expect(tunerCall, 'useAudioInput 立即求值 tunerActive/stopTuner ⇒ useTuner 必须在前').toBeLessThan(audioCall)
+    expect(audioCall, '壳只能在 `stopAudioInput` 存在之后才指向它（否则拿到 undefined）').toBeLessThan(shellAssign)
+
+    // 壳必须真的被当成 `stopAudioInput` 传进去 —— 传裸函数就把 TDZ 又绕回来了
+    expect(src, 'useTuner 必须拿「壳」而不是裸函数').toContain('stopAudioInput: stopPracticeAudio,')
   })
 
   it('startTuner 的 deps 里必须有 stopAudioInput（它确实在函数体里被 await）', () => {
@@ -65,17 +81,71 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     ).toBe(true)
   })
 
-  it('page.tsx：startPitchDetectionWithNodes 不得进任何 deps 数组，且必须保留 TDZ 说明', () => {
+  it('page.tsx 不得再引用收音链路内部符号；hook 里它必须声明在 startAudioInput 之前', () => {
+    // 2026-10-16（C2）：音频输入域整块搬进 hooks/use-audio-input.ts，页面**不再**声明
+    // `startPitchDetectionWithNodes`。历史约束是「deps 里不得出现它（TDZ）」，搬完之后
+    // 退化成更强的一条：页面里连名字都不该有（连注释也别留 —— 留着会指向已不存在的声明）。
     const src = readFileSync('app/page.tsx', 'utf8')
-    const bad = depsLines(src).filter((l) => /\bstartPitchDetectionWithNodes\b/.test(l))
-    expect(bad, 'startPitchDetectionWithNodes 声明在 hook 之后，deps 立即求值 ⇒ 会抛 TDZ').toEqual([])
-    expect(src).toContain('startPitchDetectionWithNodes 声明在本 hook 之后（TDZ）')
+    expect(
+      src.includes('startPitchDetectionWithNodes'),
+      '该函数已随收音域搬到 hooks/use-audio-input.ts，页面不应再提到它'
+    ).toBe(false)
+
+    // 在 hook 里它必须**声明在** `startAudioInput` 的 deps 之前：deps 数组立即求值，
+    // 写在后声明的位置会在渲染期抛 TDZ。搬进 hook 时特地把函数挪到了前面，
+    // 于是原来那条 eslint-disable 也可以删掉（依赖照实写全）。
+    const hook = readFileSync('hooks/use-audio-input.ts', 'utf8')
+    const declIdx = hook.indexOf('const startPitchDetectionWithNodes = useCallback(')
+    const depsIdx = hook.indexOf('startPitchDetectionWithNodes, tunerActive, stopTuner]')
+    expect(declIdx, 'hook 里找不到 startPitchDetectionWithNodes 声明').toBeGreaterThan(-1)
+    expect(depsIdx, 'hook 里 startAudioInput 的 deps 没有把它写全（应含 startPitchDetectionWithNodes）').toBeGreaterThan(-1)
+    expect(
+      declIdx,
+      'startAudioInput 的 deps 立即求值 ⇒ 必须先声明 startPitchDetectionWithNodes'
+    ).toBeLessThan(depsIdx)
   })
 
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))
     expect(bad, '请改为单取 action：const setX = useAppStore((s) => s.setX)').toEqual([])
+  })
+
+  // ==================== 收音域（hooks/use-audio-input.ts）内部的两条不变量 ====================
+  // 2026-10-16（C2 搬迁时补）。搬进 hook 时新文件的头部注释一度写着「这两条都有护栏」，
+  // 实际一条都没有 —— 补上，让说明与事实一致。
+  it('卸载清理 effect：必须经 tunerDisposeChainRef 拆调音器链路，deps 保持 []', () => {
+    // 卸载时要连调音器那条独立检测链一起拆（否则页面切换/HMR 后它继续占着麦克风）。
+    // 但 `tunerDisposeChain` 的身份每帧都可能变 ⇒ 写进 deps 会让这个「只跑一次」的
+    // 清理 effect 变成每帧重跑（反复拆链、关掉刚建好的 AudioContext）。
+    // 所以经 ref 调用：ref 在渲染期跟新（不受 deps 管辖）。
+    const src = readFileSync('hooks/use-audio-input.ts', 'utf8')
+    const call = src.indexOf('tunerDisposeChainRef.current()')
+    expect(call, '找不到 tunerDisposeChainRef.current() —— 卸载清理不再拆调音器链路？').toBeGreaterThan(-1)
+
+    const depsStart = src.indexOf('\n  }, [', call)
+    expect(depsStart, '找不到该清理 effect 的 deps 收尾').toBeGreaterThan(call)
+    const depsLine = src.slice(depsStart + 1, src.indexOf('\n', depsStart + 1)).trim()
+    expect(
+      depsLine,
+      `卸载清理 effect 的 deps 应为空数组（现在 ${JSON.stringify(depsLine)}）—— ` +
+        `写进 tunerDisposeChain 会让它每帧重跑`
+    ).toBe('}, [])')
+  })
+
+  it('stopAudioInput 必须中止正在跑的噪声校准（否则会报一个假的「环境很安静」）', () => {
+    // 校准采的是 `analyser` 上的帧；关麦会把那条链路拆掉 ⇒ 不中止的话它会静默采到
+    // 一堆「读不到帧」的无效样本，最后给出一个「底噪很低」的结论。
+    const src = readFileSync('hooks/use-audio-input.ts', 'utf8')
+    const declStart = src.indexOf('const stopAudioInput = useCallback(')
+    expect(declStart, '找不到 stopAudioInput 声明').toBeGreaterThan(-1)
+    const bodyEnd = src.indexOf('\n  }, [', declStart)
+    expect(bodyEnd, '找不到 stopAudioInput 的 deps 收尾').toBeGreaterThan(declStart)
+    const body = src.slice(declStart, bodyEnd)
+    expect(
+      /noiseCalibrationAbortRef\.current\s*=\s*true/.test(body),
+      'stopAudioInput 没有把 noiseCalibrationAbortRef 置 true —— 关麦后校准会在静默中采到无效样本'
+    ).toBe(true)
   })
 
   it('windows-audio-settings.tsx：deps 不得含裸 store，且两个 hook 必须用单取 setMicUserPreference', () => {

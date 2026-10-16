@@ -1,5 +1,6 @@
 /**
- * `app/page.tsx` 的**源码级**契约：调音器不得关闭「启用音频输入」这个全局开关。
+ * `app/page.tsx` / `hooks/use-tuner.ts` / `hooks/use-audio-input.ts` 的**源码级**契约：
+ * 调音器不得关闭「启用音频输入」这个全局开关。
  *
  * 2026-10-02 用户实测报障（桌面 exe）：
  *   在设置里启用音频输入 → 回到练习/调音 → **完全没反应** →
@@ -32,10 +33,14 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-// U0001f6a8 调音器代码横跨这两个文件（2026-10-15 拆分）。少读任何一个都会让锚点自检报错。
+// 🚨 调音器代码横跨这三个文件（2026-10-15 拆 use-tuner；2026-10-16 拆 use-audio-input）。
+//    少读任何一个都会让锚点自检报错。
+//    `startAudioInput` / `stopAudioInput` 已随音频输入域搬进 hooks/use-audio-input.ts ——
+//    本契约管的是「谁会关掉全局音频输入」，所以两个文件的 `setMicEnabled(false)` 都要数。
 const TUNER_SRC = [
   readFileSync('app/page.tsx', 'utf8'),
   readFileSync('hooks/use-tuner.ts', 'utf8'),
+  readFileSync('hooks/use-audio-input.ts', 'utf8'),
 ].join('\n')
 
 /** 剥注释：说明性注释里会提到 `setMicEnabled(false)`（在解释为什么不能乱调），不剥会误判 */
@@ -51,7 +56,7 @@ const SRC = stripComments(TUNER_SRC)
 /** 取一个函数/回调的源码段（从 `const <name> = useCallback(` 到下一个 `}, [...])` 收尾） */
 function sliceCallback(name: string): string {
   const start = SRC.indexOf(`const ${name} = useCallback(`)
-  expect(start, `hooks/use-tuner.ts 里找不到 ${name} —— 护栏会静默空转`).toBeGreaterThan(-1)
+  expect(start, `三个源文件里都找不到 ${name} —— 护栏会静默空转`).toBeGreaterThan(-1)
   const end = SRC.indexOf('\n  }, [', start)
   expect(end, `${name} 的 useCallback 收尾没找到`).toBeGreaterThan(start)
   return SRC.slice(start, end)
@@ -125,7 +130,14 @@ describe('调音器不得关闭全局「启用音频输入」开关', () => {
     }
 
     const hits = [...SRC.matchAll(/setMicEnabled\(false\)/g)].map((m) => m.index!)
-    expect(hits.length, 'page.tsx + use-tuner.ts 里 setMicEnabled(false) 的调用点数量异常').toBeGreaterThanOrEqual(3)
+    // 这条只是「正则还找得到东西吗」的底噪检查 —— 真正的判据是下面的**逐点分诊**：
+    // 任何一个新增的、无守卫的调用点都会在下标循环里被点出来。
+    // 2026-10-16 实测 5 处：use-audio-input 3（startAudioInput 的 catch / stopAudioInput 的实现体 /
+    // 自动开麦 effect 的 catch）+ page.tsx & use-tuner 2。
+    expect(
+      hits.length,
+      'page.tsx + use-tuner.ts + use-audio-input.ts 里 setMicEnabled(false) 的调用点数量异常'
+    ).toBeGreaterThanOrEqual(3)
 
     for (const at of hits) {
       // ① stopAudioInput 的实现体：它的职责就是关，跳过

@@ -1,5 +1,6 @@
 /**
- * 「多帧一致的时间口径」在 app/page.tsx 的**接线**护栏。
+ * 「多帧一致的时间口径」在收音链路上的**接线**护栏。
+ * 2026-10-16 起被扫的源是 `app/page.tsx` + `hooks/use-audio-input.ts`（C2 把收音域抽了出去）。
  *
  * 为什么单独一条：`lib/note-confirm.ts` 的单元测试只能证明**函数**会按 `frameMs` 换算帧数，
  * 证明不了**页面真的把三条路径各自的帧间隔报了上去**。而这三处接线恰恰是 bug 的现场 ——
@@ -15,7 +16,17 @@ import path from 'node:path'
 
 const ROOT = process.cwd()
 const PAGE_REL = path.join('app', 'page.tsx')
-const readPage = (): string => fs.readFileSync(path.join(ROOT, PAGE_REL), 'utf8')
+/**
+ * 🚨 收音链路 2026-10-16 整块搬进 `hooks/use-audio-input.ts`（C2）—— 三条路径的
+ * `frameMs` / 帧长常量 / `detectOnset` 门限实参**都在那边**了。契约不变，被契约的源变了，
+ * 所以两个文件都要扫（锚点找不到会当场失败，不会静默空转）。
+ */
+const AUDIO_HOOK_REL = path.join('hooks', 'use-audio-input.ts')
+const readPage = (): string =>
+  [
+    fs.readFileSync(path.join(ROOT, PAGE_REL), 'utf8'),
+    fs.readFileSync(path.join(ROOT, AUDIO_HOOK_REL), 'utf8'),
+  ].join('\n')
 
 /**
  * 去掉注释后再扫。
@@ -29,12 +40,23 @@ export function stripComments(src: string): string {
     .replace(/(^|[^:\\])\/\/[^\n]*/g, '$1')
 }
 
-/** 页面源码，已剥注释 —— 所有「扫页面代码」的断言都应当用它。 */
+/** 收音链路源码（page.tsx + use-audio-input.ts 拼接），已剥注释 —— 所有扫描断言都应当用它。 */
 const readCode = (): string => stripComments(readPage())
 
-/** 抽出每个 `processPracticeMatchRef.current({ … })` 调用的对象字面量文本。 */
+/**
+ * 抽出每个「练习匹配」调用的对象字面量文本。
+ *
+ * 名字有两种形态、调用形式也有两种 —— 都要认：
+ *   - `processPracticeMatchRef.current({ … })`  ← C2 之前，调用点在 app/page.tsx
+ *   - `processMatchRef.current?.({ … })`        ← C2 之后，调用点搬进 hooks/use-audio-input.ts
+ *     （`?.` 是防御性的：页面在渲染期就把 ref 赋成了 `processPracticeMatch`）
+ * 写成「认名字前缀 + 可选 `?.`」而不是两条字面量，是为了让**第 4 条收音路径**接进来时
+ * 自动被覆盖 —— 只要它也叫 `*MatchRef`。
+ */
 export function extractMatchCalls(src: string): string[] {
-  return [...src.matchAll(/processPracticeMatchRef\.current\(\{([\s\S]*?)\}\)/g)].map((m) => m[1])
+  // 🚨 `?.` 是一个**整体**：写成 `\??\.` 会要求 `.current` 后必有一个点，
+  //    于是 `.current({` 这种老形态一个都匹配不上（本文件的「护栏自测」当场抓到了这个错）。
+  return [...src.matchAll(/process\w*MatchRef\.current(?:\?\.)?\(\{([\s\S]*?)\}\)/g)].map((m) => m[1])
 }
 
 /** 某个调用块是否上报了帧间隔（`frameMs:` 字段）。 */
@@ -49,11 +71,12 @@ describe('多帧一致的时间口径 —— 三条收音路径都必须上报�
     expect(extractMatchCalls('a(); processPracticeMatchRef.current({ x: 1 }) b()')).toHaveLength(1)
   })
 
-  it('page.tsx 里每一个 practice 匹配调用都带 frameMs', () => {
+  it('每一条收音路径的 practice 匹配调用都带 frameMs', () => {
     const calls = extractMatchCalls(readCode())
     expect(
       calls.length,
-      '没找到 processPracticeMatchRef.current 调用（被改名 / 重构了？护栏需要同步）'
+      '没找到「匹配回调」调用点（被改名 / 重构了？护栏需要同步）—— ' +
+        '期望至少 3 条：ScriptProcessor 回退 / AudioWorklet / Tauri 原生流'
     ).toBeGreaterThanOrEqual(3)
 
     const missing = calls.filter((c) => !hasFrameMs(c))
@@ -91,7 +114,7 @@ describe('多帧一致的时间口径 —— 三条收音路径都必须上报�
 
   it('AUDIO_WORKLET_HOP_SIZE 与 worklet 源码里的 hopSize 默认值一致（跨文件同源）', () => {
     const m = readCode().match(/const AUDIO_WORKLET_HOP_SIZE = (\d+)/)
-    expect(m, 'page.tsx 里没找到 AUDIO_WORKLET_HOP_SIZE').not.toBeNull()
+    expect(m, `page.tsx / ${AUDIO_HOOK_REL} 里没找到 AUDIO_WORKLET_HOP_SIZE`).not.toBeNull()
 
     const worklet = fs.readFileSync(
       path.join(ROOT, 'public', 'js', 'audio-worklet-processor.js'),
@@ -172,7 +195,7 @@ describe('起音门限 —— ScriptProcessor 路径必须跟底噪走，不能�
     ])
   })
 
-  it('page.tsx 的门限实参是 updateOnsetGate(energy)，且不再有写死的门限常量', () => {
+  it('回退路径的门限实参是 updateOnsetGate(energy)，且不再有写死的门限常量', () => {
     const src = readCode()
     expect(
       src,
@@ -180,7 +203,10 @@ describe('起音门限 —— ScriptProcessor 路径必须跟底噪走，不能�
     ).not.toContain('SCRIPT_PROCESSOR_ONSET_GATE')
 
     const gate = extractDetectOnsetGate(src)
-    expect(gate, 'page.tsx 里没找到 detectOnset 调用（被重构了？护栏需要同步）').not.toBeNull()
+    expect(
+      gate,
+      `page.tsx / ${AUDIO_HOOK_REL} 里没找到 detectOnset 调用（被重构了？护栏需要同步）`
+    ).not.toBeNull()
     expect(gate, '门限实参不是 updateOnsetGate(energy)：写死字面量 / 换成别的来源都会与另两条路径分叉').toBe(
       'updateOnsetGate(energy)'
     )
@@ -188,7 +214,8 @@ describe('起音门限 —— ScriptProcessor 路径必须跟底噪走，不能�
 
   it('updateOnsetGate 确实从 lib/pitch-detection 引入（不是页面内自建第二真相源）', () => {
     const src = readCode()
-    const importLine = src.match(/import\s*\{([\s\S]*?)\}\s*from\s*"@\/lib\/pitch-detection"/)
+    // 引号两种都要认：app/page.tsx 用双引号，hooks/*.ts 用单引号（仓库既有风格差异）
+    const importLine = src.match(/import\s*\{([\s\S]*?)\}\s*from\s*['"]@\/lib\/pitch-detection['"]/)
     expect(importLine, '没找到对 @/lib/pitch-detection 的具名导入').not.toBeNull()
     expect(importLine![1]).toMatch(/\bupdateOnsetGate\b/)
   })

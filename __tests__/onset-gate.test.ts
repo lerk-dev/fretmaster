@@ -332,6 +332,12 @@ describe('③ 跨实现护栏：三处起音门限必须同规则', () => {
 // 修法是让噪声门也用 `getOnsetGate()`（原始 RMS 的自适应门限，与 worklet 同源同量）。
 
 const PAGE_REL = path.join('app', 'page.tsx')
+/**
+ * 🚨 ScriptProcessor 回退路径 2026-10-16 整块搬进 `hooks/use-audio-input.ts`（C2）。
+ *    本节的断言扫的是那条路径的源码，所以两个文件都要读（锚点找不到会当场失败，
+ *    不会静默空转 —— 见 `extractPracticeNoiseGate` 的 `toBeNull` 分支与自测用例）。
+ */
+const AUDIO_HOOK_REL = path.join('hooks', 'use-audio-input.ts')
 
 /**
  * 去掉注释后再扫源码。
@@ -342,9 +348,14 @@ export function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:\\])\/\/[^\n]*/g, '$1')
 }
 
-/** 页面源码（已剥注释）—— 所有「扫页面代码」的断言都必须用它。 */
+/** 收音链路源码（page.tsx + use-audio-input.ts 拼接，已剥注释）—— 所有扫描断言都必须用它。 */
 export function readPageCode(): string {
-  return stripComments(fs.readFileSync(path.join(ROOT, PAGE_REL), 'utf8'))
+  return stripComments(
+    [
+      fs.readFileSync(path.join(ROOT, PAGE_REL), 'utf8'),
+      fs.readFileSync(path.join(ROOT, AUDIO_HOOK_REL), 'utf8'),
+    ].join('\n')
+  )
 }
 
 /**

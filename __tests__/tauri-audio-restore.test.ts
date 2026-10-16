@@ -26,7 +26,12 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
+// 🚨 本契约钉的三段接线（恢复音频 effect / 乐器 effect）在 2026-10-16 随音频输入域
+//    整块搬进了 `hooks/use-audio-input.ts`（C2）。契约本身没变，**被契约的源文件变了** ——
+//    所以两个文件都要读，否则锚点自检会当场失败（这正是它存在的意义）。
+const AUDIO_HOOK_REL = 'hooks/use-audio-input.ts'
 const PAGE_SRC = readFileSync('app/page.tsx', 'utf8')
+const HOOK_SRC = readFileSync(AUDIO_HOOK_REL, 'utf8')
 
 /** 剥注释：说明性注释里会大段引用旧实现（含 `if (micEnabled) return`），不剥会误判 */
 function stripComments(src: string): string {
@@ -36,7 +41,7 @@ function stripComments(src: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-const SRC = stripComments(PAGE_SRC)
+const SRC = stripComments(`${PAGE_SRC}\n${HOOK_SRC}`)
 
 /**
  * 取出「Tauri 启动恢复音频」那个 effect 的函数体。
@@ -48,7 +53,7 @@ function sliceRestoreEffect(): string {
   const start = SRC.indexOf(startAnchor)
   expect(
     start,
-    `page.tsx 里找不到 \`${startAnchor}\` —— 恢复音频的 effect 被改名/重构，` +
+    `page.tsx / ${AUDIO_HOOK_REL} 里找不到 \`${startAnchor}\` —— 恢复音频的 effect 被改名/重构，` +
       `本护栏会静默空转，请同步更新锚点`
   ).toBeGreaterThan(-1)
 
@@ -281,10 +286,13 @@ function sliceInstrumentEffect(): string {
   const start = SRC.indexOf(startAnchor)
   expect(
     start,
-    `page.tsx 里找不到 \`${startAnchor}\` —— 乐器 effect 被改名/重构，本护栏会静默空转，请同步更新锚点`
+    `page.tsx / ${AUDIO_HOOK_REL} 里找不到 \`${startAnchor}\` —— 乐器 effect 被改名/重构，本护栏会静默空转，请同步更新锚点`
   ).toBeGreaterThan(-1)
 
-  const endAnchor = '}, [instrumentConfig.lowestStringHz, user.instrument, isTauri])'
+  // 依赖数组的第三项 2026-10-16 由 `user.instrument` 变成 `instrumentName`：搬进 hook 后
+  // 页面按值传入当前乐器名（hook 不订阅 store，与 use-tuner 同一约定）。
+  // 语义不变 ——「挂载 + 换乐器 + isTauri 翻真」三者都要触发同步。
+  const endAnchor = '}, [instrumentConfig.lowestStringHz, instrumentName, isTauri])'
   const end = SRC.indexOf(endAnchor, start)
   expect(
     end,
