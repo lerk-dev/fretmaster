@@ -2,9 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from "@/lib/stats-api"
-import { deduplicateStats } from "@/lib/export-utils"
-import { getLocalDateString, dbTimestampToLocalDate, getLocalDaysAgoStart } from "@/lib/utils"
 import { useAppStore, useAudioSettings, usePracticeSettings, useMetronomeSettings, useScore, useIsPlaying, useDisplayScale, useUser, useChordSymbols, clampMetronomeBpm, clampMetronomeBeats } from "@/lib/store"
 import { useChordExercise } from "@/hooks/use-chord-exercise"
 import { useIntervalExercise } from "@/hooks/use-interval-exercise"
@@ -33,8 +30,6 @@ import {
   scoreDeltaFor,
 } from "@/lib/answer-judge"
 import type {
-  PracticeType,
-  PracticeStats,
   StatsTimeRange,
 } from "@/lib/page-stats-types"
 import { getStatsByTimeRange as computeStatsByTimeRange } from "@/lib/stats-range"
@@ -156,7 +151,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { createTranslator } from '@/lib/i18n'
-import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
 import type { AudioDeviceInfo } from '@/lib/native-audio'
 
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
@@ -392,18 +386,17 @@ export default function FretMasterPage() {
   const [currentPracticeSuggestion, setCurrentPracticeSuggestion] = useState<string>("")
 
   // ==================== 统计模块状态 ====================
-  // 练习统计：状态与记录逻辑由 usePracticeStats 提供（同名解构，正文用法不变）
+  // 练习统计：状态、记录与「从服务器加载 / 落库」全在 usePracticeStats（同名解构，正文用法不变）
   const {
     practiceStats,
-    setPracticeStats,
     practiceSessionStartTime,
     setPracticeSessionStartTime,
     practiceElapsedTime,
     setPracticeElapsedTime,
     scoreRef,
-    pendingSaveRef,
     recordPractice,
-  } = usePracticeStats()
+    recentRecords,
+  } = usePracticeStats({ isTauri })
   const [statsTimeRange, setStatsTimeRange] = useState<StatsTimeRange>('today')
   const [highlightedFrets, setHighlightedFrets] = useState<Map<string, boolean>>(new Map())
   const practiceTime = practiceSettings.practiceTime
@@ -596,28 +589,6 @@ export default function FretMasterPage() {
   } = useFeedbackSound()
   const [showPracticeSummary, setShowPracticeSummary] = useState(false)
   const [practiceSummaryData, setPracticeSummaryData] = useState<{correct: number, total: number, duration: number}>({correct: 0, total: 0, duration: 0})
-
-  // 近期练习记录（从服务器加载，用于统计页展示）
-  const [recentRecords, setRecentRecords] = useState<ServerPracticeStats[]>([])
-
-  // 统计数据缓存版本：升级此版本号会自动清除旧的 localStorage 统计缓存
-  // 用于修复历史脏数据（如重复记录、错误时区数据等）
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const CACHE_VERSION = 'v3-20260716'  // v3: 清除路由器清理后残留的本地缓存
-    // P3-3：隐私模式 / 配额超限时 localStorage 读写会抛异常，而 error boundary 拦不住
-    // effect 内抛出的异常 ⇒ 整条 effect 崩掉、后续初始化静默不执行。必须整体包 try/catch。
-    try {
-      const stored = localStorage.getItem(STATS_STORAGE_KEYS.version)
-      if (stored !== CACHE_VERSION) {
-        localStorage.removeItem(STATS_STORAGE_KEYS.stats)
-        localStorage.setItem(STATS_STORAGE_KEYS.version, CACHE_VERSION)
-        logger.info('已清除旧的统计数据缓存', { from: stored, to: CACHE_VERSION })
-      }
-    } catch (e) {
-      console.warn('Failed to migrate stats cache version:', e)
-    }
-  }, [])
 
   // 和弦练习状态
 
@@ -827,195 +798,6 @@ export default function FretMasterPage() {
       songSortOption,
     })
   }, [practiceLevel, progressionKey, chordPlayOrder, progressionRepeat, shouldVoiceLead, shouldRandomizeKeyOnRepeat, songSortOption, setChordProgressionSettings])
-
-  // 从服务器/SQLite加载统计数据
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    // Tauri 环境首次运行：清理历史 localStorage 备份，避免从 Web 版迁移或早期版本遗留的脏数据
-    // 被错误加载（导致"未使用却显示练习记录"）
-    // 仅首次运行执行（用 CLEANED_FLAG 标记），避免每次启动都清掉当次未保存的会话
-    const CLEANED_FLAG = 'fretmaster-tauri-localstorage-cleaned'
-    if (isTauri && !localStorage.getItem(CLEANED_FLAG)) {
-      try {
-        // P3-11：两个键名统一由 clearStatsStorage() 清理（历史上此处漏过一个键 ⇒ 留脏数据）
-        clearStatsStorage()
-        localStorage.setItem(CLEANED_FLAG, '1')
-      } catch (e) {
-        console.warn('Failed to clean legacy localStorage stats:', e)
-      }
-    }
-
-    const loadStatsFromServer = async () => {
-      try {
-        const serverStats = await getAllPracticeStats()
-        
-        const newStats: PracticeStats = {
-          daily: [],
-          total: {
-            count: 0,
-            byType: {
-              pitch_finding: 0,
-              scale: 0,
-              chord_exercise: 0,
-              interval: 0,
-              chord_progression: 0
-            },
-            byDetail: {
-              pitch_finding: [],
-              scale: [],
-              chord_exercise: [],
-              interval: [],
-              chord_progression: []
-            }
-          }
-        }
-        
-        const typeMapping: Record<string, PracticeType> = {
-          '音高识别': 'pitch_finding',
-          '音阶练习': 'scale',
-          '和弦练习': 'chord_exercise',
-          '音程练习': 'interval',
-          '和弦进行': 'chord_progression'
-        }
-        
-        // 先对服务器返回的数据去重，避免旧版本 bug 产生的脏数据
-        // （同一秒内多条同类型记录、或时间差小于 duration 的重复记录）
-        // 导致统计虚高（例如"今天没练习却显示练习了"）
-        const dedupedServerStats = deduplicateStats(serverStats as ServerPracticeStats[])
-        
-        dedupedServerStats.forEach((record: ServerPracticeStats) => {
-          // 使用 dbTimestampToLocalDate 正确解析 SQLite/ISO 时间戳为本地日期
-          // 避免 SQLite 的 "YYYY-MM-DD HH:MM:SS" (UTC) 被错误解析为本地时间
-          const date = record.created_at
-            ? dbTimestampToLocalDate(record.created_at)
-            : getLocalDateString(new Date())
-          const type = typeMapping[record.exercise_type] || 'pitch_finding'
-          const detailName = record.notes?.replace('练习项目: ', '') || record.exercise_type
-          
-          newStats.total.count += 1
-          newStats.total.byType[type] = (newStats.total.byType[type] || 0) + 1
-          
-          const detailList = newStats.total.byDetail[type] || []
-          const existingDetail = detailList.find(d => d.name === detailName)
-          if (existingDetail) {
-            existingDetail.count += 1
-          } else {
-            detailList.push({ name: detailName, count: 1 })
-          }
-          newStats.total.byDetail[type] = detailList
-          
-          let todayStats = newStats.daily.find(d => d.date === date)
-          if (!todayStats) {
-            todayStats = {
-              date: date,
-              totalCount: 0,
-              byType: {
-                pitch_finding: 0,
-                scale: 0,
-                chord_exercise: 0,
-                interval: 0,
-                chord_progression: 0
-              },
-              byDetail: {
-                pitch_finding: [],
-                scale: [],
-                chord_exercise: [],
-                interval: [],
-                chord_progression: []
-              }
-            }
-            newStats.daily.push(todayStats)
-          }
-          
-          todayStats.totalCount += 1
-          todayStats.byType[type] = (todayStats.byType[type] || 0) + 1
-          
-          const todayDetailList = todayStats.byDetail[type] || []
-          const todayExistingDetail = todayDetailList.find(d => d.name === detailName)
-          if (todayExistingDetail) {
-            todayExistingDetail.count += 1
-          } else {
-            todayDetailList.push({ name: detailName, count: 1 })
-          }
-          todayStats.byDetail[type] = todayDetailList
-        })
-        
-        // 只保留最近90天的数据
-        newStats.daily = newStats.daily
-          .filter(d => {
-            // 使用本地时区解析日期，避免 UTC 偏移导致数据被误删
-            const parts = d.date.split('-')
-            if (parts.length !== 3) return false
-            const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-            const ninetyDaysAgo = getLocalDaysAgoStart(90)
-            return date >= ninetyDaysAgo
-          })
-          .sort((a, b) => b.date.localeCompare(a.date))
-        
-        setPracticeStats(newStats)
-        
-        // 保存去重后的近期记录（最多 50 条，按时间倒序），供统计页展示
-        setRecentRecords(dedupedServerStats.slice(0, 50))
-
-        // Tauri 环境以 SQLite 为唯一真相源，不写入 localStorage，避免历史脏数据污染
-        if (!isTauri) {
-          // 服务器记录为 0 时（例如管理员清空了数据库），同步清空 localStorage 旧缓存
-          if (dedupedServerStats.length === 0) {
-            clearStatsStorage()
-          } else {
-            localStorage.setItem(STATS_STORAGE_KEYS.stats, JSON.stringify(newStats))
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load stats:', e)
-        // Tauri 环境失败时返回空统计，不读 localStorage 备份（避免历史脏数据导致"未练习却有记录"）
-        if (!isTauri) {
-          const savedStats = localStorage.getItem(STATS_STORAGE_KEYS.stats)
-          if (savedStats) {
-            try {
-              const stats = JSON.parse(savedStats)
-              setPracticeStats(stats)
-            } catch (e) {
-              console.error('Failed to load stats from localStorage:', e)
-            }
-          }
-        }
-      }
-    }
-    
-    loadStatsFromServer()
-  }, [isTauri, setPracticeStats])
-
-
-  // 待持久化的统计载荷。放在 ref 中，由 [practiceStats] 的 effect 统一落库，
-  // 使 recordPractice 的 state updater 保持纯函数（并发渲染下不会重复保存）。
-
-  // 练习统计持久化（副作用集中在此 effect）：
-  // - 移出 state updater，避免并发渲染下 updater 重复执行导致重复保存
-  // - localStorage 写入加 try-catch，避免配额超限抛异常中断后续的 saveToServer
-  useEffect(() => {
-    const payload = pendingSaveRef.current
-    if (!payload || typeof window === 'undefined') return
-    pendingSaveRef.current = null
-
-    if (!isTauri) {
-      try {
-        localStorage.setItem(STATS_STORAGE_KEYS.stats, JSON.stringify(practiceStats))
-      } catch (e) {
-        logger.error('保存练习统计到 localStorage 失败（可能超出配额）:', e)
-      }
-    }
-
-    saveToServer({
-      exercise_type: payload.detailName,
-      score: payload.score,
-      duration: payload.duration,
-      accuracy: payload.accuracy,
-      notes: `练习项目: ${payload.detailName}`
-    }).catch(err => console.error('保存到服务器失败:', err))
-  }, [practiceStats, isTauri, pendingSaveRef])
-
 
   // 按时间范围取统计（实现已搬到 lib/stats-range.ts，这里只做 practiceStats 绑定，
   // 保持对下游组件的 prop 签名不变：组件仍只传 range）

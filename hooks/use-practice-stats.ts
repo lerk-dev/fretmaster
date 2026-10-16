@@ -1,5 +1,9 @@
-import { useCallback, useRef, useState } from 'react'
-import { getLocalDateString, getLocalDaysAgoStart } from '@/lib/utils'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { getLocalDateString, getLocalDaysAgoStart, dbTimestampToLocalDate } from '@/lib/utils'
+import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
+import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from '@/lib/stats-api'
+import { deduplicateStats } from '@/lib/export-utils'
+import { logger } from '@/lib/logger'
 import type { PracticeType, PracticeStats } from '@/lib/page-stats-types'
 import { useScore } from '@/lib/store'
 
@@ -99,24 +103,41 @@ export function applyPracticeRecord(
 }
 
 /**
- * usePracticeStats
+ * usePracticeStats —— 「练习统计域」的**唯一真相源**。
  *
- * 练习统计：状态、会话计时与「记录一次练习」逻辑。
- * 
- * 从 app/page.tsx 原样搬出，逐行搬运、逻辑未改动：
- * - practiceStats：统计聚合状态（总数/按类型/按明细/按天）
+ * 这个域曾经被劈成两半（state 在这里、加载与落库在 `app/page.tsx`），2026-10-16（C6）
+ * 合并回一个文件。必须合并的理由很具体：`pendingSaveRef` 由 `recordPractice` 写、
+ * 由落库 effect 读并清空 —— 分开时改任一侧都要同时看另一侧。
+ * （铁律 12：同一「量」不许两份判定；换成「同一个域的两处代码」同理。）
+ *
+ * 装的东西：
+ * - practiceStats / recentRecords：聚合状态 + 近期记录（页面把它传给统计面板）
  * - practiceSessionStartTime / practiceElapsedTime：会话计时（开始时刻 + 已累计暂停秒数）
  * - scoreRef：score 的镜像 ref，供音高/MIDI 回调读取最新值
- * - pendingSaveRef：待落库载荷（由页面里 [practiceStats] 的 effect 统一落库，
- *   使 recordPractice 的 state updater 保持纯函数）
  * - recordPractice：算分、聚合统计、写 pendingSaveRef
- * 
- * ⚠️ 唯一有意改动：剔除依赖数组里的遗留项 isTauri —— 原 deps 是
- * [practiceSessionStartTime, practiceElapsedTime, isTauri]，但函数体内从未使用 isTauri。
- * 除此之外逐行未改（校验器已把该替换作为「有意修改」归一化，逐行比对结果一致）。
- * 页面通过解构接回同名变量，因此页面正文一行都不用改。
+ * - pendingSaveRef：**内部**单槽载荷，落库 effect 取走即清空（**不对外暴露**）
+ * - 三段 effect：localStorage 缓存版本迁移、从服务器/SQLite 加载、把载荷送后端
+ *
+ * 🚨 **只暴露「读」，不暴露「写」**：`setPracticeStats` 与 `pendingSaveRef` 都刻意不在返回里 ——
+ *    加载与落库都在本 hook 内完成，于是页面不需要第二条写路径。
+ *    多一个写出口 = 多一种「统计被另一条路径覆盖」的坏法（与 C4 会话域的同一原则）。
+ *
+ * 🚨 **`isTauri` 决定两条路径**：
+ *    · 加载：Tauri 走 SQLite；Web 走 `getAllPracticeStats()`（失败回落 localStorage 备份）
+ *    · 落库：Web 额外写 localStorage 统计缓存；**Tauri 一律不写**（SQLite 是唯一真相源，
+ *      写了就会在下次启动被读回 ⇒ 「没练习却有记录」）
+ *
+ * ⚠️ 历史：旧版搬迁曾剔掉 `recordPractice` deps 里的遗留项 `isTauri`（当时函数体从未使用）；
+ *    C6 起 `isTauri` 成为**真正的**入参，用于上面两条路径。
  */
-export function usePracticeStats() {
+/** 入参：全仓只有 isTauri 一项 —— 它决定统计缓存的读写路径（见文件头）。 */
+export interface UsePracticeStatsOptions {
+  /** Tauri 环境以 SQLite 为唯一真相源 ⇒ 不读也不写 localStorage 统计缓存 */
+  isTauri: boolean
+}
+
+export function usePracticeStats(options: UsePracticeStatsOptions) {
+  const { isTauri } = options
   const score = useScore()
 
   const [practiceStats, setPracticeStats] = useState<PracticeStats>({
@@ -166,15 +187,224 @@ export function usePracticeStats() {
     setPracticeStats(prevStats => applyPracticeRecord(prevStats, { type, detailName, today }))
   }, [practiceSessionStartTime, practiceElapsedTime])
 
+  // 近期练习记录（从服务器加载，用于统计页展示）
+  const [recentRecords, setRecentRecords] = useState<ServerPracticeStats[]>([])
+
+  // 统计数据缓存版本：升级此版本号会自动清除旧的 localStorage 统计缓存
+  // 用于修复历史脏数据（如重复记录、错误时区数据等）
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const CACHE_VERSION = 'v3-20260716'  // v3: 清除路由器清理后残留的本地缓存
+    // P3-3：隐私模式 / 配额超限时 localStorage 读写会抛异常，而 error boundary 拦不住
+    // effect 内抛出的异常 ⇒ 整条 effect 崩掉、后续初始化静默不执行。必须整体包 try/catch。
+    try {
+      const stored = localStorage.getItem(STATS_STORAGE_KEYS.version)
+      if (stored !== CACHE_VERSION) {
+        localStorage.removeItem(STATS_STORAGE_KEYS.stats)
+        localStorage.setItem(STATS_STORAGE_KEYS.version, CACHE_VERSION)
+        logger.info('已清除旧的统计数据缓存', { from: stored, to: CACHE_VERSION })
+      }
+    } catch (e) {
+      console.warn('Failed to migrate stats cache version:', e)
+    }
+  }, [])
+
+  // 从服务器/SQLite加载统计数据
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // Tauri 环境首次运行：清理历史 localStorage 备份，避免从 Web 版迁移或早期版本遗留的脏数据
+    // 被错误加载（导致"未使用却显示练习记录"）
+    // 仅首次运行执行（用 CLEANED_FLAG 标记），避免每次启动都清掉当次未保存的会话
+    const CLEANED_FLAG = 'fretmaster-tauri-localstorage-cleaned'
+    if (isTauri && !localStorage.getItem(CLEANED_FLAG)) {
+      try {
+        // P3-11：两个键名统一由 clearStatsStorage() 清理（历史上此处漏过一个键 ⇒ 留脏数据）
+        clearStatsStorage()
+        localStorage.setItem(CLEANED_FLAG, '1')
+      } catch (e) {
+        console.warn('Failed to clean legacy localStorage stats:', e)
+      }
+    }
+
+    const loadStatsFromServer = async () => {
+      try {
+        const serverStats = await getAllPracticeStats()
+        
+        const newStats: PracticeStats = {
+          daily: [],
+          total: {
+            count: 0,
+            byType: {
+              pitch_finding: 0,
+              scale: 0,
+              chord_exercise: 0,
+              interval: 0,
+              chord_progression: 0
+            },
+            byDetail: {
+              pitch_finding: [],
+              scale: [],
+              chord_exercise: [],
+              interval: [],
+              chord_progression: []
+            }
+          }
+        }
+        
+        const typeMapping: Record<string, PracticeType> = {
+          '音高识别': 'pitch_finding',
+          '音阶练习': 'scale',
+          '和弦练习': 'chord_exercise',
+          '音程练习': 'interval',
+          '和弦进行': 'chord_progression'
+        }
+        
+        // 先对服务器返回的数据去重，避免旧版本 bug 产生的脏数据
+        // （同一秒内多条同类型记录、或时间差小于 duration 的重复记录）
+        // 导致统计虚高（例如"今天没练习却显示练习了"）
+        const dedupedServerStats = deduplicateStats(serverStats as ServerPracticeStats[])
+        
+        dedupedServerStats.forEach((record: ServerPracticeStats) => {
+          // 使用 dbTimestampToLocalDate 正确解析 SQLite/ISO 时间戳为本地日期
+          // 避免 SQLite 的 "YYYY-MM-DD HH:MM:SS" (UTC) 被错误解析为本地时间
+          const date = record.created_at
+            ? dbTimestampToLocalDate(record.created_at)
+            : getLocalDateString(new Date())
+          const type = typeMapping[record.exercise_type] || 'pitch_finding'
+          const detailName = record.notes?.replace('练习项目: ', '') || record.exercise_type
+          
+          newStats.total.count += 1
+          newStats.total.byType[type] = (newStats.total.byType[type] || 0) + 1
+          
+          const detailList = newStats.total.byDetail[type] || []
+          const existingDetail = detailList.find(d => d.name === detailName)
+          if (existingDetail) {
+            existingDetail.count += 1
+          } else {
+            detailList.push({ name: detailName, count: 1 })
+          }
+          newStats.total.byDetail[type] = detailList
+          
+          let todayStats = newStats.daily.find(d => d.date === date)
+          if (!todayStats) {
+            todayStats = {
+              date: date,
+              totalCount: 0,
+              byType: {
+                pitch_finding: 0,
+                scale: 0,
+                chord_exercise: 0,
+                interval: 0,
+                chord_progression: 0
+              },
+              byDetail: {
+                pitch_finding: [],
+                scale: [],
+                chord_exercise: [],
+                interval: [],
+                chord_progression: []
+              }
+            }
+            newStats.daily.push(todayStats)
+          }
+          
+          todayStats.totalCount += 1
+          todayStats.byType[type] = (todayStats.byType[type] || 0) + 1
+          
+          const todayDetailList = todayStats.byDetail[type] || []
+          const todayExistingDetail = todayDetailList.find(d => d.name === detailName)
+          if (todayExistingDetail) {
+            todayExistingDetail.count += 1
+          } else {
+            todayDetailList.push({ name: detailName, count: 1 })
+          }
+          todayStats.byDetail[type] = todayDetailList
+        })
+        
+        // 只保留最近90天的数据
+        newStats.daily = newStats.daily
+          .filter(d => {
+            // 使用本地时区解析日期，避免 UTC 偏移导致数据被误删
+            const parts = d.date.split('-')
+            if (parts.length !== 3) return false
+            const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+            const ninetyDaysAgo = getLocalDaysAgoStart(90)
+            return date >= ninetyDaysAgo
+          })
+          .sort((a, b) => b.date.localeCompare(a.date))
+        
+        setPracticeStats(newStats)
+        
+        // 保存去重后的近期记录（最多 50 条，按时间倒序），供统计页展示
+        setRecentRecords(dedupedServerStats.slice(0, 50))
+
+        // Tauri 环境以 SQLite 为唯一真相源，不写入 localStorage，避免历史脏数据污染
+        if (!isTauri) {
+          // 服务器记录为 0 时（例如管理员清空了数据库），同步清空 localStorage 旧缓存
+          if (dedupedServerStats.length === 0) {
+            clearStatsStorage()
+          } else {
+            localStorage.setItem(STATS_STORAGE_KEYS.stats, JSON.stringify(newStats))
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load stats:', e)
+        // Tauri 环境失败时返回空统计，不读 localStorage 备份（避免历史脏数据导致"未练习却有记录"）
+        if (!isTauri) {
+          const savedStats = localStorage.getItem(STATS_STORAGE_KEYS.stats)
+          if (savedStats) {
+            try {
+              const stats = JSON.parse(savedStats)
+              setPracticeStats(stats)
+            } catch (e) {
+              console.error('Failed to load stats from localStorage:', e)
+            }
+          }
+        }
+      }
+    }
+    
+    loadStatsFromServer()
+  }, [isTauri, setPracticeStats])
+
+
+  // 待持久化的统计载荷。放在 ref 中，由 [practiceStats] 的 effect 统一落库，
+  // 使 recordPractice 的 state updater 保持纯函数（并发渲染下不会重复保存）。
+
+  // 练习统计持久化（副作用集中在此 effect）：
+  // - 移出 state updater，避免并发渲染下 updater 重复执行导致重复保存
+  // - localStorage 写入加 try-catch，避免配额超限抛异常中断后续的 saveToServer
+  useEffect(() => {
+    const payload = pendingSaveRef.current
+    if (!payload || typeof window === 'undefined') return
+    pendingSaveRef.current = null
+
+    if (!isTauri) {
+      try {
+        localStorage.setItem(STATS_STORAGE_KEYS.stats, JSON.stringify(practiceStats))
+      } catch (e) {
+        logger.error('保存练习统计到 localStorage 失败（可能超出配额）:', e)
+      }
+    }
+
+    saveToServer({
+      exercise_type: payload.detailName,
+      score: payload.score,
+      duration: payload.duration,
+      accuracy: payload.accuracy,
+      notes: `练习项目: ${payload.detailName}`
+    }).catch(err => console.error('保存到服务器失败:', err))
+  }, [practiceStats, isTauri, pendingSaveRef])
+
   return {
     practiceStats,
-    setPracticeStats,
+    recentRecords,
     practiceSessionStartTime,
     setPracticeSessionStartTime,
     practiceElapsedTime,
     setPracticeElapsedTime,
     scoreRef,
-    pendingSaveRef,
     recordPractice,
   }
 }

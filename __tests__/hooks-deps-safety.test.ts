@@ -194,6 +194,37 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     ).toBe(true)
   })
 
+  // ==================== 练习统计域：整域必须在一个文件里 ====================
+  // 2026-10-16（C6）。这个域原先被**劈成两半**：state 与 recordPractice 在
+  // `hooks/use-practice-stats.ts`，而「从服务器加载」「落 localStorage」「把载荷送后端」
+  // 散在 `app/page.tsx` —— pendingSaveRef 由 hook 写、由页面 effect 读，改任一侧都要同时看另一侧。
+  // 现在三段 effect 与 recentRecords 都并进了 hook。本用例禁止它再被劈回去。
+  it('练习统计域已整体并入 hook：页面不得再直接读服务器 / 落库', () => {
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const forbidden = [
+      'getAllPracticeStats',
+      'savePracticeStats',
+      'saveToServer',
+      'pendingSaveRef',
+      'STATS_STORAGE_KEYS',
+      'clearStatsStorage',
+      'deduplicateStats',
+    ]
+    const leftovers = forbidden.filter((f) => src.includes(f))
+    expect(
+      leftovers,
+      `页面里又出现了统计域的符号（应追加到 hooks/use-practice-stats.ts，别在页面里另起一套）：\n  ${leftovers.join('\n  ')}`
+    ).toEqual([])
+
+    // 反向自检：这些符号必须确实活在 hook 里（否则本用例就是在断言空气）
+    const hook = readFileSync('hooks/use-practice-stats.ts', 'utf8')
+    for (const f of forbidden) {
+      expect(hook.includes(f), `hooks/use-practice-stats.ts 里没有 ${f} —— 锚点失效，请同步更新本用例`).toBe(true)
+    }
+    // 页面必须真的把 isTauri 传进去（不传 ⇒ 桌面版会去写 localStorage 统计缓存）
+    expect(src, 'usePracticeStats 调用点没传 isTauri').toContain('usePracticeStats({ isTauri })')
+  })
+
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))
