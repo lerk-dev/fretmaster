@@ -438,3 +438,61 @@ describe('源码护栏：page.tsx 必须走本模块，不许再手写候选循�
     expect(controlsBody).not.toMatch(/isEquivalentNote/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// 十、源码护栏：音频路径与 MIDI 路径的**统计口径**必须一致
+// ---------------------------------------------------------------------------
+
+/** 取出 `processPracticeMatch` 的函数体（剥掉注释行）。 */
+function audioMatchBody(): string {
+  const start = PAGE_SRC.indexOf('const processPracticeMatch = useCallback(')
+  expect(start, 'page.tsx 里找不到 processPracticeMatch').toBeGreaterThan(-1)
+  const end = PAGE_SRC.indexOf('\n  }, [', start)
+  expect(end, '找不到 processPracticeMatch 的 deps 行').toBeGreaterThan(start)
+  return PAGE_SRC.slice(start, end)
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n')
+}
+
+describe('源码护栏：音频路径的计分/统计口径与 MIDI 路径一致', () => {
+  // 🚨 起因：2026-10-16 的 C1 提交信息声称「音频路径答错完全不计分（5 个模式全部）」
+  //    已修，但 diff 里 `processPracticeMatch` 的五个分支**一行都没动** ——
+  //    提交信息与代码不符。这组用例把口径真正钉死。
+  it('五个模式都要有「未命中」计分路径', () => {
+    const fnBody = audioMatchBody()
+    // 每个模式的**失败**分支各一条；practice 用 `scoreDeltaFor(matched)` 一次覆盖两侧，
+    // 其余四个模式命中/未命中分开写 ⇒ false 恰好 4 条。
+    const misses = fnBody.match(/scoreDeltaFor\(false\)/g) ?? []
+    expect(
+      misses.length,
+      '音频路径的未命中计分缺分支（interval / scale / chord_exercise / chord 各一条）'
+    ).toBe(4)
+    // 反向钉子：practice 分支的「一次覆盖两侧」也要在
+    expect(fnBody.match(/scoreDeltaFor\(matched\)/g) ?? []).toHaveLength(1)
+  })
+
+  it('不许绕过 scoreDeltaFor 手写「命中 +1/+1」', () => {
+    const fnBody = audioMatchBody()
+    // 手写口径正是当初分叉的来源；命中侧也一律走 scoreDeltaFor(true)。
+    expect(fnBody).not.toMatch(/correct: prev\.correct \+ 1/)
+    // 更强的结构约束：本函数体内 `setScore` 的调用点数必须等于 `scoreDeltaFor` 的使用数
+    // ⇒ 不可能再有「自算一套 delta」的漏网分支。数字变了就说明新增了模式，回来补护栏。
+    expect((fnBody.match(/setScore\(/g) ?? []).length).toBe(12)
+    expect((fnBody.match(/scoreDeltaFor\(/g) ?? []).length).toBe(12)
+  })
+
+  it('找音练习的逐位置统计要命中/未命中都记（此前恒传字面量 true）', () => {
+    // `recordPositionStat(isCorrect)` 记的是「这一次判定」；写成 `recordPositionStat(true)`
+    // 且只在命中分支里 ⇒ Mic 用户的逐位置掌握度恒为「全掌握」。
+    const fnBody = audioMatchBody()
+    expect(fnBody).not.toMatch(/recordPositionStat\(true\)/)
+    expect(fnBody).toMatch(/recordPositionStat\(matched\)/)
+  })
+
+  it('音阶模式的连击记账不能只在 MIDI 路径（Mic 用户此前连击恒为 0）', () => {
+    const fnBody = audioMatchBody()
+    expect(fnBody).toMatch(/scaleComboRef\.current \+= 1/)
+    expect(fnBody).toMatch(/scaleComboRef\.current = 0/)
+  })
+})

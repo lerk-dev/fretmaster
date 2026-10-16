@@ -2206,12 +2206,20 @@ export default function FretMasterPage() {
         confidenceThreshold: currentConfidenceThreshold,
       })
 
+      // 🚨 计分与逐位置统计都必须**命中/未命中各记一次**。
+      //    口径见 `lib/answer-judge.ts::scoreDeltaFor`（答错也进分母）与
+      //    `recordPositionStat(isCorrect)`（它记的是「这一次判定」）。
+      //    此前这里写成 `if (matched) { recordPositionStat(true); setScore(+1/+1) }` ——
+      //    两个后果都是静默的：Mic 用户的正确率恒 100%（分母只有命中），
+      //    且逐位置掌握度永远不会出现「未掌握」。而 MIDI 路径两条都记（见
+      //    `handleMIDINoteInput` 的 practice 分支）⇒ 同一件事两种统计口径。
+      recordPositionStat(matched)
+      const practiceDelta = scoreDeltaFor(matched)
+      setScore(prev => ({ correct: prev.correct + practiceDelta.correct, total: prev.total + practiceDelta.total }))
       if (matched) {
         logger.debug('找音练习匹配成功:', note, '音分差:', adjustedCents.toFixed(1))
         isCoolingDownRef.current = true
         triggerCorrectFeedback(note)
-        setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
-        recordPositionStat(true)
         if (generateNewTargetRef.current) {
           generateNewTargetRef.current()
         }
@@ -2252,7 +2260,8 @@ export default function FretMasterPage() {
 
         if (newCompletedIntervals.length >= intervals.length) {
           setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals, answered: true })
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          const delta = scoreDeltaFor(true)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
           if (addRootBackRef.current && matchedInterval !== '1') {
             setIntervalPracticeStep('root')
           } else if (generateIntervalExerciseRef.current) {
@@ -2266,6 +2275,11 @@ export default function FretMasterPage() {
             setIntervalPracticeStep('root')
           }
         }
+      } else {
+        // 答错了 —— 口径见 `lib/answer-judge.ts::scoreDeltaFor`（答错也进分母）。
+        // 音程模式只在**整题完成**时计正分（与 MIDI 路径一致），未命中则记一次失败。
+        const delta = scoreDeltaFor(false)
+        setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
       }
     } else if (currentActiveTab === 'scale') {
       // 音阶练习 - 使用音分差匹配
@@ -2299,16 +2313,32 @@ export default function FretMasterPage() {
       if (matched) {
         logger.debug('音阶练习匹配成功:', note, '度数:', currentDegree, '音分差:', adjustedCents.toFixed(1))
         triggerCorrectFeedback(note)
+        // 连击：与 MIDI 路径**同一口径**（ref 记账 + 同步 state，供一弦三音面板显示）。
+        // 此前只有 MIDI 路径记账 ⇒ 用麦克风做音阶练习时连击恒为 0、最高连击恒为 0。
+        scaleComboRef.current += 1
+        setScaleCombo(scaleComboRef.current)
+        if (scaleComboRef.current > scaleMaxComboRef.current) {
+          scaleMaxComboRef.current = scaleComboRef.current
+          setScaleMaxCombo(scaleComboRef.current)
+        }
         const nextStep = step + 1
         if (nextStep >= sequence.length) {
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          const delta = scoreDeltaFor(true)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
           if (nextScaleExerciseRef.current) {
             nextScaleExerciseRef.current()
           }
         } else {
           setScaleExerciseCurrentStep(nextStep)
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          const delta = scoreDeltaFor(true)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
         }
+      } else {
+        // 答错了 —— 连击归零 + 计一次失败（与 MIDI 路径同一口径）
+        scaleComboRef.current = 0
+        setScaleCombo(0)
+        const delta = scoreDeltaFor(false)
+        setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
       }
     } else if (currentActiveTab === 'chord_exercise') {
       // 和弦练习 - 使用音分差匹配
@@ -2343,15 +2373,21 @@ export default function FretMasterPage() {
           // 完成整个和弦，设置 answered 状态
           setChordExerciseIsAnswered(true)
           chordExerciseIsAnsweredRef.current = true
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          const delta = scoreDeltaFor(true)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
           if (nextChordExerciseRef.current) {
             nextChordExerciseRef.current()
           }
         } else {
           // 继续下一个音，不设置 answered 状态
           setChordExerciseCurrentStep(nextStep)
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          const delta = scoreDeltaFor(true)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
         }
+      } else {
+        // 答错了 —— 口径见 `lib/answer-judge.ts::scoreDeltaFor`（答错也进分母）
+        const delta = scoreDeltaFor(false)
+        setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
       }
     } else if (currentActiveTab === 'chord') {
       // 和弦转换练习 - 使用音分差匹配
@@ -2392,18 +2428,24 @@ export default function FretMasterPage() {
         if (nextStep >= degrees.length) {
           // 完成当前和弦，记录最后一个音用于 voice leading（与 Web 路径一致）
           lastChordNoteRef.current = note
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          const delta = scoreDeltaFor(true)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
           if (nextChordInfoRef.current && nextChordRef.current) {
             nextChordRef.current()
           }
         } else {
           setChordDegreeCurrentStep(nextStep)
-          setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }))
+          const delta = scoreDeltaFor(true)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
         }
         cooldownRef.current = setTimeout(() => {
           isCoolingDownRef.current = false
           cooldownRef.current = null
         }, 800)
+      } else {
+        // 答错了 —— 口径见 `lib/answer-judge.ts::scoreDeltaFor`（答错也进分母）
+        const delta = scoreDeltaFor(false)
+        setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
       }
     } else if (currentActiveTab === 'tuner') {
       // 调音表模式 - 只显示音高，不需要答题逻辑
