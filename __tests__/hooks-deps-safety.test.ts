@@ -105,6 +105,62 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     ).toBeLessThan(depsIdx)
   })
 
+  // ==================== 练习会话域（hooks/use-practice-session.ts）的两条不变量 ====================
+  // 2026-10-16（C4）。会话域与收音域踩的是**同一个坑**：options 对象立即求值。
+  it('练习会话域的装配顺序：调用点必须在它引用的页面级声明**之后**', () => {
+    // `usePracticeSession({ generateNewTarget, generateScaleExercise, clearFretClickTimers, … })`
+    // 的 options 对象是**渲染期立即求值**的 —— 调用点若摆在这些 `const` 声明之前，
+    // 拿到的是 TDZ 绑定（不是 undefined，而是直接抛 "Cannot access before initialization"）。
+    // 拆出来时路径依赖长得吓人（出题动作由各练习域 hook 提供、且分散在页面各处），
+    // 所以把「调用点晚于谁」钉死，别指望下一个人记得。
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const call = src.indexOf('= usePracticeSession({')
+    expect(call, 'page.tsx 里找不到 usePracticeSession 调用（被改名/搬走了？护栏会静默空转）').toBeGreaterThan(-1)
+
+    const deps: Array<[string, string]> = [
+      ['const [practiceSummaryData, setPracticeSummaryData] = useState', 'setPracticeSummaryData'],
+      ['const clearFretClickTimers = useCallback(', 'clearFretClickTimers'],
+      ['const generateNewTarget = useCallback(', 'generateNewTarget'],
+      ['const generateScaleExercise = useCallback(', 'generateScaleExercise'],
+    ]
+    for (const [needle, label] of deps) {
+      const at = src.indexOf(needle)
+      expect(at, `page.tsx 里找不到 ${label} 的声明 —— 锚点失效，请同步更新本用例`).toBeGreaterThan(-1)
+      expect(at, `usePracticeSession 的 options 立即求值 ⇒ 调用点必须在 ${label} 声明之后`).toBeLessThan(call)
+    }
+  })
+
+  it('练习会话域已整体搬出页面：页面不得再「声明」其中任何一个符号', () => {
+    // 与 C2 的 `startPitchDetectionWithNodes` 那条同型。
+    // 页面允许**使用** `togglePractice` / `resetPractice` / `isPracticePaused`（解构自 hook），
+    // 但不允许再**声明**它们 —— 一旦有人把它拷回去一半，就会出现两份 `isPracticePaused`
+    //（一份在 hook、一份在页面），且页面那份永远不会被 hook 的倒计时 effect 读到。
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const forbidden = [
+      'const togglePractice = useCallback(',
+      'const resetPractice = useCallback(',
+      'const pausePractice = useCallback(',
+      'const resumePractice = useCallback(',
+      'const togglePausePractice = useCallback(',
+      'const savePracticeState = useCallback(',
+      'const [timeLeft, setTimeLeft] = useState(',
+      'const [isPracticePaused, setIsPracticePaused] = useState(',
+      'const sessionStartRef = useRef',
+      'const timerRef = useRef',
+      'const wakeLockRef = useRef',
+      'const tabToPracticeType = (',
+      'fretmaster-practice-state',
+    ]
+    const leftovers = forbidden.filter((f) => src.includes(f))
+    expect(leftovers, `页面里又出现了会话域符号的声明：\n  ${leftovers.join('\n  ')}`).toEqual([])
+
+    // 反向自检：这些符号必须确实活在 hook 里（否则本用例就是「断言空气」）
+    const hook = readFileSync('hooks/use-practice-session.ts', 'utf8')
+    for (const f of forbidden) {
+      expect(hook.includes(f), `hooks/use-practice-session.ts 里没有 ${f} —— 锚点失效，请同步更新本用例`).toBe(true)
+    }
+  })
+
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))

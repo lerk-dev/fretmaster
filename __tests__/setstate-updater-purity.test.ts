@@ -117,10 +117,16 @@ describe('铁律 1：setState updater 必须纯（不得含 Date.now / Math.rand
   })
 
   it('pausePractice：Date.now() 必须在 updater 之外取（P3-1 回归）', () => {
-    const src = readFileSync('app/page.tsx', 'utf8')
+    // 🚨 2026-10-16（C4）：练习会话域整块搬到了 hooks/use-practice-session.ts，
+    //    `pausePractice` 已不在 app/page.tsx。这里读**两个文件**而不是改成只读 hook ——
+    //    万一以后又搬回去，锚点照样命中，不会静默空转。
+    const src = [
+      readFileSync('app/page.tsx', 'utf8'),
+      readFileSync('hooks/use-practice-session.ts', 'utf8'),
+    ].join('\n')
     // 锚点：pausePractice 的定义体
     const idx = src.indexOf('const pausePractice = useCallback(')
-    expect(idx, '未找到 pausePractice').toBeGreaterThan(-1)
+    expect(idx, 'app/page.tsx + hooks/use-practice-session.ts 里都找不到 pausePractice').toBeGreaterThan(-1)
     const body = src.slice(idx, idx + 900)
     // ❌ 不得再出现「把 Date.now() 写进 setPracticeElapsedTime 的 updater」
     expect(
