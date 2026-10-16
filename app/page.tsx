@@ -12,6 +12,7 @@ import { useStructureWindowDrag } from "@/hooks/use-structure-window-drag"
 import { useFullscreen } from "@/hooks/use-fullscreen"
 import { usePracticeStats } from "@/hooks/use-practice-stats"
 import { usePracticeSession } from "@/hooks/use-practice-session"
+import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts"
 import { useAudioDeviceEnumeration } from "@/hooks/use-audio-device-enumeration"
 import { useFeedbackSound } from "@/hooks/use-feedback-sound"
 import { useMetronomeScheduler } from "@/hooks/use-metronome-scheduler"
@@ -2729,183 +2730,21 @@ export default function FretMasterPage() {
     nextChordRef.current = nextChord
   }, [nextChord])
 
-  // 键盘事件监听 - 全局快捷键
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // 忽略输入框/可编辑元素中的按键，避免与文本输入冲突
-      const target = event.target as HTMLElement | null
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
-        return
-      }
-      // contenteditable 元素（如富文本编辑器）也跳过
-      if (target && target.isContentEditable) {
-        return
-      }
-
-      // 带系统修饰键的组合（Ctrl/Cmd/Alt）交给浏览器处理，
-      // 避免劫持 Ctrl+P 打印、Ctrl+F 查找、Ctrl+S 保存、Ctrl+M 等系统快捷键
-      if (event.ctrlKey || event.metaKey || event.altKey) {
-        return
-      }
-
-      // 🚨 专注模式下，Space / Escape 归 FocusMode 面板所有（P2-7）。
-      //    两个 window 级 keydown 同时存活时：按 Space 既推进下一题**又**启停番茄钟、
-      //    按 Esc 既退出专注模式**又**停止练习 —— `preventDefault()` 拦不住另一个监听器
-      //    （它只挡浏览器默认行为，不挡同页其它 handler）。这里用「谁在场谁接管」的
-      //    约定做互斥：专注模式开着 ⇒ 页面这侧的 Space/Esc 让位。
-      //    （P/A/F 等其余快捷键不受影响，专注模式下仍可用。）
-      if (focusMode?.enabled && (event.key === 'Escape' || event.key === ' ' || event.key === 'Spacebar')) {
-        return
-      }
-
-      // ESC - 退出全屏或停止练习
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        if (isFullscreen) {
-          setFullscreenMode(false)
-        } else if (isPlaying) {
-          setIsPlaying(false)
-          setHighlightedFrets(new Map())
-          setHighlightedTargetPosition(null)
-        }
-        return
-      }
-
-      // P - 开始/停止练习
-      if (event.key === 'p' || event.key === 'P') {
-        event.preventDefault()
-        togglePractice()
-        return
-      }
-
-      // F - 切换全屏模式（全局快捷键，不依赖练习状态，与快捷键说明一致）
-      if (event.key === 'f' || event.key === 'F') {
-        event.preventDefault()
-        setFullscreenMode(!isFullscreen)
-        return
-      }
-
-      // M - 切换麦克风（用户显式选择 ⇒ 走偏好落盘，跨会话记住）
-      if (event.key === 'm' || event.key === 'M') {
-        event.preventDefault()
-        const next = !useAppStore.getState().audio.micEnabled
-        setMicUserPreference(next)
-        if (isTauri) {
-          // 🚨 只翻标志不碰 Rust ⇒ 会复刻「以为开了其实没开」的老 bug（另一扇门）。
-          // 运行时对齐：开 ⇒ 确保采集在跑（ensureCaptureRunning 幂等：已在采集就不动）；
-          // 关 ⇒ 停采集。pitch stream 由练习/调音 effect 依 micEnabled 自行启停，这里不管。
-          import('@/lib/native-audio').then(({ stopAudioCapture, ensureCaptureRunning }) => {
-            const a = useAppStore.getState().audio
-            const job = next
-              ? ensureCaptureRunning({
-                  selectedDevice: a.selectedAudioDevice || undefined,
-                  sampleRate: a.sampleRate || 48000,
-                  backend: a.audioBackend || 'wasapi_shared',
-                })
-              : stopAudioCapture()
-            job.catch((err) => console.error('[Tauri] M 键切换音频输入失败:', err))
-          })
-        }
-        return
-      }
-
-      // H - 显示/隐藏快捷键帮助
-      if (event.key === 'h' || event.key === 'H') {
-        event.preventDefault()
-        setShowShortcutsHelp(prev => !prev)
-        return
-      }
-
-      // S - 打开设置
-      if (event.key === 's' || event.key === 'S') {
-        event.preventDefault()
-        setSettingsOpen(true)
-        return
-      }
-
-      // 1-5 - 切换标签页
-      const tabKeys = ['1', '2', '3', '4', '5']
-      const tabs = ['practice', 'interval', 'chord_exercise', 'chord', 'scale']
-      if (tabKeys.includes(event.key)) {
-        event.preventDefault()
-        handleTabChange(tabs[parseInt(event.key) - 1])
-        return
-      }
-
-      // 空格/右箭头/PageDown - 下一题（练习中）
-      if ((event.key === ' ' || event.key === 'ArrowRight' || event.key === 'PageDown') && isPlaying) {
-        event.preventDefault()
-        if (activeTab === 'practice') {
-          generateNewTarget()
-        } else if (activeTab === 'interval') {
-          generateIntervalExerciseRef.current?.()
-        } else if (activeTab === 'chord_exercise') {
-          nextChordExercise()
-        } else if (activeTab === 'scale') {
-          nextScaleExercise()
-        } else if (activeTab === 'chord') {
-          nextChord()
-        }
-        return
-      }
-
-      // 上箭头/PageUp - 显示指板（与快捷键说明一致）
-      if ((event.key === 'ArrowUp' || event.key === 'PageUp') && isPlaying) {
-        event.preventDefault()
-        // 根据当前练习 tab 显示对应的指板（映射见唯一真相源 lib/tab-fretboard-toggle.ts）
-        setTabFretboardFlag(activeTab, true)
-        setShowAllNotes(true)
-        return
-      }
-
-      // 下箭头 - 隐藏指板 / 下一题（与快捷键说明一致）
-      // 练习中：隐藏指板并生成下一题；非练习中：仅隐藏指板
-      if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        // 根据当前练习 tab 隐藏对应的指板（映射见唯一真相源 lib/tab-fretboard-toggle.ts）
-        setTabFretboardFlag(activeTab, false)
-        setShowAllNotes(false)
-        // 练习中同时生成下一题
-        if (isPlaying) {
-          if (activeTab === 'practice') {
-            generateNewTarget()
-          } else if (activeTab === 'interval') {
-            generateIntervalExerciseRef.current?.()
-          } else if (activeTab === 'chord_exercise') {
-            nextChordExercise()
-          } else if (activeTab === 'scale') {
-            nextScaleExercise()
-          } else if (activeTab === 'chord') {
-            nextChord()
-          }
-        }
-        return
-      }
-
-      // Enter - 下一题（练习中）
-      if (event.key === 'Enter' && isPlaying) {
-        event.preventDefault()
-        if (activeTab === 'practice') {
-          generateNewTarget()
-        } else if (activeTab === 'interval') {
-          generateIntervalExerciseRef.current?.()
-        } else if (activeTab === 'chord_exercise') {
-          nextChordExercise()
-        } else if (activeTab === 'scale') {
-          nextScaleExercise()
-        } else if (activeTab === 'chord') {
-          nextChord()
-        }
-        return
-      }
-
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isFullscreen, isPlaying, togglePractice, activeTab, generateNewTarget, generateIntervalExercise, nextChordExercise, nextScaleExercise, nextChord, micEnabled, handleTabChange, setFullscreenMode, setIsPlaying, setMicUserPreference, isTauri, setSettingsOpen, generateIntervalExerciseRef, setTabFretboardFlag, focusMode?.enabled])
+  // 全局键盘快捷键（含「专注模式下 Space/Esc 让位」的互斥约定）——
+  // 实现在 hooks/use-global-shortcuts.ts（逐行搬出）。页面只负责把回调递进去。
+  useGlobalShortcuts({
+    activeTab,
+    isFullscreen, setFullscreenMode,
+    isPlaying, setIsPlaying,
+    setHighlightedFrets, setHighlightedTargetPosition, setShowAllNotes,
+    togglePractice,
+    isTauri, setMicUserPreference,
+    setShowShortcutsHelp, setSettingsOpen,
+    handleTabChange, setTabFretboardFlag,
+    generateNewTarget, generateIntervalExerciseRef,
+    nextChordExercise, nextScaleExercise, nextChord,
+    focusModeEnabled: focusMode?.enabled,
+  })
 
   // 获取音符颜色
   // 获取音符颜色（判定已抽到 lib/fretboard-note-button-color.ts —— 那里可单测，

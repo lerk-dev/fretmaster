@@ -4,7 +4,8 @@
  * 两部分：
  *  ① **渲染契约**：两个分组、10 行、每行 kbd 与说明都来自 `t()`；关闭按钮回传 false
  *  ② **文档与实现交叉校验**（本文件的主要价值）：帮助里承诺的每个按键，
- *     都必须在 `app/page.tsx` 的 `handleKeyDown` 里有对应的 `event.key` 分支。
+ *     都必须在 `hooks/use-global-shortcuts.ts` 的 `handleKeyDown` 里有对应的 `event.key` 分支，
+ *     且 `app/page.tsx` 必须真的把该 hook 接上（2026-10-16 C5 起实现横跨这两个文件）。
  *
  * 这类「帮助文档说能做、实际没接线」的缺陷用户一旦遇到就会怀疑是自己按错，
  * 且**不会报错**——必须靠交叉校验才能持续守住。
@@ -32,7 +33,7 @@ const tEn = (k: string) => (TRANSLATIONS['en'] as Record<string, string>)[k] ?? 
 const GLOBAL_ROWS = ['esc', 'number', 'f', 'm', 's', 'p', 'h'] as const
 const PRACTICE_ROWS = ['space', 'up', 'down'] as const
 
-/** 帮助文案里的按键记号 → `app/page.tsx` 里应出现的代码片段 */
+/** 帮助文案里的按键记号 → 源码里应出现的代码片段（扫 hook + page，见下方 SRC） */
 const TOKEN_TO_CODE: Record<string, string> = {
   ESC: "event.key === 'Escape'",
   F: "event.key === 'f'",
@@ -152,7 +153,14 @@ describe('ShortcutsHelpDialog', () => {
   })
 
   describe('文档与实现交叉校验', () => {
-    const pageSrc = readFileSync(join(__dirname, '..', 'app', 'page.tsx'), 'utf8')
+    // 🚨 实现横跨两个文件（2026-10-16 C5 拆分「全局快捷键域」后）：
+    //   · hooks/use-global-shortcuts.ts —— handleKeyDown 本体与 window 级监听
+    //   · app/page.tsx                 —— 必须**真的调用** useGlobalShortcuts（否则 hook 白写、
+    //                                     而下面的「按键都有分支」会因为扫的是 hook 而照样全绿）
+    // 少读任何一个，这节的校验都会失真，所以合并成 SRC 再扫。
+    const HOOK_SRC = readFileSync(join(__dirname, '..', 'hooks', 'use-global-shortcuts.ts'), 'utf8')
+    const PAGE_SRC = readFileSync(join(__dirname, '..', 'app', 'page.tsx'), 'utf8')
+    const SRC = HOOK_SRC + '\n' + PAGE_SRC
 
     it('本测试的映射表覆盖了文档里出现的所有按键记号（新增记号会提醒补表）', () => {
       const tokens = new Set<string>()
@@ -170,13 +178,13 @@ describe('ShortcutsHelpDialog', () => {
       ).toEqual([])
     })
 
-    it('帮助里承诺的每个按键，page.tsx 的键盘处理里都有对应分支', () => {
+    it('帮助里承诺的每个按键，键盘处理里都有对应分支', () => {
       const missing: string[] = []
       for (const k of [...GLOBAL_ROWS, ...PRACTICE_ROWS]) {
         const value = (TRANSLATIONS['zh-CN'] as Record<string, string>)[`shortcuts_${k}`]
         for (const token of value.split(' / ')) {
           const needle = TOKEN_TO_CODE[token.trim()]
-          if (needle && !pageSrc.includes(needle)) {
+          if (needle && !SRC.includes(needle)) {
             missing.push(`${k}（${token.trim()}）→ 期望源码含 \`${needle}\``)
           }
         }
@@ -184,17 +192,29 @@ describe('ShortcutsHelpDialog', () => {
       expect(missing, `\n帮助文档承诺但源码里找不到处理的按键：\n${missing.join('\n')}`).toEqual([])
     })
 
-    it('page.tsx 里确实存在 handleKeyDown 与 window 级监听（防止把校验指向错误的文件）', () => {
-      expect(pageSrc).toContain('const handleKeyDown')
-      expect(pageSrc).toContain("window.addEventListener('keydown', handleKeyDown)")
+    it('hook 里确实存在 handleKeyDown 与 window 级监听（防止把校验指向错误的文件）', () => {
+      expect(HOOK_SRC).toContain('const handleKeyDown')
+      expect(HOOK_SRC).toContain("window.addEventListener('keydown', handleKeyDown)")
+      expect(HOOK_SRC).toContain("window.removeEventListener('keydown', handleKeyDown)")
       // 带修饰键的组合应让给浏览器（Ctrl+P 打印 / Ctrl+F 查找等）
-      expect(pageSrc).toContain('event.ctrlKey || event.metaKey || event.altKey')
+      expect(HOOK_SRC).toContain('event.ctrlKey || event.metaKey || event.altKey')
+    })
+
+    it('🚨 page.tsx 必须真的调用 useGlobalShortcuts（hook 写了但没接线 = 全部快捷键失效）', () => {
+      // 本条是上一条的「反向钉子」：光看 hook 会全绿，而用户按键毫无反应。
+      expect(PAGE_SRC, 'page.tsx 里找不到 useGlobalShortcuts 调用 —— 快捷键域被抽走却没接回来').toContain(
+        'useGlobalShortcuts({',
+      )
+      // 页面侧不许再留一份 window keydown（否则两个监听器打架）
+      expect(PAGE_SRC, 'page.tsx 里又出现了 window 级 keydown 监听').not.toContain(
+        "window.addEventListener('keydown'",
+      )
     })
 
     it('如实记录：实现里有但帮助未列出的按键（Enter → 下一题）', () => {
       // Enter 也会「下一题」，但 shortcuts 文档里没有对应行。
       // 本轮未加（新增一行属产品口径），仅用断言钉住现状，避免将来无声漂移。
-      expect(pageSrc).toContain("event.key === 'Enter'")
+      expect(SRC).toContain("event.key === 'Enter'")
       const documented = [...GLOBAL_ROWS, ...PRACTICE_ROWS]
         .map((k) => (TRANSLATIONS['zh-CN'] as Record<string, string>)[`shortcuts_${k}`])
         .join(' ')

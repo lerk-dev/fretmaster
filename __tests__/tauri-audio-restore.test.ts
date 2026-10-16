@@ -26,12 +26,16 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-// 🚨 本契约钉的三段接线（恢复音频 effect / 乐器 effect）在 2026-10-16 随音频输入域
-//    整块搬进了 `hooks/use-audio-input.ts`（C2）。契约本身没变，**被契约的源文件变了** ——
-//    所以两个文件都要读，否则锚点自检会当场失败（这正是它存在的意义）。
+// 🚨 本契约钉的三段接线里：
+//    · 恢复音频 effect / 乐器 effect —— 2026-10-16 随音频输入域整块搬进 `hooks/use-audio-input.ts`（C2）
+//    · M 快捷键分支               —— 同日随快捷键域搬进 `hooks/use-global-shortcuts.ts`（C5）
+//    契约本身没变，**被契约的源文件变了** —— 所以三个文件都要读，否则锚点自检会当场失败
+//    （这正是它存在的意义：搬走实现却忘了改契约，护栏会立刻报「分支找不到了」）。
 const AUDIO_HOOK_REL = 'hooks/use-audio-input.ts'
+const SHORTCUTS_HOOK_REL = 'hooks/use-global-shortcuts.ts'
 const PAGE_SRC = readFileSync('app/page.tsx', 'utf8')
 const HOOK_SRC = readFileSync(AUDIO_HOOK_REL, 'utf8')
+const SHORTCUTS_SRC = readFileSync(SHORTCUTS_HOOK_REL, 'utf8')
 
 /** 剥注释：说明性注释里会大段引用旧实现（含 `if (micEnabled) return`），不剥会误判 */
 function stripComments(src: string): string {
@@ -41,7 +45,9 @@ function stripComments(src: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-const SRC = stripComments(`${PAGE_SRC}\n${HOOK_SRC}`)
+// 拼接顺序刻意把快捷键 hook 放**最后**：本文件多处用 `SRC.indexOf(锚点)` 取切片，
+// 锚点（`const restoreAudio = async () => {` / `}, [isTauri])`）在前两个文件里先命中。
+const SRC = stripComments(`${PAGE_SRC}\n${HOOK_SRC}\n${SHORTCUTS_SRC}`)
 
 /**
  * 取出「Tauri 启动恢复音频」那个 effect 的函数体。
@@ -182,6 +188,12 @@ describe('Tauri 启动恢复音频（B 层）：默认开 + 显式关跨会话�
     const start = SRC.indexOf("if (event.key === 'm' || event.key === 'M')")
     expect(start, "M 快捷键分支找不到了（event.key === 'm' 被删/被改）").toBeGreaterThan(-1)
     const seg = SRC.slice(start, start + 1600)
+
+    // 锚点自检：确认命中的是快捷键 hook 里的那一段（而非别处同名代码），否则下面的正则就是在扫别的文件
+    expect(
+      SHORTCUTS_SRC.includes("if (event.key === 'm' || event.key === 'M')"),
+      'M 快捷键分支不在 hooks/use-global-shortcuts.ts 里 —— 实现又搬走了，请同步更新本契约'
+    ).toBe(true)
 
     expect(
       /setMicUserPreference\(/.test(seg),

@@ -12,6 +12,9 @@
  * 本文件同时管两件事：
  *   ① 真相源自身的契约（覆盖全集、往返一致、未知 tab 的明确兜底）；
  *   ② **源码级护栏** —— 禁止那两份内联映射复活（读源码，因为 `page.tsx` 是巨石无单测）。
+ *
+ * ⚠️ 2026-10-16（C5）：↑/↓ 键那两处已随「全局快捷键域」搬进 `hooks/use-global-shortcuts.ts`，
+ *    所以 ② 要同时读 `app/page.tsx` 与该 hook。
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -129,6 +132,9 @@ describe('pickTabFretboardFlag：读侧（全屏覆盖层）', () => {
 describe('🚨 源码护栏：3 份内联映射不许复活', () => {
   const OVERLAY = stripComments(readFileSync('components/fullscreen-overlay.tsx', 'utf8'))
   const PAGE = stripComments(readFileSync('app/page.tsx', 'utf8'))
+  // 🚨 2026-10-16（C5）：↑/↓ 键的处理随「全局快捷键域」搬进了这个 hook。
+  //    不读它 ⇒ 断言 `setTabFretboardFlag(activeTab, false)` 会找不到，护栏当场红（这是设计目的）。
+  const SHORTCUTS = stripComments(readFileSync('hooks/use-global-shortcuts.ts', 'utf8'))
 
   it('全屏覆盖层不再自带 tab→开关 的三元链', () => {
     // 特征物：`=== 'xxx' ? showXxxFretboard` 形式的取舍链
@@ -137,12 +143,17 @@ describe('🚨 源码护栏：3 份内联映射不许复活', () => {
     expect(OVERLAY).toContain('pickTabFretboardFlag')
   })
 
-  it('page.tsx 的 ↑/↓ 键不再自带 tab→setter 的 if/else 链', () => {
+  it('↑/↓ 键（page.tsx + use-global-shortcuts.ts）不再自带 tab→setter 的 if/else 链', () => {
     // 特征物：`activeTab === 'xxx') { setShowXxxFretboard(true` / `(false`
-    expect(PAGE).not.toMatch(
+    const SRC = `${PAGE}\n${SHORTCUTS}`
+    expect(SRC).not.toMatch(
       /activeTab\s*===\s*['"][a-z_]+['"]\s*\)\s*\{\s*\n?\s*setShow[A-Za-z]*Fretboard\((?:true|false)\)/,
     )
-    expect(PAGE).toContain('setTabFretboardFlag(activeTab, false)')
+    // 且必须真的走真相源（否则删掉链子却没接上 ⇒ 指板再也不显隐）
+    expect(SHORTCUTS, 'hook 里找不到 ↑ 键的 setTabFretboardFlag(activeTab, true) —— 锚点失效').toContain(
+      'setTabFretboardFlag(activeTab, true)',
+    )
+    expect(SRC).toContain('setTabFretboardFlag(activeTab, false)')
   })
 
   it('setter 对照表由真相源的类型钉住（新增 tab 漏 setter ⇒ tsc 报错）', () => {

@@ -161,6 +161,39 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     }
   })
 
+  // ==================== 全局快捷键域（hooks/use-global-shortcuts.ts）的装配顺序 ====================
+  // 2026-10-16（C5）。第三个踩「options 对象渲染期立即求值」的域（前两个：收音域 C2、会话域 C4）。
+  it('全局快捷键域的装配顺序：调用点必须在它引用的页面级声明**之后**', () => {
+    // options 立即求值 ⇒ 调用点摆在某个 `const` 声明之前，拿到的是 TDZ 绑定
+    //（不是 undefined，而是渲染期直接抛 "Cannot access before initialization"）。
+    // 页面上这一段被 5 个不同练习域的出题动作包围，谁挪一下都可能踩到，所以钉死。
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const call = src.indexOf('useGlobalShortcuts({')
+    expect(call, 'page.tsx 里找不到 useGlobalShortcuts 调用 —— 锚点失效，或快捷键域被抽走却没接回来').toBeGreaterThan(-1)
+
+    const deps: Array<[string, string]> = [
+      ['const [showAllNotes, setShowAllNotes] = useState(', 'setShowAllNotes'],
+      ['const generateNewTarget = useCallback(', 'generateNewTarget'],
+      ['const nextScaleExercise = useCallback(', 'nextScaleExercise'],
+      ['const setTabFretboardFlag = useCallback(', 'setTabFretboardFlag'],
+      ['const handleTabChange = useCallback(', 'handleTabChange'],
+      ['const nextChord = useCallback(', 'nextChord'],
+    ]
+    for (const [needle, label] of deps) {
+      const at = src.indexOf(needle)
+      expect(at, `page.tsx 里找不到 ${label} 的声明 —— 锚点失效，请同步更新本用例`).toBeGreaterThan(-1)
+      expect(at, `useGlobalShortcuts 的 options 立即求值 ⇒ 调用点必须在 ${label} 声明之后`).toBeLessThan(call)
+    }
+
+    // 反向自检：handleKeyDown 本体必须真的在 hook 里（否则上面的顺序检查毫无意义）
+    const hook = readFileSync('hooks/use-global-shortcuts.ts', 'utf8')
+    expect(hook.includes('const handleKeyDown'), 'hook 里没有 handleKeyDown —— 实现没搬过去').toBe(true)
+    expect(
+      hook.includes("window.addEventListener('keydown', handleKeyDown)"),
+      'hook 里没有 window 级监听 —— 快捷键不会生效'
+    ).toBe(true)
+  })
+
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))
