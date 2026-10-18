@@ -148,11 +148,24 @@ describe('ASIO 输入流建流契约（Rust 源码护栏）', () => {
       'raw 回调没有 I32 分支 ⇒ ASIO（唯一实测格式）的数据不会被正确归一化',
     ).toBe(true)
 
-    // 必须有归一化除算，而不是把原始 i32 直接当 f32 用
+    // 必须有归一化转换，而不是把原始 i32 直接当 f32 用。
+    // 2026-10-18（P2-9）：判据从「必须写成 `i32_to_f32(s)` 调用」放宽为
+    // 「i32_to_f32 出现在 **I32 分支内**」—— 因为现在它作为函数值传给
+    // write_converted_into_ring(…, i32_to_f32, …)，没有调用括号。
+    // 同时**加强**：把断言范围收窄到 I32 分支体（原先扫整个回调体，
+    // 别处顺手提一句 i32_to_f32 也能过），并要求该分支确实把结果写进 ring。
+    const i32Start = body.indexOf('cpal::SampleFormat::I32')
+    const i32End = body.indexOf('cpal::SampleFormat::I16', i32Start)
+    expect(i32Start, 'raw 回调里找不到 I32 分支').toBeGreaterThan(-1)
+    const i32Branch = i32End > i32Start ? body.slice(i32Start, i32End) : body.slice(i32Start)
     expect(
-      /i32_to_f32\s*\(/.test(body),
-      'raw 回调没有调用 i32_to_f32 ⇒ 原始 i32 幅值（±21 亿）会被当成 f32 采样值，' +
+      /i32_to_f32/.test(i32Branch),
+      'I32 分支没有做 i32_to_f32 归一化 ⇒ 原始 i32 幅值（±21 亿）会被当成 f32 采样值，' +
         '下游起音检测/音高识别全部失真或恒饱和',
+    ).toBe(true)
+    expect(
+      /write_(converted_|mono_)into_ring/.test(i32Branch),
+      'I32 分支转换完没有写进 ring（转换了却没用 = 静默无数据）',
     ).toBe(true)
 
     // I16 / U8 也要处理（覆盖其它后端），U8 必须减 128 偏置
