@@ -1,5 +1,28 @@
 // 统计数据 API 模块
 // Web 版本使用 CGI API，Windows 版本使用 SQLite
+//
+// ============================================================================
+// 2026-10-18 审计复核：本模块有 5 个导出**当前零业务调用方**。
+// 结论是**保留**（不是遗忘的死代码），理由与「要删时该改什么」一并记在这里：
+//
+//   getMyPracticeStats / getStatsSummary / getRecentStats / getStatsByExerciseType
+//     · 服务器侧聚合查询。UI 现在用 getAllPracticeStats 一次拉全量再本地聚合，
+//       所以确实没人调。
+//     · **保留理由**：它们是 __tests__/native-invoke-contract.test.ts 的**跨语言契约载体**
+//       —— 那 8 条用例用它们验证「前端 invoke 的命令名 / 参数键与 Rust 形参一致」
+//       （get_recent_stats 的 days、get_stats_summary 的透传字段、get_stats_by_exercise_type 的分组）。
+//       删函数 = 连带删掉这层护栏，Rust 侧那 5 条命令就再没有任何前端契约校验。
+//     · 若确认永不使用：删实现时**必须同步**删 native-invoke-contract.test.ts 里对应用例，
+//       并在 main.rs 摘掉命令 —— 三处一起删，别只删一处留下悬空的护栏。
+//
+//   syncLocalBackupToServer
+//     · 🚨 **不可直接接线**（本轮实测发现的隐患，见函数内注释）：
+//       `savePracticeStats` 在**成功**路径也会把记录写进同一份本地备份，
+//       而该函数把备份当成「待上传队列」整批重发 ⇒ 真接上会让已上传的记录重复入库。
+//       历史版本的备份里更是混着大量成功记录，上线即翻倍。
+//     · 要做弱网补传，得先给备份记录加「已上传」标记、并做一次性历史清洗。
+//       在那之前保持「零调用」才是安全的。
+// ============================================================================
 
 import { logger } from './logger'
 import { isTauriEnv, parseDbTimestamp, normalizeAccuracy } from './utils'
@@ -295,6 +318,24 @@ function getLocalBackup(): PracticeStats[] {
 }
 
 // 同步本地备份到服务器
+/**
+ * 把本地备份里的记录补传到服务器。
+ *
+ * 🚨 **当前零调用方，且不要贸然接上**（2026-10-18 复核）：
+ *
+ *   本函数的语义是「备份 = 待上传队列」，逐条 POST 后只把失败的留下。但
+ *   `savePracticeStats` 在**成功**路径也会 `saveToLocalBackup(...)`（那是给
+ *   `getAllPracticeStats` 的离线 fallback 用的本地镜像）⇒ 备份里**同时**装着
+ *   「已上传成功」与「上传失败」两种记录，本函数会把成功的那批**再传一遍**。
+ *
+ *   历史安装的备份里更是长期累积着成功记录（旧版同样是成功也写），
+ *   所以「把它接到挂载 effect 里」= 上线即让老用户的统计翻倍。
+ *
+ *   要做弱网补传，先做两件事：
+ *     ① 备份记录加 `_synced` 标记（成功写 true、失败写 false），本函数只处理非 true 的；
+ *     ② 一次性清洗历史备份（无法区分来源，只能清空或全部按已同步处理）。
+ *   在此之前保持零调用是**正确**状态 —— 别为了「消除零调用」而引入数据翻倍。
+ */
 export async function syncLocalBackupToServer(): Promise<number> {
   if (isTauri) {
     const { syncLocalBackupToServer: nativeSync } = await import('./native-stats');
