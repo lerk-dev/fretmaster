@@ -51,85 +51,124 @@ import type { NoteConfirmState } from '@/lib/note-confirm'
  * 来自它的返回值（C2 的装配顺序，护栏 hooks-deps-safety.test.ts）。
  */
 
+/**
+ * 答题域的依赖，按**域**分成 7 组。
+ *
+ * 为什么分组：C8 只做音频路径时是 45 项平铺，C9 并入 MIDI / 点击后涨到 75 项。
+ * 75 个平铺参数有两个实际问题：
+ *   ① 写测试要凭空构造 75 个 mock —— 等于没法测（这是分组的**主要**动机）；
+ *   ② 读接口的人看不出哪些是一伙的（`chordExerciseXxxRef` 与 `chordExerciseXxx` 明明成对）。
+ * 分组后可以用 `__tests__/answer-context-fixture.ts` 的工厂只覆盖用到的组，其余走默认桩。
+ *
+ * ⚠️ 函数体仍然用裸名字（`isPlayingRef` 而不是 `runtime.isPlayingRef`）——
+ *    hook 顶部逐组解构，那里是**唯一**允许出现组名的地方。
+ */
 export interface UsePracticeMatchOptions {
-  // ---- 运行时镜像（身份恒定，回调经 ref 读最新值） ----
+  /** 全局运行状态：三条路径都要判「在不在练习 / 哪个 tab / 灵敏度与置信度 / 答题方式」 */
+  runtime: AnswerRuntimeDeps
+  /** 与收音链路**共用同一份**的 ref（冷却 / 多帧确认）—— 见文件头，不能各建一份 */
+  audio: AnswerAudioDeps
+  /** 找音练习 */
+  practice: AnswerPracticeDeps
+  /** 音程练习（含先找根音 / 回弹根音） */
+  interval: AnswerIntervalDeps
+  /** 音阶练习（含一弦三音连击记账） */
+  scale: AnswerScaleDeps
+  /** 和弦两条路径：chord_exercise（练习）与 chord（进行），共用 level 与 voice leading */
+  chord: AnswerChordDeps
+  /** 动作与落点：计分 / 反馈 / 点击高亮与定时器 / 品区限制 */
+  actions: AnswerActionsDeps
+}
+
+export interface AnswerRuntimeDeps {
   isPlayingRef: { current: boolean }
   activeTabRef: { current: string }
   sensitivityRef: { current: number }
   confidenceThresholdRef: { current: number }
-  /** 冷却 / 多帧确认：必须与收音链路共用**同一份**（同对象），见文件头 */
+  practiceAnswerModeRef: { current: 'fretboard' | 'buttons' }
+  isPlaying: boolean
+  activeTab: string
+}
+
+export interface AnswerAudioDeps {
   isCoolingDownRef: { current: boolean }
   cooldownRef: { current: ReturnType<typeof setTimeout> | null }
   noteConfirmStateRef: { current: NoteConfirmState | null }
-  practiceAnswerModeRef: { current: 'fretboard' | 'buttons' }
+}
+
+export interface AnswerPracticeDeps {
   targetNoteRef: { current: string | null }
+  targetNote: string
   generateNewTargetRef: { current: (() => void) | null }
+  generateNewTarget: () => void
+}
+
+export interface AnswerIntervalDeps {
   currentIntervalExerciseRef: { current: IntervalExercise | null }
+  currentIntervalExercise: IntervalExercise | null
+  setCurrentIntervalExercise: (v: IntervalExercise | null) => void
+  setIntervalPracticeStep: (v: 'root' | 'interval') => void
+  generateIntervalExerciseRef: { current: (() => void) | null }
   findRootFirstRef: { current: boolean }
+  findRootFirst: boolean
   addRootBackRef: { current: boolean }
+}
+
+export interface AnswerScaleDeps {
   scaleKeyRef: { current: string }
-  scaleExerciseSequenceRef: { current: string[] }
-  scaleExerciseCurrentStepRef: { current: number }
+  scaleKey: string
   selectedScaleRef: { current: { name: string; notes: number[]; intervals: string[] } }
+  selectedScale: { name: string; notes: number[]; intervals: string[] }
+  scaleExerciseSequenceRef: { current: string[] }
+  scaleExerciseSequence: string[]
+  scaleExerciseCurrentStepRef: { current: number }
+  scaleExerciseCurrentStep: number
+  setScaleExerciseCurrentStep: (v: number) => void
+  nextScaleExerciseRef: { current: (() => void) | null }
+  nextScaleExercise: () => void
   scaleComboRef: { current: number }
   scaleMaxComboRef: { current: number }
-  nextScaleExerciseRef: { current: (() => void) | null }
+  setScaleCombo: (v: number) => void
+  setScaleMaxCombo: (v: number) => void
+}
+
+export interface AnswerChordDeps {
   chordExerciseTargetChordRef: { current: { root: string; type: string } | null }
+  chordExerciseTargetChord: { root: string; type: string } | null
   chordExerciseSequenceRef: { current: string[] }
+  chordExerciseSequence: string[]
   chordExerciseCurrentStepRef: { current: number }
+  chordExerciseCurrentStep: number
   chordExerciseIsAnsweredRef: { current: boolean }
+  setChordExerciseIsAnswered: (v: boolean) => void
+  setChordExerciseCurrentStep: (v: number) => void
   nextChordExerciseRef: { current: (() => void) | null }
-  /** chord 分支跑完一道题时调的「下一题」（页面 nextChord） */
-  nextChordRef: { current: (() => void) | null }
+  nextChordExercise: () => void
+  transposedChords: { root: string; type: string; bass?: string }[]
+  getTransposedChordsRef: { current: (() => { root: string; type: string }[]) | null }
   currentChordIndexRef: { current: number }
+  currentChordIndex: number
+  nextChordRef: { current: (() => void) | null }
   chordDegreeCurrentStepRef: { current: number }
+  setChordDegreeCurrentStep: (v: number) => void
   practiceLevelRef: { current: string }
+  practiceLevel: string
+  getLevelOptions: () => LevelOptions
   levelOptionsRef: { current: LevelOptions }
   shouldVoiceLeadRef: { current: boolean }
   nextChordInfoRef: { current: { index: number; root: string; type: string; bass?: string; degrees: string[] } | null }
   lastChordNoteRef: { current: string | null }
-  getTransposedChordsRef: { current: (() => { root: string; type: string }[]) | null }
-  generateIntervalExerciseRef: { current: (() => void) | null }
+}
 
-  // ---- 动作 / setter ----
+export interface AnswerActionsDeps {
   recordPositionStat: (isCorrect: boolean) => void
   setScore: (fn: (prev: { correct: number; total: number }) => { correct: number; total: number }) => void
-  setCurrentIntervalExercise: (v: IntervalExercise | null) => void
-  setIntervalPracticeStep: (v: 'root' | 'interval') => void
-  setScaleCombo: (v: number) => void
-  setScaleMaxCombo: (v: number) => void
-  setScaleExerciseCurrentStep: (v: number) => void
-  setChordExerciseIsAnswered: (v: boolean) => void
-  setChordExerciseCurrentStep: (v: number) => void
-  setChordDegreeCurrentStep: (v: number) => void
   triggerCorrectFeedback: (note: string) => void
-  // ---- MIDI / 点击路径的额外依赖（C9）----
-  isPlaying: boolean
-  activeTab: string
-  targetNote: string
-  currentIntervalExercise: IntervalExercise | null
-  findRootFirst: boolean
-  transposedChords: { root: string; type: string; bass?: string }[]
-  currentChordIndex: number
-  practiceLevel: string
-  getLevelOptions: () => LevelOptions
-  scaleExerciseSequence: string[]
-  scaleExerciseCurrentStep: number
-  selectedScale: { name: string; notes: number[]; intervals: string[] }
-  scaleKey: string
-  chordExerciseTargetChord: { root: string; type: string } | null
-  chordExerciseSequence: string[]
-  chordExerciseCurrentStep: number
-  nextScaleExercise: () => void
-  nextChordExercise: () => void
-  generateNewTarget: () => void
-  playFeedbackSound: (isCorrect: boolean) => void
   triggerWrongFeedback: (note: string) => void
-  clearFretClickTimers: () => void
+  playFeedbackSound: (isCorrect: boolean) => void
   setHighlightedFrets: (fn: (prev: Map<string, boolean>) => Map<string, boolean>) => void
-  /** 点击路径暂存的落点，供随后 handleMIDINoteInput 记逐位置统计 */
+  clearFretClickTimers: () => void
   lastFretClickPositionRef: { current: { stringIndex: number; fret: number } | null }
-  /** 点击红色的 500ms 清除 + 100ms 后推进这两个定时器 */
   fretClickTimersRef: { current: Array<ReturnType<typeof setTimeout>> }
   fretZoneEnabled: boolean
   fretZoneStart: number
@@ -157,83 +196,43 @@ interface LevelOptions {
 }
 
 export function usePracticeMatch(options: UsePracticeMatchOptions) {
+  const { runtime, audio, practice, interval, scale, chord, actions } = options
+
   const {
-    isPlayingRef,
-    activeTabRef,
-    sensitivityRef,
-    confidenceThresholdRef,
-    isCoolingDownRef,
-    cooldownRef,
-    noteConfirmStateRef,
-    practiceAnswerModeRef,
-    targetNoteRef,
-    generateNewTargetRef,
-    currentIntervalExerciseRef,
-    setCurrentIntervalExercise,
-    setIntervalPracticeStep,
-    generateIntervalExerciseRef,
-    findRootFirstRef,
-    addRootBackRef,
-    scaleKeyRef,
-    scaleExerciseSequenceRef,
-    scaleExerciseCurrentStepRef,
-    selectedScaleRef,
-    scaleComboRef,
-    scaleMaxComboRef,
-    setScaleCombo,
-    setScaleMaxCombo,
-    setScaleExerciseCurrentStep,
-    nextScaleExerciseRef,
-    chordExerciseTargetChordRef,
-    chordExerciseSequenceRef,
-    chordExerciseCurrentStepRef,
-    chordExerciseIsAnsweredRef,
-    setChordExerciseIsAnswered,
-    setChordExerciseCurrentStep,
-    nextChordExerciseRef,
-    nextChordRef,
-    currentChordIndexRef,
-    chordDegreeCurrentStepRef,
-    setChordDegreeCurrentStep,
-    practiceLevelRef,
-    levelOptionsRef,
-    shouldVoiceLeadRef,
-    nextChordInfoRef,
+    isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef,
+    practiceAnswerModeRef, isPlaying, activeTab,
+  } = runtime
+  const {
+    isCoolingDownRef, cooldownRef, noteConfirmStateRef,
+  } = audio
+  const {
+    targetNoteRef, targetNote, generateNewTargetRef, generateNewTarget,
+  } = practice
+  const {
+    currentIntervalExerciseRef, currentIntervalExercise, setCurrentIntervalExercise, setIntervalPracticeStep,
+    generateIntervalExerciseRef, findRootFirstRef, findRootFirst, addRootBackRef,
+  } = interval
+  const {
+    scaleKeyRef, scaleKey, selectedScaleRef, selectedScale,
+    scaleExerciseSequenceRef, scaleExerciseSequence, scaleExerciseCurrentStepRef, scaleExerciseCurrentStep,
+    setScaleExerciseCurrentStep, nextScaleExerciseRef, nextScaleExercise, scaleComboRef,
+    scaleMaxComboRef, setScaleCombo, setScaleMaxCombo,
+  } = scale
+  const {
+    chordExerciseTargetChordRef, chordExerciseTargetChord, chordExerciseSequenceRef, chordExerciseSequence,
+    chordExerciseCurrentStepRef, chordExerciseCurrentStep, chordExerciseIsAnsweredRef, setChordExerciseIsAnswered,
+    setChordExerciseCurrentStep, nextChordExerciseRef, nextChordExercise, transposedChords,
+    getTransposedChordsRef, currentChordIndexRef, currentChordIndex, nextChordRef,
+    chordDegreeCurrentStepRef, setChordDegreeCurrentStep, practiceLevelRef, practiceLevel,
+    getLevelOptions, levelOptionsRef, shouldVoiceLeadRef, nextChordInfoRef,
     lastChordNoteRef,
-    getTransposedChordsRef,
-    recordPositionStat,
-    setScore,
-    triggerCorrectFeedback,
-    isPlaying,
-    activeTab,
-    targetNote,
-    currentIntervalExercise,
-    findRootFirst,
-    transposedChords,
-    currentChordIndex,
-    practiceLevel,
-    getLevelOptions,
-    scaleExerciseSequence,
-    scaleExerciseCurrentStep,
-    selectedScale,
-    scaleKey,
-    chordExerciseTargetChord,
-    chordExerciseSequence,
-    chordExerciseCurrentStep,
-    nextScaleExercise,
-    nextChordExercise,
-    generateNewTarget,
-    playFeedbackSound,
-    triggerWrongFeedback,
-    clearFretClickTimers,
-    setHighlightedFrets,
-    lastFretClickPositionRef,
-    fretClickTimersRef,
-    fretZoneEnabled,
-    fretZoneStart,
-    fretZoneSize,
+  } = chord
+  const {
+    recordPositionStat, setScore, triggerCorrectFeedback, triggerWrongFeedback,
+    playFeedbackSound, setHighlightedFrets, clearFretClickTimers, lastFretClickPositionRef,
+    fretClickTimersRef, fretZoneEnabled, fretZoneStart, fretZoneSize,
     fretCount,
-  } = options
+  } = actions
 
   const processPracticeMatch = useCallback(({ frequency, note, probability, isNoteOnset, rawFrequency, frameMs }: DetectedPitchForMatch) => {
     const currentIsPlaying = isPlayingRef.current
