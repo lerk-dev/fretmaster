@@ -60,6 +60,7 @@ import { resolveInstrumentConfig } from "@/lib/practice-suggestions"
 import { recordPositionResult, getPositionWeight, loadPositionStats } from "@/lib/position-stats"
 import { getTabFretboardFlag, type TabFretboardFlag } from "@/lib/tab-fretboard-toggle"
 import { applyRootFontSize } from "@/lib/display-scale"
+import { themeBackgroundColor } from "@/lib/theme-colors"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
   Dialog,
@@ -1568,6 +1569,14 @@ export default function FretMasterPage() {
   useEffect(() => {
     return applyRootFontSize(displayScale)
   }, [displayScale])
+
+  // 桌面版：主题切换时把 WebView 底色同步成当前主题的底色。
+  // 真全屏把客户区拉满整块屏幕，过扫描区露的就是 WebView 底色 ——
+  // 不同步的话「浅色主题 + 真全屏」会露出深色边（此前该值还写死成另一个色号）。
+  useEffect(() => {
+    if (!isTauri) return
+    void import("@/lib/native-window").then((m) => m.setWebViewBackgroundColor(themeBackgroundColor(theme)))
+  }, [isTauri, theme])
 
   return (
     <OnboardingProvider t={t}>

@@ -1,6 +1,8 @@
 import { logger } from './logger'
 import { isTauriEnv } from './utils'
 import type { FullscreenModeType } from './store'
+import { useAppStore } from './store'
+import { themeBackgroundColor } from './theme-colors'
 
 const isTauri = (): boolean => {
   return isTauriEnv()
@@ -90,7 +92,9 @@ export async function setTrueFullscreen(enable: boolean): Promise<void> {
   try {
     const invoke = await getInvoke()
     await invoke('set_true_fullscreen', { enable })
-    await setWebViewBackgroundColor('#0b0f14')
+    // 底色跟随当前主题（此前写死 0b0f14 —— 既不在主题表里，也与 dark 的 101317 不同）。
+    // 真全屏把客户区拉满整块屏幕，过扫描区露的就是这个颜色，浅色主题下最容易看见。
+    await setWebViewBackgroundColor(themeBackgroundColor(useAppStore.getState().user.theme))
   } catch (error) {
     logger.error('setTrueFullscreen failed:', error)
   }
