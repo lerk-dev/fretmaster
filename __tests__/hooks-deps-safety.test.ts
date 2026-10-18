@@ -279,34 +279,46 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     expect(src, 'page.tsx 里找不到 useScaleExercise 调用').toContain('= useScaleExercise({')
   })
 
-  // ==================== 音频答题域（hooks/use-practice-match.ts）：整域必须在一个文件里 ====================
-  // 2026-10-18（C8）。processPracticeMatch 是五模式判定 + 计分/连击/推进 + 冷却的音频侧实现，
-  // 判定口径由 lib/answer-judge.ts / lib/pitch-match.ts 钉死（护栏 answer-judge.test.ts）。
-  it('音频答题域已整体搬出页面：页面不得再声明 processPracticeMatch 的实现', () => {
+  // ==================== 答题域（hooks/use-practice-match.ts）：三条路径必须在一个文件里 ====================
+  // 2026-10-18（C8 音频 / C9 MIDI + 点击）。三条路径共用同一批 ref（冷却 / 多帧确认 / 连击 /
+  // voice leading 的 lastChordNote），且点击路径**直接调用** handleMIDINoteInput（100ms 后推进）
+  // ⇒ 拆成两个 hook 就得把 refs 在 hook 之间倒手。
+  it('答题域已整体搬出页面：三条路径的实现都不得再在页面里声明', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const forbidden = [
       'const processPracticeMatch = useCallback(',
+      'const handleMIDINoteInput = useCallback(',
+      'const handleFretClick = useCallback(',
     ]
     const leftovers = forbidden.filter((f) => src.includes(f))
     expect(
       leftovers,
-      `页面里又出现了音频答题的实现 —— 应追加到 hooks/use-practice-match.ts。\n` +
+      `页面里又出现了答题路径的实现 —— 应追加到 hooks/use-practice-match.ts。\n` +
         `判定口径有护栏（answer-judge.test.ts），在页面里另写一份 = 两套口径各自腐烂：\n  ${leftovers.join('\n  ')}`
     ).toEqual([])
 
-    // 反向自检：实现必须真的在 hook 里
+    // 反向自检：三条实现必须真的在 hook 里
     const hook = readFileSync('hooks/use-practice-match.ts', 'utf8')
     for (const f of forbidden) {
       expect(hook.includes(f), `hooks/use-practice-match.ts 里没有 ${f} —— 锚点失效，请同步更新本用例`).toBe(true)
     }
     // 且 hook 的实现里不得再出现 deps 豁免（C8 把历史豁免改成 deps 写全，别退回去）
-    const implAt = hook.indexOf('const processPracticeMatch = useCallback(')
-    const implEnd = hook.indexOf('\n  }, [', implAt)
-    const implBody = hook.slice(implAt, implEnd)
-    expect(
-      implBody.includes('eslint-disable'),
-      'processPracticeMatch 里又出现了 deps 豁免 —— C8 已把 deps 照实写全，别退回「半份 deps + disable」'
-    ).toBe(false)
+    for (const anchor of ['const processPracticeMatch = useCallback(', 'const handleMIDINoteInput = useCallback(', 'const handleFretClick = useCallback(']) {
+      const from = hook.indexOf(anchor)
+      const to = hook.indexOf('\n  }, [', from)
+      expect(hook.slice(from, to).includes('eslint-disable'), `${anchor} 里又出现了 deps 豁免`).toBe(false)
+    }
+  })
+
+  it('答题域的装配顺序：usePracticeMatch 调用点必须在 generateNewTarget 之后', () => {
+    // 🚨 C9 实测踩到：MIDI 路径直接调用 `generateNewTarget()`，而 options 对象是渲染期立即求值
+    //    ⇒ 调用点若摆在它声明之前，渲染期直接抛 "Cannot access before initialization"（tsc 也报）。
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const call = src.indexOf('= usePracticeMatch({')
+    const decl = src.indexOf('const generateNewTarget = useCallback(')
+    expect(call, 'page.tsx 里找不到 usePracticeMatch 调用').toBeGreaterThan(-1)
+    expect(decl, 'page.tsx 里找不到 generateNewTarget 声明').toBeGreaterThan(-1)
+    expect(decl, 'usePracticeMatch 的 options 立即求值 ⇒ 调用点必须在 generateNewTarget 声明之后').toBeLessThan(call)
   })
 
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {

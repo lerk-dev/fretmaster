@@ -208,9 +208,11 @@ function usesResolveHelper(block: string): boolean {
   return /resolveScaleTargetNoteIndex\s*\(/.test(block) || /resolveScaleDegreeSemitone\s*\(/.test(block)
 }
 
-describe('接线：app/page.tsx 的音阶分支必须走 lib 的音级解析', () => {
-  const pageSrc = fs.readFileSync(path.join(process.cwd(), 'app', 'page.tsx'), 'utf8')
-  const scaleCase = extractScaleCase(pageSrc)
+describe('接线：音阶分支必须走 lib 的音级解析', () => {
+  // 🚨 2026-10-18（C9）：MIDI 与点击两条路径已随「答题域」搬进 hooks/use-practice-match.ts，
+  //    这里从 app/page.tsx 改为读该 hook —— 不跟着改，抽取器会切出空串（自测会炸）。
+  const hookSrc = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-practice-match.ts'), 'utf8')
+  const scaleCase = extractScaleCase(hookSrc)
 
   it('自测：抽取器与判定不是恒真的（拿掉调用就判 false）', () => {
     expect(scaleCase.length).toBeGreaterThan(200)
@@ -233,10 +235,14 @@ describe('接线：app/page.tsx 的音阶分支必须走 lib 的音级解析', (
     expect(scaleCase).toContain('resolveScaleTargetNoteIndex(selectedScale, currentDegree, scaleKey)')
   })
 
-  it('页面里不再有第二个真相源（内联的 mod-12 手写表）', () => {
+  it('实现里不再有第二个真相源（内联的 mod-12 手写表）', () => {
     expect(scaleCase).not.toContain('degreeToSemitoneOfScale')
-    // 整份源码里也不该再有这个名字（表已搬进 lib）
-    expect(pageSrc).not.toContain('degreeToSemitoneOfScale')
+    // 两份源码里都不该再有这个名字（表已搬进 lib）
+    expect(hookSrc).not.toContain('degreeToSemitoneOfScale')
+    expect(
+      fs.readFileSync(path.join(process.cwd(), 'app', 'page.tsx'), 'utf8'),
+      'page.tsx 里又出现了内联的「音级 → 半音」表',
+    ).not.toContain('degreeToSemitoneOfScale')
   })
 
   it('未知音级仍然拒绝推进并告警（不是当成 0 继续跑）', () => {

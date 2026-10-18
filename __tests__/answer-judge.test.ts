@@ -411,9 +411,13 @@ describe('源码护栏：page.tsx / use-practice-match.ts 必须走本模块，�
     .filter((line) => !line.trim().startsWith('*') && !line.trim().startsWith('//'))
     .join('\n')
 
-  it('page.tsx 与 use-practice-match.ts 都已 import answer-judge', () => {
-    expect(PAGE_SRC).toMatch(/from ["']@\/lib\/answer-judge["']/)
-    expect(MATCH_HOOK_SRC, '音频答题 hook 没走 answer-judge').toMatch(/from ["']@\/lib\/answer-judge["']/)
+  it('🚨 use-practice-match.ts 已 import answer-judge；页面**不得**再直接 import 它', () => {
+    // C9 起三条答题路径（音频 / MIDI / 点击）全在 hook 里 ⇒ 页面不该再有判定。
+    // 页面重新 import 本模块 = 有人又想在页面里手写一份判定（正是 C1 收敛掉的东西）。
+    expect(MATCH_HOOK_SRC).toMatch(/from ["']@\/lib\/answer-judge["']/)
+    expect(PAGE_SRC, 'page.tsx 又直接 import 了 answer-judge —— 判定应留在 hook / practice-mode-controls').not.toMatch(
+      /from ["']@\/lib\/answer-judge["']/,
+    )
   })
 
   it('🚨 音频答题路径必须真的接线：页面把 processPracticeMatch 接进收音链路的 ref', () => {

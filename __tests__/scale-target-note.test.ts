@@ -140,11 +140,20 @@ describe('源码级护栏：判定路径不许再出现「半音 → 音级标�
     expect(body).not.toMatch(/6:\s*"b5"/)
   })
 
-  it('三条判定路径都调用同一个真相源（调用点数量 = 2：点击 + MIDI）', () => {
+  it('三条判定路径都调用同一个真相源（点击 + MIDI 在 hook 里，共 2 处）', () => {
+    // 🚨 2026-10-18（C9）：MIDI 与点击随「答题域」搬进 hooks/use-practice-match.ts
+    //    ⇒ hook 里应恰好 2 处，页面里应为 0（页面不再有判定）。
+    //    铁律 #20：数**调用点**、断言**具体数字**，不是 length >= 1。
+    const hook = fs.readFileSync(path.join(ROOT, 'hooks/use-practice-match.ts'), 'utf8')
     const page = fs.readFileSync(path.join(ROOT, 'app/page.tsx'), 'utf8')
-    const calls = page.match(/resolveScaleTargetNoteIndex\s*\(/g) ?? []
-    // 铁律 #20：数**调用点**、断言**具体数字**，不是 length >= 1
-    expect(calls.length, 'app/page.tsx 里 resolveScaleTargetNoteIndex 的调用点数应为 2（点击 + MIDI）').toBe(2)
+    expect(
+      (hook.match(/resolveScaleTargetNoteIndex\s*\(/g) ?? []).length,
+      'hooks/use-practice-match.ts 里 resolveScaleTargetNoteIndex 的调用点数应为 2（点击 + MIDI）',
+    ).toBe(2)
+    expect(
+      (page.match(/resolveScaleTargetNoteIndex\s*\(/g) ?? []).length,
+      'page.tsx 里又出现了 resolveScaleTargetNoteIndex 调用 —— 答题路径已抽走，页面不该再判定',
+    ).toBe(0)
   })
 })
 
