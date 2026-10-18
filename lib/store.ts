@@ -183,6 +183,18 @@ export interface UserSettings {
   fretboardStyle: FretboardStyle
   /** 钢琴键盘样式：classic = 整键底色高亮；musmath = 键面留白 + 音级色标 */
   pianoKeyboardStyle: PianoKeyboardStyle
+  /**
+   * AGC（自动增益控制）—— **仅桌面版**，Web 侧的检测链没有实现。
+   *
+   * 默认 true，与 Rust 侧 AudioPipeline::new() 的 agc_enabled: true 保持一致
+   * （两处默认值必须同源，否则首次启动 UI 与后端就打架）。
+   *
+   * 为什么要有开关：detect_pitch 的注释写明「先 noise gate 再 AGC，避免 AGC 先把噪声
+   * 放大到 0.15 RMS」—— 安静环境下 AGC 会持续抬底噪，有些用户宁可关掉换取更稳的起音判定。
+   * 此前 Rust 默认开着、前端**没有任何入口**（set_agc_enabled 桥接函数零调用），
+   * 用户既不知道也关不掉。
+   */
+  agcEnabled: boolean
 }
 
 // Premium功能状态
@@ -497,6 +509,8 @@ export interface AppActions {
   setNoteAccidentalDisplay: (display: NoteAccidentalDisplay) => void
   setFretboardStyle: (style: FretboardStyle) => void
   setPianoKeyboardStyle: (style: PianoKeyboardStyle) => void
+  /** AGC 开关（仅桌面版生效；页面负责同步到 native-audio.setAgcEnabled） */
+  setAgcEnabled: (enabled: boolean) => void
   setShowPracticeSuggestion: (show: boolean) => void
   setCurrentPracticeSuggestion: (suggestion: string | null) => void
   
@@ -723,6 +737,7 @@ const initialState: AppState = {
     showPracticeSuggestion: true,
     fretboardStyle: 'classic' as FretboardStyle,
     pianoKeyboardStyle: 'classic' as PianoKeyboardStyle,
+    agcEnabled: true,
   },
   
   premium: {
@@ -795,6 +810,11 @@ export function migratePersistedState(persistedState: any, version: number): any
       }
       if (persistedState.user.pianoKeyboardStyle === undefined) {
         persistedState.user.pianoKeyboardStyle = 'classic'
+      }
+      // 2026-10-18 新增：AGC 开关（仅桌面版）。老 blob 没有这个字段 ⇒ 必须补 true，
+      // 与 Rust 的 agc_enabled 默认值同源；漏补的话 UI 会显示「关」而后端实际开着。
+      if (persistedState.user.agcEnabled === undefined) {
+        persistedState.user.agcEnabled = true
       }
     }
     // audio.micUserDisabled：2026-10-02 新增（「桌面端音频输入默认开」语义）。
@@ -1010,6 +1030,7 @@ export const useAppStore = create<AppState & AppActions>()(
       setNoteAccidentalDisplay: (noteAccidentalDisplay) => set((state) => ({ user: { ...state.user, noteAccidentalDisplay } })),
       setFretboardStyle: (fretboardStyle) => set((state) => ({ user: { ...state.user, fretboardStyle } })),
       setPianoKeyboardStyle: (pianoKeyboardStyle) => set((state) => ({ user: { ...state.user, pianoKeyboardStyle } })),
+      setAgcEnabled: (agcEnabled) => set((state) => ({ user: { ...state.user, agcEnabled } })),
       setShowPracticeSuggestion: (show) => set((state) => ({ user: { ...state.user, showPracticeSuggestion: show } })),
       setCurrentPracticeSuggestion: (suggestion) => set({ currentPracticeSuggestion: suggestion }),
       

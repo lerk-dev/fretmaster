@@ -167,6 +167,8 @@ export default function FretMasterPage() {
   const language = user.language
   const setLanguage = store.setLanguage
   const theme = user.theme
+  const agcEnabled = user.agcEnabled
+  const setAgcEnabled = store.setAgcEnabled
   const setTheme = store.setTheme
   
   const chordScaleDisplay = user.chordScaleDisplay
@@ -1581,6 +1583,16 @@ export default function FretMasterPage() {
     void import("@/lib/native-window").then((m) => m.setWebViewBackgroundColor(themeBackgroundColor(theme)))
   }, [isTauri, theme])
 
+  // AGC 开关必须真的到达 Rust（铁律 22：UI 写 store ≠ 到达后端）。
+  // 这里同时覆盖两件事：启动时把持久化值同步一次（上次关掉后重启不会又开着），
+  // 以及用户切换开关时立刻生效（Rust 的 agc_enabled 默认 true）。
+  useEffect(() => {
+    if (!isTauri) return
+    void import("@/lib/native-audio")
+      .then((m) => m.setAgcEnabled(agcEnabled))
+      .catch((err) => logger.warn("同步 AGC 开关失败:", err))
+  }, [isTauri, agcEnabled])
+
   return (
     <OnboardingProvider t={t}>
     <TooltipProvider>
@@ -1618,6 +1630,8 @@ export default function FretMasterPage() {
           onSelectedMidiDeviceChange={setSelectedMidiDevice}
           useAudioWorklet={useAudioWorklet}
           onUseAudioWorkletChange={setUseAudioWorklet}
+          agcEnabled={agcEnabled}
+          onAgcEnabledChange={setAgcEnabled}
           noiseFloor={noiseFloor}
           noiseCalibrating={noiseCalibrating}
           noiseCalibrationCountdown={noiseCalibrationCountdown}

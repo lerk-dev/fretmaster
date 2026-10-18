@@ -220,6 +220,8 @@ const CASES: Case[] = [
   { label: 'setFretboardStyle → user.fretboardStyle', call: () => S().setFretboardStyle('guitarrun'), changed: [{ path: 'user.fretboardStyle', to: 'guitarrun' }] },
   { label: 'setPianoKeyboardStyle → user.pianoKeyboardStyle', call: () => S().setPianoKeyboardStyle('musmath'), changed: [{ path: 'user.pianoKeyboardStyle', to: 'musmath' }] },
   { label: 'setShowPracticeSuggestion → user.showPracticeSuggestion', call: () => S().setShowPracticeSuggestion(false), changed: [{ path: 'user.showPracticeSuggestion', to: false }] },
+  // 2026-10-18：AGC 开关（仅桌面版；页面另有 effect 把它同步到 native-audio.setAgcEnabled）
+  { label: 'setAgcEnabled → user.agcEnabled', call: () => S().setAgcEnabled(false), changed: [{ path: 'user.agcEnabled', to: false }] },
   { label: 'setCurrentPracticeSuggestion → currentPracticeSuggestion（顶层）', call: () => S().setCurrentPracticeSuggestion('练一下'), changed: [{ path: 'currentPracticeSuggestion', to: '练一下' }] },
 
   // ---- Premium

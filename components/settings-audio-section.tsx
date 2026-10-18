@@ -48,6 +48,9 @@ interface SettingsAudioSectionProps {
   audioError: string | null
   useAudioWorklet: boolean
   onUseAudioWorkletChange: (v: boolean) => void
+  /** AGC 开关（仅桌面版；Web 侧检测链没有 AGC） */
+  agcEnabled: boolean
+  onAgcEnabledChange: (v: boolean) => void
   inputGain: number
   /** Slider 回传百分比数组 */
   onInputGainChange: (v: number[]) => void
@@ -94,6 +97,8 @@ export function SettingsAudioSection({
   audioError,
   useAudioWorklet,
   onUseAudioWorkletChange,
+  agcEnabled,
+  onAgcEnabledChange,
   inputGain,
   onInputGainChange,
   pitchAlgorithm,
@@ -248,6 +253,16 @@ export function SettingsAudioSection({
             />
           </div>
         </div>
+        {/* AGC 只有桌面版有（Web 的检测链没有实现），所以只在 Tauri 下显示 */}
+        {isTauri && (
+          <div className="flex items-center justify-between py-2 border-t border-border/50">
+            <div className="flex flex-col pr-3">
+              <span className="text-sm text-muted-foreground">{t('settings_agc')}</span>
+              <span className="text-xs text-muted-foreground/60">{t('settings_agc_hint')}</span>
+            </div>
+            <Switch checked={agcEnabled} onCheckedChange={onAgcEnabledChange} />
+          </div>
+        )}
         {audioError && (
           <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
             {audioError}

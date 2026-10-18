@@ -423,6 +423,22 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     expect(exportBody, '缺少下载回退路径').toContain('a.download')
   })
 
+  /**
+   * 2026-10-18（AGC）：Rust 的 agc_enabled 默认 true，而前端此前**没有任何入口**
+   * （setAgcEnabled 桥接零调用）⇒ 用户既不知道也关不掉。补开关时容易只做「UI 写 store」
+   * 那一半（铁律 22 的典型症状），所以这里把**整条链**钉住：
+   *   页面 effect → native-audio 桥接 → invoke 命令名 → main.rs 注册。
+   */
+  it('AGC 开关的整条链路都在（页面同步 → 桥接 → invoke → Rust 注册）', () => {
+    const page = readFileSync('app/page.tsx', 'utf8')
+    expect(page, '页面没有把 agcEnabled 同步到后端（只写了 store 就是装饰品）').toContain('setAgcEnabled(agcEnabled)')
+
+    const native = readFileSync('lib/native-audio.ts', 'utf8')
+    expect(native, 'native-audio 缺少 setAgcEnabled 桥接').toContain("invoke('set_agc_enabled'")
+
+    const main = readFileSync('src-tauri/src/main.rs', 'utf8')
+    expect(main, 'set_agc_enabled 没有在 main.rs 注册（invoke 会报命令不存在）').toContain('set_agc_enabled')
+  })
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))

@@ -55,6 +55,9 @@ interface AppHeaderProps {
   /** 使用 AudioWorklet 检测 */
   useAudioWorklet: boolean
   onUseAudioWorkletChange: (v: boolean) => void
+  /** AGC 开关（仅桌面版） */
+  agcEnabled: boolean
+  onAgcEnabledChange: (v: boolean) => void
   /** 环境噪声校准：已校准的环境噪声底（undefined = 从未校准，走 EMA 默认初值） */
   noiseFloor?: number
   /** 校准进行中（倒计时或采样阶段） */
@@ -106,6 +109,8 @@ export const AppHeader = memo(function AppHeader({
   onSelectedMidiDeviceChange,
   useAudioWorklet,
   onUseAudioWorkletChange,
+  agcEnabled,
+  onAgcEnabledChange,
   noiseFloor,
   noiseCalibrating,
   noiseCalibrationCountdown,
@@ -365,6 +370,8 @@ export const AppHeader = memo(function AppHeader({
               audioError={audioError}
               useAudioWorklet={useAudioWorklet}
               onUseAudioWorkletChange={onUseAudioWorkletChange}
+              agcEnabled={agcEnabled}
+              onAgcEnabledChange={onAgcEnabledChange}
               noiseFloor={noiseFloor}
               noiseCalibrating={noiseCalibrating}
               noiseCalibrationCountdown={noiseCalibrationCountdown}

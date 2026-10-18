@@ -13,7 +13,7 @@
  *  B. 真实 localStorage 上的 persist 端到端（白名单 / version / migrate / rehydrate）。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { useAppStore, debounceStorage } from '@/lib/store'
+import { useAppStore, debounceStorage, migratePersistedState } from '@/lib/store'
 
 const KEY = 'fretmaster-store'
 const ls = () => window.localStorage
@@ -260,5 +260,31 @@ describe('persist：真实 localStorage 上的落盘 / 白名单 / 版本迁移'
   it('blob 损坏时 rehydrate 不抛异常（走默认 state）', async () => {
     ls().setItem(KEY, '{not json')
     await expect(useAppStore.persist.rehydrate()).resolves.not.toThrow()
+  })
+})
+
+// ============================================================ 老存档的新字段补齐
+
+/**
+ * `user` 是**嵌套** slice，zustand 的持久化只做顶层浅合并 ⇒ 新加的 user 字段
+ * 在旧 blob 里永远是 undefined（源码注释里已经写过这条坑）。
+ *
+ * 对 `agcEnabled` 尤其要紧：undefined 会让 Switch 渲染成「关」，而 Rust 侧
+ * `agc_enabled` 默认是 true ⇒ 用户看到「关」、后端实际开着，且他再也没法确认状态。
+ */
+describe('老存档的用户设置补齐', () => {
+  it('老 blob 没有 agcEnabled ⇒ 迁移后补成 true（与 Rust 默认同源）', () => {
+    const migrated = migratePersistedState({ user: { language: 'zh-CN' } }, 2)
+    expect(migrated.user.agcEnabled).toBe(true)
+  })
+
+  it('用户显式关过（false）⇒ 迁移不得覆盖（否则每次重启又自己开了）', () => {
+    const migrated = migratePersistedState({ user: { agcEnabled: false } }, 2)
+    expect(migrated.user.agcEnabled).toBe(false)
+  })
+
+  it('连 user 都没有 ⇒ 整个默认对象（含 agcEnabled）', () => {
+    const migrated = migratePersistedState({}, 2)
+    expect(migrated.user.agcEnabled).toBe(true)
   })
 })
