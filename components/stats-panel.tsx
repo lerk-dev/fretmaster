@@ -36,6 +36,8 @@ interface StatsPanelProps {
    * 不传则整列不显示删除按钮 —— 兼容旧调用方 / 只读场景。
    */
   onDeleteRecord?: (id: number) => Promise<void>
+  /** 清空**全部**记录（不可逆）。不传则不显示「清空全部」按钮。 */
+  onClearAllRecords?: () => Promise<void>
 }
 
 /**
@@ -50,6 +52,7 @@ export const StatsPanel = memo(function StatsPanel({
   getStatsByTimeRange,
   recentRecords,
   onDeleteRecord,
+  onClearAllRecords,
 }: StatsPanelProps) {
 // language 来自 user（与页面一致）：导出与时间格式化都要用
   const user = useUser()
@@ -65,6 +68,8 @@ export const StatsPanel = memo(function StatsPanel({
    * 护栏：`__tests__/window-native-dialog-guard.test.ts`。
    */
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
+  /** 清空全部的确认框（与单条删除分开：文案与后果都不同，混用一个 state 容易点错） */
+  const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false)
 
   /** 确认删除：先关弹窗再执行，避免失败时弹窗还挂着让人重复点 */
   const handleConfirmDelete = useCallback(async () => {
@@ -78,6 +83,17 @@ export const StatsPanel = memo(function StatsPanel({
       toast.error(t('stats_delete_failed'))
     }
   }, [pendingDeleteId, onDeleteRecord, t])
+
+  const handleConfirmClearAll = useCallback(async () => {
+    if (!onClearAllRecords) return
+    setConfirmClearAllOpen(false)
+    try {
+      await onClearAllRecords()
+      toast.success(t('stats_clear_all_success'))
+    } catch {
+      toast.error(t('stats_clear_all_failed'))
+    }
+  }, [onClearAllRecords, t])
 
   return (
       <>
@@ -264,7 +280,20 @@ export const StatsPanel = memo(function StatsPanel({
           
           {/* 近期练习记录列表 */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">{t('stats_recent_records')}</h4>
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-medium text-muted-foreground">{t('stats_recent_records')}</h4>
+              {onClearAllRecords && recentRecords.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmClearAllOpen(true)}
+                  className="h-7 gap-1 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('stats_clear_all')}
+                </Button>
+              )}
+            </div>
             {recentRecords.length === 0 ? (
               <div className="text-center py-4 text-xs text-muted-foreground">
                 {t('stats_recent_empty')}
@@ -352,6 +381,25 @@ export const StatsPanel = memo(function StatsPanel({
               onClick={handleConfirmDelete}
             >
               {t('stats_delete_record')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 清空全部：与单条删除分开一个弹窗，文案写明「桌面与云端都会删除」 */}
+      <AlertDialog open={confirmClearAllOpen} onOpenChange={setConfirmClearAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('stats_clear_all')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('stats_clear_all_confirm')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('btn_cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={handleConfirmClearAll}
+            >
+              {t('stats_clear_all')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

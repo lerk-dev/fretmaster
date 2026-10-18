@@ -308,13 +308,18 @@ describe('isDev=false（非 Tauri）：走 fetch /cgi-bin/stats', () => {
     errSpy.mockRestore()
   })
 
-  it('clearAllPracticeStats：localStorage 抛错时记日志但不上抛', async () => {
+  it('clearAllPracticeStats：localStorage 抛错时记日志但不上抛，且**仍然清后端**', async () => {
+    // 2026-10-18：clearAll 现在会发 DELETE ⇒ 必须 stub fetch，否则 jsdom 报 parse URL 失败。
+    // 语义也顺势加强：本地备份写失败不能阻断清后端（否则「本地满了 = 永远清不掉」）。
+    const fetchSpy = vi.fn(async () => ({ ok: true, status: 200 }) as unknown as Response)
+    vi.stubGlobal('fetch', fetchSpy)
     const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
     const setItem = window.localStorage.setItem as unknown as ReturnType<typeof vi.fn>
     setItem.mockImplementationOnce(() => { throw new Error('QuotaExceededError') })
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => { /* 静音 */ })
 
     await expect(mod.clearAllPracticeStats()).resolves.toBeUndefined()
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
 
     errSpy.mockRestore()
   })
@@ -372,6 +377,52 @@ describe('deletePracticeStat：桌面走 SQLite、Web 走 CGI DELETE', () => {
     await expect(mod.deletePracticeStat(-3)).rejects.toThrow(/正整数/)
     await expect(mod.deletePracticeStat(1.5)).rejects.toThrow(/正整数/)
     // 一次请求都不该发出去 —— 否则会在后端跑一条 WHERE id = 0 的空删
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+// ============================================================ D. clearAllPracticeStats（2026-10-18 修）
+
+/**
+ * 历史缺陷：Web 分支**只清 localStorage、从来不发请求** ⇒ 界面看着清空了，刷新后
+ * `getAllPracticeStats` 又从服务器拉回全部记录（用户侧表现为「清空按钮没用」）。
+ * 现在 Web 版必须发 `DELETE { all: true }`，且 CGI 只认显式的 all（不做「缺 id 就清空」的推断）。
+ */
+describe('clearAllPracticeStats：Web 版必须清后端', () => {
+  it('isDev=false → DELETE /cgi-bin/stats，body 是显式的 { all: true }', async () => {
+    const fetchSpy = vi.fn(async () => ({ ok: true, status: 200 }) as unknown as Response)
+    vi.stubGlobal('fetch', fetchSpy)
+    const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
+
+    await mod.clearAllPracticeStats()
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/cgi-bin/stats')
+    expect(init.method).toBe('DELETE')
+    // 🚨 必须是 `{"all":true}`：CGI 用 grep 找 '"all":true' 才清空，缺 id 不会被当成清空
+    expect(init.body).toBe(JSON.stringify({ all: true }))
+    // 本地备份同样要清
+    expect(readBackup()).toEqual([])
+  })
+
+  it('isDev=false → 非 2xx 抛错（不能把失败当成清空了）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503 }) as unknown as Response))
+    const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
+
+    await expect(mod.clearAllPracticeStats()).rejects.toThrow(/HTTP 503/)
+    // 但本地备份已经清了（网络失败也不该继续显示旧数据）
+    expect(readBackup()).toEqual([])
+  })
+
+  it('isTauri=true → 转交 native，不发 fetch', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const mod = await loadStatsApi({ tauri: true })
+
+    await mod.clearAllPracticeStats()
+
+    expect(native.clearAllPracticeStats).toHaveBeenCalledTimes(1)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

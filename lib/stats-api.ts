@@ -378,15 +378,40 @@ export async function deletePracticeStat(id: number): Promise<void> {
   }
 }
 
+/**
+ * 清空**全部**练习记录。
+ *
+ * · 桌面版：Rust `clear_all_practice_stats`（SQLite）。
+ * · Web 版：`DELETE /cgi-bin/stats` + `{ all: true }`。
+ *
+ * 🚨 2026-10-18 修：此前 Web 分支**只清 localStorage、从来不发请求** ——
+ *    界面当下看着清空了，刷新后 `getAllPracticeStats` 又从服务器把记录全拉回来
+ *    （用户侧表现为「清空按钮没用」）。CGI 当时也没有清空接口（只有按 id 删单条），
+ *    两边一起补：CGI 的 DELETE 现在认 `{"all":true}`（**必须显式传**，不做「缺 id 就清空」的推断）。
+ */
 export async function clearAllPracticeStats(): Promise<void> {
   if (isTauri) {
     const { clearAllPracticeStats: nativeClear } = await import('./native-stats');
     return nativeClear();
   }
+
+  // 本地备份/缓存在任何情况下都要清 —— 否则网络失败时界面还会显示旧数据
   try {
     localStorage.setItem(LOCAL_BACKUP_KEY, '[]');
     localStorage.removeItem(STATS_STORAGE_KEYS.stats);
   } catch (e) {
     logger.error('清空本地备份失败:', e);
+  }
+
+  // 开发环境没有 CGI，本地清空即视为完成
+  if (isDev) return;
+
+  const response = await fetch(`${API_BASE_URL}/stats`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ all: true }),
+  });
+  if (!response.ok) {
+    throw new Error(`清空统计失败：HTTP ${response.status}`);
   }
 }

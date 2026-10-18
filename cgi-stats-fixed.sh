@@ -317,6 +317,21 @@ fi
 # 处理 DELETE 请求 - 删除数据
 if [ "$REQUEST_METHOD" = "DELETE" ]; then
     DELETE_DATA=$(cat)
+
+    # 「清空全部」必须**显式**带 "all":true（2026-10-18 补）。
+    # 🚨 绝不能用「没有 id 就当作清空」的推断 —— 前端漏传 id（或 body 解析失败）时
+    #    会直接抹掉整张表。清空是不可逆操作，必须正着写才生效。
+    if printf '%s' "$DELETE_DATA" | grep -q '"all"[[:space:]]*:[[:space:]]*true'; then
+        DELETED=$(with_db_lock << EOF
+DELETE FROM practice_records;
+SELECT changes();
+EOF
+)
+        DELETED=$(printf '%s' "$DELETED" | tr -dc '0-9')
+        echo "{\"status\":\"ok\",\"message\":\"已清空练习记录\",\"deleted\":${DELETED:-0}}"
+        exit 0
+    fi
+
     RAW_RECORD_ID=$(printf '%s' "$DELETE_DATA" | grep -o '"id"[^,}]*' | grep -o '[0-9]*')
     RECORD_ID=$(sanitize_integer "$RAW_RECORD_ID" "" 1 999999999)
 

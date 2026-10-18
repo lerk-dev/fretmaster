@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getLocalDateString, getLocalDaysAgoStart, dbTimestampToLocalDate } from '@/lib/utils'
 import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
-import { savePracticeStats as saveToServer, getAllPracticeStats, deletePracticeStat, PracticeStats as ServerPracticeStats } from '@/lib/stats-api'
+import { savePracticeStats as saveToServer, getAllPracticeStats, deletePracticeStat, clearAllPracticeStats, PracticeStats as ServerPracticeStats } from '@/lib/stats-api'
 import { deduplicateStats } from '@/lib/export-utils'
 import { logger } from '@/lib/logger'
 import type { PracticeType, PracticeStats } from '@/lib/page-stats-types'
@@ -386,6 +386,17 @@ export function usePracticeStats(options: UsePracticeStatsOptions) {
     await reloadStats()
   }, [reloadStats])
 
+  /**
+   * 清空**全部**练习记录，然后重算聚合。
+   *
+   * 与 deleteRecord 同一形状：先等后端确认，再 reloadStats（反过来会让刚清掉的记录复活）。
+   * ⚠️ 这是不可逆操作 —— 二次确认由调用方（统计面板的 AlertDialog）负责。
+   */
+  const clearAllRecords = useCallback(async () => {
+    await clearAllPracticeStats()
+    await reloadStats()
+  }, [reloadStats])
+
 
   // 待持久化的统计载荷。放在 ref 中，由 [practiceStats] 的 effect 统一落库，
   // 使 recordPractice 的 state updater 保持纯函数（并发渲染下不会重复保存）。
@@ -418,6 +429,7 @@ export function usePracticeStats(options: UsePracticeStatsOptions) {
   return {
     practiceStats,
     deleteRecord,
+    clearAllRecords,
     recentRecords,
     practiceSessionStartTime,
     setPracticeSessionStartTime,

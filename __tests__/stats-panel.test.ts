@@ -60,6 +60,8 @@ function render(opts: {
   records?: Record<string, unknown>[]
   /** 传了才显示删除按钮（P3-16） */
   onDelete?: (id: number) => Promise<void>
+  /** 传了才显示「清空全部」按钮 */
+  onClearAll?: () => Promise<void>
 } = {}) {
   const calls: StatsTimeRange[] = []
   const container = document.createElement('div')
@@ -74,6 +76,7 @@ function render(opts: {
         getStatsByTimeRange: () => opts.data ?? agg(),
         recentRecords: (opts.records ?? []) as unknown as ServerStats[],
         onDeleteRecord: opts.onDelete,
+        onClearAllRecords: opts.onClearAll,
       } as never),
     )
   })
@@ -349,6 +352,63 @@ describe('删除单条记录', () => {
     await act(async () => { dialogCancel()!.click() })
 
     expect(deleted).toEqual([])
+    r.unmount()
+  })
+})
+
+// ============================================================ 清空全部记录（2026-10-18）
+
+/**
+ * 「清空全部」与「删除单条」必须**分成两个确认框**：后果完全不同（后者只删一行，
+ * 前者连云端一起抹掉），共用一个 state 很容易在文案上出岔子。
+ */
+describe('清空全部记录', () => {
+  const rec = { id: 11, exercise_type: 'scale', score: 80, duration: 60, notes: '练习项目: A', created_at: '2026-10-18 02:00:00' }
+  const clearLabel = '[stats_clear_all]'
+  const clearBtn = (buttons: HTMLButtonElement[]) =>
+    buttons.find((b) => b.textContent?.includes(clearLabel))
+  const dialogAction = () =>
+    [...document.body.querySelectorAll('[role="alertdialog"] button')].find(
+      (b) => b.textContent === clearLabel,
+    ) as HTMLButtonElement | undefined
+  const dialogCancel = () =>
+    [...document.body.querySelectorAll('[role="alertdialog"] button')].find(
+      (b) => b.textContent === '[btn_cancel]',
+    ) as HTMLButtonElement | undefined
+
+  it('不传 onClearAllRecords ⇒ 不出清空按钮', () => {
+    const r = render({ records: [rec] })
+    expect(clearBtn(r.buttons)).toBeUndefined()
+    r.unmount()
+  })
+
+  it('没有任何记录时也不出按钮（清了也没意义）', () => {
+    const r = render({ records: [], onClearAll: async () => {} })
+    expect(clearBtn(r.buttons)).toBeUndefined()
+    r.unmount()
+  })
+
+  it('传了且有记录 ⇒ 出按钮；点它先弹确认框（不直接清）', async () => {
+    const calls: number[] = []
+    const r = render({ records: [rec], onClearAll: async () => { calls.push(1) } })
+
+    await act(async () => { clearBtn(r.buttons)!.click() })
+    expect(dialogAction()).toBeTruthy()
+    expect(calls).toEqual([])
+
+    await act(async () => { dialogAction()!.click() })
+    expect(calls).toHaveLength(1)
+    r.unmount()
+  })
+
+  it('取消 ⇒ 一次都不调', async () => {
+    const calls: number[] = []
+    const r = render({ records: [rec], onClearAll: async () => { calls.push(1) } })
+
+    await act(async () => { clearBtn(r.buttons)!.click() })
+    await act(async () => { dialogCancel()!.click() })
+
+    expect(calls).toEqual([])
     r.unmount()
   })
 })

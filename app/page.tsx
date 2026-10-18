@@ -348,6 +348,7 @@ export default function FretMasterPage() {
     recordPractice,
     recentRecords,
     deleteRecord,
+    clearAllRecords,
   } = usePracticeStats({ isTauri })
   const [statsTimeRange, setStatsTimeRange] = useState<StatsTimeRange>('today')
   const [highlightedFrets, setHighlightedFrets] = useState<Map<string, boolean>>(new Map())
@@ -2293,6 +2294,7 @@ export default function FretMasterPage() {
                   getStatsByTimeRange={getStatsByTimeRange}
                   recentRecords={recentRecords}
                   onDeleteRecord={deleteRecord}
+                  onClearAllRecords={clearAllRecords}
                 />
               )}
 

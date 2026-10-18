@@ -115,11 +115,13 @@ describe('usePracticeStats：初始状态与返回面', () => {
     expect(h.current.scoreRef.current).toEqual({ correct: 2, total: 5 })
   })
 
-  // 2026-10-18（P3-16）：deleteRecord 是新增的写动作（删单条记录后重算聚合）。
-  it('返回面完整：页面解构的 9 个键一个都不能少', () => {
+  // 2026-10-18：新增两个写动作 —— deleteRecord（删单条）/ clearAllRecords（清空全部），
+  // 两者都必须在写成功后 reloadStats 重算聚合。
+  it('返回面完整：页面解构的 10 个键一个都不能少', () => {
     const h = mount()
     expect(Object.keys(h.current).sort()).toEqual(
       [
+        'clearAllRecords',
         'deleteRecord',
         'practiceElapsedTime',
         'practiceSessionStartTime',
