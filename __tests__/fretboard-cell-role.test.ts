@@ -479,17 +479,21 @@ describe('7. 一弦三音（把位 + 目标 + 压暗 + 预览）', () => {
       expect(roleAt(c, 0, 8)).toBe('muted')
     })
 
-    it('产出侧时机必须与消费侧一致 —— 从 `app/page.tsx` 源码解析那条守卫', () => {
+    it('产出侧时机必须与消费侧一致 —— 从源码解析那条守卫', () => {
       // 铁律：跨实现的一致性要从**对方源码**解析出来，不能凭记忆写死形状。
       // 这条护栏把「产出」与「消费」绑在一起：谁改时机，另一边必须跟着改。
-      const src = readFileSync('app/page.tsx', 'utf8')
+      // （2026-10-18 C7：nextThreeNpsCells 随「音阶练习域」搬进 hooks/use-scale-exercise.ts）
+      const src = readFileSync('hooks/use-scale-exercise.ts', 'utf8')
       const at = src.indexOf('const nextThreeNpsCells = useMemo(')
-      expect(at, 'page.tsx 里应存在 nextThreeNpsCells 的 useMemo').toBeGreaterThanOrEqual(0)
+      expect(at, 'hooks/use-scale-exercise.ts 里应存在 nextThreeNpsCells 的 useMemo').toBeGreaterThanOrEqual(0)
       const body = src.slice(at, src.indexOf('}, [', at))
       expect(
         body,
         '产出侧只在「当前把位跑完」时给数据 ⇒ resolveBaseRole 的 ② 必须同样只在 threeNpsTarget 为空时读',
       ).toMatch(/if \(!isThreeNpsActive \|\| threeNpsTarget\) return map/)
+      // 反向钉子：页面必须真的把这条产出接进指板（否则 hook 白写、预览永不出现）
+      const page = readFileSync('app/page.tsx', 'utf8')
+      expect(page, 'page.tsx 不再消费 nextThreeNpsCells —— 下一把位预览断了').toContain('nextThreeNpsCells')
     })
 
     it('预览表里没有的格子仍退回普通音阶判定（整块音阶照常亮）', () => {

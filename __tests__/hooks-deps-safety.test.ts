@@ -121,7 +121,9 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
       ['const [practiceSummaryData, setPracticeSummaryData] = useState', 'setPracticeSummaryData'],
       ['const clearFretClickTimers = useCallback(', 'clearFretClickTimers'],
       ['const generateNewTarget = useCallback(', 'generateNewTarget'],
-      ['const generateScaleExercise = useCallback(', 'generateScaleExercise'],
+      // 2026-10-18（C7）：`generateScaleExercise` 已随「音阶练习域」搬进 hooks/use-scale-exercise.ts，
+      // 现在来自 hook 解构（解构本身就是声明）⇒ 顺序风险消失，锚点从本列表移除。
+      // 它「必须真的被解构出来」由下方的「音阶域已整体搬出页面」用例负责。
     ]
     for (const [needle, label] of deps) {
       const at = src.indexOf(needle)
@@ -174,7 +176,8 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     const deps: Array<[string, string]> = [
       ['const [showAllNotes, setShowAllNotes] = useState(', 'setShowAllNotes'],
       ['const generateNewTarget = useCallback(', 'generateNewTarget'],
-      ['const nextScaleExercise = useCallback(', 'nextScaleExercise'],
+      // 2026-10-18（C7）：`nextScaleExercise` 已随「音阶练习域」搬进 hooks/use-scale-exercise.ts，
+      // 现在来自 hook 解构 ⇒ 顺序风险消失，锚点从本列表移除（同 C4 的说明）。
       ['const setTabFretboardFlag = useCallback(', 'setTabFretboardFlag'],
       ['const handleTabChange = useCallback(', 'handleTabChange'],
       ['const nextChord = useCallback(', 'nextChord'],
@@ -223,6 +226,57 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     }
     // 页面必须真的把 isTauri 传进去（不传 ⇒ 桌面版会去写 localStorage 统计缓存）
     expect(src, 'usePracticeStats 调用点没传 isTauri').toContain('usePracticeStats({ isTauri })')
+  })
+
+  // ==================== 音阶练习域（hooks/use-scale-exercise.ts）：整域必须在一个文件里 ====================
+  // 2026-10-18（C7）。这是第三个练习域 hook（与 use-interval-exercise / use-chord-exercise 对齐）。
+  // 域里的 refs 是三条判定路径（音频 / MIDI / 点击）读「最新音阶状态」的唯一通道 ——
+  // 判定回调不能依赖 state（换音阶会重建回调、打断正在跑的音频处理循环）。
+  it('音阶练习域已整体搬出页面：页面不得再声明其 state / ref / 出题函数', () => {
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const forbidden = [
+      'const [scaleKey, setScaleKey] = useState(',
+      'const [selectedScale, setSelectedScale] = useState(',
+      // 🚨 下面三项在原文里是 `useState<泛型>(...)` —— 判据不能写死成 `useState(`，
+      //    否则反向自检（hook 侧必须存在）会当场红（本轮就是这么被抓的）。
+      'const [selectedScales, setSelectedScales] = useState',
+      'const [scaleExerciseSequence, setScaleExerciseSequence] = useState',
+      'const [scaleCombo, setScaleCombo] = useState(',
+      'const [nextScaleExerciseInfo, setNextScaleExerciseInfo] = useState',
+      'const nextScaleExerciseRef = useRef',
+      'const scaleKeyRef = useRef(',
+      'const scaleComboRef = useRef(0)',
+      'const generateScaleExercise = useCallback(',
+      'const nextScaleExercise = useCallback(',
+      'const computeNextScaleExerciseInfo = useCallback(',
+      'const applyThreeNpsPosition = useCallback(',
+      'const isThreeNpsMode =',
+      'const THREE_NPS_SEQUENCE_ID',
+    ]
+    const leftovers = forbidden.filter((f) => src.includes(f))
+    expect(
+      leftovers,
+      `页面里又出现了音阶域符号的声明（应追加到 hooks/use-scale-exercise.ts，别在页面里另起一套）：\n  ${leftovers.join('\n  ')}`
+    ).toEqual([])
+
+    // 反向自检：这些符号必须确实活在 hook 里（否则本用例就是在断言空气）
+    const hook = readFileSync('hooks/use-scale-exercise.ts', 'utf8')
+    for (const f of forbidden) {
+      expect(hook.includes(f), `hooks/use-scale-exercise.ts 里没有 ${f} —— 锚点失效，请同步更新本用例`).toBe(true)
+    }
+    // 判定路径的 refs 必须仍从 hook 解构（少一个 ⇒ 判定回调读到旧值或直接编译错）。
+    // 🚨 必须在**解构块内**查：页面别处（记账代码 / usePracticeSession 的 options）也会出现
+    //    这些名字，全文件 toContain 是无效断言（变异验证抓到过：删掉解构项它照样绿）。
+    const declStart = src.indexOf('  const {', src.indexOf('==== 音阶练习域'))
+    const declEnd = src.indexOf('= useScaleExercise({', declStart)
+    expect(declStart, '找不到 useScaleExercise 的解构块起点').toBeGreaterThan(-1)
+    expect(declEnd, '找不到 useScaleExercise 调用').toBeGreaterThan(declStart)
+    const destructure = src.slice(declStart, declEnd)
+    for (const ref of ['nextScaleExerciseRef', 'scaleKeyRef', 'scaleExerciseSequenceRef', 'scaleExerciseCurrentStepRef', 'selectedScaleRef', 'scaleComboRef', 'scaleMaxComboRef']) {
+      expect(destructure, `页面没有从 useScaleExercise 解构 ${ref} —— 判定路径断了`).toContain(ref)
+    }
+    // 页面必须真的调用 hook（抽走却没接上 ⇒ 全部音阶功能静默失效）
+    expect(src, 'page.tsx 里找不到 useScaleExercise 调用').toContain('= useScaleExercise({')
   })
 
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
