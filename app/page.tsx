@@ -124,7 +124,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { createTranslator } from '@/lib/i18n'
-import type { AudioDeviceInfo } from '@/lib/native-audio'
 
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
 
@@ -826,7 +825,7 @@ export default function FretMasterPage() {
   //    练习中「怎么弹都没反应」且用户不知道为什么）
   //  · 新设备接入 ⇒ 提示（此前是静默的，用户只能自己去设置里刷新才发现）
   const handleGlobalDeviceChange = useCallback((
-    added: AudioDeviceInfo[],
+    added: { name: string }[],
     removed: string[]
   ) => {
     const st = useAppStore.getState()
@@ -885,7 +884,11 @@ export default function FretMasterPage() {
         if (cancelled) return
         // 双保险：Rust 已在 setup 常驻启动，这里再 ensure 一次（幂等），
         // 以防运行在「setup 未覆盖」的旧二进制上。
-        await m.ensureDeviceMonitor().catch(() => {})
+        // 启动失败不能静默：热插拔从此不工作，用户只会觉得「插了设备没反应」，
+        // 而控制台没有任何线索。
+        await m.ensureDeviceMonitor().catch((err) => {
+          logger.warn("设备监控启动失败，热插拔将不生效:", err)
+        })
         const fn = await m.listenDeviceChanges((event) => {
           // 启动快照不是真实插入：只更新列表，不弹提示（否则每次启动误报 N 个设备）
           if (event.isInitial) return
@@ -943,7 +946,7 @@ export default function FretMasterPage() {
           const removed = before.filter(id => !after.includes(id))
           if (added.length > 0 || removed.length > 0) {
             handleGlobalDeviceChange(
-              added.map(id => ({ name: id } as unknown as AudioDeviceInfo)),
+              added.map(id => ({ name: id })),
               removed
             )
           }
