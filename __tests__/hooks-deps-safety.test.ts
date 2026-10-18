@@ -321,6 +321,58 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     expect(decl, 'usePracticeMatch 的 options 立即求值 ⇒ 调用点必须在 generateNewTarget 声明之后').toBeLessThan(call)
   })
 
+  // ==================== 设置 IO 域（hooks/use-settings-io.ts）====================
+  // 2026-10-18（C10）。这个域出过两个**静默**缺陷（不报错，用户换设备后才发现设置变样）：
+  //   · export 漏了 `theme`（import 侧读它 ⇒ 主题永远被重置成 dark）
+  //   · import 用 `||` 取缺省值，把合法的 0 / false 吞掉（滑块 0 导回变 1）
+  // 之前**没有任何源码护栏**盯着这块 —— 全靠注释和人工记忆。本轮补上。
+  it('设置 IO 域已整体搬出页面：导入/导出/重置的实现不得再在页面里声明', () => {
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const forbidden = [
+      'const saveSettings = useCallback(',
+      'const exportSettings = useCallback(',
+      'const importSettings = useCallback(',
+      'const resetSettings = useCallback(',
+    ]
+    const leftovers = forbidden.filter((f) => src.includes(f))
+    expect(
+      leftovers,
+      `页面里又出现了设置 IO 的实现 —— 应追加到 hooks/use-settings-io.ts：\n  ${leftovers.join('\n  ')}`
+    ).toEqual([])
+
+    const hook = readFileSync('hooks/use-settings-io.ts', 'utf8')
+    for (const f of forbidden) {
+      expect(hook.includes(f), `hooks/use-settings-io.ts 里没有 ${f} —— 锚点失效，请同步更新本用例`).toBe(true)
+    }
+    // 装配顺序：resetSettings 要调 clearNoiseFloor ⇒ 调用点必须在 useAudioInput 之后
+    expect(src).toContain('useSettingsIo({')
+    expect(
+      src.indexOf('= useAudioInput({'),
+      '设置 IO 的调用点必须在 useAudioInput 之前就出现了 —— resetSettings 会拿到未初始化的 clearNoiseFloor',
+    ).toBeLessThan(src.indexOf('useSettingsIo({'))
+  })
+
+  it('🚨 导出与导入的字段集合必须**完全对称**（漏一个就是「换设备后设置悄悄变样」）', () => {
+    // 历史缺陷：export 漏 `theme` —— import 侧读 `settings.theme`，导出侧没写 ⇒
+    // 换设备/重装后主题永远被重置成 dark，界面静默变样且无从回溯。
+    // 这类缺陷**不会报错**，只能靠「两个集合相等」这条对称性守住。
+    const hook = readFileSync('hooks/use-settings-io.ts', 'utf8')
+    const exportStart = hook.indexOf('const settings = {')
+    expect(exportStart, '找不到导出对象字面量').toBeGreaterThan(-1)
+    const exportBlock = hook.slice(exportStart, hook.indexOf('\n    }', exportStart))
+    // 对象里每个 key 一行（6 空格缩进 + `name,`）；注释行不匹配
+    const exported = [...exportBlock.matchAll(/^\s{6}([A-Za-z_][A-Za-z0-9_]*),\s*$/gm)].map((m) => m[1])
+    expect(exported.length, '导出对象里一个 key 都没解析到 —— 正则失效，请同步更新本用例').toBeGreaterThan(5)
+
+    const importBlock = hook.slice(hook.indexOf('const importSettings = useCallback('))
+    const imported = [...new Set([...importBlock.matchAll(/settings\.([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]))]
+
+    const missingInExport = imported.filter((k) => !exported.includes(k))
+    expect(missingInExport, `import 读了但 export 没写（历史 bug 复发）：\n  ${missingInExport.join('\n  ')}`).toEqual([])
+    const missingInImport = exported.filter((k) => !imported.includes(k))
+    expect(missingInImport, `export 写了但 import 从不读（导出了无用的字段）：\n  ${missingInImport.join('\n  ')}`).toEqual([])
+  })
+
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))
