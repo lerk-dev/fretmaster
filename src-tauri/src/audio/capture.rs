@@ -82,34 +82,83 @@ impl RingBuffer {
     }
 }
 
+thread_local! {
+    // 多声道混音用的独立暂存区。
+    //
+    // ⚠️ 必须与 `SCRATCH_F32` 分开：I32/I16/U8 分支在「格式转换」那一层已经借用着
+    // SCRATCH_F32，若混音也借同一个 RefCell 会直接 panic（运行时才炸，且在音频线程上）。
+    static SCRATCH_MIX: std::cell::RefCell<Vec<f32>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 /// 把一段**已归一化到 f32**的交错多声道样本混为单声道并写入环形缓冲区。
 ///
 /// 抽成独立函数是刻意的：f32 便捷回调与 raw 回调（I32/I16/U16…）必须共用
 /// **同一份**混音/增益/写环逻辑。若各写一份，两条路会各自漂移 ——
 /// 例如只有一条处理了 gain、另一条忘了除以声道数，症状是「换个后端音量就不对」
 /// 这种不报错、纯听感差异的问题。
+
 fn write_mono_into_ring(
     ring: &Arc<Mutex<RingBuffer>>,
     data: &[f32],
     gain: f32,
     channels: u16,
 ) {
-    let mut r = ring.lock();
     if channels > 1 {
-        let mono: Vec<f32> = data
-            .chunks(channels as usize)
-            .map(|chunk| chunk.iter().sum::<f32>() / channels as f32)
-            .collect();
-        if gain != 1.0 {
-            r.write_with_gain(&mono, gain);
-        } else {
-            r.write(&mono);
-        }
-    } else if gain != 1.0 {
-        r.write_with_gain(data, gain);
+        // 🚨 混音放在**锁外**：`chunks().sum()` 是 O(n) 计算，原先它在 ring 锁内做，
+        //    而命令线程的 `get_latest_samples`（持锁拷 4096 样本 ≈85µs）也在争同一把锁
+        //    ⇒ 回调持锁时间被拉长，优先级倒置更容易演成爆音/丢帧（P2-9）。
+        //    现在锁内只剩一次 memcpy。混音缓冲复用线程局部暂存区，稳态零分配。
+        SCRATCH_MIX.with(|scratch| {
+            let mut buf = scratch.borrow_mut();
+            buf.clear();
+            buf.reserve(data.len() / channels as usize + 1);
+            for chunk in data.chunks(channels as usize) {
+                buf.push(chunk.iter().sum::<f32>() / channels as f32);
+            }
+            let mut r = ring.lock();
+            if gain != 1.0 {
+                r.write_with_gain(&buf, gain);
+            } else {
+                r.write(&buf);
+            }
+        });
     } else {
-        r.write(data);
+        let mut r = ring.lock();
+        if gain != 1.0 {
+            r.write_with_gain(data, gain);
+        } else {
+            r.write(data);
+        }
     }
+}
+
+thread_local! {
+    // 实时回调用的样本格式转换暂存区（I32 / I16 / U8 → f32）。
+    ///
+    // 每个音频周期都会走一次格式转换，原先写 `.map(...).collect::<Vec<_>>()` ——
+    // 每帧一次堆分配，而且是在**音频线程**上（硬实时期最不该 malloc 的地方）。
+    // 这里复用一个线程局部 Vec：`clear()` 保留容量，稳态下零分配。
+    ///
+    // ⚠️ 只用于「格式转换」这一层。`write_mono_into_ring` 内部的多声道混音缓冲是独立的，
+    // 不会与本缓冲嵌套借用（否则 RefCell 会 panic）。
+    static SCRATCH_F32: std::cell::RefCell<Vec<f32>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// 把 `data` 按 `convert` 转成 f32 后写入 ring —— 走线程局部暂存区，稳态零堆分配。
+fn write_converted_into_ring<T: Copy>(
+    ring: &Arc<Mutex<RingBuffer>>,
+    data: &[T],
+    convert: impl Fn(T) -> f32,
+    gain: f32,
+    channels: u16,
+) {
+    SCRATCH_F32.with(|scratch| {
+        let mut buf = scratch.borrow_mut();
+        buf.clear();
+        buf.reserve(data.len());
+        buf.extend(data.iter().map(|&s| convert(s)));
+        write_mono_into_ring(ring, &buf, gain, channels);
+    });
 }
 
 /// 构造 cpal 输入回调：把多声道混为单声道后写入环形缓冲区。
@@ -188,34 +237,34 @@ fn make_input_callback_raw(
                 write_mono_into_ring(&ring, samples, gain, channels);
             }
             cpal::SampleFormat::I32 => {
-                // ASIO 实测走这条分支
-                let mono: Vec<f32> = data
-                    .as_slice::<i32>()
-                    .unwrap_or(&[])
-                    .iter()
-                    .map(|&s| i32_to_f32(s))
-                    .collect();
-                write_mono_into_ring(&ring, &mono, gain, channels);
+                // ASIO 实测走这条分支（最热路径）—— 转换走线程局部暂存区，稳态零分配
+                write_converted_into_ring(
+                    &ring,
+                    data.as_slice::<i32>().unwrap_or(&[]),
+                    i32_to_f32,
+                    gain,
+                    channels,
+                );
             }
             cpal::SampleFormat::I16 => {
-                let mono: Vec<f32> = data
-                    .as_slice::<i16>()
-                    .unwrap_or(&[])
-                    .iter()
-                    .map(|&s| s as f32 / i16::MAX as f32)
-                    .collect();
-                write_mono_into_ring(&ring, &mono, gain, channels);
+                write_converted_into_ring(
+                    &ring,
+                    data.as_slice::<i16>().unwrap_or(&[]),
+                    |s| s as f32 / i16::MAX as f32,
+                    gain,
+                    channels,
+                );
             }
             cpal::SampleFormat::U8 => {
                 // u8 是无符号偏移量：128 才是零点，必须先减偏置再归一化，
                 // 否则整条波形带一个 DC 直流偏置，下游会看到恒定的"能量"。
-                let mono: Vec<f32> = data
-                    .as_slice::<u8>()
-                    .unwrap_or(&[])
-                    .iter()
-                    .map(|&s| (s as f32 - 128.0) / 128.0)
-                    .collect();
-                write_mono_into_ring(&ring, &mono, gain, channels);
+                write_converted_into_ring(
+                    &ring,
+                    data.as_slice::<u8>().unwrap_or(&[]),
+                    |s| (s as f32 - 128.0) / 128.0,
+                    gain,
+                    channels,
+                );
             }
             other => {
                 log::error!(
