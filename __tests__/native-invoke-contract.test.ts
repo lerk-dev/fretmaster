@@ -1,3 +1,5 @@
+import { themeBackgroundColor } from '@/lib/theme-colors'
+import { useAppStore } from '@/lib/store'
 /**
  * Tauri 桥接层契约测试（lib/native-window.ts / lib/native-stats.ts 的 **Tauri 分支**）。
  *
@@ -104,9 +106,20 @@ describe('native-window：Tauri 分支真的把命令发给了后端', () => {
     expect(mocks.invoke).toHaveBeenCalledWith('set_true_fullscreen', { enable: false })
   })
 
-  it('setTrueFullscreen 成功后连带把 WebView 背景刷成统一底色（避免白闪）', async () => {
+  it('🚨 setTrueFullscreen 成功后把 WebView 背景刷成**当前主题的底色**（不是写死的色号）', async () => {
     await win.setTrueFullscreen(true)
-    expect(mocks.setBackgroundColor).toHaveBeenCalledWith('#0b0f14')
+    // 2026-10-18：原来这里断言写死的 '#0b0f14' —— 那个值既不在主题表里，
+    // 也和 dark 的 '#101317' 不同 ⇒ 浅色主题进真全屏会露出深色过扫描边。
+    // 现在底色来自 lib/theme-colors.ts，断言改为「跟随 store 里的当前主题」。
+    useAppStore.getState().setTheme('ocean-dark')
+    await win.setTrueFullscreen(true)
+    expect(mocks.setBackgroundColor).toHaveBeenCalledWith(themeBackgroundColor('ocean-dark'))
+    // 反向钉子：不能再用那个历史色号
+    expect(mocks.setBackgroundColor).not.toHaveBeenCalledWith('#0b0f14')
+
+    useAppStore.getState().setTheme('light')
+    await win.setTrueFullscreen(true)
+    expect(mocks.setBackgroundColor).toHaveBeenLastCalledWith(themeBackgroundColor('light'))
   })
 
   it('setWebViewBackgroundColor 走 getCurrentWebview().setBackgroundColor', async () => {
