@@ -167,6 +167,8 @@ FretMaster 是一款专为吉他手设计的指板视觉化练习工具，基于
 - 进度追踪
 - **多格式导出**：CSV / PDF / JSON
 - 时间范围筛选（今日/本周/本月）
+- **记录可维护**：单条记录可删除（二次确认），也可一键清空全部（桌面写 SQLite、Web 同步 CGI）
+- 删除后自动重算聚合 —— 正确率、分类计数、明细分布不会残留已删记录的数字
 
 ---
 
@@ -200,7 +202,7 @@ Web 版是 FretMaster 的基础版本，基于 Next.js 构建，支持部署到�
 - **自动更新** - 支持在线检查更新（计划中）
 - **数据持久化** - 使用 SQLite 本地数据库，数据更安全
 - **真全屏模式** - Win32 API 实现，完全覆盖任务栏
-- **软件 AGC** - 自动增益控制，适应不同音量环境
+- **软件 AGC** - 自动增益控制，适应不同音量环境（**可在设置 → 音频里关闭**）
 - **事件驱动音频** - 替代轮询，更高效的音高检测
 
 #### 系统环境要求
@@ -338,7 +340,32 @@ Web 版是 FretMaster 的基础版本，基于 Next.js 构建，支持部署到�
 
 #### 版本更新日志
 
-##### v0.2.219 (当前版本)
+##### v0.2.223 (当前版本)
+
+**练习记录可维护**
+- 统计面板新增「删除单条记录」：桌面走 SQLite 的 `delete_practice_stat`，Web 走 `DELETE /cgi-bin/stats`
+- 新增「清空全部记录」：CGI 的 DELETE 认**显式** `{"all":true}`（不做「缺 id 就清空」的推断 —— 清空不可逆），桌面走 `clear_all_practice_stats`
+- 删除 / 清空后重算整表聚合（`daily` / `total` / `byType` 全部由记录派生，只改缓存会留下幽灵数字）
+
+**音频**
+- 实时回调去锁：`is_capturing` 改 `AtomicBool`；格式转换（I32 / I16 / U8）改线程局部缓冲复用（稳态零 malloc）；多声道混音移出 ring 锁（锁内只剩 memcpy）
+- `detect_pitch` 改 `#[tauri::command(async)]` + 同步 fn ⇒ 不再占用 tokio worker（此前 20Hz 轮询会让窗口/设置类命令跟着变慢）
+- 新增 **AGC 开关**（设置 → 音频，仅桌面版）：此前 `agc_enabled` 默认 `true` 而前端没有任何入口，安静环境下它会持续抬底噪且用户无法关闭
+
+**主题**
+- 抽出 `lib/theme-colors.ts` 作为主题底色的唯一真相源；真全屏的 WebView 底色改为跟随当前主题（此前写死 `#0b0f14`），切换主题时即时同步
+- `app/layout.tsx` 的 pre-hydration 内联底色表与 lib 表由测试逐项比对（内联脚本无法 import，只能靠测试钉住）
+
+**答题判定**
+- `use-practice-match` 的 options 从 75 个平铺参数分成 7 个域组（`runtime` / `audio` / `practice` / `interval` / `scale` / `chord` / `actions`）
+- 补上音频 / MIDI / 点击三条路径的行为测试（此前只有源码级护栏）：帧数门槛、答错也进分母、冷却期整段跳过、`E4` 吃八度后缀、异名同音、按钮模式不抢答
+
+**工程**
+- `vitest` **176 文件 3418 用例**全绿；`cargo test --lib` 48 通过；`cargo check` 0 警告
+- 新增 `.githooks/pre-push`（tsc → lint → vitest），与 GitHub Actions 的 `ci.yml` 互为补充：CI 兜底、pre-push 提前拦截
+- 修正一批「改实现就撞死写文本的源码护栏」：`parseCommandParams` 支持 `#[tauri::command(async)]`、ASIO 归一化判据收窄到 I32 分支并要求结果确实写入 ring
+
+##### v0.2.219
 
 **工程门禁与质量**
 - 恢复构建期 TypeScript 类型门禁（移除 `next.config.mjs` 中两处 `ignoreBuildErrors`）
