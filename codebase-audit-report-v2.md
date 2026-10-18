@@ -102,6 +102,26 @@ FAIL __tests__/chord-theory.test.ts > 应该标记为 MINOR（带变音根音）
 
 **修复**：按功能域拆分为 `hooks/`（`useAudioEngine`、`usePracticeSession`、`useStatsPersistence`、`useKeyboardShortcuts`、`useTheme`）+ 各练习模式子组件，逐步迁移而非一次性重写。
 
+> **✅ 2026-10-18 已完成（C1–C11）**：`app/page.tsx` **5134 → 2474 行**（-52%），
+> 按域拆出的 hook（全部逐行搬运 + 机械等价核证 + 变异验证）：
+>
+> | hook | 行数 | 域 |
+> |---|---|---|
+> | `hooks/use-audio-input.ts` | 1247 | 收音链路（getUserMedia / worklet / 校准 / MIDI 设备 / 原生音高流 / 卸载清理）|
+> | `hooks/use-practice-match.ts` | 949 | **三条答题路径**（音频 processPracticeMatch / MIDI handleMIDINoteInput / 点击 handleFretClick）|
+> | `hooks/use-practice-session.ts` | 544 | 会话三态机 / 计时 / 快照 / WakeLock |
+> | `hooks/use-scale-exercise.ts` | 429 | 音阶练习域（含一弦三音 3NPS 出题与把位）|
+> | `hooks/use-global-shortcuts.ts` | 264 | 页面级 keydown 全部分支 |
+> | `hooks/use-settings-io.ts` | 199 | 设置导入/导出/重置 |
+> | `hooks/use-chord-library.ts` | 175 | 自定义和弦库（含 iReal 导入导出）|
+> | `hooks/use-practice-stats.ts` | 400 | 练习统计（合并了原散在页面的加载/落库）|
+>
+> 门禁：`tsc --noEmit` 0 / `eslint --max-warnings 0` 0 / `vitest run` **174 文件 3375 用例全绿** /
+> `TAURI_BUILD=true next build` 通过（24s）。每个域都补了「整域已搬出页面」的负向护栏 +
+> 装配顺序护栏（options 立即求值 ⇒ 调用点必须晚于其依赖声明，踩到 5 次 TDZ）。
+>
+> **仍未做的部分**：JSX 渲染区（~850 行，props 打包为主）与 store 精确订阅的进一步优化。
+
 ---
 
 ## P1 严重问题
@@ -250,7 +270,7 @@ FAIL __tests__/chord-theory.test.ts > 应该标记为 MINOR（带变音根音）
 | 项 | 状态 |
 |----|------|
 | P0-1 FFT 算法、P0-2 和弦 m/M 解析 | ✅ 已修复，跳过的 14 个 SOLO 测试已恢复并通过 |
-| P0-3 巨石文件拆分 | ⏸ 未做（高风险重构，建议单独立项） |
+| P0-3 巨石文件拆分 | ✅ **2026-10-18 完成**（C1–C11：5134 → 2474 行，8 个域 hook，详见 P0-3 段落内的完成记录）|
 | P1 音频泄漏 / 孤儿 interval / 暂停失效 / 时长恒 1 秒 / updater 副作用 / scoreRef / 计时双源 | ✅ 已修复 |
 | P1 数据丢失（localStorage / stats-api / position-stats / 崩溃快照 / store 深合并） | ✅ 已修复 |
 | P1 CGI 安全（DB 位置 / 鉴权 / 注入 / 并发锁）与部署脚本删库 bug | ✅ 已修复（脚本结构重写） |
