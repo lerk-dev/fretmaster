@@ -16,8 +16,9 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
 const SRC = 'src-tauri/src/audio/capture.rs'
-const HARD_FALSE = '*self.is_capturing.lock() = false;'
-const SNAPSHOT = 'let was_capturing = *self.is_capturing.lock();'
+// 2026-10-18（P2-9）：标志位从 parking_lot::Mutex<bool> 改为 AtomicBool
+const HARD_FALSE = 'self.is_capturing.store(false, Ordering::Relaxed);'
+const SNAPSHOT = 'let was_capturing = self.is_capturing.load(Ordering::Relaxed);'
 
 function stripped(): string {
   return readFileSync(SRC, 'utf8')

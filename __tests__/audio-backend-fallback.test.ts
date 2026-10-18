@@ -122,7 +122,7 @@ describe('音频后端回退契约（Rust 源码护栏）', () => {
     ).toBe(false)
 
     // 置位点
-    const setIdx = fnBody.indexOf('*self.is_capturing.lock() = true')
+    const setIdx = fnBody.indexOf('self.is_capturing.store(true, Ordering::Relaxed)')
     expect(setIdx, 'start_with_host 里找不到 is_capturing 置位点').toBeGreaterThan(-1)
 
     const after = fnBody.slice(setIdx)
@@ -135,7 +135,7 @@ describe('音频后端回退契约（Rust 源码护栏）', () => {
     //    硬编码 false 在「重复 start（旧流仍活着）时建流失败」这一场景下会把标志位
     //    错标成「未采集」，而旧流还在跑 ⇒ 守卫误判。硬编码 false 的**总量**由
     //    `audio-capture-rollback-guard.test.ts` 单独钉住（全文件恰好 1 处、且在 stop() 内）。
-    const rollbackCount = (after.match(/\*self\.is_capturing\.lock\(\)\s*=\s*was_capturing/g) ?? []).length
+    const rollbackCount = (after.match(/self\.is_capturing\.store\(was_capturing,\s*Ordering::Relaxed\)/g) ?? []).length
     expect(
       rollbackCount,
       `置位点之后应有 2 处回滚（建流全部失败出口 + play()），实际 ${rollbackCount} 处 ⇒ ` +
@@ -153,7 +153,7 @@ describe('音频后端回退契约（Rust 源码护栏）', () => {
     expect(
       playBody,
       'play() 分支里没有回滚 is_capturing（删掉回滚语句即为回归）',
-    ).toContain('*self.is_capturing.lock() = was_capturing')
+    ).toContain('self.is_capturing.store(was_capturing, Ordering::Relaxed)')
 
     // 建流全部失败的那条出口。
     // 🚨 这里**不再**断言 `.map_err(` —— 该函数在 ASIO 修复（10-02）后重构为
@@ -166,7 +166,7 @@ describe('音频后端回退契约（Rust 源码护栏）', () => {
     expect(
       builtFailBody,
       '建流全部失败时没有回滚 is_capturing（标志位泄漏，后续检测全部静默空转）',
-    ).toContain('*self.is_capturing.lock() = was_capturing')
+    ).toContain('self.is_capturing.store(was_capturing, Ordering::Relaxed)')
   })
 
   it('负向：护栏锚点必须真实存在（防止改结构后静默空转）', () => {

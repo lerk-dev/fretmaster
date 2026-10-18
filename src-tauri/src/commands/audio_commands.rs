@@ -63,8 +63,14 @@ pub async fn is_capturing(state: State<'_, AppState>) -> Result<bool, String> {
     Ok(pipeline.is_capturing())
 }
 
-#[tauri::command]
-pub async fn detect_pitch(state: State<'_, AppState>) -> Result<Option<crate::audio::PitchResult>, String> {
+/// 音高检测 —— **CPU 密集 + 长时间持锁**（YIN over 4096 samples，全程持有 pipeline 锁）。
+///
+/// 🚨 刻意不用 `async fn`：Tauri 的 async 命令跑在 **tokio worker** 上，而这里同步持锁跑
+/// 完整 YIN，会把运行时 worker 占住 —— 前端 20Hz 轮询时其它命令（含窗口/设置类）都会被拖慢
+/// （P3-15）。`#[tauri::command(async)]` + **同步** fn 的语义正好相反：把它丢到阻塞线程池执行，
+/// 不占 tokio worker。前端 `invoke('detect_pitch')` 的调用方式完全不变。
+#[tauri::command(async)]
+pub fn detect_pitch(state: State<'_, AppState>) -> Result<Option<crate::audio::PitchResult>, String> {
     let mut pipeline = state.inner().pipeline.lock();
     Ok(pipeline.detect_pitch())
 }

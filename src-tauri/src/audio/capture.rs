@@ -1,5 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use parking_lot::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use anyhow::Result;
 
@@ -113,14 +114,30 @@ fn write_mono_into_ring(
 
 /// 构造 cpal 输入回调：把多声道混为单声道后写入环形缓冲区。
 /// 提取为独立函数，以便在“固定缓冲区失败 → 回退默认缓冲区”时复用同一份逻辑。
+///
+/// ## 实时性（P2-9，2026-10-18 部分完成）
+///
+/// 音频回调是硬实时期（每周期 ~10–20ms），理想是**零锁零分配**。当前状态：
+///
+/// · ✅ `is_capturing` 已从 `parking_lot::Mutex<bool>` 改为 `Arc<AtomicBool>`
+///   （`Ordering::Relaxed` 足够：它只是「要不要写数据」的开关，数据同步靠 ring 自身的锁）
+///   —— 每帧少一次 lock/unlock，也彻底移除「回调与命令线程争同一把锁」的一条路径。
+/// · ⚠️ **仍然存在**两处实时性违规，留待独立立项（需真机听感验证，本机只能验证编译与逻辑）：
+///   1. `ring.lock()`：与命令线程的 `get_latest_samples`（持锁拷 4096 样本 ≈85µs）相遇时
+///      会产生优先级倒置 ⇒ 极端情况下爆音/丢帧。彻底修需要无锁 SPSC（新依赖或手写 unsafe）。
+///   2. I32/I16/U8 分支每帧 `Vec::with_capacity` + `collect`：一次堆分配。可改为
+///      `thread_local!` 预分配缓冲复用，但会引入 TLS + RefCell 借用管理。
+///
+/// 这两项**不做**的理由不是「做不到」，而是无法在本机验证收益与回归 —— 见
+/// `local-only/audit-2026-10-10.md` 的 P2-9 条目。
 fn make_input_callback(
     ring: Arc<Mutex<RingBuffer>>,
-    is_capturing: Arc<Mutex<bool>>,
+    is_capturing: Arc<AtomicBool>,
     gain: f32,
     channels: u16,
 ) -> impl FnMut(&[f32], &cpal::InputCallbackInfo) + Send + 'static {
     move |data: &[f32], _: &cpal::InputCallbackInfo| {
-        if !*is_capturing.lock() {
+        if !is_capturing.load(Ordering::Relaxed) {
             return;
         }
         write_mono_into_ring(&ring, data, gain, channels);
@@ -152,13 +169,13 @@ fn i32_to_f32(s: i32) -> f32 {
 /// 保证混音/增益逻辑与 f32 回调**逐字相同**。
 fn make_input_callback_raw(
     ring: Arc<Mutex<RingBuffer>>,
-    is_capturing: Arc<Mutex<bool>>,
+    is_capturing: Arc<AtomicBool>,
     gain: f32,
     channels: u16,
     format: cpal::SampleFormat,
 ) -> impl FnMut(&cpal::Data, &cpal::InputCallbackInfo) + Send + 'static {
     move |data: &cpal::Data, _: &cpal::InputCallbackInfo| {
-        if !*is_capturing.lock() {
+        if !is_capturing.load(Ordering::Relaxed) {
             return;
         }
         // 🚨 cpal 0.15 的 `Data::as_slice::<T>()` 返回 `Option<&[T]>`（格式不符时为 None）
@@ -238,7 +255,7 @@ pub struct AudioCapture {
     stream: Arc<Mutex<StreamHolder>>,
     sample_rate: u32,
     ring: Arc<Mutex<RingBuffer>>,
-    is_capturing: Arc<Mutex<bool>>,
+    is_capturing: Arc<AtomicBool>,
     device_name: Option<String>,
     target_sample_rate: Option<u32>,
     buffer_size: usize,
@@ -256,7 +273,7 @@ impl AudioCapture {
             stream: Arc::new(Mutex::new(StreamHolder { stream: None })),
             sample_rate: 48000,
             ring: Arc::new(Mutex::new(RingBuffer::new(RING_BUFFER_CAPACITY))),
-            is_capturing: Arc::new(Mutex::new(false)),
+            is_capturing: Arc::new(AtomicBool::new(false)),
             device_name: None,
             target_sample_rate: None,
             buffer_size: DEFAULT_BUFFER_SIZE,
@@ -323,8 +340,8 @@ impl AudioCapture {
         }
         // 🚨 P3-14 快照（同 start_with_host）：独占失败回滚到快照值而非硬编码 false ——
         //    若进入时旧的共享流仍在跑，硬编码 false 会让标志位与事实不符。
-        let was_capturing = *self.is_capturing.lock();
-        *self.is_capturing.lock() = true;
+        let was_capturing = self.is_capturing.load(Ordering::Relaxed);
+        self.is_capturing.store(true, Ordering::Relaxed);
         // 把设置里的缓冲区帧数传给独占模式，用于换算缓冲时长（与用户 bufferSize 设置联动）
         match crate::audio::wasapi_exclusive::WasapiExclusiveCapture::start(
             self.ring.clone(),
@@ -350,7 +367,7 @@ impl AudioCapture {
                 Ok(())
             }
             Err(e) => {
-                *self.is_capturing.lock() = was_capturing;
+                self.is_capturing.store(was_capturing, Ordering::Relaxed);
                 Err(e)
             }
         }
@@ -407,7 +424,7 @@ impl AudioCapture {
     fn start_with_host(&mut self, host: cpal::Host, device_name: Option<String>, target_sample_rate: Option<u32>) -> Result<()> {
         // 🚨 P3-14 入口幂等守卫：已在采集且设备/采样率未变 ⇒ no-op（判据见 start_should_short_circuit）。
         if start_should_short_circuit(
-            *self.is_capturing.lock(),
+            self.is_capturing.load(Ordering::Relaxed),
             self.device_name.as_deref(),
             device_name.as_deref(),
             self.target_sample_rate,
@@ -534,8 +551,8 @@ impl AudioCapture {
         //    ⇒ 旧流还在跑，但 pipeline 的 `if !is_capturing()` 守卫认为「没在采集」
         //    ⇒ 后续采集/检测操作全部静默空转（不报错，只是没反应）。
         //    这是铁律 6 的变体 —— 回滚到**错误的值**比不回滚更隐蔽。
-        let was_capturing = *self.is_capturing.lock();
-        *self.is_capturing.lock() = true;
+        let was_capturing = self.is_capturing.load(Ordering::Relaxed);
+        self.is_capturing.store(true, Ordering::Relaxed);
 
         let err_fn = |err| log::error!("Audio stream error: {}", err);
 
@@ -617,7 +634,7 @@ impl AudioCapture {
                 //    守卫误判为正在采集 ⇒ 后续操作静默空转。
                 //    回滚到硬编码 false 也不行：若进入时已在采集（旧流仍活着），
                 //    会把标志位错标 false ⇒ 旧流还在跑但守卫认为没在采集。
-                *self.is_capturing.lock() = was_capturing;
+                self.is_capturing.store(was_capturing, Ordering::Relaxed);
                 return Err(anyhow::anyhow!(
                     "无法建立输入流（ch={}, sr={}, fmt={:?}）：{}",
                     channels,
@@ -630,7 +647,7 @@ impl AudioCapture {
 
         if let Err(e) = stream.play() {
             // 同理：play() 失败也要回滚到快照值（不是硬编码 false）。
-            *self.is_capturing.lock() = was_capturing;
+            self.is_capturing.store(was_capturing, Ordering::Relaxed);
             return Err(anyhow::anyhow!("{}", e));
         }
         self.stream.lock().stream = Some(stream);
@@ -644,7 +661,7 @@ impl AudioCapture {
     }
 
     pub fn stop(&mut self) {
-        *self.is_capturing.lock() = false;
+        self.is_capturing.store(false, Ordering::Relaxed);
         self.stream.lock().stream = None;
         #[cfg(target_os = "windows")]
         if let Some(mut cap) = self.exclusive.take() {
@@ -665,7 +682,7 @@ impl AudioCapture {
     }
 
     pub fn is_capturing(&self) -> bool {
-        *self.is_capturing.lock()
+        self.is_capturing.load(Ordering::Relaxed)
     }
 
     pub fn get_device_name(&self) -> Option<&str> {

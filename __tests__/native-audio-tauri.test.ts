@@ -662,7 +662,10 @@ function splitTopLevelParams(params: string): string[] {
 function parseCommandParams(rustText: string): Map<string, string[]> {
   const text = stripLineComments(rustText)
   const out = new Map<string, string[]>()
-  const re = /#\[tauri::command\]\s*pub\s+async\s+fn\s+([a-z_0-9]+)\s*\(([\s\S]*?)\)\s*->/g
+  // 2026-10-18（P3-15）：允许 `#[tauri::command(async)]` + **同步** fn（CPU 密集命令改走阻塞线程池，
+  // 不再占 tokio worker）。旧正则只认 `#[tauri::command]` + `pub async fn`，会把这类命令整个漏掉
+  // ⇒ 它在 params 里查不到，断言误报「Rust 里找不到该命令」。
+  const re = /#\[tauri::command(?:\([^)]*\))?\]\s*pub\s+(?:async\s+)?fn\s+([a-z_0-9]+)\s*\(([\s\S]*?)\)\s*->/g
   let m: RegExpExecArray | null
   while ((m = re.exec(text))) {
     const params = splitTopLevelParams(m[2])
@@ -746,6 +749,18 @@ describe('跨语言护栏：invoke 的顶层参数名必须与 Rust 形参一致
         '}',
       ].join('\n')
       expect(parseCommandParams(fake).get('do_thing')).toEqual(['device_name', 'interval_ms'])
+    })
+
+    it('\#[tauri::command(async)] + 同步 fn 也要能解析（P3-15 的 CPU 密集命令）', () => {
+      const fake = [
+        '#[tauri::command(async)]',
+        'pub fn detect_pitch(',
+        "    state: State<'_, AppState>,",
+        ') -> Result<(), String> {',
+        '    Ok(())',
+        '}',
+      ].join('\n')
+      expect(parseCommandParams(fake).get('detect_pitch')).toEqual([])
     })
 
     it('整行注释掉的命令定义不算数（含单行形式）', () => {
