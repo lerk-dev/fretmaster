@@ -20,7 +20,9 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "cross-env TAURI_BUILD=true next build && tauri build",
     "tauri:build:asio": "cross-env TAURI_BUILD=true next build && tauri build --features asio",
-    "deploy:router": "scp -r -o StrictHostKeyChecking=no ./out/* root@192.168.123.2:/www/fretmaster/"
+    "deploy:router": "scp -r -o StrictHostKeyChecking=no ./out/* root@192.168.123.2:/www/fretmaster/",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "hooks:uninstall": "git config --unset core.hooksPath || true"
   },
   "dependencies": {
     "@fontsource/noto-music": "^5.2.8",

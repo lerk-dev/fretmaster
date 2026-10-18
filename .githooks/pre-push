@@ -1,0 +1,40 @@
+#!/bin/sh
+# 推送前门禁 —— 四门禁里的前三项（build 太慢，留给发布时手动跑）。
+#
+# 为什么需要它：本项目没有 CI，门禁全靠人工记得跑。2026-10-18 之前发生过
+# 多次「vitest 绿但 tsc 红」的提交（类型错误只有 tsc 看得见），也发生过
+# 「本地跑的是小写盘符 ⇒ vitest 全量假失败」（见下）。
+#
+# 启用（每台机器执行一次）：
+#   git config core.hooksPath .githooks
+# 关闭：
+#   git config --unset core.hooksPath
+#
+# 跳过单次检查（不推荐）：
+#   git push --no-verify
+
+set -e
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# 🚨 必须有一步「把 cwd 规范化成磁盘真实大小写」。
+#    本环境 Bash 的默认 cwd 可能是小写 `e:\…`，而 Node 的 ESM loader 会把
+#    `file:///e:/…` 与 `file:///E:/…` 当成**两个不同模块** ⇒ vitest 的
+#    `@vitest/runner` 被加载两遍，测试文件里 `import { describe } from 'vitest'`
+#    拿到未初始化的一份 ⇒ **每一个测试文件**都报
+#    `TypeError: Cannot read properties of undefined (reading 'config')`。
+#    （2026-10-15 实测，排查了一小时）
+node -e "const p=require('path'); const real=p.resolve(process.argv[1]); if(real!==process.argv[1]){console.error('[pre-push] cwd 大小写与磁盘不一致:',process.argv[1],'→',real); process.exit(1)}" "$ROOT" || {
+  cd "$(node -e "console.log(require('path').resolve(process.argv[1]))" "$ROOT")"
+}
+
+echo "[pre-push] tsc --noEmit"
+npx tsc --noEmit
+
+echo "[pre-push] eslint . --max-warnings 0"
+npx eslint . --max-warnings 0
+
+echo "[pre-push] vitest run --no-file-parallelism"
+npx vitest run --no-file-parallelism
+
+echo "[pre-push] 通过。"
