@@ -175,7 +175,9 @@ describe('源码级护栏：麦克风（音阶）路径也必须走真相源', (
   }
 
   it('音阶分支改用 resolveScaleDegreeSemitone(selectedScaleRef.current, ...)', () => {
-    const branch = extractMicScaleBranch(fs.readFileSync(path.join(ROOT, 'app/page.tsx'), 'utf8'))
+    // 🚨 2026-10-18（C8）：音频答题路径（含麦克风音阶分支）已随域搬进 hooks/use-practice-match.ts，
+    //    这里的源从 app/page.tsx 改为该 hook —— 少读会静默空转。
+    const branch = extractMicScaleBranch(fs.readFileSync(path.join(ROOT, 'hooks/use-practice-match.ts'), 'utf8'))
     // 扫描下限：切不出来就说明结构变了，别让「空串不含 X」假通过
     expect(branch.length).toBeGreaterThan(200)
     expect(branch).toContain('scaleExerciseCurrentStepRef.current')
@@ -183,17 +185,21 @@ describe('源码级护栏：麦克风（音阶）路径也必须走真相源', (
     expect(branch).not.toContain('intervalToSemitones')
   })
 
-  it('intervalToSemitones 只剩音频路径的和弦两处（音阶与 MIDI 那两处已迁走）', () => {
+  it('intervalToSemitones[ 只剩音频路径的和弦两处（音阶与 MIDI 那两处已迁走）', () => {
+    // 🚨 C8：音频路径已搬进 hooks/use-practice-match.ts ⇒ 页面应为 **0**，hook 应为 **2**。
+    //    两个数各自点名：页面多出一处 = 有人又在页面手写判定；hook 多出一处 = 音阶分支
+    //    又退回了缺 #2 / maj7 的旧表（那会让弹对了没反应且不报错）。
     const page = fs.readFileSync(path.join(ROOT, 'app/page.tsx'), 'utf8')
-    const uses = page.match(/intervalToSemitones\[/g) ?? []
-    // 铁律 #20：断言**具体数字**。剩下的两处都在 `processPracticeMatch`（音频路径）的
-    // 和弦族分支里：它们只需要一个**标量**目标半音去喂 `evaluatePitchMatch` 做音准校验，
-    // 不适合套 `buildSingleTargetExpectation`（那是「给一个确定音名判对错」的语义）。
+    const hook = fs.readFileSync(path.join(ROOT, 'hooks/use-practice-match.ts'), 'utf8')
+    const pageUses = (page.match(/intervalToSemitones\[/g) ?? []).length
+    const hookUses = (hook.match(/intervalToSemitones\[/g) ?? []).length
+    // 铁律 #20：断言**具体数字**。剩下两处在 hook 的和弦族分支（chord_exercise / chord）：
+    // 它们只需要一个**标量**目标半音去喂 evaluatePitchMatch 做音准校验，
+    // 不适合套 buildSingleTargetExpectation（那是「给一个确定音名判对错」的语义）。
     //
-    // 记账：原为 3 处，2026-10-16 第 3 处（`handleMIDINoteInput` 的和弦分支
-    // `intervalToSemitones[d]`）已并入 `lib/answer-judge.ts` 的
-    // `buildChordMembershipExpectation`（顺带修了复合音程不取模）。
-    // 数字变 3 ⇒ 有人又在音阶 / MIDI 处用了它。
-    expect(uses.length, 'intervalToSemitones[ 的调用点数应为 2（都在音频路径的和弦分支）').toBe(2)
+    // 记账：原为 3 处，2026-10-16 第 3 处（handleMIDINoteInput 的和弦分支）已并入
+    // lib/answer-judge.ts 的 buildChordMembershipExpectation。
+    expect(pageUses, 'page.tsx 又出现了 intervalToSemitones[ —— 音频路径已抽走，页面不该再手写').toBe(0)
+    expect(hookUses, 'hook 里 intervalToSemitones[ 应为 2（chord_exercise / chord 各一处）；数字变 3 ⇒ 音阶分支退回了缺 #2 / maj7 的旧表').toBe(2)
   })
 })

@@ -279,6 +279,36 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     expect(src, 'page.tsx 里找不到 useScaleExercise 调用').toContain('= useScaleExercise({')
   })
 
+  // ==================== 音频答题域（hooks/use-practice-match.ts）：整域必须在一个文件里 ====================
+  // 2026-10-18（C8）。processPracticeMatch 是五模式判定 + 计分/连击/推进 + 冷却的音频侧实现，
+  // 判定口径由 lib/answer-judge.ts / lib/pitch-match.ts 钉死（护栏 answer-judge.test.ts）。
+  it('音频答题域已整体搬出页面：页面不得再声明 processPracticeMatch 的实现', () => {
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const forbidden = [
+      'const processPracticeMatch = useCallback(',
+    ]
+    const leftovers = forbidden.filter((f) => src.includes(f))
+    expect(
+      leftovers,
+      `页面里又出现了音频答题的实现 —— 应追加到 hooks/use-practice-match.ts。\n` +
+        `判定口径有护栏（answer-judge.test.ts），在页面里另写一份 = 两套口径各自腐烂：\n  ${leftovers.join('\n  ')}`
+    ).toEqual([])
+
+    // 反向自检：实现必须真的在 hook 里
+    const hook = readFileSync('hooks/use-practice-match.ts', 'utf8')
+    for (const f of forbidden) {
+      expect(hook.includes(f), `hooks/use-practice-match.ts 里没有 ${f} —— 锚点失效，请同步更新本用例`).toBe(true)
+    }
+    // 且 hook 的实现里不得再出现 deps 豁免（C8 把历史豁免改成 deps 写全，别退回去）
+    const implAt = hook.indexOf('const processPracticeMatch = useCallback(')
+    const implEnd = hook.indexOf('\n  }, [', implAt)
+    const implBody = hook.slice(implAt, implEnd)
+    expect(
+      implBody.includes('eslint-disable'),
+      'processPracticeMatch 里又出现了 deps 豁免 —— C8 已把 deps 照实写全，别退回「半份 deps + disable」'
+    ).toBe(false)
+  })
+
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))

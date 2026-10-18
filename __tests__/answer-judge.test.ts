@@ -23,6 +23,17 @@ const PAGE_SRC = readFileSync(
   'utf8',
 ).replace(/\r\n/g, '\n')
 
+/**
+ * 2026-10-18（C8）：音频答题路径（processPracticeMatch）已随「音频答题域」搬进
+ * hooks/use-practice-match.ts。凡是「检查判定实现本身」的断言要同时扫两个文件 ——
+ * 少读一个就会让护栏对着已经搬空的文件断言空气。
+ */
+const MATCH_HOOK_SRC = readFileSync(
+  path.join(process.cwd(), 'hooks', 'use-practice-match.ts'),
+  'utf8',
+).replace(/\r\n/g, '\n')
+const SRC = `${PAGE_SRC}\n${MATCH_HOOK_SRC}`
+
 // ---------------------------------------------------------------------------
 // 一、最核心的分叉：「音程回弹根音」
 // ---------------------------------------------------------------------------
@@ -393,14 +404,26 @@ describe('计分口径：答错也要计 total（与 store 一致）', () => {
 // 九、源码护栏：三条路径不许再手写判定
 // ---------------------------------------------------------------------------
 
-describe('源码护栏：page.tsx 必须走本模块，不许再手写候选循环', () => {
-  const body = PAGE_SRC
+describe('源码护栏：page.tsx / use-practice-match.ts 必须走本模块，不许再手写候选循环', () => {
+  // C8 起音频路径在 hook、MIDI / 点击路径在页面 —— 两边都要扫，少一个就有空子。
+  const body = SRC
     .split('\n')
     .filter((line) => !line.trim().startsWith('*') && !line.trim().startsWith('//'))
     .join('\n')
 
-  it('page.tsx 已 import answer-judge', () => {
-    expect(body).toMatch(/from ["']@\/lib\/answer-judge["']/)
+  it('page.tsx 与 use-practice-match.ts 都已 import answer-judge', () => {
+    expect(PAGE_SRC).toMatch(/from ["']@\/lib\/answer-judge["']/)
+    expect(MATCH_HOOK_SRC, '音频答题 hook 没走 answer-judge').toMatch(/from ["']@\/lib\/answer-judge["']/)
+  })
+
+  it('🚨 音频答题路径必须真的接线：页面把 processPracticeMatch 接进收音链路的 ref', () => {
+    // 只扫 hook 会全绿而 Mic 用户毫无反应 —— 「实现搬走了」和「实现接上了」是两件事。
+    expect(PAGE_SRC, '页面里找不到 usePracticeMatch 调用 —— 音频答题被抽走却没接回来').toContain(
+      'usePracticeMatch({',
+    )
+    expect(PAGE_SRC, 'processPracticeMatch 没被接进 processPracticeMatchRef').toContain(
+      'processPracticeMatchRef.current = processPracticeMatch',
+    )
   })
 
   it('音程判定不再手写 `exercise.allIntervals.find` 循环（应改用 buildIntervalExpectation）', () => {
@@ -443,13 +466,13 @@ describe('源码护栏：page.tsx 必须走本模块，不许再手写候选循�
 // 十、源码护栏：音频路径与 MIDI 路径的**统计口径**必须一致
 // ---------------------------------------------------------------------------
 
-/** 取出 `processPracticeMatch` 的函数体（剥掉注释行）。 */
+/** 取出 `processPracticeMatch` 的函数体（剥掉注释行）。C8 起它在 hooks/use-practice-match.ts */
 function audioMatchBody(): string {
-  const start = PAGE_SRC.indexOf('const processPracticeMatch = useCallback(')
-  expect(start, 'page.tsx 里找不到 processPracticeMatch').toBeGreaterThan(-1)
-  const end = PAGE_SRC.indexOf('\n  }, [', start)
+  const start = MATCH_HOOK_SRC.indexOf('const processPracticeMatch = useCallback(')
+  expect(start, 'hooks/use-practice-match.ts 里找不到 processPracticeMatch —— 实现又搬走了，请同步更新本护栏').toBeGreaterThan(-1)
+  const end = MATCH_HOOK_SRC.indexOf('\n  }, [', start)
   expect(end, '找不到 processPracticeMatch 的 deps 行').toBeGreaterThan(start)
-  return PAGE_SRC.slice(start, end)
+  return MATCH_HOOK_SRC.slice(start, end)
     .split('\n')
     .filter((line) => !line.trim().startsWith('//'))
     .join('\n')
