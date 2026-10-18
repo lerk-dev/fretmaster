@@ -339,6 +339,45 @@ export async function syncLocalBackupToServer(): Promise<number> {
 }
 
 // 清空所有练习记录（Tauri 环境调用 SQLite，Web 环境清空 localStorage 备份）
+/**
+ * 删除**单条**练习记录。
+ *
+ * · 桌面版：走 Rust 的 `delete_practice_stat`（SQLite）。
+ * · Web 版：走 CGI 的 `DELETE /cgi-bin/stats` —— `cgi-stats-fixed.sh` 早已实现
+ *   （`DELETE FROM practice_records WHERE id = $RECORD_ID`），只是前端从来没调过。
+ *
+ * ⚠️ CGI 的 DELETE 用原始 body 读 id（`grep -o '"id"[^,}]*'`），所以 body 必须是
+ * 紧凑 JSON，不能带额外字段把它们隔开语义化 —— 保持 `{ id: number }` 单字段。
+ */
+export async function deletePracticeStat(id: number): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error(`deletePracticeStat: id 必须是正整数，收到 ${id}`)
+  }
+  if (isTauri) {
+    const { deletePracticeStat: nativeDelete } = await import('./native-stats');
+    return nativeDelete(id);
+  }
+  if (isDev) {
+    // 开发环境没有 CGI：只从本地备份里摘掉，保持与线上行为一致（记录消失）
+    const backup = getLocalBackup().filter((r) => r.id !== id);
+    try {
+      localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(backup));
+    } catch (e) {
+      logger.error('删除本地备份记录失败（可能超出配额）:', e);
+      throw e;
+    }
+    return;
+  }
+  const response = await fetch(`${API_BASE_URL}/stats`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  if (!response.ok) {
+    throw new Error(`删除记录失败：HTTP ${response.status}`);
+  }
+}
+
 export async function clearAllPracticeStats(): Promise<void> {
   if (isTauri) {
     const { clearAllPracticeStats: nativeClear } = await import('./native-stats');

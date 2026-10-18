@@ -30,6 +30,7 @@ const native = vi.hoisted(() => ({
   getRecentStats: vi.fn(async () => [{ exercise_type: 'native-recent', score: 1, duration: 1 }]),
   getStatsByExerciseType: vi.fn(async () => ({ scale: { count: 1, avgScore: 88, totalDuration: 12 } })),
   clearAllPracticeStats: vi.fn(async () => undefined),
+  deletePracticeStat: vi.fn(async () => undefined),
   syncLocalBackupToServer: vi.fn(async () => 5),
 }))
 
@@ -316,5 +317,61 @@ describe('isDev=false（非 Tauri）：走 fetch /cgi-bin/stats', () => {
     await expect(mod.clearAllPracticeStats()).resolves.toBeUndefined()
 
     errSpy.mockRestore()
+  })
+})
+
+// ============================================================ C. deletePracticeStat（P3-16）
+
+/**
+ * 2026-10-18（P3-16）：Rust 的 `delete_practice_stat` 注册了很久但前端零调用 ⇒
+ * 统计面板没有「删掉那条错记录」的入口。这三条钉住补上的桥接：
+ * 桌面转交 native、Web 发 CGI DELETE、非法 id 在**发出请求之前**就拒绝。
+ */
+describe('deletePracticeStat：桌面走 SQLite、Web 走 CGI DELETE', () => {
+  it('isTauri=true → 转交 native.deletePracticeStat(id)，不发 fetch、不碰 localStorage', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const mod = await loadStatsApi({ tauri: true })
+
+    await mod.deletePracticeStat(5)
+
+    expect(native.deletePracticeStat).toHaveBeenCalledTimes(1)
+    expect(native.deletePracticeStat).toHaveBeenCalledWith(5)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('isDev=false → DELETE /cgi-bin/stats，body 是紧凑的 { id }（CGI 用正则抠 id）', async () => {
+    const fetchSpy = vi.fn(async () => ({ ok: true, status: 200 }) as unknown as Response)
+    vi.stubGlobal('fetch', fetchSpy)
+    const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
+
+    await mod.deletePracticeStat(42)
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/cgi-bin/stats')
+    expect(init.method).toBe('DELETE')
+    // 🚨 CGI 侧用 `grep -o '"id"[^,}]*'` 抠 id ⇒ body 必须能让这条正则命中
+    expect(init.body).toBe(JSON.stringify({ id: 42 }))
+    expect(native.deletePracticeStat).not.toHaveBeenCalled()
+  })
+
+  it('isDev=false → 非 2xx 必须抛错（不能把失败当成删掉了）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500 }) as unknown as Response))
+    const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
+
+    await expect(mod.deletePracticeStat(7)).rejects.toThrow(/HTTP 500/)
+  })
+
+  it('🚨 非法 id（0 / 负数 / 非整数）在**发出请求之前**就拒绝', async () => {
+    const fetchSpy = vi.fn(async () => ({ ok: true, status: 200 }) as unknown as Response)
+    vi.stubGlobal('fetch', fetchSpy)
+    const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
+
+    await expect(mod.deletePracticeStat(0)).rejects.toThrow(/正整数/)
+    await expect(mod.deletePracticeStat(-3)).rejects.toThrow(/正整数/)
+    await expect(mod.deletePracticeStat(1.5)).rejects.toThrow(/正整数/)
+    // 一次请求都不该发出去 —— 否则会在后端跑一条 WHERE id = 0 的空删
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

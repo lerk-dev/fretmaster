@@ -58,6 +58,8 @@ function render(opts: {
   range?: StatsTimeRange
   data?: ReturnType<typeof agg>
   records?: Record<string, unknown>[]
+  /** 传了才显示删除按钮（P3-16） */
+  onDelete?: (id: number) => Promise<void>
 } = {}) {
   const calls: StatsTimeRange[] = []
   const container = document.createElement('div')
@@ -71,6 +73,7 @@ function render(opts: {
         onStatsTimeRangeChange: (v: StatsTimeRange) => calls.push(v),
         getStatsByTimeRange: () => opts.data ?? agg(),
         recentRecords: (opts.records ?? []) as unknown as ServerStats[],
+        onDeleteRecord: opts.onDelete,
       } as never),
     )
   })
@@ -269,6 +272,83 @@ describe('空态与时间范围', () => {
     expect(new Set(classes).size, '应有「选中 / 未选中」两种样式').toBe(2)
     const selected = classes[1] // week 是第 2 个
     expect(classes.filter((c) => c === selected).length).toBe(1)
+    r.unmount()
+  })
+})
+
+// ============================================================ 删除单条记录（P3-16）
+
+/**
+ * 2026-10-18（P3-16）：统计面板补上「删除这条记录」入口。
+ *
+ * 🚨 确认框用 Radix AlertDialog 而**不是** window.confirm —— 桌面版里后者被
+ * tauri-plugin-dialog 改写成 invoke('plugin:dialog|confirm')，而该命令没有 ACL 权限，
+ * 必被拒（护栏 __tests__/window-native-dialog-guard.test.ts）。
+ * AlertDialog 用 Portal 渲染到 document.body ⇒ 断言要在 body 里按 role="alertdialog" 查。
+ */
+describe('删除单条记录', () => {
+  const rec = {
+    id: 11,
+    exercise_type: 'scale',
+    score: 80,
+    duration: 60,
+    notes: '练习项目: A',
+    created_at: '2026-10-18 02:00:00',
+  }
+  const label = '[stats_delete_record]'
+  /** 卡片行内的删除按钮 */
+  const rowDeleteBtn = (buttons: HTMLButtonElement[]) =>
+    buttons.find((b) => b.getAttribute('aria-label') === label)
+  /** 确认框里那个「删除」动作（Portal 到 body） */
+  const dialogAction = () =>
+    [...document.body.querySelectorAll('[role="alertdialog"] button')].find(
+      (b) => b.textContent === label,
+    ) as HTMLButtonElement | undefined
+  const dialogCancel = () =>
+    [...document.body.querySelectorAll('[role="alertdialog"] button')].find(
+      (b) => b.textContent === '[btn_cancel]',
+    ) as HTMLButtonElement | undefined
+
+  it('不传 onDeleteRecord ⇒ 一个删除按钮都没有（只读场景不能误伤）', () => {
+    const r = render({ records: [rec] })
+    expect(rowDeleteBtn(r.buttons)).toBeUndefined()
+    r.unmount()
+  })
+
+  it('记录没有 id ⇒ 不出删除按钮（无 id 无法定位到后端那一行）', () => {
+    const r = render({ records: [{ ...rec, id: undefined }], onDelete: async () => {} })
+    expect(rowDeleteBtn(r.buttons)).toBeUndefined()
+    r.unmount()
+  })
+
+  it('传了回调 ⇒ 每条有 id 的记录各一个删除按钮', () => {
+    const r = render({ records: [rec, { ...rec, id: 12 }], onDelete: async () => {} })
+    expect(r.buttons.filter((b) => b.getAttribute('aria-label') === label)).toHaveLength(2)
+    r.unmount()
+  })
+
+  it('点删除 ⇒ 弹确认框（不直接删）；确认后才调 onDeleteRecord(该行 id)', async () => {
+    const deleted: number[] = []
+    const r = render({ records: [rec], onDelete: async (id) => { deleted.push(id) } })
+
+    await act(async () => { rowDeleteBtn(r.buttons)!.click() })
+    // 弹了确认框，但还没删
+    expect(dialogAction()).toBeTruthy()
+    expect(deleted).toEqual([])
+
+    await act(async () => { dialogAction()!.click() })
+    expect(deleted).toEqual([11])
+    r.unmount()
+  })
+
+  it('取消 ⇒ 一次都不调（删除不可撤销，必须给用户退路）', async () => {
+    const deleted: number[] = []
+    const r = render({ records: [rec], onDelete: async (id) => { deleted.push(id) } })
+
+    await act(async () => { rowDeleteBtn(r.buttons)!.click() })
+    await act(async () => { dialogCancel()!.click() })
+
+    expect(deleted).toEqual([])
     r.unmount()
   })
 })

@@ -134,6 +134,27 @@ export async function getStatsByExerciseType(): Promise<Record<string, { count: 
   }
 }
 
+/**
+ * 删除**单条**练习记录（桌面版）。
+ *
+ * 对应 Rust 的 `delete_practice_stat`（db_commands.rs，带 `id <= 0` 拒绝）。
+ * 这个命令在 main.rs 里注册了很久，但前端一直没有调用方 —— 统计面板因此没有
+ * 「删掉那条错记录」的入口（2026-10-18 P3-16 补上）。
+ */
+export async function deletePracticeStat(id: number): Promise<void> {
+  if (!isTauri()) return
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error(`deletePracticeStat: id 必须是正整数，收到 ${id}`)
+  }
+  try {
+    const invoke = await getInvoke()
+    await invoke('delete_practice_stat', { id })
+  } catch (error) {
+    logger.error('删除单条练习记录失败:', error)
+    throw error
+  }
+}
+
 export async function clearAllPracticeStats(): Promise<void> {
   if (!isTauri()) return
   try {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getLocalDateString, getLocalDaysAgoStart, dbTimestampToLocalDate } from '@/lib/utils'
 import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
-import { savePracticeStats as saveToServer, getAllPracticeStats, PracticeStats as ServerPracticeStats } from '@/lib/stats-api'
+import { savePracticeStats as saveToServer, getAllPracticeStats, deletePracticeStat, PracticeStats as ServerPracticeStats } from '@/lib/stats-api'
 import { deduplicateStats } from '@/lib/export-utils'
 import { logger } from '@/lib/logger'
 import type { PracticeType, PracticeStats } from '@/lib/page-stats-types'
@@ -209,6 +209,150 @@ export function usePracticeStats(options: UsePracticeStatsOptions) {
     }
   }, [])
 
+  /**
+   * 从服务器 / SQLite 重新加载并重算聚合（daily / total / byType / byDetail）。
+   *
+   * 原先这段只活在挂载 effect 体内 ⇒ 删除单条记录后无法重算（聚合全部由记录派生）。
+   * 提成 useCallback 后：挂载 effect 与 deleteRecord 共用同一份实现。
+   */
+  const reloadStats = useCallback(async () => {
+    try {
+      const serverStats = await getAllPracticeStats()
+      
+      const newStats: PracticeStats = {
+        daily: [],
+        total: {
+          count: 0,
+          byType: {
+            pitch_finding: 0,
+            scale: 0,
+            chord_exercise: 0,
+            interval: 0,
+            chord_progression: 0
+          },
+          byDetail: {
+            pitch_finding: [],
+            scale: [],
+            chord_exercise: [],
+            interval: [],
+            chord_progression: []
+          }
+        }
+      }
+      
+      const typeMapping: Record<string, PracticeType> = {
+        '音高识别': 'pitch_finding',
+        '音阶练习': 'scale',
+        '和弦练习': 'chord_exercise',
+        '音程练习': 'interval',
+        '和弦进行': 'chord_progression'
+      }
+      
+      // 先对服务器返回的数据去重，避免旧版本 bug 产生的脏数据
+      // （同一秒内多条同类型记录、或时间差小于 duration 的重复记录）
+      // 导致统计虚高（例如"今天没练习却显示练习了"）
+      const dedupedServerStats = deduplicateStats(serverStats as ServerPracticeStats[])
+      
+      dedupedServerStats.forEach((record: ServerPracticeStats) => {
+        // 使用 dbTimestampToLocalDate 正确解析 SQLite/ISO 时间戳为本地日期
+        // 避免 SQLite 的 "YYYY-MM-DD HH:MM:SS" (UTC) 被错误解析为本地时间
+        const date = record.created_at
+          ? dbTimestampToLocalDate(record.created_at)
+          : getLocalDateString(new Date())
+        const type = typeMapping[record.exercise_type] || 'pitch_finding'
+        const detailName = record.notes?.replace('练习项目: ', '') || record.exercise_type
+        
+        newStats.total.count += 1
+        newStats.total.byType[type] = (newStats.total.byType[type] || 0) + 1
+        
+        const detailList = newStats.total.byDetail[type] || []
+        const existingDetail = detailList.find(d => d.name === detailName)
+        if (existingDetail) {
+          existingDetail.count += 1
+        } else {
+          detailList.push({ name: detailName, count: 1 })
+        }
+        newStats.total.byDetail[type] = detailList
+        
+        let todayStats = newStats.daily.find(d => d.date === date)
+        if (!todayStats) {
+          todayStats = {
+            date: date,
+            totalCount: 0,
+            byType: {
+              pitch_finding: 0,
+              scale: 0,
+              chord_exercise: 0,
+              interval: 0,
+              chord_progression: 0
+            },
+            byDetail: {
+              pitch_finding: [],
+              scale: [],
+              chord_exercise: [],
+              interval: [],
+              chord_progression: []
+            }
+          }
+          newStats.daily.push(todayStats)
+        }
+        
+        todayStats.totalCount += 1
+        todayStats.byType[type] = (todayStats.byType[type] || 0) + 1
+        
+        const todayDetailList = todayStats.byDetail[type] || []
+        const todayExistingDetail = todayDetailList.find(d => d.name === detailName)
+        if (todayExistingDetail) {
+          todayExistingDetail.count += 1
+        } else {
+          todayDetailList.push({ name: detailName, count: 1 })
+        }
+        todayStats.byDetail[type] = todayDetailList
+      })
+      
+      // 只保留最近90天的数据
+      newStats.daily = newStats.daily
+        .filter(d => {
+          // 使用本地时区解析日期，避免 UTC 偏移导致数据被误删
+          const parts = d.date.split('-')
+          if (parts.length !== 3) return false
+          const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+          const ninetyDaysAgo = getLocalDaysAgoStart(90)
+          return date >= ninetyDaysAgo
+        })
+        .sort((a, b) => b.date.localeCompare(a.date))
+      
+      setPracticeStats(newStats)
+      
+      // 保存去重后的近期记录（最多 50 条，按时间倒序），供统计页展示
+      setRecentRecords(dedupedServerStats.slice(0, 50))
+
+      // Tauri 环境以 SQLite 为唯一真相源，不写入 localStorage，避免历史脏数据污染
+      if (!isTauri) {
+        // 服务器记录为 0 时（例如管理员清空了数据库），同步清空 localStorage 旧缓存
+        if (dedupedServerStats.length === 0) {
+          clearStatsStorage()
+        } else {
+          localStorage.setItem(STATS_STORAGE_KEYS.stats, JSON.stringify(newStats))
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load stats:', e)
+      // Tauri 环境失败时返回空统计，不读 localStorage 备份（避免历史脏数据导致"未练习却有记录"）
+      if (!isTauri) {
+        const savedStats = localStorage.getItem(STATS_STORAGE_KEYS.stats)
+        if (savedStats) {
+          try {
+            const stats = JSON.parse(savedStats)
+            setPracticeStats(stats)
+          } catch (e) {
+            console.error('Failed to load stats from localStorage:', e)
+          }
+        }
+      }
+    }
+  }, [isTauri])
+
   // 从服务器/SQLite加载统计数据
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -227,146 +371,20 @@ export function usePracticeStats(options: UsePracticeStatsOptions) {
       }
     }
 
-    const loadStatsFromServer = async () => {
-      try {
-        const serverStats = await getAllPracticeStats()
-        
-        const newStats: PracticeStats = {
-          daily: [],
-          total: {
-            count: 0,
-            byType: {
-              pitch_finding: 0,
-              scale: 0,
-              chord_exercise: 0,
-              interval: 0,
-              chord_progression: 0
-            },
-            byDetail: {
-              pitch_finding: [],
-              scale: [],
-              chord_exercise: [],
-              interval: [],
-              chord_progression: []
-            }
-          }
-        }
-        
-        const typeMapping: Record<string, PracticeType> = {
-          '音高识别': 'pitch_finding',
-          '音阶练习': 'scale',
-          '和弦练习': 'chord_exercise',
-          '音程练习': 'interval',
-          '和弦进行': 'chord_progression'
-        }
-        
-        // 先对服务器返回的数据去重，避免旧版本 bug 产生的脏数据
-        // （同一秒内多条同类型记录、或时间差小于 duration 的重复记录）
-        // 导致统计虚高（例如"今天没练习却显示练习了"）
-        const dedupedServerStats = deduplicateStats(serverStats as ServerPracticeStats[])
-        
-        dedupedServerStats.forEach((record: ServerPracticeStats) => {
-          // 使用 dbTimestampToLocalDate 正确解析 SQLite/ISO 时间戳为本地日期
-          // 避免 SQLite 的 "YYYY-MM-DD HH:MM:SS" (UTC) 被错误解析为本地时间
-          const date = record.created_at
-            ? dbTimestampToLocalDate(record.created_at)
-            : getLocalDateString(new Date())
-          const type = typeMapping[record.exercise_type] || 'pitch_finding'
-          const detailName = record.notes?.replace('练习项目: ', '') || record.exercise_type
-          
-          newStats.total.count += 1
-          newStats.total.byType[type] = (newStats.total.byType[type] || 0) + 1
-          
-          const detailList = newStats.total.byDetail[type] || []
-          const existingDetail = detailList.find(d => d.name === detailName)
-          if (existingDetail) {
-            existingDetail.count += 1
-          } else {
-            detailList.push({ name: detailName, count: 1 })
-          }
-          newStats.total.byDetail[type] = detailList
-          
-          let todayStats = newStats.daily.find(d => d.date === date)
-          if (!todayStats) {
-            todayStats = {
-              date: date,
-              totalCount: 0,
-              byType: {
-                pitch_finding: 0,
-                scale: 0,
-                chord_exercise: 0,
-                interval: 0,
-                chord_progression: 0
-              },
-              byDetail: {
-                pitch_finding: [],
-                scale: [],
-                chord_exercise: [],
-                interval: [],
-                chord_progression: []
-              }
-            }
-            newStats.daily.push(todayStats)
-          }
-          
-          todayStats.totalCount += 1
-          todayStats.byType[type] = (todayStats.byType[type] || 0) + 1
-          
-          const todayDetailList = todayStats.byDetail[type] || []
-          const todayExistingDetail = todayDetailList.find(d => d.name === detailName)
-          if (todayExistingDetail) {
-            todayExistingDetail.count += 1
-          } else {
-            todayDetailList.push({ name: detailName, count: 1 })
-          }
-          todayStats.byDetail[type] = todayDetailList
-        })
-        
-        // 只保留最近90天的数据
-        newStats.daily = newStats.daily
-          .filter(d => {
-            // 使用本地时区解析日期，避免 UTC 偏移导致数据被误删
-            const parts = d.date.split('-')
-            if (parts.length !== 3) return false
-            const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-            const ninetyDaysAgo = getLocalDaysAgoStart(90)
-            return date >= ninetyDaysAgo
-          })
-          .sort((a, b) => b.date.localeCompare(a.date))
-        
-        setPracticeStats(newStats)
-        
-        // 保存去重后的近期记录（最多 50 条，按时间倒序），供统计页展示
-        setRecentRecords(dedupedServerStats.slice(0, 50))
-
-        // Tauri 环境以 SQLite 为唯一真相源，不写入 localStorage，避免历史脏数据污染
-        if (!isTauri) {
-          // 服务器记录为 0 时（例如管理员清空了数据库），同步清空 localStorage 旧缓存
-          if (dedupedServerStats.length === 0) {
-            clearStatsStorage()
-          } else {
-            localStorage.setItem(STATS_STORAGE_KEYS.stats, JSON.stringify(newStats))
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load stats:', e)
-        // Tauri 环境失败时返回空统计，不读 localStorage 备份（避免历史脏数据导致"未练习却有记录"）
-        if (!isTauri) {
-          const savedStats = localStorage.getItem(STATS_STORAGE_KEYS.stats)
-          if (savedStats) {
-            try {
-              const stats = JSON.parse(savedStats)
-              setPracticeStats(stats)
-            } catch (e) {
-              console.error('Failed to load stats from localStorage:', e)
-            }
-          }
-        }
-      }
-    }
     
-    loadStatsFromServer()
-  }, [isTauri, setPracticeStats])
+    reloadStats()
+  }, [isTauri, reloadStats])
+
+  /**
+   * 删除**单条**练习记录，然后重算聚合。
+   *
+   * 顺序要紧：先等后端删除成功，再 reloadStats —— 反过来会让「刚删的记录」在重算里复活。
+   * 失败时把错误抛给调用方（面板负责提示），不在这里吞掉。
+   */
+  const deleteRecord = useCallback(async (id: number) => {
+    await deletePracticeStat(id)
+    await reloadStats()
+  }, [reloadStats])
 
 
   // 待持久化的统计载荷。放在 ref 中，由 [practiceStats] 的 effect 统一落库，
@@ -399,6 +417,7 @@ export function usePracticeStats(options: UsePracticeStatsOptions) {
 
   return {
     practiceStats,
+    deleteRecord,
     recentRecords,
     practiceSessionStartTime,
     setPracticeSessionStartTime,
