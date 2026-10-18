@@ -221,7 +221,11 @@ export const StatsPanel = memo(function StatsPanel({
   <CardContent className="space-y-4">
     {(() => {
       const stats = getStatsByTimeRange(statsTimeRange)
-      const practiceTypeNames: Record<PracticeType, string> = {
+      // 必须是 Partial<Record<string, string>>：byType 的键来自后端聚合结果，
+      // 历史上出现过「未知练习」这类不在 5 个 PracticeType 之内的键；原先写成
+      // Record<PracticeType, string> 会让 practiceTypeNames[type] 直接是 undefined
+      // ⇒ 卡片渲染出「有数字、标签空白」。兜底显示原键名（数据本身就是可读中文）。
+      const practiceTypeNames: Partial<Record<string, string>> = {
         pitch_finding: t('nav_practice'),
         scale: t('nav_scale'),
         chord_exercise: t('nav_chord_exercise'),
@@ -240,7 +244,7 @@ export const StatsPanel = memo(function StatsPanel({
             {(Object.keys(stats.byType) as PracticeType[]).map(type => (
               <div key={type} className="bg-card/50 rounded-lg p-2 sm:p-3 text-center border border-border/30">
                 <div className="text-lg sm:text-xl font-semibold">{stats.byType[type] || 0}</div>
-                <div className="text-2xs sm:text-xs text-muted-foreground">{practiceTypeNames[type]}</div>
+                <div className="text-2xs sm:text-xs text-muted-foreground">{practiceTypeNames[type] ?? type}</div>
               </div>
             ))}
           </div>
@@ -257,7 +261,7 @@ export const StatsPanel = memo(function StatsPanel({
                 return (
                   <div key={type} className="bg-card/30 rounded-lg p-3 border border-border/30">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">{practiceTypeNames[type]}</span>
+                      <span className="text-sm font-medium">{practiceTypeNames[type] ?? type}</span>
                       <span className="text-xs text-muted-foreground">{t('stats_count')}: {stats.byType[type] || 0}</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">

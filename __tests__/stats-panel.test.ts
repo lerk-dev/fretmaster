@@ -412,3 +412,23 @@ describe('清空全部记录', () => {
     r.unmount()
   })
 })
+
+// ============================================================ 未知类型兜底（2026-10-18）
+
+/**
+ * 历史遗留（测试注释里此前「如实记录未改」）：类型名表只覆盖 5 个 PracticeType，
+ * 而后端聚合结果里出现过「未知练习」这类键（stats-api 给空 exercise_type 的兜底值）。
+ * 原先 `Record<PracticeType, string>` 索引未知键得到 undefined ⇒ 卡片「有数字、标签空白」。
+ */
+describe('未知练习类型', () => {
+  it('不在 5 个 PracticeType 之内的键 ⇒ 标签兜底显示原键名，不是空白', () => {
+    const data = agg()
+    const byType = { ...data.byType, '未知练习': 3 } as unknown as typeof data.byType
+    const r = render({ data: { ...data, count: 3, byType } })
+
+    // 卡片里必须出现「未知练习」这几个字（兜底渲染），而不是一个空 div
+    expect(r.text).toContain('未知练习')
+    expect(r.text).toContain('3')
+    r.unmount()
+  })
+})
