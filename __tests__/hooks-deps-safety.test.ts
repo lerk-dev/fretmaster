@@ -373,6 +373,56 @@ describe('hooks deps 安全：TDZ 与整体 store（不得照抄 ESLint 建议�
     expect(missingInImport, `export 写了但 import 从不读（导出了无用的字段）：\n  ${missingInImport.join('\n  ')}`).toEqual([])
   })
 
+  // ==================== 自定义和弦库（hooks/use-chord-library.ts）====================
+  // 2026-10-18（C11）。这块的两个 IO 坑都会**静默**失败，此前也没有源码护栏。
+  it('自定义和弦库已整体搬出页面：增删/存取/导入导出的实现不得再在页面里声明', () => {
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const forbidden = [
+      'const addCustomChord =',
+      'const removeCustomChord =',
+      'const clearCustomChords =',
+      'const saveCustomChords =',
+      'const loadCustomChords =',
+      'const importIrealPro =',
+      'const exportCustomChords =',
+    ]
+    const leftovers = forbidden.filter((f) => src.includes(f))
+    expect(
+      leftovers,
+      `页面里又出现了自定义和弦库的实现 —— 应追加到 hooks/use-chord-library.ts：\n  ${leftovers.join('\n  ')}`
+    ).toEqual([])
+
+    const hook = readFileSync('hooks/use-chord-library.ts', 'utf8')
+    for (const f of forbidden) {
+      expect(hook.includes(f), `hooks/use-chord-library.ts 里没有 ${f} —— 锚点失效，请同步更新本用例`).toBe(true)
+    }
+    // 装配顺序：customChords 被 transposedChords 的 useMemo 直接使用 ⇒ 调用点必须在它之前
+    expect(
+      src.indexOf('= useChordLibrary({'),
+      'useChordLibrary 的调用点必须在 transposedChords 声明之前（否则 transposedChords 读未初始化的 customChords）',
+    ).toBeLessThan(src.indexOf('transposeSongChords(customChords'))
+  })
+
+  it('🚨 自定义和弦的两个 IO 坑：save 必须 try/catch，export 必须有「剪贴板 → 下载」两条路径', () => {
+    const hook = readFileSync('hooks/use-chord-library.ts', 'utf8')
+
+    const saveStart = hook.indexOf('const saveCustomChords =')
+    const saveEnd = hook.indexOf('const loadCustomChords =', saveStart)
+    expect(saveStart, '找不到 saveCustomChords').toBeGreaterThan(-1)
+    const saveBody = hook.slice(saveStart, saveEnd)
+    // 序列可能很长 ⇒ 配额超限会抛异常，冒泡到 onClick 之外还会经 React 事件系统重抛，
+    // 用户侧表现为「点了没反应 + 控制台红字」。
+    expect(saveBody, 'localStorage 写入必须包 try/catch（配额超限）').toContain('try {')
+    expect(saveBody, 'localStorage 写入必须包 try/catch（配额超限）').toContain('catch')
+
+    const exportStart = hook.indexOf('const exportCustomChords =')
+    expect(exportStart, '找不到 exportCustomChords').toBeGreaterThan(-1)
+    const exportBody = hook.slice(exportStart)
+    expect(exportBody, '导出必须优先试剪贴板').toContain('navigator.clipboard.writeText')
+    expect(exportBody, '剪贴板失败必须回退到下载（桌面 WebView 可能不给权限）').toContain('.catch(')
+    expect(exportBody, '缺少下载回退路径').toContain('a.download')
+  })
+
   it('page.tsx：deps 数组不得含裸 store（getState 快照引用会变）', () => {
     const src = readFileSync('app/page.tsx', 'utf8')
     const bad = depsLines(src).filter((l) => /\bstore\b/.test(l))

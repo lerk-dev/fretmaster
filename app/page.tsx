@@ -11,6 +11,7 @@ import { usePracticeStats } from "@/hooks/use-practice-stats"
 import { usePracticeSession } from "@/hooks/use-practice-session"
 import { useScaleExercise } from "@/hooks/use-scale-exercise"
 import { usePracticeMatch } from "@/hooks/use-practice-match"
+import { useChordLibrary } from "@/hooks/use-chord-library"
 import { useSettingsIo } from "@/hooks/use-settings-io"
 import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts"
 import { useAudioDeviceEnumeration } from "@/hooks/use-audio-device-enumeration"
@@ -20,8 +21,7 @@ import { useTuner } from "@/hooks/use-tuner"
 import { useAudioInput, type DetectedPitchForMatch } from "@/hooks/use-audio-input"
 import { logger } from "@/lib/logger"
 import { SONG_PROGRESSIONS } from "@/lib/page-songs"
-import { transposeSongChords, parseIrealPro, parseIrealUrl } from "@/lib/song-chords"
-import { CUSTOM_CHORD_STORAGE_KEY, parseStoredCustomChords, buildCustomChordsExport } from "@/lib/custom-chords-io"
+import { transposeSongChords } from "@/lib/song-chords"
 import { filterAndGroupSongs } from "@/lib/song-filters"
 import { setStringTuning } from "@/lib/string-tuning"
 import type {
@@ -403,7 +403,17 @@ export default function FretMasterPage() {
   
   // 和弦进行状态
   const [selectedSong, setSelectedSong] = useState(SONG_PROGRESSIONS[0])
-  const [customChords, setCustomChords] = useState<{ root: string; type: string; bass?: string }[]>([])
+  // 自定义和弦库（增删 / 本地存取 / iReal 导入 / 导出）—— 实现在 hooks/use-chord-library.ts。
+  // 调用点必须在 transposedChords（用 customChords 做移调）之前。
+  const {
+    customChords, setCustomChords,
+    irealInput, setIrealInput,
+    newChordRoot, setNewChordRoot,
+    newChordType, setNewChordType,
+    customChordName, setCustomChordName,
+    addCustomChord, removeCustomChord, clearCustomChords,
+    saveCustomChords, loadCustomChords, importIrealPro, exportCustomChords,
+  } = useChordLibrary({ t, chordScaleDisplay, chordSymbols })
   const [currentChordIndex, setCurrentChordIndex] = useState(0)
   const [chordPlayOrder, setChordPlayOrder] = useState<"asc" | "desc" | "random">(store.chordProgression.playOrder)
   const [practiceLevel, setPracticeLevel] = useState(store.chordProgression.selectedLevelId)
@@ -433,11 +443,6 @@ export default function FretMasterPage() {
     usePassingNoteBebopScale: levelUsePassingNoteBebopScale,
     sevenFlatNineScaleChoice: chordSymbols.sevenFlatNineScaleChoice,
   }), [levelForceNaturalFive, levelEndOnStartingInterval, levelUsePassingNoteBebopScale, chordSymbols.sevenFlatNineScaleChoice])
-  const [irealInput, setIrealInput] = useState("")
-  const [newChordRoot, setNewChordRoot] = useState("C")
-  const [newChordType, setNewChordType] = useState("Major")
-  const [newChordBass] = useState<string | undefined>(undefined)
-  const [customChordName, setCustomChordName] = useState("")
   
   
   // ==================== 音阶练习域（含一弦三音 3NPS）====================
@@ -1509,111 +1514,6 @@ export default function FretMasterPage() {
 
   // 切换音程选择
 
-  // 添加自定义和弦
-  const addCustomChord = () => {
-    setCustomChords(prev => [...prev, { root: newChordRoot, type: newChordType, bass: newChordBass }])
-  }
-
-  // 移除自定义和弦
-  const removeCustomChord = (index: number) => {
-    setCustomChords(prev => prev.filter((_, i) => i !== index))
-  }
-
-  // 清空自定义和弦
-  const clearCustomChords = () => {
-    setCustomChords([])
-  }
-
-  // 保存自定义和弦序列到本地存储
-  const saveCustomChords = () => {
-    if (customChords.length === 0) {
-      toast.error(t('custom_chord_empty'))
-      return
-    }
-    const data = {
-      name: customChordName || t('custom_chord_unnamed'),
-      sequence: customChords
-    }
-    if (typeof window !== 'undefined') {
-      // P3-3：配额超限（和弦序列可能很长）时必须捕获，否则抛异常冒泡到调用方
-      // （onClick 之外还会经 React 事件系统重抛），用户侧表现为「点了没反应 + 控制台红字」。
-      try {
-        localStorage.setItem(CUSTOM_CHORD_STORAGE_KEY, JSON.stringify(data))
-      } catch (e) {
-        console.warn('Failed to persist custom chords:', e)
-        toast.error(t('custom_chord_save_failed'))
-        return
-      }
-    }
-    toast.success(t('custom_chord_saved'))
-  }
-
-  // 从本地存储加载自定义和弦序列（解析与四种结果分类见 lib/custom-chords-io.ts）
-  const loadCustomChords = () => {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(CUSTOM_CHORD_STORAGE_KEY) : null
-    const result = parseStoredCustomChords(raw)
-    if (result.kind === 'loaded') {
-      setCustomChords(result.sequence)
-      setCustomChordName(result.name)
-      toast.success(t('custom_chord_loaded'))
-      return
-    }
-    if (result.kind === 'empty') {
-      toast.error(t('custom_chord_empty_load'))
-      return
-    }
-    if (result.kind === 'invalid') {
-      toast.error(t('custom_chord_load_error'))
-      return
-    }
-    toast.error(t('custom_chord_not_found'))
-  }
-
-  // 导入iReal Pro（解析实现见 lib/song-chords.ts）
-  // irealbook:// URL 优先 —— 一次能拿到歌名与和弦进行；不是 URL 时回退到纯文本解析
-  const importIrealPro = () => {
-    const fromUrl = parseIrealUrl(irealInput)
-    const chords = fromUrl ? fromUrl.chords : parseIrealPro(irealInput)
-    if (chords.length > 0) {
-      setCustomChords(chords)
-      // URL 里带的歌名顺手用作序列名（纯文本导入没有这个信息）
-      if (fromUrl?.title) setCustomChordName(fromUrl.title)
-      toast.success(t('import_success'))
-      setIrealInput("")
-    } else {
-      toast.error(t('error_occurred'))
-    }
-  }
-
-  // 导出自定义和弦为简化格式（文本构造见 lib/custom-chords-io.ts 的 buildCustomChordsExport）
-  const exportCustomChords = () => {
-    if (customChords.length === 0) {
-      toast.error(t('custom_chord_empty'))
-      return
-    }
-
-    const { name, text } = buildCustomChordsExport(customChords, {
-      name: customChordName,
-      unnamedLabel: t('custom_chord_unnamed'),
-      chordScaleDisplay,
-      chordSymbols,
-    })
-
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success(t('export_success'))
-    }).catch(() => {
-      const blob = new Blob([text], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${name}.txt`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      toast.success(t('export_success'))
-    })
-  }
 
   
   // 更新 getTransposedChordsRef
@@ -1669,7 +1569,7 @@ export default function FretMasterPage() {
     setCustomChords([])
     setCurrentChordIndex(0)
     setShowSongSelector(false)
-  }, [])
+  }, [setCustomChords])
   const handleShowSongInfo = useCallback((song: typeof SONG_PROGRESSIONS[0]) => {
     setSelectedSongInfo(song)
     setShowSongInfoDialog(true)
@@ -1690,7 +1590,7 @@ export default function FretMasterPage() {
       setCurrentChordIndex(0)
     }
     setShowSongSelector(false)
-  }, [])
+  }, [setCustomChords])
   const handleLevelInfoConfirm = useCallback((level: typeof ALL_PRACTICE_LEVELS[0] | null) => {
     if (level) {
       setPracticeLevel(level.id)
