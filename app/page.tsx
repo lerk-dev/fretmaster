@@ -1706,7 +1706,14 @@ export default function FretMasterPage() {
 
           {/* Main Area */}
           <main className="flex-1 overflow-auto min-h-0 p-2 sm:p-4 pb-20 sm:pb-6">
-            <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
+            {/*
+              内容列宽按视口分级（2026-10-19 比例修正）。
+              原先固定 `max-w-4xl`（896px）⇒ 1920 屏上只占主区 53%、两侧各留 ~400px 空白，
+              指板被压成窄条、设置项挤成小方块。现在按断点递进：
+                基准 864 / lg 1024 / xl 1152 / 2xl 1312 / ≥1920 1408。
+              小屏（< lg）仍是「撑满可用宽度」，行为不变。
+            */}
+            <div className="max-w-4xl lg:max-w-[60rem] xl:max-w-[66rem] 2xl:max-w-[72rem] mx-auto space-y-3 sm:space-y-4">
               {/* Control Panel - 统计/乐理页面不显示（依赖场景，无练习需控制） */}
               {activeTab !== "stats" && activeTab !== "theory" && (
               <Card
@@ -1718,7 +1725,7 @@ export default function FretMasterPage() {
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold leading-none">
+                    <h2 className="text-lg lg:text-xl font-semibold leading-none">
                       {activeTab === "practice" && t('nav_practice')}
                       {activeTab === "interval" && t('nav_interval')}
                       {activeTab === "chord_exercise" && t('nav_chord_exercise')}
