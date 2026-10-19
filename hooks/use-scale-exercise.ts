@@ -31,6 +31,12 @@ export type NextScaleExerciseInfo = {
     startStringIndex: number
     startFret: number
   } | null
+  /**
+   * 生成这份预览时的**设置指纹**（见 `makeScaleSettingsKey`）。
+   * 设置一改预览即失效（否则序列会与当前音阶/方向不一致）。
+   * 字段缺失 = 不是本 hook 生成的（外部注入/测试）⇒ 一律信任。
+   */
+  settingsKey?: string
 }
 
 
@@ -131,6 +137,27 @@ export function useScaleExercise(options: UseScaleExerciseOptions) {
   )
   const isThreeNpsActive = isThreeNpsMode && threeNpsEligibleScales.length > 0
 
+  /**
+   * 出题设置指纹（调性 + 已选音阶池 + 序列形态 + 方向 + 根音移动 + 是否 3NPS + 调弦/品数）。
+   *
+   * `nextScaleExerciseInfo` 是在**上一题生成时**算好的，而设置面板在练习途中仍可改。
+   * 不校验就会出现「改了方向/换了音阶池，下一题还是按旧设置出」——更糟的是
+   * `nextScaleExercise` 拿 `scaleName` 去已选池里找，找不到时退到 `selectedScales[0]`，
+   * 却仍然用旧快照里的 `sequence` ⇒ **题目序列与当前音阶不一致**（指板高亮/判定全错）。
+   * 指纹不符 ⇒ 视为过期，回退到按当前设置重新出题。
+   */
+  const makeScaleSettingsKey = useCallback((key: string) => [
+    key,
+    isScaleKeyRandom ? '1' : '0',
+    selectedScales.map((s) => s.name).join(','),
+    scalePracticeSequence,
+    scaleDirection,
+    scaleRootMovement,
+    isThreeNpsActive ? '1' : '0',
+    tuning.join(','),
+    String(fretCount),
+  ].join('|'), [isScaleKeyRandom, selectedScales, scalePracticeSequence, scaleDirection, scaleRootMovement, isThreeNpsActive, tuning, fretCount])
+
   /** 生成某调 + 某音阶的七个把位（品数太小导致把所有音都截掉时返回空） */
   const buildThreeNpsFor = useCallback((
     key: string,
@@ -183,6 +210,7 @@ export function useScaleExercise(options: UseScaleExerciseOptions) {
           key,
           scaleName: scale.name,
           sequence: position.steps.map((s) => s.degreeLabel),
+          settingsKey: makeScaleSettingsKey(key),
           threeNps: {
             positionIndex: nextIdx,
             position: position.index,
@@ -204,6 +232,7 @@ export function useScaleExercise(options: UseScaleExerciseOptions) {
         key: nextKey,
         scaleName: nextScale.name,
         sequence: firstPos ? firstPos.steps.map((s) => s.degreeLabel) : [],
+        settingsKey: makeScaleSettingsKey(key),
         threeNps: firstPos
           ? {
               positionIndex: 0,
@@ -224,8 +253,9 @@ export function useScaleExercise(options: UseScaleExerciseOptions) {
       key: nextKey,
       scaleName: nextScale.name,
       sequence: generateScaleSequence(nextScale, scalePracticeSequence, scaleDirection),
+      settingsKey: makeScaleSettingsKey(key),
     }
-  }, [isThreeNpsActive, buildThreeNpsFor, threeNpsEligibleScales, isScaleKeyRandom, scaleRootMovement, selectedScales, scalePracticeSequence, scaleDirection])
+  }, [isThreeNpsActive, buildThreeNpsFor, threeNpsEligibleScales, isScaleKeyRandom, scaleRootMovement, selectedScales, scalePracticeSequence, scaleDirection, makeScaleSettingsKey])
 
   // 生成音阶练习序列 - 参考 F:\新建文件夹\吉他指板视觉化练习工具.html
   const generateScaleExercise = useCallback(() => {
@@ -266,7 +296,12 @@ export function useScaleExercise(options: UseScaleExerciseOptions) {
 
   // 下一音阶练习
   const nextScaleExercise = useCallback(() => {
-    if (nextScaleExerciseInfo) {
+    // 预览只在「设置没变」时可信：设置一改，快照里的 key/scaleName/sequence 就与
+    // 当前音阶池/方向不一致（见 makeScaleSettingsKey 注释）⇒ 回退到按当前设置重新出题。
+    const previewStale = nextScaleExerciseInfo?.settingsKey !== undefined
+      && nextScaleExerciseInfo.settingsKey !== makeScaleSettingsKey(scaleKey)
+
+    if (nextScaleExerciseInfo && !previewStale) {
       setScaleKey(nextScaleExerciseInfo.key)
       const scale = selectedScales.find(s => s.name === nextScaleExerciseInfo.scaleName) || selectedScales[0]
       setSelectedScale(scale)
@@ -295,7 +330,7 @@ export function useScaleExercise(options: UseScaleExerciseOptions) {
     } else {
       generateScaleExercise()
     }
-  }, [nextScaleExerciseInfo, selectedScales, generateScaleExercise, isThreeNpsActive, buildThreeNpsFor, applyThreeNpsPosition, computeNextScaleExerciseInfo, t])
+  }, [nextScaleExerciseInfo, selectedScales, generateScaleExercise, isThreeNpsActive, buildThreeNpsFor, applyThreeNpsPosition, computeNextScaleExerciseInfo, t, makeScaleSettingsKey, scaleKey])
 
   // ==================== 一弦三音：视图快照 ====================
   /** 当前把位的「弦-品」索引 → 指板高亮查表 */
@@ -370,8 +405,13 @@ export function useScaleExercise(options: UseScaleExerciseOptions) {
     const map = new Map<string, ThreeNpsPreviewKind>()
     if (!isThreeNpsActive || threeNpsTarget) return map
     const next = nextScaleExerciseInfo?.threeNps
-    if (!next) return map
-    const position = buildThreeNpsFor(scaleKey, selectedScale)[next.positionIndex]
+    const info = nextScaleExerciseInfo
+    if (!next || !info) return map
+    // 🚨 必须用**预览自己的 key/音阶**，不能用当前的 `scaleKey`/`selectedScale`：
+    // 马拉松跑完最后一个把位时，预览已跨到「下一个调 + 下一个音阶」——
+    // 用当前音阶算会把**别的音阶**的把位画到指板上（2026-10-19 修复）。
+    const nextScale = selectedScales.find((s) => s.name === info.scaleName) ?? selectedScale
+    const position = buildThreeNpsFor(info.key, nextScale)[next.positionIndex]
     if (!position) return map
     const startKey = `${next.startStringIndex}-${next.startFret}`
     for (const step of position.steps) {
@@ -379,7 +419,7 @@ export function useScaleExercise(options: UseScaleExerciseOptions) {
       map.set(key, key === startKey ? 'start' : step.isRoot ? 'root' : 'note')
     }
     return map
-  }, [isThreeNpsActive, threeNpsTarget, nextScaleExerciseInfo, buildThreeNpsFor, scaleKey, selectedScale])
+  }, [isThreeNpsActive, threeNpsTarget, nextScaleExerciseInfo, buildThreeNpsFor, selectedScales, selectedScale])
 
   /**
    * 在设置面板里手动选把位：直接装载该把位（序列重置到第 1 步）。

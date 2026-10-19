@@ -362,6 +362,10 @@ describe('下拉框：三个 Select 的 onValueChange（此前零覆盖）', () 
     p.pickOption(1, '大调模式')
     expect(p.onSelectedScaleCategoryChange).toHaveBeenCalledWith('majorScaleModes')
     expect(p.onSelectedScaleChange).toHaveBeenCalledWith(MAJOR_MODES[0])
+    // 🚨 练习池必须**一起**重置：出题是从 selectedScales 里随机抽的，
+    // 只改 selectedScale 的话练习仍会从旧分类抽题（切了分类却听到别的音阶），
+    // 且旧池里的音阶不在这张分类的按钮列表里 ⇒ 用户看不见也取消不掉。
+    expect(p.onSelectedScalesChange).toHaveBeenCalledWith([MAJOR_MODES[0]])
     p.unmount()
   })
 

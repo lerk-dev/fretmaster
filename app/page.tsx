@@ -21,7 +21,7 @@ import { useTuner } from "@/hooks/use-tuner"
 import { useAudioInput, type DetectedPitchForMatch } from "@/hooks/use-audio-input"
 import { logger } from "@/lib/logger"
 import { SONG_PROGRESSIONS } from "@/lib/page-songs"
-import { transposeSongChords } from "@/lib/song-chords"
+import { transposeSongChords, clampChordIndex } from "@/lib/song-chords"
 import { filterAndGroupSongs } from "@/lib/song-filters"
 import { setStringTuning } from "@/lib/string-tuning"
 import type {
@@ -437,6 +437,13 @@ export default function FretMasterPage() {
     () => transposeSongChords(customChords, selectedSong, progressionKey),
     [customChords, selectedSong, progressionKey]
   )
+
+  // 和弦列表变短后钳制索引：删除自定义和弦 / 切换歌曲 / 导入设置都会换掉整份列表，
+  // 而 currentChordIndex 是独立 state ⇒ 越界后当前和弦空白、判定无候选，练习静默卡住。
+  useEffect(() => {
+    const clamped = clampChordIndex(currentChordIndex, transposedChords.length)
+    if (clamped !== currentChordIndex) setCurrentChordIndex(clamped)
+  }, [transposedChords, currentChordIndex])
   
   const [levelForceNaturalFive, setLevelForceNaturalFive] = useState(true)
   const [levelEndOnStartingInterval, setLevelEndOnStartingInterval] = useState(false)

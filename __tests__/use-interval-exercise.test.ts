@@ -351,4 +351,53 @@ describe('generateIntervalExercise', () => {
     expect(api!.currentIntervalExercise!.targetNote).toBe('F♯') // D(2) + 4 = 6（NOTES 用 Unicode ♯）
     h.unmount()
   })
+
+  // ------------------------------------------------ 练习途中改设置（队列必须失效）
+  //
+  // 🚨 2026-10-19 修复前的坏法：队列只在「空/耗尽」时重建，于是练习途中
+  //   取消勾选的音程还会照常出现、改了方向也还在按旧方向出，直到整轮跑完。
+  //   这三条用例分别钉住「取消勾选」「改方向」「设置没变时仍复用队列（不许无脑重建）」。
+
+  it('取消勾选某个音程后：下一题不再出它（旧队列作废，队列状态同步为新池）', () => {
+    const h = mount()
+    act(() => { api!.setSelectedIntervals([THIRD, FIFTH]) })
+    act(() => { api!.generateIntervalExercise() })
+    expect(api!.currentIntervalExercise!.interval).toEqual(INTERVALS[THIRD])
+    expect(api!.intervalExerciseQueue).toEqual([THIRD, FIFTH])
+
+    // 取消「五度」：旧队列此时索引指向 5，若不失效就会把刚取消的五度出出来
+    act(() => { api!.setSelectedIntervals([THIRD]) })
+    act(() => { api!.generateIntervalExercise() })
+
+    expect(api!.intervalExerciseQueue).toEqual([THIRD])
+    expect(api!.currentIntervalExercise!.interval).toEqual(INTERVALS[THIRD])
+    h.unmount()
+  })
+
+  it('改方向后：下一题按新方向重新生成队列（不再沿用旧方向的项）', () => {
+    const h = mount()
+    act(() => { api!.setSelectedIntervals([THIRD]) })
+    act(() => { api!.setIntervalDirection('up') })
+    act(() => { api!.generateIntervalExercise() })
+    expect(api!.currentIntervalExercise!.interval).toEqual(INTERVALS[THIRD])
+
+    act(() => { api!.setIntervalDirection('down') })
+    act(() => { api!.generateIntervalExercise() })
+
+    expect(api!.intervalExerciseQueue).toEqual([resolveDownIndex(THIRD)])
+    expect(api!.currentIntervalExercise!.interval).toEqual(INTERVALS[resolveDownIndex(THIRD)])
+    h.unmount()
+  })
+
+  it('设置没变时仍复用旧队列（不许每次都重建，否则「按顺序练完一轮」的语义就没了）', () => {
+    const h = mount()
+    act(() => { api!.setSelectedIntervals([THIRD, FIFTH]) })
+    act(() => { api!.generateIntervalExercise() })   // 出 3，索引 1
+    const queueAfterFirst = api!.intervalExerciseQueue
+
+    act(() => { api!.generateIntervalExercise() })   // 设置未变 ⇒ 必须接着出 5
+    expect(api!.currentIntervalExercise!.interval).toEqual(INTERVALS[FIFTH])
+    expect(api!.intervalExerciseQueue).toBe(queueAfterFirst)   // 同一份队列（状态引用未换）
+    h.unmount()
+  })
 })

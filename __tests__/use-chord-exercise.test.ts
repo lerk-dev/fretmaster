@@ -181,4 +181,37 @@ describe('nextChordExercise', () => {
     expect(api!.nextChordExerciseInfo).not.toBeNull()
     h.unmount()
   })
+
+  // 🚨 2026-10-19：预览是「生成当前题时按当时的设置」算好的，设置面板在练习途中可改。
+  // 修复前改了等级/顺序，点「下一题」仍把旧设置算出的 sequence 顶上来（题目与设置不符）。
+  it('改了练习等级后：预览作废，下一题按新等级重新出（不沿用旧等级的序列）', () => {
+    const h = mount()
+    act(() => { api!.setChordExerciseLevel(LEVEL) })   // 1-3-5，序列长度 3
+    act(() => { api!.generateChordExercise() })
+    expect(api!.chordExerciseSequence.length).toBe(3)
+
+    act(() => { api!.setChordExerciseLevel('single_chord_tones_root') })
+    act(() => { api!.nextChordExercise() })
+
+    expect(api!.chordExerciseTargetChord).toEqual({ root: 'C', type: 'Major' })
+    expect(api!.chordExerciseSequence).toEqual(
+      generateChordSequence('C', 'Major', 'single_chord_tones_root', 'asc', 'root', undefined)
+    )
+    // 反向钉子：若还沿用旧预览，这里会是 3 个音级
+    expect(api!.chordExerciseSequence).toHaveLength(1)
+    h.unmount()
+  })
+
+  it('改了演奏顺序后：预览作废，下一题按新顺序重新出', () => {
+    const h = mount()
+    act(() => { api!.setChordExerciseLevel(LEVEL) })
+    act(() => { api!.generateChordExercise() })          // asc
+    act(() => { api!.setChordExerciseOrder('desc') })
+    act(() => { api!.nextChordExercise() })
+
+    expect(api!.chordExerciseSequence).toEqual(
+      generateChordSequence('C', 'Major', LEVEL, 'desc', 'root', undefined)
+    )
+    h.unmount()
+  })
 })

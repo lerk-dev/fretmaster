@@ -55,6 +55,21 @@ export function useIntervalExercise() {
   const generateIntervalExerciseRef = useRef<(() => void) | null>(null)
   const currentIntervalExerciseRef = useRef(currentIntervalExercise)
   const prevIntervalTimeLeftRef = useRef(intervalTimeLeft)
+  /**
+   * 生成队列时的**设置指纹**（选中音程 / 方向 / 先找根音 / 打乱）。
+   *
+   * 队列只在「空 / 耗尽」时重建，于是练习途中改设置会出现：取消勾选的音程照样出、
+   * 改了方向却还在按旧方向出题 —— 一直要到整轮跑完才生效（用户能直接看到
+   * 「刚取消的大六度又出现了」）。指纹不同就重建队列、从新队列头出题。
+   *
+   * 初始 `null` = 队列不是本 hook 生成的（外部注入，如重置/单测），一律信任。
+   */
+  const queueSignatureRef = useRef<string | null>(null)
+
+  const buildQueueSignature = useCallback(() => (
+    `${[...selectedIntervals].sort((a, b) => a - b).join(',')}` +
+    `|${intervalDirection}|${findRootFirst ? '1' : '0'}|${intervalRandomizeOrder ? '1' : '0'}`
+  ), [selectedIntervals, intervalDirection, findRootFirst, intervalRandomizeOrder])
 
   const generateIntervalExerciseQueue = useCallback(() => {
     if (selectedIntervals.length === 0) return []
@@ -86,11 +101,15 @@ export function useIntervalExercise() {
     
     let queue = currentQueue
     let nextIndex = currentIndex
-    
-    // 如果队列为空或已遍历完，重新生成队列
-    if (queue.length === 0 || nextIndex >= queue.length) {
+
+    // 队列为空 / 已遍历完 / **设置已变**（见 queueSignatureRef 注释）⇒ 重建队列
+    const signature = buildQueueSignature()
+    const queueStale = queueSignatureRef.current !== null && queueSignatureRef.current !== signature
+
+    if (queue.length === 0 || nextIndex >= queue.length || queueStale) {
       queue = generateIntervalExerciseQueue()
       setIntervalExerciseQueue(queue)
+      queueSignatureRef.current = signature
       nextIndex = 0
       setIntervalCurrentQueueIndex(0)
     }
@@ -142,7 +161,7 @@ export function useIntervalExercise() {
     setIntervalCurrentQueueIndex(nextIndex + 1)
 
     // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
-  }, [rootNote, intervalRootMode, selectedIntervals, findRootFirst, addRootBack, intervalExerciseQueue, intervalCurrentQueueIndex, generateIntervalExerciseQueue])
+  }, [rootNote, intervalRootMode, selectedIntervals, findRootFirst, addRootBack, intervalExerciseQueue, intervalCurrentQueueIndex, generateIntervalExerciseQueue, buildQueueSignature])
 
   const toggleInterval = (index: number) => {
     setSelectedIntervals(prev => 

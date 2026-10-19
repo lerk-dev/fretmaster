@@ -10,7 +10,8 @@
  *   或用户直接粘贴 irealbook:// URL）都会被静默变成 C 大三和弦塞进和弦列表。
  */
 import { describe, it, expect } from 'vitest'
-import { transposeSongChords, parseIrealPro, irealQualityToProjectType, extractIrealChords } from '@/lib/song-chords'
+import { readFileSync } from 'node:fs'
+import { transposeSongChords, parseIrealPro, irealQualityToProjectType, extractIrealChords, clampChordIndex } from '@/lib/song-chords'
 import { getKeyNote } from '@/lib/page-theory-functions'
 import { SONG_PROGRESSIONS } from '@/lib/page-songs'
 
@@ -207,5 +208,57 @@ describe('extractIrealChords：纯段落记号的 token 要被跳过', () => {
     expect(extractIrealChords('C^7 ZZZ')).toHaveLength(1)
     expect(extractIrealChords('C^7 ZZZ')[0]).toEqual({ root: 'C', type: 'Maj7' })
     expect(extractIrealChords('C^7')).toHaveLength(1)
+  })
+})
+
+/**
+ * 和弦进行索引钳制（2026-10-19）。
+ *
+ * 和弦列表会在练习途中变短（删除自定义和弦 / 切歌 / 导入设置），而 `currentChordIndex`
+ * 是独立 state ⇒ 越界后 `transposedChords[index]` 为 undefined：当前和弦显示空白、
+ * 判定拿不到候选，练习静默卡住。这类「越界」只靠钳制修，不能指望用户自己点一下。
+ */
+describe('clampChordIndex：索引钳制', () => {
+  it('范围内原样返回（含边界）', () => {
+    expect(clampChordIndex(0, 5)).toBe(0)
+    expect(clampChordIndex(4, 5)).toBe(4)
+  })
+
+  it('越界钳到末尾 / 负数钳到 0', () => {
+    expect(clampChordIndex(9, 5)).toBe(4)
+    expect(clampChordIndex(-3, 5)).toBe(0)
+  })
+
+  it('空列表恒为 0（列表清空后索引停在 0，等新列表装进来）', () => {
+    expect(clampChordIndex(7, 0)).toBe(0)
+    expect(clampChordIndex(0, 0)).toBe(0)
+  })
+
+  it('非数值兜底成 0（导入的脏数据/NaN 不许把索引卡成 NaN）', () => {
+    expect(clampChordIndex(Number.NaN, 5)).toBe(0)
+    expect(clampChordIndex(Number.POSITIVE_INFINITY, 5)).toBe(0)
+  })
+
+  it('小数向下取整（索引必须是整数）', () => {
+    expect(clampChordIndex(2.9, 5)).toBe(2)
+  })
+})
+
+describe('源码级：页面必须在列表变化时真的调用钳制（防止 helper 成了摆设）', () => {
+  it('app/page.tsx 里 clampChordIndex 出现在「依赖 transposedChords / currentChordIndex」的 effect 中', () => {
+    const src = readFileSync('app/page.tsx', 'utf8')
+    const call = src.indexOf('clampChordIndex(currentChordIndex, transposedChords.length)')
+    expect(call, 'page.tsx 没有调用 clampChordIndex —— 删和弦/切歌后索引会越界').toBeGreaterThan(-1)
+    // 该调用必须处在某个 effect 的依赖数组里包含 transposedChords 的上下文中：
+    // 取调用点往前最近的 `useEffect(` 与往后最近的 `}, [`，断言依赖里两项都在。
+    const effectStart = src.lastIndexOf('useEffect(', call)
+    expect(effectStart, 'clampChordIndex 的调用不在任何 useEffect 里 —— 不会在列表变化时触发').toBeGreaterThan(-1)
+    const depsEnd = src.indexOf('}, [', call)
+    const deps = src.slice(depsEnd, src.indexOf('])', depsEnd))
+    expect(deps, 'effect 依赖里缺 transposedChords（列表变了不重跑）').toContain('transposedChords')
+    expect(deps, 'effect 依赖里缺 currentChordIndex（索引变了不校验）').toContain('currentChordIndex')
+    // 只算不写 = 摆设：必须真的把钳制结果写回 state（否则越界依旧）
+    expect(src, 'effect 算出了 clamped 却没写回 currentChordIndex —— 钳制等于没做')
+      .toContain('if (clamped !== currentChordIndex) setCurrentChordIndex(clamped)')
   })
 })

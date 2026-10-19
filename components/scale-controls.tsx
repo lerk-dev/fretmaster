@@ -192,7 +192,14 @@ export const ScaleControls = memo(function ScaleControls({
       <div className="text-2xs text-muted-foreground leading-3">{t('scale_mode')}</div>
       <Select value={resolvedCategory} onValueChange={(v: keyof typeof SCALE_MODES) => {
         onSelectedScaleCategoryChange(v)
-        onSelectedScaleChange(SCALE_MODES[v][0])
+        const first = SCALE_MODES[v][0]
+        onSelectedScaleChange(first)
+        // 🚨 练习池必须**一起**重置：出题是从 `selectedScales` 里随机抽的，
+        // 只改 `selectedScale` 的话练习仍会从**旧分类**里抽题（用户切了分类却听到别的音阶），
+        // 且旧池里的音阶已不在当前分类的按钮列表里 ⇒ 用户无法取消/看不见。
+        // 同时这条保证了不变量「当前音阶 ∈ 练习池」—— 指板高亮用的是 `selectedScale`，
+        // 题目序列却来自池里随机那一项，二者不同步就是「高亮与题目对不上」。
+        onSelectedScalesChange([first])
       }}>
         <SelectTrigger className="h-8 text-xs px-2 w-full">
           <SelectValue />

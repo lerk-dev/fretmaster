@@ -28,7 +28,20 @@ export function useChordExercise() {
   const [chordExerciseSequence, setChordExerciseSequence] = useState<string[]>([])
   const [chordExerciseTargetChord, setChordExerciseTargetChord] = useState<{root: string, type: string} | null>(null)
   const [chordExerciseIsAnswered, setChordExerciseIsAnswered] = useState(false)
-  const [nextChordExerciseInfo, setNextChordExerciseInfo] = useState<{root: string, type: string, sequence: string[]} | null>(null)
+  /**
+   * 预生成的下一题。
+   *
+   * 🚨 `settingsKey` 是**生成这份预览时的设置指纹**（根音/类型集合/等级/顺序/低音/七降九音阶）。
+   * 预览是在「当前题生成时」算好的，而设置面板在练习途中仍可改 —— 不校验就会出现
+   * 「改了等级/顺序，下一题还是旧等级」：预览里的 `sequence` 是按旧设置算出来的，
+   * 点击「下一题」只是把它顶上来（`nextChordExercise` 的设计就是**用预览**，
+   * 否则用户看到的预览与实际出的题不一致）。
+   * 指纹不符 ⇒ 视为过期，回退到按当前设置重新出题。
+   * 字段缺失 = 不是本 hook 生成的（外部注入/测试）⇒ 一律信任，保持原语义务。
+   */
+  const [nextChordExerciseInfo, setNextChordExerciseInfo] = useState<{
+    root: string, type: string, sequence: string[], settingsKey?: string
+  } | null>(null)
   const [showChordExerciseStructure, setShowChordExerciseStructure] = useState(false)
   const [showChordExerciseLevelSelector, setShowChordExerciseLevelSelector] = useState(false)
   const [showChordExerciseKeyboard, setShowChordExerciseKeyboard] = useState(false)
@@ -40,6 +53,19 @@ export function useChordExercise() {
 
   // 七和弦音阶选择属于和弦符号设置，直接读 store（同名局部变量 → 下方出题正文零改动）
   const chordSymbols = useChordSymbols()
+
+  /**
+   * 出题相关设置（不含随机根音实际取到的值）的指纹。
+   * 预览里的 `sequence` 完全由这些设置决定 ⇒ 指纹一变，预览即失效。
+   */
+  const chordSettingsKey = [
+    chordExerciseRoot,
+    chordExerciseTypes.join(','),
+    chordExerciseLevel,
+    chordExerciseOrder,
+    chordExerciseBass,
+    chordSymbols.sevenFlatNineScaleChoice ?? '',
+  ].join('|')
 
   // 生成和弦练习
   const generateChordExercise = useCallback(() => {
@@ -81,16 +107,21 @@ export function useChordExercise() {
     setNextChordExerciseInfo({
       root: nextRoot,
       type: nextType,
-      sequence: nextSequence
+      sequence: nextSequence,
+      settingsKey: chordSettingsKey,
     })
 
     // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
-  }, [chordExerciseRoot, chordExerciseTypes, chordExerciseLevel, chordExerciseOrder, chordExerciseBass, chordSymbols.sevenFlatNineScaleChoice])
+  }, [chordExerciseRoot, chordExerciseTypes, chordExerciseLevel, chordExerciseOrder, chordExerciseBass, chordSymbols.sevenFlatNineScaleChoice, chordSettingsKey])
 
   // 下一和弦练习
   const nextChordExercise = useCallback(() => {
-    // 使用预览中的下一题信息
-    if (nextChordExerciseInfo) {
+    // 预览只在「设置没变」时可信（见 nextChordExerciseInfo.settingsKey 注释）
+    const previewStale = nextChordExerciseInfo?.settingsKey !== undefined
+      && nextChordExerciseInfo.settingsKey !== chordSettingsKey
+
+    // 使用预览中的下一题信息（未过期时）
+    if (nextChordExerciseInfo && !previewStale) {
       setChordExerciseTargetChord({ root: nextChordExerciseInfo.root, type: nextChordExerciseInfo.type })
       setChordExerciseSequence(nextChordExerciseInfo.sequence)
       setChordExerciseCurrentStep(0)
@@ -106,13 +137,14 @@ export function useChordExercise() {
       setNextChordExerciseInfo({
         root: newNextRoot,
         type: newNextType,
-        sequence: newNextSequence
+        sequence: newNextSequence,
+        settingsKey: chordSettingsKey,
       })
     } else {
-      // 如果没有预览信息，重新生成
+      // 没有预览（或预览已随设置变化过期）⇒ 重新出题，绝不让旧设置的题顶上
       generateChordExercise()
     }
-  }, [nextChordExerciseInfo, chordExerciseRoot, chordExerciseTypes, chordExerciseLevel, chordExerciseOrder, chordExerciseBass, generateChordExercise, chordSymbols.sevenFlatNineScaleChoice])
+  }, [nextChordExerciseInfo, chordExerciseRoot, chordExerciseTypes, chordExerciseLevel, chordExerciseOrder, chordExerciseBass, generateChordExercise, chordSymbols.sevenFlatNineScaleChoice, chordSettingsKey])
 
   return {
     chordExerciseRoot,

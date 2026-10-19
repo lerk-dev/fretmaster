@@ -24,6 +24,23 @@ export const transposeSongChords = (customChords: { root: string; type: string; 
   })
 }
 
+/**
+ * 和弦进行索引的钳制。
+ *
+ * 和弦列表会在练习途中变短：删除自定义和弦、切换歌曲、导入设置都会替换整份列表，
+ * 而 `currentChordIndex` 是一个**独立的 state**，没人会记得同步它。越界后
+ * `transposedChords[index]` 为 `undefined` ⇒ 当前和弦显示空白、判定拿不到候选
+ * ⇒ 练习静默卡住（这类「卡住」只能靠钳制，不能靠用户自己点一下修复）。
+ *
+ * @param index  当前索引（可能越界或为负）
+ * @param length 当前和弦列长度
+ */
+export function clampChordIndex(index: number, length: number): number {
+  if (length <= 0) return 0
+  if (!Number.isFinite(index)) return 0
+  return Math.min(Math.max(Math.trunc(index), 0), length - 1)
+}
+
 export const parseIrealPro = (text: string) => {
   const chords: { root: string; type: string; bass?: string }[] = []
   
