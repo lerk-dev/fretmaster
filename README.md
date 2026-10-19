@@ -11,7 +11,7 @@
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-blue?logo=tauri)](https://tauri.app/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.2.219-orange.svg)](https://github.com/lerk-dev/fretmaster/releases)
+[![Version](https://img.shields.io/badge/Version-0.2.224-orange.svg)](https://github.com/lerk-dev/fretmaster/releases)
 
 [在线演示](https://lerk-dev.github.io/fretmaster/) | [功能特点](#功能特点) | [快速开始](#快速开始) | [练习指南](#练习指南) | [部署](#部署指南)
 
@@ -340,7 +340,11 @@ Web 版是 FretMaster 的基础版本，基于 Next.js 构建，支持部署到�
 
 #### 版本更新日志
 
-##### v0.2.223 (当前版本)
+##### v0.2.224 (当前版本)
+
+> 与 v0.2.223 功能相同。本修订版修复发布流程漏洞：此前绕过 `prebuild` 直接构建，导致 `scripts/update-version.js` 未执行、版本时间戳停留在 10/2。现在版本号在发布前显式刷新并四处同步（`package.json` / `lib/version.ts` / `Cargo.toml` / `tauri.conf.json`），桌面与 Web 包均基于 0.2.224 重新构建。
+
+##### v0.2.223
 
 **练习记录可维护**
 - 统计面板新增「删除单条记录」：桌面走 SQLite 的 `delete_practice_stat`，Web 走 `DELETE /cgi-bin/stats`
