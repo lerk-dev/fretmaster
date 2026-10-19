@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { logger } from '@/lib/logger'
 import { getAudioContextClass } from '@/lib/utils'
+import { ensureGuitarSamples, playGuitarPluck } from '@/lib/guitar-sound'
 import { useFeedbackSoundSettings } from '@/lib/store'
 
 /**
@@ -13,7 +14,8 @@ import { useFeedbackSoundSettings } from '@/lib/store'
  * - showWrongFeedback / wrongFeedbackNote：错误提示的显隐与音符
  * - feedbackAudioCtxRef：反馈音共享的 AudioContext（避免每次播放新建实例，
  *   浏览器/WebView 通常限制约 6 个实例，超限后新创建会抛异常导致反馈音静默失效）
- * - playFeedbackSound：按设置播放正确音（880Hz 正弦）/ 错误音（220Hz 锯齿）
+ * - playFeedbackSound：按设置播放反馈音 —— **真实钢弦木吉他采样**（见 lib/guitar-sound.ts）；
+ *   采样未就绪（首声/加载失败）时退回原来的 880Hz 正弦 / 220Hz 锯齿提示音
  * - triggerCorrectFeedback / triggerWrongFeedback：设置提示内容并 500/600ms 后自动隐藏
  * 
  * 外部依赖面：仅 feedbackSoundSettings（由 hook 内部 useFeedbackSoundSettings 自取，
@@ -44,14 +46,25 @@ export function useFeedbackSound() {
     },
     []
   )
-  const playFeedbackSound = useCallback((isCorrect: boolean) => {
-    if (!feedbackSoundSettings.enabled) return
-    if (isCorrect && !feedbackSoundSettings.correctSound) return
-    if (!isCorrect && !feedbackSoundSettings.wrongSound) return
-    
+  /**
+   * 播放一次答题反馈。
+   *
+   * @param isCorrect 答题对错（决定用「清脆拨弦」还是「闷音」）
+   * @param midi      被点击位置的音高（C4=60）；不传则用 A3 兜底，保证有声音
+   *
+   * 🚨 采样是**可选增强**：首次调用时采样还没解码完（见 lib/guitar-sound.ts），
+   *    那一声会退回合成提示音，之后的点击就是吉他。加载彻底失败也一样退回，
+   *    绝不出现「点了没声音」。
+   */
+  /**
+   * 取（或建）共享 AudioContext。
+   *
+   * 抽出来是为了让「首次交互预热」和「播放」用**同一个**实例：
+   * 浏览器配额约 6 个 AudioContext，多建一个就少一次容错。
+   * 创建失败（极端环境下会抛）返回 null，由调用方决定安静降级。
+   */
+  const ensureContext = useCallback((): AudioContext | null => {
     try {
-      // 复用共享 AudioContext，避免每次调用都创建新实例导致配额耗尽
-      // （Chromium 限制约 6 个 AudioContext，超过后新创建会抛异常导致反馈音静默失效）
       const AudioCtx = getAudioContextClass()
       if (!feedbackAudioCtxRef.current || feedbackAudioCtxRef.current.state === 'closed') {
         feedbackAudioCtxRef.current = new AudioCtx()
@@ -61,6 +74,49 @@ export function useFeedbackSound() {
       if (ctx.state === 'suspended') {
         ctx.resume().catch(() => {})
       }
+      return ctx
+    } catch (e) {
+      logger.debug('创建反馈音 AudioContext 失败', e)
+      return null
+    }
+  }, [])
+
+  /**
+   * 首次交互预热：在**用户手势里**创建 AudioContext 并开始下载/解码吉他采样。
+   *
+   * 为什么需要：`playFeedbackSound` 是同步的，采样没解码完只能退回合成提示音 ——
+   * 而「开始练习」按钮本身就是一次手势，比第一次点指板早好几秒。
+   * 只挂在 `pointerdown`（一次性）：页面里**不新增 window keydown**（唯一监听器是
+   * use-global-shortcuts），点击/触摸已覆盖所有交互入口。
+   */
+  useEffect(() => {
+    if (!feedbackSoundSettings.enabled) return
+    if (typeof window === 'undefined') return
+    let warmed = false
+    const warm = () => {
+      if (warmed) return
+      warmed = true
+      const ctx = ensureContext()
+      if (ctx) void ensureGuitarSamples(ctx)
+    }
+    window.addEventListener('pointerdown', warm, { once: true, passive: true })
+    return () => window.removeEventListener('pointerdown', warm)
+  }, [feedbackSoundSettings.enabled, ensureContext])
+
+  const playFeedbackSound = useCallback((isCorrect: boolean, midi?: number) => {
+    if (!feedbackSoundSettings.enabled) return
+    if (isCorrect && !feedbackSoundSettings.correctSound) return
+    if (!isCorrect && !feedbackSoundSettings.wrongSound) return
+    
+    try {
+      // 复用共享 AudioContext（见 ensureContext 注释：配额约 6 个，必须复用）
+      const ctx = ensureContext()
+      if (!ctx) return
+      // 采样优先：已解码就直接播真实吉他，返回 false 才走下面的合成音兜底。
+      // 顺手发起加载（同一 ctx 只发一轮请求，失败也只告警一次）。
+      void ensureGuitarSamples(ctx)
+      if (playGuitarPluck(ctx, { midi, muted: !isCorrect })) return
+
       const oscillator = ctx.createOscillator()
       const gainNode = ctx.createGain()
       oscillator.connect(gainNode)
@@ -84,7 +140,7 @@ export function useFeedbackSound() {
     } catch (e) {
       logger.debug('播放反馈音失败', e)
     }
-  }, [feedbackSoundSettings])
+  }, [feedbackSoundSettings, ensureContext])
   // 触发正确答案反馈
   const triggerCorrectFeedback = useCallback((note: string) => {
     setCorrectFeedbackNote(note)

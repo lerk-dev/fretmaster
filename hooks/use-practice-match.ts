@@ -13,6 +13,7 @@ import {
 import { CHORD_TYPES, DEGREE_TO_SEMITONE } from '@/lib/page-theory-data'
 import { ALL_PRACTICE_LEVELS } from '@/lib/practice-levels'
 import { resolveScaleTargetNoteIndex } from '@/lib/scale-target-note'
+import { guitarPositionToMidi } from '@/lib/guitar-sound'
 import {
   noteToSemitones,
   intervalToSemitones,
@@ -165,7 +166,8 @@ export interface AnswerActionsDeps {
   setScore: (fn: (prev: { correct: number; total: number }) => { correct: number; total: number }) => void
   triggerCorrectFeedback: (note: string) => void
   triggerWrongFeedback: (note: string) => void
-  playFeedbackSound: (isCorrect: boolean) => void
+  /** 反馈音：第二个参数是点击位置的 MIDI 音高（采样按它移调） */
+  playFeedbackSound: (isCorrect: boolean, midi?: number) => void
   setHighlightedFrets: (fn: (prev: Map<string, boolean>) => Map<string, boolean>) => void
   clearFretClickTimers: () => void
   lastFretClickPositionRef: { current: { stringIndex: number; fret: number } | null }
@@ -925,7 +927,8 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
         triggerWrongFeedback(clickedNote)
       }
 
-      playFeedbackSound(isCorrect)
+      // 反馈音用**真实吉他采样**：把点击位置的音高一起传下去（采样按音高移调）
+      playFeedbackSound(isCorrect, guitarPositionToMidi(stringIndex, fret) ?? undefined)
 
       // P3-2：先清掉上一轮遗留的两个定时器，再挂新的；句柄存入 ref 以便 stop/tab 切换时清理。
       clearFretClickTimers()

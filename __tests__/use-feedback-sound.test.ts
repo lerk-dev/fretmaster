@@ -25,86 +25,7 @@ import { renderHook, unmountAllHooks } from './helpers/render-hook'
 // renderHook 小工具已收敛到 __tests__/helpers/render-hook.ts
 // （两个 hook 测试各抄一份会漂移；那边也有"为什么不引 @testing-library/react"的说明）
 
-interface FakeOscillator {
-  type: string
-  frequency: { value: number }
-  connect: () => void
-  start: ReturnType<typeof vi.fn>
-  stop: ReturnType<typeof vi.fn>
-}
-
-interface FakeGain {
-  gain: {
-    value: number
-    setValueAtTime: ReturnType<typeof vi.fn>
-    exponentialRampToValueAtTime: ReturnType<typeof vi.fn>
-  }
-  connect: () => void
-}
-
-class FakeAudioContext {
-  static instances: FakeAudioContext[] = []
-  static reset() {
-    FakeAudioContext.instances = []
-  }
-
-  state: string = 'running'
-  currentTime = 0
-  destination = {}
-  oscillators: FakeOscillator[] = []
-  gains: FakeGain[] = []
-  resume = vi.fn(() => Promise.resolve())
-
-  constructor() {
-    FakeAudioContext.instances.push(this)
-  }
-
-  createOscillator(): FakeOscillator {
-    const osc: FakeOscillator = {
-      type: '',
-      frequency: { value: 0 },
-      connect: () => {},
-      start: vi.fn(),
-      stop: vi.fn(),
-    }
-    this.oscillators.push(osc)
-    return osc
-  }
-
-  createGain(): FakeGain {
-    const gain: FakeGain = {
-      gain: {
-        value: 1,
-        setValueAtTime: vi.fn(),
-        exponentialRampToValueAtTime: vi.fn(),
-      },
-      connect: () => {},
-    }
-    this.gains.push(gain)
-    return gain
-  }
-}
-
-const realAudioContext = (globalThis as Record<string, unknown>).AudioContext
-const realWebkitAudioContext = (globalThis as Record<string, unknown>).webkitAudioContext
-
-function installFakeAudioContext() {
-  ;(globalThis as Record<string, unknown>).AudioContext = FakeAudioContext
-  ;(globalThis as Record<string, unknown>).webkitAudioContext = undefined
-  if (typeof window !== 'undefined') {
-    ;(window as unknown as Record<string, unknown>).AudioContext = FakeAudioContext
-    ;(window as unknown as Record<string, unknown>).webkitAudioContext = undefined
-  }
-}
-
-function restoreAudioContext() {
-  ;(globalThis as Record<string, unknown>).AudioContext = realAudioContext
-  ;(globalThis as Record<string, unknown>).webkitAudioContext = realWebkitAudioContext
-  if (typeof window !== 'undefined') {
-    ;(window as unknown as Record<string, unknown>).AudioContext = realAudioContext
-    ;(window as unknown as Record<string, unknown>).webkitAudioContext = realWebkitAudioContext
-  }
-}
+import { FakeAudioContext, installFakeAudioContext, restoreFakeAudioContext } from './helpers/fake-audio-context'
 
 const setSoundSettings = (s: {
   enabled: boolean
@@ -127,7 +48,7 @@ describe('useFeedbackSound', () => {
   afterEach(() => {
     unmountAllHooks()
     vi.useRealTimers()
-    restoreAudioContext()
+    restoreFakeAudioContext()
   })
 
   it('初始状态：提示均不显示、音符为空、尚未创建 AudioContext', () => {

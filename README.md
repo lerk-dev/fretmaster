@@ -1080,6 +1080,10 @@ chore: 构建/工具相关
 - [Tailwind CSS](https://tailwindcss.com/) - 样式框架
 - [Tauri](https://tauri.app/) - 桌面应用框架
 - [rustfft](https://github.com/ejmahler/RustFFT) - FFT 库
+- **指板点击反馈音**：钢弦木吉他采样（2017 Martin HD28，作者 Jeff Learman，
+  出自 Discord SFZ GM Bank 的 `026-Acoustic Guitar`），**CC0 / 公有领域**；
+  经 [ferrosintesis-samples-orchestral](https://crates.io/crates/ferrosintesis-samples-orchestral)
+  裁切，再由 `scripts/build-guitar-samples.py` 降采样为 32kHz/0.7s（8 个音，约 350KB）
 
 ---
 

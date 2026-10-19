@@ -61,7 +61,8 @@ describe('handleFretClick：红绿显示与实际推进必须一致', () => {
     // 判绿 + 声音反馈
     expect(actions.triggerCorrectFeedback).toHaveBeenCalledWith(NOTE_AT_0_0)
     expect(actions.triggerWrongFeedback).not.toHaveBeenCalled()
-    expect(actions.playFeedbackSound).toHaveBeenCalledWith(true)
+    // 第二个参数是点击位置的 MIDI 音高（真实吉他采样按它移调）
+    expect(actions.playFeedbackSound).toHaveBeenCalledWith(true, expect.any(Number))
     // 高亮先记绿（第一个参数是 updater，不是布尔 —— 断言「传进去的是个函数」+ 调用它能得到 Map）
     expect(actions.setHighlightedFrets).toHaveBeenCalledTimes(1)
     const updater = actions.setHighlightedFrets.mock.calls[0][0] as (p: Map<string, boolean>) => Map<string, boolean>
@@ -98,7 +99,7 @@ describe('handleFretClick：红绿显示与实际推进必须一致', () => {
     act(() => h.current.handleFretClick(0, 0))
 
     expect(actions.triggerWrongFeedback).toHaveBeenCalledWith(NOTE_AT_0_0)
-    expect(actions.playFeedbackSound).toHaveBeenCalledWith(false)
+    expect(actions.playFeedbackSound).toHaveBeenCalledWith(false, expect.any(Number))
     const updater = actions.setHighlightedFrets.mock.calls[0][0] as (p: Map<string, boolean>) => Map<string, boolean>
     expect(updater(new Map())).toEqual(new Map([['0-0', false]]))
 
