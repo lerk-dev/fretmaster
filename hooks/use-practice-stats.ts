@@ -3,6 +3,7 @@ import { getLocalDateString, getLocalDaysAgoStart, dbTimestampToLocalDate } from
 import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
 import { savePracticeStats as saveToServer, getAllPracticeStats, deletePracticeStat, clearAllPracticeStats, PracticeStats as ServerPracticeStats } from '@/lib/stats-api'
 import { deduplicateStats } from '@/lib/export-utils'
+import { practiceTypeFromLabel } from '@/lib/practice-type-labels'
 import { logger } from '@/lib/logger'
 import type { PracticeType, PracticeStats } from '@/lib/page-stats-types'
 import { useScore } from '@/lib/store'
@@ -240,26 +241,20 @@ export function usePracticeStats(options: UsePracticeStatsOptions) {
         }
       }
       
-      const typeMapping: Record<string, PracticeType> = {
-        '音高识别': 'pitch_finding',
-        '音阶练习': 'scale',
-        '和弦练习': 'chord_exercise',
-        '音程练习': 'interval',
-        '和弦进行': 'chord_progression'
-      }
-      
       // 先对服务器返回的数据去重，避免旧版本 bug 产生的脏数据
       // （同一秒内多条同类型记录、或时间差小于 duration 的重复记录）
       // 导致统计虚高（例如"今天没练习却显示练习了"）
       const dedupedServerStats = deduplicateStats(serverStats as ServerPracticeStats[])
-      
+
       dedupedServerStats.forEach((record: ServerPracticeStats) => {
         // 使用 dbTimestampToLocalDate 正确解析 SQLite/ISO 时间戳为本地日期
         // 避免 SQLite 的 "YYYY-MM-DD HH:MM:SS" (UTC) 被错误解析为本地时间
         const date = record.created_at
           ? dbTimestampToLocalDate(record.created_at)
           : getLocalDateString(new Date())
-        const type = typeMapping[record.exercise_type] || 'pitch_finding'
+        // 类型标签 → PracticeType（唯一真相源 lib/practice-type-labels.ts，
+        // 与写侧 use-practice-session.ts 用的是同一张表，含 legacy '音高识别' 别名与兜底）
+        const type = practiceTypeFromLabel(record.exercise_type)
         const detailName = record.notes?.replace('练习项目: ', '') || record.exercise_type
         
         newStats.total.count += 1
@@ -311,13 +306,14 @@ export function usePracticeStats(options: UsePracticeStatsOptions) {
       })
       
       // 只保留最近90天的数据
+      // ninetyDaysAgo 提到循环外：每条记录都是同一天的 0 点，逐条算一遍纯属浪费
+      const ninetyDaysAgo = getLocalDaysAgoStart(90)
       newStats.daily = newStats.daily
         .filter(d => {
           // 使用本地时区解析日期，避免 UTC 偏移导致数据被误删
           const parts = d.date.split('-')
           if (parts.length !== 3) return false
           const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-          const ninetyDaysAgo = getLocalDaysAgoStart(90)
           return date >= ninetyDaysAgo
         })
         .sort((a, b) => b.date.localeCompare(a.date))

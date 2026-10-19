@@ -312,7 +312,8 @@ export const StatsPanel = memo(function StatsPanel({
                   const notesStr = rec.notes || ''
                   const m = notesStr.match(/练习项目[:：]\s*(.+)/)
                   const detailName = m ? m[1].trim() : (notesStr.trim() || '-')
-                  // 类型中文名映射
+                  // 类型中文名映射（显示层超集，见 lib/export-utils.ts 同款注释；
+                  // 数据回环的唯一真相源是 lib/practice-type-labels.ts）
                   const typeDisplayMap: Record<string, string> = {
                     'pitch_finding': t('nav_practice'),
                     'find_note': t('nav_practice'),

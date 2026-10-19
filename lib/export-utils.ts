@@ -110,6 +110,11 @@ const t = (key: string, language: 'zh-CN' | 'en'): string => {
 // 数据库中可能存储的值：
 //  - 中文: '音高识别', '音阶练习', '和弦练习', '音程练习', '和弦进行'
 //  - 英文 key: 'pitch_finding', 'find_note', 'scale', 'chord_exercise', 'interval', 'chord_progression'
+//
+// ⚠️ 这是**显示层超集**（导出报告用），比数据回环表 lib/practice-type-labels.ts 更宽容：
+// 额外认英文 key、'和弦转换' 等历史脏值。两表中「中文标签 → 内部 key」的部分必须一致
+// （回环护栏测试 __tests__/practice-type-labels.test.ts 盯着），但不要把这个超集
+// 搬去别处当数据回环用 —— 它会替未知值原样返回，掩盖脏数据。
 const EXERCISE_TYPE_MAP: Record<string, string> = {
   // 中文 → 内部 key
   '音高识别': 'pitch_finding',

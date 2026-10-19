@@ -42,6 +42,7 @@ import { logger } from '@/lib/logger'
 import { resetNoteConfirmState, type NoteConfirmState } from '@/lib/note-confirm'
 import { buildDirectionalQueue, shuffle, type IntervalDirection } from '@/lib/interval-direction'
 import { PRACTICE_SUGGESTIONS, type InstrumentType } from '@/lib/practice-suggestions'
+import { PRACTICE_TYPE_LABELS } from '@/lib/practice-type-labels'
 import type { PracticeType } from '@/lib/page-stats-types'
 
 // tab → PracticeType 映射（chord tab 对应 chord_progression 类型）
@@ -296,15 +297,9 @@ export function usePracticeSession({
         const pausedSec = practiceElapsedTime +
           (isPracticePaused && practiceSessionStartTime ? (Date.now() - practiceSessionStartTime) / 1000 : 0)
         const duration = Math.max(1, Math.round((Date.now() - startTime!) / 1000 - pausedSec))
-        // detailName 用类型对应的中文名
-        const detailNames: Record<PracticeType, string> = {
-          pitch_finding: '找音练习',
-          interval: '音程练习',
-          scale: '音阶练习',
-          chord_exercise: '和弦练习',
-          chord_progression: '和弦进行',
-        }
-        recordPractice(sessionType, detailNames[sessionType], { score: accuracy, duration, accuracy })
+        // detailName 用类型对应的中文名（唯一真相源 lib/practice-type-labels.ts，
+        // 读侧 reloadStats 靠同一张表把 exercise_type 翻回 PracticeType）
+        recordPractice(sessionType, PRACTICE_TYPE_LABELS[sessionType], { score: accuracy, duration, accuracy })
       }
     }
   }, [isPlaying, activeTab, score, recordPractice, practiceElapsedTime, isPracticePaused, practiceSessionStartTime])
