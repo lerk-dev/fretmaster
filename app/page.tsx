@@ -99,6 +99,7 @@ import { FocusMode } from "@/components/focus-mode"
 import { CustomSongEditor } from "@/components/custom-song-editor-ui"
 import { MetronomeVisualizer } from "@/components/metronome-visualizer"
 import { PositionHeatmap } from "@/components/position-heatmap"
+import { MobileNav } from "@/components/mobile-nav"
 import { TheoryPanel } from "@/components/theory-panel"
 import {
   OnboardingProvider,
@@ -193,13 +194,19 @@ export default function FretMasterPage() {
     { id: "stats", label: t('nav_stats'), Icon: BarChart3 },
   ], [t])
 
-  // 底部导航菜单 - useMemo缓存避免每次渲染重新创建
+  // 手机底部导航：**只放 5 个练习页**（高频操作）。
+  // 教程/乐理/统计是低频浏览，折进「更多」——8 个平铺在 390px 宽上每个只剩 ~48px，
+  // 短名被 truncate 成「和…」「教…」，点击目标也太小（2026-10-19）。
   const bottomNavItems = useMemo(() => [
     { id: "practice", label: t('nav_practice'), Icon: Target, shortLabel: t('nav_short_practice') },
     { id: "interval", label: t('nav_interval'), Icon: Activity, shortLabel: t('nav_short_interval') },
     { id: "chord_exercise", label: t('nav_chord_exercise'), Icon: Guitar, shortLabel: t('nav_short_chord_exercise') },
     { id: "chord", label: t('nav_chord'), Icon: ListMusic, shortLabel: t('nav_short_chord') },
     { id: "scale", label: t('nav_scale'), Icon: Music, shortLabel: t('nav_short_scale') },
+  ], [t])
+
+  /** 折叠进「更多」面板的页面（桌面侧栏仍逐个列出，不受影响） */
+  const bottomFoldedItems = useMemo(() => [
     { id: "theory", label: t('nav_theory'), Icon: BookOpen, shortLabel: t('nav_short_theory') },
     { id: "stats", label: t('nav_stats'), Icon: BarChart3, shortLabel: t('nav_short_stats') },
   ], [t])
@@ -2312,30 +2319,15 @@ export default function FretMasterPage() {
           </main>
         </div>
 
-        {/* Mobile bottom navigation - 优化显示 */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border/50 p-1 pb-safe z-50 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]" role="tablist" aria-label={t('nav_practice')}>
-          <div className="flex justify-around overflow-x-auto">
-            {bottomNavItems.map((mode) => (
-              <button
-                key={mode.id}
-                onClick={() => handleTabChange(mode.id)}
-                className={cn(
-                  "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg flex-1 min-w-[2.75rem]",
-                  activeTab === mode.id
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground"
-                )}
-                style={{ willChange: 'background-color, color' }}
-                role="tab"
-                aria-selected={activeTab === mode.id}
-                aria-label={mode.label}
-              >
-                <mode.Icon className="h-5 w-5" />
-                <span className="text-2xs font-medium truncate max-w-full">{mode.shortLabel}</span>
-              </button>
-            ))}
-          </div>
-        </nav>
+        {/* 手机底部导航：5 个练习页 + 「更多」（教程/乐理/统计折叠在内） */}
+        <MobileNav
+          items={bottomNavItems}
+          foldedItems={bottomFoldedItems}
+          activeTab={activeTab}
+          onSelect={handleTabChange}
+          moreLabel={t('nav_more')}
+          ariaLabel={t('nav_main_menu')}
+        />
 
         {/* 全屏模式覆盖层 */}
         {isFullscreen && (
