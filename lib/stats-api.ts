@@ -16,12 +16,14 @@
 //       并在 main.rs 摘掉命令 —— 三处一起删，别只删一处留下悬空的护栏。
 //
 //   syncLocalBackupToServer
-//     · 🚨 **不可直接接线**（本轮实测发现的隐患，见函数内注释）：
+//     · 🚨 曾经**不可直接接线**（2026-10-18 复核发现的隐患）：
 //       `savePracticeStats` 在**成功**路径也会把记录写进同一份本地备份，
 //       而该函数把备份当成「待上传队列」整批重发 ⇒ 真接上会让已上传的记录重复入库。
 //       历史版本的备份里更是混着大量成功记录，上线即翻倍。
-//     · 要做弱网补传，得先给备份记录加「已上传」标记、并做一次性历史清洗。
-//       在那之前保持「零调用」才是安全的。
+//     · 2026-10-19 已修（见 BackupRecord 与函数内注释）：备份记录带 `_synced` 标记
+//       （成功 true / 失败 false / 历史缺失按 true 处理），补传只处理未确认的，
+//       且补传成功的记录**留在备份里**当离线镜像。⇒「要不要接线」现在是产品决策
+//       （弱网补传有价值），不再是数据安全禁忌。
 // ============================================================================
 
 import { logger } from './logger'
@@ -63,6 +65,19 @@ export interface PracticeStats {
   date?: string;
   exerciseType?: string;
 }
+
+/**
+ * 本地备份里的记录 = PracticeStats + 内部同步标记。
+ *
+ * `_synced` **只存在于 localStorage**，不进服务器请求体（syncLocalBackupToServer
+ * 的 POST 显式挑字段）。它把备份从「纯队列」升级为「队列 + 离线镜像」的并集：
+ *   · `true`  = 已确认上传成功（开发模式的记录没有服务器，也记 true）⇒ 只作离线
+ *     镜像（getAllPracticeStats 的 fallback 数据源），补传时**跳过**
+ *   · `false` = 上传失败，待下次补传
+ *   · 缺失   = 2026-10-19 之前写入的历史记录，一律按 `true` 处理
+ *     （重复入库会永久污染服务器聚合且不可逆；少传最多丢有界的本地记录）
+ */
+export type BackupRecord = PracticeStats & { _synced?: boolean }
 
 function normalizeStatsFields(stats: PracticeStats): PracticeStats {
   const exerciseType = stats.exercise_type || stats.exerciseType || '未知练习'
@@ -114,7 +129,8 @@ export async function savePracticeStats(
       ...data,
       created_at: new Date().toISOString(),
     });
-    saveToLocalBackup(backupData);
+    // 没有服务器可传 ⇒ 记 true（补传时跳过，别把开发记录当真失败队列）
+    saveToLocalBackup({ ...backupData, _synced: true });
     return { status: 'success', message: '已保存到本地（开发模式）', id: Date.now() };
   }
 
@@ -133,14 +149,14 @@ export async function savePracticeStats(
 
     const result = await response.json();
     
-    // 同时保存到本地备份
+    // 同时保存到本地备份（离线镜像；已确认入库 ⇒ _synced: true，补传时跳过）
     const backupData: PracticeStats = normalizeStatsFields({
       ...data,
       id: result.id,
       created_at: new Date().toISOString(),
     });
-    saveToLocalBackup(backupData);
-    
+    saveToLocalBackup({ ...backupData, _synced: true });
+
     return result;
   } catch (error) {
     logger.error('保存统计数据失败:', error);
@@ -149,7 +165,8 @@ export async function savePracticeStats(
       ...data,
       created_at: new Date().toISOString(),
     });
-    saveToLocalBackup(backupData);
+    // 未确认入库 ⇒ _synced: false，下次 syncLocalBackupToServer 会补传
+    saveToLocalBackup({ ...backupData, _synced: false });
     throw error;
   }
 }
@@ -295,9 +312,9 @@ export async function getStatsByExerciseType() {
 // P3-11：键名统一走真相源 lib/stats-storage-keys.ts（禁止在此手写字面量）
 const LOCAL_BACKUP_KEY = STATS_STORAGE_KEYS.backup;
 
-function saveToLocalBackup(stats: PracticeStats) {
+function saveToLocalBackup(stats: BackupRecord) {
   try {
-    const existing = JSON.parse(localStorage.getItem(LOCAL_BACKUP_KEY) || '[]');
+    const existing: BackupRecord[] = JSON.parse(localStorage.getItem(LOCAL_BACKUP_KEY) || '[]');
     existing.push(stats);
     // 只保留最近 100 条记录
     if (existing.length > 100) {
@@ -309,7 +326,7 @@ function saveToLocalBackup(stats: PracticeStats) {
   }
 }
 
-function getLocalBackup(): PracticeStats[] {
+function getLocalBackup(): BackupRecord[] {
   try {
     return JSON.parse(localStorage.getItem(LOCAL_BACKUP_KEY) || '[]');
   } catch {
@@ -319,35 +336,41 @@ function getLocalBackup(): PracticeStats[] {
 
 // 同步本地备份到服务器
 /**
- * 把本地备份里的记录补传到服务器。
+ * 把本地备份里**未确认上传成功**的记录补传到服务器。
  *
- * 🚨 **当前零调用方，且不要贸然接上**（2026-10-18 复核）：
+ * 语义（2026-10-19 重修；重修前有两个隐患，见文末）：
  *
- *   本函数的语义是「备份 = 待上传队列」，逐条 POST 后只把失败的留下。但
- *   `savePracticeStats` 在**成功**路径也会 `saveToLocalBackup(...)`（那是给
- *   `getAllPracticeStats` 的离线 fallback 用的本地镜像）⇒ 备份里**同时**装着
- *   「已上传成功」与「上传失败」两种记录，本函数会把成功的那批**再传一遍**。
+ * · 备份 = 「离线镜像」与「待补传队列」的**并集**，用 `_synced` 区分：
+ *     - `true`  = 已确认上传成功 ⇒ 只作离线镜像，**不补传**
+ *     - `false` = 上传失败，待重试
+ *     - 缺失   = 历史记录，按 `true` 处理（宁可少传也不重复入库：
+ *               重复会永久污染服务器聚合且不可逆，少传最多丢有界的本地记录）
+ * · 补传成功的记录**留在备份里**并标记 `_synced: true` —— 备份同时是
+ *   `getAllPracticeStats` 的离线 fallback 数据源，不是用完即清的队列。
+ * · 内部标记 `_synced` **不进请求体**（POST 显式挑字段）。
  *
- *   历史安装的备份里更是长期累积着成功记录（旧版同样是成功也写），
- *   所以「把它接到挂载 effect 里」= 上线即让老用户的统计翻倍。
+ * 重修前隐患：
+ *   ① 重复入库：把整个备份当队列重发，已成功的记录再传一遍；
+ *   ② 镜像被清：回写时只写失败记录，成功的那批镜像一起没了 ⇒ 离线 fallback 秃了。
  *
- *   要做弱网补传，先做两件事：
- *     ① 备份记录加 `_synced` 标记（成功写 true、失败写 false），本函数只处理非 true 的；
- *     ② 一次性清洗历史备份（无法区分来源，只能清空或全部按已同步处理）。
- *   在此之前保持零调用是**正确**状态 —— 别为了「消除零调用」而引入数据翻倍。
+ * 已知残余窗口：补传成功后若整份回写 localStorage 失败（配额），盘上仍是
+ * `_synced: false` ⇒ 下次会重传（重复）。选择「一次写整份」而非「每条一写」，
+ * 是把失败面从 N 次降到 1 次；要彻底消除得先解决备份配额本身（上限 100 条）。
  */
 export async function syncLocalBackupToServer(): Promise<number> {
   if (isTauri) {
     const { syncLocalBackupToServer: nativeSync } = await import('./native-stats');
     return nativeSync();
   }
-  
+
   const localData = getLocalBackup();
-  if (localData.length === 0) return 0;
+  // 只补传**确认失败**的记录。缺失 _synced 的历史记录按已同步跳过（宁少传不重复）。
+  // 注意不能写成 `!== true` —— 那会把漏档历史记录也当成待传，正是本轮要消除的翻倍源。
+  const pending = localData.filter((r) => r._synced === false);
+  if (pending.length === 0) return 0;
 
   let syncedCount = 0;
-  const failed: typeof localData = [];
-  for (const record of localData) {
+  for (const record of pending) {
     try {
       const res = await fetch(`${API_BASE_URL}/stats`, {
         method: 'POST',
@@ -362,16 +385,18 @@ export async function syncLocalBackupToServer(): Promise<number> {
       });
       // 服务器可能以非 2xx 表示失败，必须显式校验，否则会把失败当成功丢进备份
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // 就地标记（记录对象来自本次 JSON.parse，mutate 安全）；留在备份里当离线镜像
+      record._synced = true;
       syncedCount++;
     } catch (e) {
       logger.error('同步记录失败，保留待下次重试:', e);
-      failed.push(record);
     }
   }
 
-  // 只把失败的记录回写备份。原实现同步前就先清空备份，弱网下记录会永久丢失。
+  // 回写**整个**备份：补传成功的转为已同步镜像，失败的保持待重试。
+  // 原实现只写回失败记录 —— 那正是「镜像被清」隐患。
   try {
-    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(failed));
+    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(localData));
   } catch (e) {
     logger.error('回写本地备份失败:', e);
   }

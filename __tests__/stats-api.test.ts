@@ -6,8 +6,9 @@
  *
  * 最有价值的两处：
  * ① `savePracticeStats` 的字段校验/截断（脏数据进库前必须归一）；
- * ② `syncLocalBackupToServer` 的「只回写失败记录」—— 源码注释写明原实现会在同步前
- *    先清空备份，弱网下记录永久丢失（已修），本测试把它变成护栏。
+ * ② `syncLocalBackupToServer` 的「只补传未确认记录」—— 2026-10-19 重修：
+ *    原实现把备份当纯队列整批重发（已成功的再传一遍 = 统计翻倍）且回写时只留
+ *    失败记录（离线镜像被清空）。现在备份记录带 `_synced` 标记，本测试把它变成护栏。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
@@ -19,7 +20,7 @@ import {
   syncLocalBackupToServer,
   clearAllPracticeStats,
 } from '@/lib/stats-api'
-import type { PracticeStats } from '@/lib/stats-api'
+import type { BackupRecord } from '@/lib/stats-api'
 
 const BACKUP_KEY = 'fretmaster_stats_backup'
 const mem = new Map<string, string>()
@@ -32,10 +33,10 @@ type LsMock = {
 const ls = () => window.localStorage as unknown as LsMock
 
 /** 直接写入本地备份（跳过 savePracticeStats，用于构造边界数据） */
-function writeBackup(records: Array<Partial<PracticeStats>>) {
+function writeBackup(records: Array<Partial<BackupRecord>>) {
   mem.set(BACKUP_KEY, JSON.stringify(records))
 }
-function readBackup(): PracticeStats[] {
+function readBackup(): BackupRecord[] {
   return JSON.parse(mem.get(BACKUP_KEY) || '[]')
 }
 function isoDaysAgo(days: number): string {
@@ -225,38 +226,76 @@ describe('syncLocalBackupToServer', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('只把失败记录回写备份（成功的不留、失败的保留待重试）', async () => {
+  it('🚨 已成功上传的记录（_synced: true）不重传 —— 防「统计翻倍」的核心回归', async () => {
     writeBackup([
-      { exercise_type: 'ok', score: 1, duration: 1 },
-      { exercise_type: 'bad', score: 1, duration: 1 },
+      { exercise_type: 'ok1', score: 1, duration: 1, _synced: true },
+      { exercise_type: 'ok2', score: 1, duration: 1, _synced: true },
+    ])
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    expect(await syncLocalBackupToServer()).toBe(0)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    // 镜像原样保留
+    expect(readBackup().map((r) => r.exercise_type)).toEqual(['ok1', 'ok2'])
+  })
+
+  it('历史记录（无 _synced 字段）按已同步处理，不重传', async () => {
+    // 2026-10-19 之前的备份无法区分来源；重复入库不可逆，宁可不传
+    writeBackup([{ exercise_type: 'legacy', score: 1, duration: 1 }])
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    expect(await syncLocalBackupToServer()).toBe(0)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('只补传未确认的记录：成功的转标记留作镜像、失败的保持待重试', async () => {
+    writeBackup([
+      { exercise_type: 'ok', score: 1, duration: 1, _synced: true },
+      { exercise_type: 'retry', score: 1, duration: 1, _synced: false },
     ])
     vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string }) => {
       const body = JSON.parse(init.body)
-      return body.exercise_type === 'bad'
+      return body.exercise_type === 'retry'
         ? ({ ok: false, status: 500 } as Response)
         : ({ ok: true, status: 200 } as Response)
     }))
 
     const synced = await syncLocalBackupToServer()
-    expect(synced).toBe(1)
-    expect(readBackup().map((r) => r.exercise_type)).toEqual(['bad'])
+    expect(synced).toBe(0) // retry 上传失败；ok 被跳过（不是重传）
+    // 整份备份保留：ok 仍是镜像，retry 保持 _synced: false 待下次重试
+    const backup = readBackup()
+    expect(backup.map((r) => r.exercise_type)).toEqual(['ok', 'retry'])
+    expect(backup.map((r) => r._synced)).toEqual([true, false])
   })
 
-  it('全部成功时备份被清空', async () => {
+  it('补传成功后记录标记 _synced: true 且留在备份里（不当纯队列清掉）', async () => {
     writeBackup([
-      { exercise_type: 'a', score: 1, duration: 1 },
-      { exercise_type: 'b', score: 1, duration: 1 },
+      { exercise_type: 'mirror', score: 1, duration: 1, _synced: true },
+      { exercise_type: 'pending', score: 1, duration: 1, _synced: false },
     ])
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200 } as Response)))
-    expect(await syncLocalBackupToServer()).toBe(2)
-    expect(readBackup()).toEqual([])
+    expect(await syncLocalBackupToServer()).toBe(1)
+    const backup = readBackup()
+    expect(backup.map((r) => r.exercise_type)).toEqual(['mirror', 'pending'])
+    expect(backup.every((r) => r._synced === true)).toBe(true)
   })
 
-  it('网络异常（抛错）时记录保留在备份里，不丢失', async () => {
-    writeBackup([{ exercise_type: 'a', score: 1, duration: 1 }])
+  it('补传的 POST body 不带内部标记 _synced', async () => {
+    writeBackup([{ exercise_type: 'a', score: 1, duration: 1, _synced: false }])
+    const fetchSpy = vi.fn(async () => ({ ok: true, status: 200 } as Response))
+    vi.stubGlobal('fetch', fetchSpy)
+    await syncLocalBackupToServer()
+    const body = JSON.parse((fetchSpy.mock.calls[0] as unknown as [string, { body: string }])[1].body)
+    expect(body).not.toHaveProperty('_synced')
+  })
+
+  it('网络异常（抛错）时待传记录保留 _synced: false，不丢失', async () => {
+    writeBackup([{ exercise_type: 'a', score: 1, duration: 1, _synced: false }])
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down') }))
     expect(await syncLocalBackupToServer()).toBe(0)
-    expect(readBackup().map((r) => r.exercise_type)).toEqual(['a'])
+    const backup = readBackup()
+    expect(backup.map((r) => r.exercise_type)).toEqual(['a'])
+    expect(backup[0]._synced).toBe(false)
   })
 })
 

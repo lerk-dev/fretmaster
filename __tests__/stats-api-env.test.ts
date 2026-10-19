@@ -295,8 +295,32 @@ describe('isDev=false（非 Tauri）：走 fetch /cgi-bin/stats', () => {
     errSpy.mockRestore()
   })
 
+  it('savePracticeStats 成功：备份记录带 _synced: true（补传时跳过，防统计翻倍）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ id: 42, status: 'ok' }) })))
+    const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
+
+    await mod.savePracticeStats({ exercise_type: 'a', score: 1, duration: 1 } as never)
+
+    const backup = readBackup()
+    expect(backup).toHaveLength(1)
+    expect(backup[0]._synced).toBe(true)
+  })
+
+  it('savePracticeStats 失败：备份记录带 _synced: false（待 syncLocalBackupToServer 补传）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down') }))
+    const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
+
+    await expect(
+      mod.savePracticeStats({ exercise_type: 'b', score: 1, duration: 1 } as never)
+    ).rejects.toThrow('network down')
+
+    expect(readBackup()[0]._synced).toBe(false)
+  })
+
   it('syncLocalBackupToServer：回写备份失败时记日志，但仍返回已同步条数', async () => {
-    window.localStorage.setItem(BACKUP_KEY, JSON.stringify([{ exercise_type: 'a', score: 1, duration: 1 }]))
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify([
+      { exercise_type: 'a', score: 1, duration: 1, _synced: false },
+    ]))
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200 })))
     const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
     const setItem = window.localStorage.setItem as unknown as ReturnType<typeof vi.fn>
