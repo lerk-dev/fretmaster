@@ -41,7 +41,11 @@
  */
 
 import { getStringTuning } from '@/lib/string-tuning'
+
+/** 单个采样的下载超时：44KB 的文件，6 秒已经极宽，超了就当这份采样不可用 */
+const SAMPLE_FETCH_TIMEOUT_MS = 6_000
 import { logger } from '@/lib/logger'
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 
 /** 采样清单：文件名 + 该采样的 MIDI 音高（C4 = 60）。 */
 export const GUITAR_SAMPLES = [
@@ -137,7 +141,7 @@ export function ensureGuitarSamples(ctx: BaseAudioContext): Promise<void> {
     await Promise.all(
       GUITAR_SAMPLES.map(async ({ file }) => {
         const url = new URL(GUITAR_SOUND_DIR + file, base).toString()
-        const res = await fetch(url)
+        const res = await fetchWithTimeout(url, {}, SAMPLE_FETCH_TIMEOUT_MS)
         if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`)
         const bytes = await res.arrayBuffer()
         const buffer = await ctx.decodeAudioData(bytes)

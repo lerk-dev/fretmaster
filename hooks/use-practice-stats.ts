@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getLocalDateString, getLocalDaysAgoStart, dbTimestampToLocalDate } from '@/lib/utils'
 import { STATS_STORAGE_KEYS, clearStatsStorage } from '@/lib/stats-storage-keys'
-import { savePracticeStats as saveToServer, getAllPracticeStats, deletePracticeStat, clearAllPracticeStats, PracticeStats as ServerPracticeStats } from '@/lib/stats-api'
+import { savePracticeStats as saveToServer, getAllPracticeStats, deletePracticeStat, clearAllPracticeStats, migrateLegacyLocalRecords, PracticeStats as ServerPracticeStats } from '@/lib/stats-api'
 import { deduplicateStats } from '@/lib/export-utils'
 import { practiceTypeFromLabel } from '@/lib/practice-type-labels'
 import { logger } from '@/lib/logger'
@@ -367,8 +367,16 @@ export function usePracticeStats(options: UsePracticeStatsOptions) {
       }
     }
 
-    
-    reloadStats()
+    // 先把「历史遗留、从没上传过」的本地记录补传（一次性、幂等），再加载。
+    // 顺序反了会先渲染出「本地独有」的合并结果，紧接着又跳一次数字。
+    void (async () => {
+      try {
+        await migrateLegacyLocalRecords()
+      } catch (e) {
+        logger.error('补传历史记录失败（不影响本次加载）:', e)
+      }
+      await reloadStats()
+    })()
   }, [isTauri, reloadStats])
 
   /**

@@ -27,6 +27,7 @@
 // ============================================================================
 
 import { logger } from './logger'
+import { fetchWithTimeout } from './fetch-with-timeout'
 import { isTauriEnv, parseDbTimestamp, normalizeAccuracy } from './utils'
 import { STATS_STORAGE_KEYS } from './stats-storage-keys'
 
@@ -150,7 +151,7 @@ export async function savePracticeStats(
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/stats`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/stats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -200,7 +201,7 @@ export async function getAllPracticeStats(): Promise<PracticeStats[]> {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/stats`);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/stats`);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -416,7 +417,7 @@ export async function syncLocalBackupToServer(): Promise<number> {
   let syncedCount = 0;
   for (const record of pending) {
     try {
-      const res = await fetch(`${API_BASE_URL}/stats`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/stats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -446,6 +447,75 @@ export async function syncLocalBackupToServer(): Promise<number> {
   }
 
   return syncedCount;
+}
+
+/**
+ * 一次性补传：把「历史遗留、从没上传过」的本地记录真正写入服务器。
+ *
+ * 背景（与 isLocalPreview 的注释同源）：2026-10-22 之前内网 IP 被判成「开发环境」，
+ * 路由器部署版的练习记录只写进 localStorage，而且 `_synced` 被标成 `true`
+ * （当时的语义是「本地预览模式，没有服务器可传」）⇒ `syncLocalBackupToServer`
+ * 永远不会碰它们。判据修好之后这些记录仍只活在本机（靠 `mergeRecordsMissingOnServer`
+ * 才在统计页看得见），换设备依旧看不到。本函数把它们补进服务器。
+ *
+ * 判据与 `syncLocalBackupToServer` **互斥**（否则同一条会被两条路径各传一次 ⇒ 统计翻倍）：
+ *   · 本函数：`_synced === true` 且 **没有服务器 id**（缺失，或 `Date.now()` 形态）
+ *   · syncLocalBackupToServer：`_synced === false`（明确的上传失败）
+ *
+ * 幂等：每成功一条**立刻**用服务器 id 回写并落盘 —— 中途崩了也不会重复上传，
+ * 下次调用时这条已经「有服务器 id」而被判据排除。
+ *
+ * ⚠️ 必须带上原 `created_at`：CGI 自 2026-10-22 起支持该可选字段（见 cgi-stats-fixed.sh
+ * 的 `normalize_created_at`）。不带的话几十条历史记录会全落成「今天」，
+ * 统计页的今天/本周/本月全部失真 —— 那比丢数据更难查。
+ *
+ * @returns 成功补传的条数
+ */
+export async function migrateLegacyLocalRecords(): Promise<number> {
+  if (isTauri || isLocalPreview) return 0
+
+  const backup = getLocalBackup()
+  const legacy = backup.filter(
+    (r) => r._synced === true && (r.id === undefined || isLocallyIssuedId(r.id))
+  )
+  if (legacy.length === 0) return 0
+
+  let migrated = 0
+  for (const record of legacy) {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/stats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_id: getUserId(),
+          exercise_type: record.exercise_type,
+          score: record.score,
+          duration: record.duration,
+          accuracy: record.accuracy,
+          notes: record.notes || '',
+          // 原时间（ISO 或 SQLite 形态都行，CGI 会归一成 UTC 的 "YYYY-MM-DD HH:MM:SS"）
+          created_at: record.created_at || record.date,
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json();
+      if (typeof result?.id !== 'number') throw new Error('服务器没有返回 id');
+
+      // 拿到服务器 id 后这条就不再是「本地独有」——合并逻辑会自动让位
+      record.id = result.id;
+      migrated++;
+      // 每条成功就落盘：避免「传了 10 条、回写时崩了」导致下次全部重传
+      try {
+        localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(backup));
+      } catch (e) {
+        logger.error('补传成功但回写本地备份失败（下次可能重复上传）:', e);
+      }
+    } catch (e) {
+      logger.error('补传历史记录失败，保留待下次重试:', e);
+    }
+  }
+
+  return migrated;
 }
 
 // 清空所有练习记录（Tauri 环境调用 SQLite，Web 环境清空 localStorage 备份）
@@ -478,7 +548,7 @@ export async function deletePracticeStat(id: number): Promise<void> {
     }
     return;
   }
-  const response = await fetch(`${API_BASE_URL}/stats`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/stats`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id }),
@@ -559,7 +629,7 @@ export async function clearAllPracticeStats(): Promise<void> {
   // 本地预览没有 CGI，本地清空即视为完成
   if (isLocalPreview) return;
 
-  const response = await fetch(`${API_BASE_URL}/stats`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/stats`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ all: true }),

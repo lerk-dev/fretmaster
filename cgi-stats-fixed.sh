@@ -169,6 +169,38 @@ validate_exercise_type() {
     printf '%s' "练习"
 }
 
+# 归一化可选的 created_at（补传历史记录时用，让旧记录保留原来的练习时间）
+#
+# 为什么需要：客户端在「内网 IP 被判成开发环境」时期只写本地，这些历史记录要补传上来；
+# 若不接受 created_at，全部会落成 CURRENT_TIMESTAMP ⇒ 半年前练的几十条全算「今天」，
+# 统计页的今天/本周/本月全部失真。
+#
+# 只接受三种形态，统一成 SQLite 的 "YYYY-MM-DD HH:MM:SS"（**UTC**，与 CURRENT_TIMESTAMP 同基准）：
+#   2026-09-01T10:00:00Z         （ISO，秒级）
+#   2026-09-01T10:00:00.123Z     （ISO，带毫秒 ⇒ 截断毫秒）
+#   2026-09-01 10:00:00          （已是 SQLite 形态）
+# 其它任何形态（含带时区偏移的 +08:00）一律丢弃，退回 CURRENT_TIMESTAMP ——
+# 宁可时间不准，也不要把未校验的字符串拼进 SQL。
+normalize_created_at() {
+    local v="$1"
+    [ -z "$v" ] && return 0
+
+    case "$v" in
+        [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z)
+            printf '%s' "$(printf '%s' "$v" | cut -c1-19 | tr 'T' ' ')"
+            ;;
+        [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].*Z)
+            printf '%s' "$(printf '%s' "$v" | cut -c1-19 | tr 'T' ' ')"
+            ;;
+        [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\ [0-9][0-9]:[0-9][0-9]:[0-9][0-9])
+            printf '%s' "$v"
+            ;;
+        *)
+            # 不认识的形态：不报错、不写入，交给 INSERT 用默认值
+            ;;
+    esac
+}
+
 # URL 解码
 url_decode() {
     local input="$1"
@@ -225,6 +257,8 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     RAW_DURATION=$(printf '%s' "$POST_DATA" | grep -o '"duration"[^,}]*' | grep -o '[0-9]*')
     RAW_ACCURACY=$(printf '%s' "$POST_DATA" | grep -o '"accuracy"[^,}]*' | grep -o '[0-9.]*' | head -1)
     RAW_NOTES=$(printf '%s' "$POST_DATA" | grep -o '"notes"[^,}]*' | cut -d'"' -f4)
+    # 可选：补传历史记录时带上原练习时间（见 normalize_created_at 注释）
+    RAW_CREATED_AT=$(printf '%s' "$POST_DATA" | grep -o '"created_at"[^,}]*' | cut -d'"' -f4)
 
     DEVICE_ID=$(validate_device_id "$RAW_DEVICE_ID")
     EXERCISE_TYPE=$(validate_exercise_type "$RAW_EXERCISE_TYPE")
@@ -233,6 +267,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     DURATION=$(sanitize_integer "$RAW_DURATION" 0 0 86400)
     ACCURACY=$(sanitize_float "$RAW_ACCURACY" "NULL")
     NOTES=$(sanitize_string "$RAW_NOTES" 500)
+    CREATED_AT=$(normalize_created_at "$RAW_CREATED_AT")
 
     # 记录客户端 IP（支持 X-Forwarded-For，取第一个）
     CLIENT_IP="${REMOTE_ADDR:-unknown}"
@@ -254,18 +289,27 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     ESC_NOTES=$(sql_escape "$NOTES")
     ESC_CLIENT_IP=$(sql_escape "$CLIENT_IP")
 
+    # 客户端没给（或给的形态不认识）就留空 ⇒ 用表默认的 CURRENT_TIMESTAMP
+    EXTRA_COL=""
+    EXTRA_VAL=""
+    if [ -n "$CREATED_AT" ]; then
+        ESC_CREATED_AT=$(sql_escape "$CREATED_AT")
+        EXTRA_COL=", created_at"
+        EXTRA_VAL=", '$ESC_CREATED_AT'"
+    fi
+
     # 使用字符串字面量构造 SQL（单引号已转义），不依赖 .param set 的表达式求值行为
     if [ "$ACCURACY" = "NULL" ]; then
         RESULT=$(with_db_lock << EOF
-INSERT INTO practice_records (device_id, exercise_type, score, duration, notes, client_ip)
-VALUES ('$ESC_DEVICE_ID', '$ESC_EXERCISE_TYPE', $SCORE, $DURATION, '$ESC_NOTES', '$ESC_CLIENT_IP');
+INSERT INTO practice_records (device_id, exercise_type, score, duration, notes, client_ip$EXTRA_COL)
+VALUES ('$ESC_DEVICE_ID', '$ESC_EXERCISE_TYPE', $SCORE, $DURATION, '$ESC_NOTES', '$ESC_CLIENT_IP'$EXTRA_VAL);
 SELECT last_insert_rowid();
 EOF
 )
     else
         RESULT=$(with_db_lock << EOF
-INSERT INTO practice_records (device_id, exercise_type, score, duration, accuracy, notes, client_ip)
-VALUES ('$ESC_DEVICE_ID', '$ESC_EXERCISE_TYPE', $SCORE, $DURATION, $ACCURACY, '$ESC_NOTES', '$ESC_CLIENT_IP');
+INSERT INTO practice_records (device_id, exercise_type, score, duration, accuracy, notes, client_ip$EXTRA_COL)
+VALUES ('$ESC_DEVICE_ID', '$ESC_EXERCISE_TYPE', $SCORE, $DURATION, $ACCURACY, '$ESC_NOTES', '$ESC_CLIENT_IP'$EXTRA_VAL);
 SELECT last_insert_rowid();
 EOF
 )

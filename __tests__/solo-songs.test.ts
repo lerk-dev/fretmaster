@@ -172,7 +172,8 @@ describe('loadSoloSongs', () => {
     vi.stubGlobal('fetch', fetchSpy)
 
     const songs = await load()
-    expect(fetchSpy).toHaveBeenCalledWith('/data/songs.json')
+    // 第二个参数现在带 signal（fetchWithTimeout 注入超时），只断言 URL
+    expect((fetchSpy.mock.calls[0] as unknown as [string])[0]).toBe('/data/songs.json')
     expect(songs[0].key).toBe('Am')
     expect(songs[0].chords).toEqual(['Am'])
   })

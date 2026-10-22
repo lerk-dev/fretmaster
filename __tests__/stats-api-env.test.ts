@@ -278,7 +278,8 @@ describe('isDev=false（非 Tauri）：走 fetch /cgi-bin/stats', () => {
     const mod = await loadStatsApi({ tauri: false, hostname: 'fretmaster.example.com' })
 
     expect((await mod.getMyPracticeStats()).map((r: { exercise_type?: string }) => r.exercise_type)).toEqual(['shared'])
-    expect(fetchSpy).toHaveBeenCalledWith('/cgi-bin/stats')
+    // 第二个参数现在会带 signal（fetchWithTimeout 注入超时用），所以只断言 URL
+    expect((fetchSpy.mock.calls[0] as unknown as [string])[0]).toBe('/cgi-bin/stats')
   })
 
   it('saveToLocalBackup：localStorage 写不进去时只记日志，不影响保存主流程', async () => {
@@ -613,6 +614,123 @@ describe('clearAllPracticeStats：Web 版必须清后端', () => {
     await mod.clearAllPracticeStats()
 
     expect(native.clearAllPracticeStats).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+// ====================== E. migrateLegacyLocalRecords（2026-10-22 一次性补传）
+
+describe('migrateLegacyLocalRecords：把「从没上传过」的历史记录补进服务器', () => {
+  /**
+   * 判据必须与 syncLocalBackupToServer **互斥**：
+   *   · 本函数：`_synced === true` 且没有服务器 id（本地预览时代写的，从没到过服务器）
+   *   · sync：`_synced === false`（明确失败）
+   * 一旦重叠，同一条会被两条路径各传一次 ⇒ 统计翻倍（且不可逆）。
+   */
+  const writeBackup = (rows: unknown[]) =>
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify(rows))
+  const readBackupRaw = () => JSON.parse(window.localStorage.getItem(BACKUP_KEY) || '[]')
+
+  const okFetch = (id = 101) =>
+    vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ status: 'ok', id }) }))
+
+  it('历史记录（_synced: true、无 id）被 POST，且带上原 created_at', async () => {
+    const fetchSpy = okFetch(101)
+    vi.stubGlobal('fetch', fetchSpy)
+    writeBackup([
+      { exercise_type: '音阶练习', score: 88, duration: 120, accuracy: 90, created_at: '2026-05-04T08:09:10.000Z', _synced: true },
+    ])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect(await mod.migrateLegacyLocalRecords()).toBe(1)
+
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, { method: string; body: string }]
+    expect(url).toBe('/cgi-bin/stats')
+    expect(init.method).toBe('POST')
+    const body = JSON.parse(init.body)
+    expect(body.exercise_type).toBe('音阶练习')
+    expect(body.device_id).toBe('fretmaster_user')
+    // 🚨 不带 created_at 的话，几十条历史会全落成「今天」，今天/本周/本月全部失真
+    expect(body.created_at).toBe('2026-05-04T08:09:10.000Z')
+  })
+
+  it('成功后回写服务器 id ⇒ 再调一次不重复上传（幂等）', async () => {
+    const fetchSpy = okFetch(101)
+    vi.stubGlobal('fetch', fetchSpy)
+    writeBackup([{ exercise_type: '找音练习', score: 70, duration: 60, created_at: '2026-05-01T00:00:00.000Z', _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect(await mod.migrateLegacyLocalRecords()).toBe(1)
+    expect(readBackupRaw()[0].id).toBe(101)
+
+    expect(await mod.migrateLegacyLocalRecords(), '第二次必须 0 条 —— 否则统计翻倍').toBe(0)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('已有服务器 id 的记录不动（那是已上传，再传就是重复入库）', async () => {
+    const fetchSpy = okFetch(5)
+    vi.stubGlobal('fetch', fetchSpy)
+    writeBackup([{ id: 5, exercise_type: '和弦练习', score: 60, duration: 30, _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect(await mod.migrateLegacyLocalRecords()).toBe(0)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('_synced: false 的记录不归本函数管（避免与 syncLocalBackupToServer 双传）', async () => {
+    const fetchSpy = okFetch()
+    vi.stubGlobal('fetch', fetchSpy)
+    writeBackup([{ exercise_type: '音程练习', score: 50, duration: 20, _synced: false }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect(await mod.migrateLegacyLocalRecords()).toBe(0)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('上传失败：返回 0，记录原样保留（下次重试）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })))
+    writeBackup([{ exercise_type: '音阶练习', score: 80, duration: 60, _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect(await mod.migrateLegacyLocalRecords()).toBe(0)
+    expect(readBackupRaw()[0].id, '失败时不许写 id（否则下次跳过 = 数据丢了）').toBeUndefined()
+  })
+
+  it('部分成功：成功的写 id，失败的仍无 id（下次只重传失败那条）', async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: 201 }) })
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+    vi.stubGlobal('fetch', fetchSpy)
+    writeBackup([
+      { exercise_type: '找音练习', score: 90, duration: 60, created_at: '2026-05-01T00:00:00.000Z', _synced: true },
+      { exercise_type: '音阶练习', score: 40, duration: 30, created_at: '2026-04-01T00:00:00.000Z', _synced: true },
+    ])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect(await mod.migrateLegacyLocalRecords()).toBe(1)
+    const backup = readBackupRaw()
+    expect(backup[0].id).toBe(201)
+    expect(backup[1].id).toBeUndefined()
+  })
+
+  it('本地预览（localhost）不发请求：那里根本没有 CGI', async () => {
+    const fetchSpy = okFetch()
+    vi.stubGlobal('fetch', fetchSpy)
+    writeBackup([{ exercise_type: '音阶练习', score: 80, duration: 60, _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: 'localhost' })
+
+    expect(await mod.migrateLegacyLocalRecords()).toBe(0)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('Tauri 版不发请求：SQLite 是唯一真相源', async () => {
+    const fetchSpy = okFetch()
+    vi.stubGlobal('fetch', fetchSpy)
+    writeBackup([{ exercise_type: '音阶练习', score: 80, duration: 60, _synced: true }])
+    const mod = await loadStatsApi({ tauri: true })
+
+    expect(await mod.migrateLegacyLocalRecords()).toBe(0)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
