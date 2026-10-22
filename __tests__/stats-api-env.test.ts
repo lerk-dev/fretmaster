@@ -349,6 +349,172 @@ describe('isDev=false（非 Tauri）：走 fetch /cgi-bin/stats', () => {
   })
 })
 
+// ==================================== B2. 内网 IP ≠ 开发环境（2026-10-22 修）
+
+describe('内网 IP 不是「开发环境」：必须走后端', () => {
+  /**
+   * 回归背景（真机实测的静默失效）：
+   *
+   * 原判据是「hostname 为 localhost / 127.0.0.1，或以 192.168. 、10. 、172. 开头 ⇒ isDev」。
+   * 但**静态导出的生产站点本来就部署在内网**（路由器 192.168.123.2）⇒ 生产被判成 dev
+   * ⇒ savePracticeStats / getAllPracticeStats / deletePracticeStat / clearAllPracticeStats
+   * 四条分支全部只读写 localStorage，`/cgi-bin` 一次都没被调用。
+   *
+   * 实测证据：headless Chrome 打开线上站点切到「统计」页，`/cgi-bin` 请求数 = **0**；
+   * 同一时刻 `curl /cgi-bin/stats` 返回着服务器上的记录。用户可见后果：
+   * 多设备共享统计静默失效（手机练的电脑上永远看不到）、换设备/清缓存即丢数据，
+   * 界面不报任何错。判据因此改为「只认本地回环」。
+   */
+  const lanHosts = ['192.168.123.2', '10.0.0.5', '172.16.3.4']
+
+  it.each(lanHosts)('%s：savePracticeStats 发 POST /cgi-bin/stats（而不是只写本地）', async (hostname) => {
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 9, status: 'ok', message: 'saved' }),
+    }))
+    vi.stubGlobal('fetch', fetchSpy)
+    const mod = await loadStatsApi({ tauri: false, hostname })
+
+    const res = await mod.savePracticeStats({ exercise_type: '找音练习', score: 80, duration: 60, accuracy: 80 } as never)
+
+    expect(fetchSpy, `${hostname} 被判成开发环境 ⇒ 记录只留在本机浏览器里`).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, { method: string }]
+    expect(url).toBe('/cgi-bin/stats')
+    expect(init.method).toBe('POST')
+    expect(res).toEqual({ id: 9, status: 'ok', message: 'saved' })
+  })
+
+  it('192.168.x：getAllPracticeStats 走 GET（能读到其它设备的数据）', async () => {
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [{ id: 1, exercise_type: '音阶练习', score: 70, duration: 30 }],
+    }))
+    vi.stubGlobal('fetch', fetchSpy)
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    const rows = await mod.getAllPracticeStats()
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect((fetchSpy.mock.calls[0] as unknown as [string])[0]).toBe('/cgi-bin/stats')
+    expect(rows).toHaveLength(1)
+  })
+
+  it.each(['localhost', '127.0.0.1', '::1'])('%s：仍然只写本地（本地 dev / 静态目录预览没有 CGI）', async (hostname) => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const mod = await loadStatsApi({ tauri: false, hostname })
+
+    await mod.savePracticeStats({ exercise_type: '找音练习', score: 80, duration: 60, accuracy: 80 } as never)
+
+    expect(fetchSpy, `${hostname} 属于本地回环，不该去请求 CGI`).not.toHaveBeenCalled()
+    expect(readBackup()).toHaveLength(1)
+  })
+})
+
+// ============================== B3. 服务器没有的本地记录必须并进来（2026-10-22）
+
+describe('getAllPracticeStats：服务器上还没有的本地记录要合并（否则统计页看着「清零」）', () => {
+  /**
+   * 两个真实来源：
+   *  ① 上传失败（`_synced: false`）—— 弱网练完，服务器没收到，本地备份还在；
+   *  ② 历史遗留 —— 内网 IP 被判成开发环境时代（见 isLocalPreview 注释），
+   *     路由器部署版的记录从没上传过。
+   * 只返回服务器数据的话，用户升级那一刻会看到"我的记录全没了"。
+   */
+  const writeBackup = (rows: unknown[]) =>
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify(rows))
+
+  it('本地独有（无服务器 id）的记录并入结果', async () => {
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [{ id: 1, exercise_type: '音阶练习', score: 60, duration: 30, created_at: '2026-10-01 10:00:00' }],
+    }))
+    vi.stubGlobal('fetch', fetchSpy)
+    writeBackup([
+      { id: 1, exercise_type: '音阶练习', score: 60, duration: 30, created_at: '2026-10-01 10:00:00', _synced: true },
+      { exercise_type: '找音练习', score: 90, duration: 90, created_at: '2026-10-02 10:00:00', _synced: false },
+    ])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    const rows = await mod.getAllPracticeStats()
+
+    expect(rows).toHaveLength(2)
+    expect(rows.map((r) => r.exercise_type).sort()).toEqual(['找音练习', '音阶练习'])
+  })
+
+  it('本地记录与服务器同 id ⇒ 不重复（成功保存时两边 id 相同）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [{ id: 7, exercise_type: '和弦练习', score: 80, duration: 40, created_at: '2026-10-03 10:00:00' }],
+    })))
+    writeBackup([{ id: 7, exercise_type: '和弦练习', score: 80, duration: 40, created_at: '2026-10-03 10:00:00', _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect(await mod.getAllPracticeStats()).toHaveLength(1)
+  })
+
+  it('合并后按时间倒序（本地记录插到末尾会打乱「近期练习」的阅读顺序）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [{ id: 1, exercise_type: '旧', score: 1, duration: 1, created_at: '2026-09-01 10:00:00' }],
+    })))
+    writeBackup([{ exercise_type: '新', score: 1, duration: 1, created_at: '2026-10-10 10:00:00', _synced: false }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect((await mod.getAllPracticeStats()).map((r) => r.exercise_type)).toEqual(['新', '旧'])
+  })
+
+  it('本地没有独有记录时原样返回（不重排、不增删）', async () => {
+    const server = [
+      { id: 2, exercise_type: 'B', score: 1, duration: 1, created_at: '2026-10-01 10:00:00' },
+      { id: 1, exercise_type: 'A', score: 1, duration: 1, created_at: '2026-09-01 10:00:00' },
+    ]
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => server })))
+    writeBackup([{ id: 1, exercise_type: 'A', score: 1, duration: 1, _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    expect((await mod.getAllPracticeStats()).map((r) => r.id)).toEqual([2, 1])
+  })
+})
+
+describe('deletePracticeStat：本地独有记录（服务器上没有）也能删掉', () => {
+  const writeBackup = (rows: unknown[]) =>
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify(rows))
+
+  it('本地生成的 id（>1e9）+ 服务器 404 ⇒ 只删本地副本，不抛错', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })))
+    const localId = Date.now()   // isLocalPreview 时代写入的 id
+    writeBackup([{ id: localId, exercise_type: '找音练习', score: 1, duration: 1, _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    await expect(mod.deletePracticeStat(localId)).resolves.toBeUndefined()
+    expect(readBackup()).toEqual([])
+  })
+
+  it('服务器 id 删除失败必须上抛（不能把失败当成删掉了，否则刷新又回来）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })))
+    writeBackup([{ id: 5, exercise_type: '音阶练习', score: 1, duration: 1, _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    await expect(mod.deletePracticeStat(5)).rejects.toThrow(/删除记录失败/)
+    expect(readBackup(), '删除失败时不许动本地镜像').toHaveLength(1)
+  })
+
+  it('服务器删成功后本地镜像也要摘掉（否则合并逻辑会把它加回来 = 删不掉）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) })))
+    writeBackup([{ id: 5, exercise_type: '音阶练习', score: 1, duration: 1, _synced: true }])
+    const mod = await loadStatsApi({ tauri: false, hostname: '192.168.123.2' })
+
+    await mod.deletePracticeStat(5)
+    expect(readBackup()).toEqual([])
+  })
+})
+
 // ============================================================ C. deletePracticeStat（P3-16）
 
 /**

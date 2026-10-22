@@ -32,13 +32,28 @@ import { STATS_STORAGE_KEYS } from './stats-storage-keys'
 
 const API_BASE_URL = '/cgi-bin';
 
-// 检查是否在开发环境
-const isDev = typeof window !== 'undefined' && (
+/**
+ * 是否「只有本地存储、没有 CGI 后端」。
+ *
+ * 🚨 2026-10-22 修：原判据是「hostname 为 localhost / 127.0.0.1，或以 192.168. 、10. 、172. 开头」。
+ * **静态导出的生产站点本来就可能部署在内网**（路由器 192.168.123.2）⇒ 生产被判成 dev
+ * ⇒ `savePracticeStats` / `getAllPracticeStats` / `deletePracticeStat` /
+ * `clearAllPracticeStats` 四个分支全部只读写本地，CGI 一次都没被调用过。
+ * 实测（headless Chrome 打开线上地址切到统计页）：`/cgi-bin` 请求数 = **0**，
+ * 而同一时刻 `curl /cgi-bin/stats` 明明返回着服务器上的记录。
+ * 后果是「多设备共享统计」静默失效：每台设备只看得到自己浏览器里的那份，
+ * 清缓存/换设备即丢数据，而界面没有任何提示。
+ *
+ * 判据只认**本地回环**：`next dev` 与 `python -m http.server` 静态预览都在这些地址上，
+ * 它们背后确实没有 CGI。其余地址（含内网 IP、局域网域名）一律**假定有后端** ——
+ * 真用内网 IP 去访问 `next dev` 时请求会 404，`getAllPracticeStats` 本来就会回落到
+ * 本地备份、`savePracticeStats` 会把记录标成待补传（`_synced: false`），功能不丢。
+ */
+const isLocalPreview = typeof window !== 'undefined' && (
   window.location.hostname === 'localhost' ||
   window.location.hostname === '127.0.0.1' ||
-  window.location.hostname.startsWith('192.168.') ||
-  window.location.hostname.startsWith('10.') ||
-  window.location.hostname.startsWith('172.')
+  window.location.hostname === '::1' ||
+  window.location.hostname === '[::1]'
 );
 
 // 检查是否在 Tauri 环境（Windows 桌面版）
@@ -123,15 +138,15 @@ export async function savePracticeStats(
     notes: validatedNotes,
   };
 
-  // 开发环境下只保存到本地
-  if (isDev) {
+  // 本地预览（`next dev` / 静态目录预览）没有 CGI：只保存到本地备份
+  if (isLocalPreview) {
     const backupData: PracticeStats = normalizeStatsFields({
       ...data,
       created_at: new Date().toISOString(),
     });
-    // 没有服务器可传 ⇒ 记 true（补传时跳过，别把开发记录当真失败队列）
+    // 没有服务器可传 ⇒ 记 true（补传时跳过，别把本地预览记录当真失败队列）
     saveToLocalBackup({ ...backupData, _synced: true });
-    return { status: 'success', message: '已保存到本地（开发模式）', id: Date.now() };
+    return { status: 'success', message: '已保存到本地（本地预览模式）', id: Date.now() };
   }
 
   try {
@@ -179,8 +194,8 @@ export async function getAllPracticeStats(): Promise<PracticeStats[]> {
     return nativeGetAll();
   }
   
-  // 开发环境下直接返回本地数据
-  if (isDev) {
+  // 本地预览（无 CGI）直接返回本地备份
+  if (isLocalPreview) {
     return getLocalBackup();
   }
 
@@ -196,12 +211,41 @@ export async function getAllPracticeStats(): Promise<PracticeStats[]> {
     // 转换字段名以兼容前端显示
     const formatted = Array.isArray(data) ? data.map((item: PracticeStats) => normalizeStatsFields(item)) : [];
     
-    return formatted;
+    return mergeRecordsMissingOnServer(formatted);
   } catch (error) {
     logger.error('获取统计数据失败:', error);
     // 如果网络请求失败，返回本地备份数据
     return getLocalBackup();
   }
+}
+
+/**
+ * 把「服务器上还没有」的本地记录并进返回结果。
+ *
+ * 为什么必须合并（两个真实场景，都会让用户以为「我的统计没了」）：
+ *  1. **上传失败的记录**（`_synced: false`）：弱网/离线时练习完，服务器没收到，
+ *     但本地备份留着。只返回服务器数据 ⇒ 统计页当场少一截，用户以为丢数据。
+ *  2. **历史遗留**：2026-10-22 之前内网 IP 被判成「开发环境」（见 isLocalPreview 注释），
+ *     路由器部署版的记录**从没上传过**（`_synced: true` 但 id 是本地时间戳）。
+ *     只返回服务器数据 ⇒ 一升级，用户在这台设备上练过的全部记录从界面消失。
+ *
+ * 去重判据用 **id 是否在服务器的 id 集合里**：成功保存的记录两侧 id 相同
+ * （服务器自增 id），会被正确过滤掉；本地生成的 id（`Date.now()`）或缺失 id 的记录则保留。
+ */
+function mergeRecordsMissingOnServer(serverRows: PracticeStats[]): PracticeStats[] {
+  const serverIds = new Set(
+    serverRows.map((r) => r.id).filter((id): id is number => typeof id === 'number')
+  );
+  const localOnly = getLocalBackup().filter((r) => r.id === undefined || !serverIds.has(r.id));
+  if (localOnly.length === 0) return serverRows;
+
+  // 服务器/CGI 按时间倒序返回，本地记录插在末尾会打乱「近期练习」的阅读顺序 ⇒ 重排。
+  // parseDbTimestamp 同时吃 SQLite 的 "YYYY-MM-DD HH:MM:SS" 与 ISO；解析失败按 0 排到最后。
+  const ts = (r: PracticeStats) => {
+    const raw = r.created_at || r.date;
+    return raw ? parseDbTimestamp(raw).getTime() || 0 : 0;
+  };
+  return [...serverRows, ...localOnly].sort((a, b) => ts(b) - ts(a));
 }
 
 // 获取当前用户的练习数据（所有设备共享）
@@ -423,8 +467,8 @@ export async function deletePracticeStat(id: number): Promise<void> {
     const { deletePracticeStat: nativeDelete } = await import('./native-stats');
     return nativeDelete(id);
   }
-  if (isDev) {
-    // 开发环境没有 CGI：只从本地备份里摘掉，保持与线上行为一致（记录消失）
+  if (isLocalPreview) {
+    // 本地预览没有 CGI：只从本地备份里摘掉，保持与线上行为一致（记录消失）
     const backup = getLocalBackup().filter((r) => r.id !== id);
     try {
       localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(backup));
@@ -440,7 +484,50 @@ export async function deletePracticeStat(id: number): Promise<void> {
     body: JSON.stringify({ id }),
   });
   if (!response.ok) {
+    // 本地独有记录（从没上传成功：弱网失败的那条，或 isLocalPreview 时代只写了本地的历史记录）
+    // 在服务器上根本不存在 ⇒ DELETE 必然失败。用户要删的是「界面上看得见的这条」，
+    // 所以删掉本地副本就算完成。**只认本地生成的 id**；服务器 id 删除失败必须上抛，
+    // 否则界面显示删了、刷新又回来（2026-10-18 修过一个同型 bug）。
+    if (isLocallyIssuedId(id) && removeLocalBackupRecord(id)) return;
     throw new Error(`删除记录失败：HTTP ${response.status}`);
+  }
+  // 服务器删成功后同步清理本地镜像 —— 不清理的话，`mergeRecordsMissingOnServer`
+  // 下次会把这条当成「服务器没有的本地记录」又合并回来，表现为「删了又出现」。
+  pruneLocalMirror(id);
+}
+
+/**
+ * 这个 id 是**本地生成**的吗（服务器上不存在这条记录）。
+ *
+ * 服务器 id 是 SQLite 自增行号（个位/十位）；本地生成的是 `Date.now()` 毫秒时间戳（13 位）。
+ * 因此 > 1e9 可判定为本地 id —— 服务器不可能存过十亿条练习记录。
+ * 只在「DELETE 失败」的兜底路径使用，不会误伤正常删除。
+ */
+function isLocallyIssuedId(id: number): boolean {
+  return id > 1_000_000_000;
+}
+
+/** 从本地备份里删一条；删到了返回 true（配额满会抛，调用方决定要不要吞）。 */
+function removeLocalBackupRecord(id: number): boolean {
+  const backup = getLocalBackup();
+  const next = backup.filter((r) => r.id !== id);
+  if (next.length === backup.length) return false;
+  try {
+    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(next));
+  } catch (e) {
+    logger.error('删除本地备份记录失败（可能超出配额）:', e);
+    return false;
+  }
+  return true;
+}
+
+/** 服务器已经删成功之后清理本地镜像：静默失败（镜像清不掉不该让用户以为删除失败）。 */
+function pruneLocalMirror(id: number): void {
+  try {
+    if (removeLocalBackupRecord(id)) return;
+    // 本地本来就没有这条（正常：成功保存的记录也可能只在服务器上）
+  } catch (e) {
+    logger.error('清理本地备份镜像失败:', e);
   }
 }
 
@@ -469,8 +556,8 @@ export async function clearAllPracticeStats(): Promise<void> {
     logger.error('清空本地备份失败:', e);
   }
 
-  // 开发环境没有 CGI，本地清空即视为完成
-  if (isDev) return;
+  // 本地预览没有 CGI，本地清空即视为完成
+  if (isLocalPreview) return;
 
   const response = await fetch(`${API_BASE_URL}/stats`, {
     method: 'DELETE',
