@@ -132,6 +132,11 @@ export const TRANSLATIONS = {
         // 调式图鉴 / 音程探索（展示方式参考 myfretboardtrainer.com）
         'theory_tab_modes': '调式图鉴',
         'theory_tab_intervals': '音程探索',
+        // 乐理页的「图形大小」（只放大指板/五度圈，不动界面字号）
+        'theory_board_size': '图形大小',
+        'theory_board_size_smaller': '缩小图形',
+        'theory_board_size_larger': '放大图形',
+        'theory_board_size_reset': '恢复默认大小 100%',
         'theory_modes_hint': '选择调式族与根音，查看该调式在整个指板上的分布；可在音名 / 音级间切换显示。',
         'theory_modes_family': '调式族',
         'theory_modes_family_major': '大调调式',
@@ -1196,6 +1201,10 @@ export const TRANSLATIONS = {
         // 调式图鉴 / 音程探索（展示方式参考 myfretboardtrainer.com）
         'theory_tab_modes': 'Modes',
         'theory_tab_intervals': 'Interval Explorer',
+        'theory_board_size': 'Diagram size',
+        'theory_board_size_smaller': 'Smaller diagram',
+        'theory_board_size_larger': 'Larger diagram',
+        'theory_board_size_reset': 'Reset diagram size to 100%',
         'theory_modes_hint': 'Pick a mode family and root to see the mode across the whole neck; toggle between note names and degrees.',
         'theory_modes_family': 'Family',
         'theory_modes_family_major': 'Major modes',

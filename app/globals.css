@@ -1106,11 +1106,13 @@
   --ft-orange-a: #fb923c;
   --ft-orange-b: #ea580c;
   /* 装文字的容器尺寸 ⇒ 随显示缩放走 rem（与 GuitarRun 同一取舍）；
-     下面的弦粗/品丝/琴枕/品记/圆角是**乐器比例件**，保持 px，别改 rem。 */
-  --ft-open-w: 2.5rem;
-  --ft-row-h: 1.75rem;
-  --ft-dot: 1.5rem;
-  --ft-num-h: 1.25rem;
+     下面的弦粗/品丝/琴枕/品记/圆角是**乐器比例件**，保持 px，别改 rem。
+     `--board-scale` 由乐理面板根节点下发（lib/theory-board-scale.ts），练习页没有该变量
+     ⇒ `var(--board-scale, 1)` 回退 1，与加这个倍率之前完全等价。 */
+  --ft-open-w: calc(2.5rem * var(--board-scale, 1));
+  --ft-row-h: calc(1.75rem * var(--board-scale, 1));
+  --ft-dot: calc(1.5rem * var(--board-scale, 1));
+  --ft-num-h: calc(1.25rem * var(--board-scale, 1));
   position: relative;
   overflow: hidden;
   padding: 10px 8px 4px;
@@ -1120,10 +1122,10 @@
 }
 @media (min-width: 640px) {
   .ft-stage {
-    --ft-open-w: 3.25rem;
-    --ft-row-h: 2.1875rem;
-    --ft-dot: 2rem;
-    --ft-num-h: 1.375rem;
+    --ft-open-w: calc(3.25rem * var(--board-scale, 1));
+    --ft-row-h: calc(2.1875rem * var(--board-scale, 1));
+    --ft-dot: calc(2rem * var(--board-scale, 1));
+    --ft-num-h: calc(1.375rem * var(--board-scale, 1));
     padding: 16px 14px 6px;
   }
 }
@@ -1283,7 +1285,8 @@
   border-radius: 50%;
   border: 2px solid #ffffff;
   font-family: var(--font-fretboard);
-  font-size: 0.75rem; /* 12px 基准（小屏）；≥640px 提到 0.8125rem */
+  /* 字号必须与圆点同倍率：只放大圆点会让里面的音名显得更小（容器放大、字不放大 = 假修） */
+  font-size: calc(0.75rem * var(--board-scale, 1)); /* 12px 基准（小屏）；≥640px 提到 0.8125rem */
   font-weight: 700;
   line-height: 1;
   color: #ffffff;
@@ -1295,7 +1298,7 @@
 }
 @media (min-width: 640px) {
   .ft-dot {
-    font-size: 0.8125rem; /* 13px 基准 */
+    font-size: calc(0.8125rem * var(--board-scale, 1)); /* 13px 基准 */
   }
 }
 .ft-dot[data-visible='1'] {
@@ -1485,4 +1488,60 @@
    ⚠️ 若将来引入「body 自身可滚动」的布局，需要重新评估本规则。 */
 html body[data-scroll-locked] {
   margin-right: 0 !important;
+}
+
+/* ===== 乐理面板图形缩放（2026-10-24）=====
+
+   背景：乐理页的图（mini 指板、CAGED 整幅指板、五度圈 SVG）在大屏上显得小。
+   全局「显示大小」（lib/display-scale.ts）改的是根字号，指板格子高度却是固定 rem ⇒
+   字变大了、图没变，比例更失衡。所以给乐理页单独一个倍率 `--board-scale`
+   （lib/theory-board-scale.ts，范围 0.8–1.8）。
+
+   作用域：`--board-scale` 只在 TheoryPanel 根节点设置。这里所有 calc 都写
+   `var(--board-scale, 1)` ⇒ 练习页（读不到该变量）行为与加这个特性之前完全一致。
+
+   谁跟着变：格子行高/圆点/空弦列宽/品号行高（上面 .ft-stage 已改）、圆点字号、
+   mini 指板格子、五度圈。谁不变：弦线粗细、品丝、琴枕、品记 —— 乐器比例件。 */
+
+/* mini 指板（components/theory-panel.tsx 的 MiniFretboard）：
+   原先是 `w-8 sm:w-9 h-6 m-[1px] text-2xs`，换成这三条类才能乘倍率。
+   宽度基准与 .ft-* 无关（mini 是另一套视觉），但同样分 640px 断点。 */
+.mini-cell {
+  width: calc(2rem * var(--board-scale, 1));
+  height: calc(1.5rem * var(--board-scale, 1));
+  margin: 1px;
+  /* 字号与 line-height 一起给：组件里原来还挂着 text-2xs（它自带 line-height），
+     去掉那个类之后必须在这里补，否则行高会退回 body 默认值、文字被挤。 */
+  font-size: calc(0.625rem * var(--board-scale, 1));
+  line-height: 1;
+}
+/* 品号单元格：只要宽度与字号（高度由行内容撑） */
+.mini-col {
+  width: calc(2rem * var(--board-scale, 1));
+  font-size: calc(0.5625rem * var(--board-scale, 1));
+  line-height: 1.2;
+}
+/* 空弦名那一列 */
+.mini-label {
+  width: calc(1.5rem * var(--board-scale, 1));
+  font-size: calc(0.5625rem * var(--board-scale, 1));
+  line-height: 1.2;
+}
+@media (min-width: 640px) {
+  .mini-cell,
+  .mini-col {
+    width: calc(2.25rem * var(--board-scale, 1));
+  }
+}
+
+/* 五度圈：原来是 w-72 h-72 sm:w-80 sm:h-80（固定 288/320px） */
+.theory-disc {
+  width: calc(18rem * var(--board-scale, 1));
+  height: calc(18rem * var(--board-scale, 1));
+}
+@media (min-width: 640px) {
+  .theory-disc {
+    width: calc(20rem * var(--board-scale, 1));
+    height: calc(20rem * var(--board-scale, 1));
+  }
 }

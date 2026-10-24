@@ -9,7 +9,7 @@
 //    音名↔音级切换，每个调式附特征/用法教学文字与父调提示
 // 5. 音程探索 —— 整指板每格显示与根音的音程，点击任意格子换根音；按互补对分组着色
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type CSSProperties } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -20,7 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen } from 'lucide-react'
+import { BookOpen, Minus, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useTheoryBoardScale } from '@/hooks/use-theory-board-scale'
 import { CagedBoard } from '@/components/caged-board'
 import { NOTES } from '@/lib/page-theory-data'
 import { TRANSLATIONS } from '@/lib/i18n'
@@ -185,7 +187,7 @@ function MiniFretboard({ stringCount, tuning, startFret, endFret, cells, onCellC
           data-cell={`${s}-${f}`}
           aria-label={cellAriaLabel?.(s, f)}
           onClick={() => onCellClick(s, f)}
-          className={`w-8 sm:w-9 h-6 m-[1px] rounded-sm flex items-center justify-center gap-0.5 text-2xs font-semibold tabular-nums border ${colorCls || 'bg-muted/50 dark:bg-zinc-800/50 border-border/20'} cursor-pointer hover:brightness-110`}
+          className={`mini-cell rounded-sm flex items-center justify-center gap-0.5 font-semibold tabular-nums border ${colorCls || 'bg-muted/50 dark:bg-zinc-800/50 border-border/20'} cursor-pointer hover:brightness-110`}
         >
           {inner}
         </button>
@@ -196,7 +198,7 @@ function MiniFretboard({ stringCount, tuning, startFret, endFret, cells, onCellC
         <div
           key={f}
           data-cell={`${s}-${f}`}
-          className="w-8 sm:w-9 h-6 m-[1px] rounded-sm bg-muted/50 dark:bg-zinc-800/50 border border-border/20"
+          className="mini-cell rounded-sm bg-muted/50 dark:bg-zinc-800/50 border border-border/20"
         />
       )
     }
@@ -204,7 +206,7 @@ function MiniFretboard({ stringCount, tuning, startFret, endFret, cells, onCellC
       <div
         key={f}
         data-cell={`${s}-${f}`}
-        className={`w-8 sm:w-9 h-6 m-[1px] rounded-sm flex items-center justify-center gap-0.5 text-2xs font-semibold tabular-nums border ${colorCls}`}
+        className={`mini-cell rounded-sm flex items-center justify-center gap-0.5 font-semibold tabular-nums border ${colorCls}`}
       >
         {inner}
       </div>
@@ -214,9 +216,9 @@ function MiniFretboard({ stringCount, tuning, startFret, endFret, cells, onCellC
     <div className="inline-block" data-fretboard="mini">
       {/* 品号行 */}
       <div className="flex mb-0.5">
-        <div className="w-6 shrink-0" />
+        <div className="mini-label shrink-0" />
         {frets.map(f => (
-          <div key={f} className="w-8 sm:w-9 text-center text-3xs text-muted-foreground tabular-nums">
+          <div key={f} className="mini-col text-center text-muted-foreground tabular-nums">
             {f}
           </div>
         ))}
@@ -226,7 +228,7 @@ function MiniFretboard({ stringCount, tuning, startFret, endFret, cells, onCellC
         const openName = NOTE_UNICODE_NAMES[tuning[s]] ?? ''
         return (
           <div key={s} className="flex items-center">
-            <div className="w-6 shrink-0 text-center text-3xs text-muted-foreground">{openName}</div>
+            <div className="mini-label shrink-0 text-center text-muted-foreground">{openName}</div>
             {frets.map(f => renderCell(s, f))}
           </div>
         )
@@ -271,6 +273,9 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
   // 音程探索状态
   const [intRoot, setIntRoot] = useState(0)
   const [intShowIntervals, setIntShowIntervals] = useState(true)
+
+  // 图的倍率（与全局「显示大小」是两件事：那个改字号、这个只放大图）
+  const boardScale = useTheoryBoardScale()
 
   // ===== 五度圈详情 =====
   const circleDetail = useMemo(() => {
@@ -409,7 +414,9 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
   }, [config, fretCount, chordType, chordRoot])
 
   return (
-    <Card>
+    // 图形倍率只在**本卡片**内以 CSS 变量下发：练习页的 .ft-stage 读不到它，
+    // 所以在乐理页放大指板不会影响练习界面（见 lib/theory-board-scale.ts）。
+    <Card style={{ '--board-scale': String(boardScale.scale) } as CSSProperties}>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
@@ -418,13 +425,49 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="circle">
-          <TabsList className="mb-3">
-            <TabsTrigger value="circle" className="text-xs">{t('theory_tab_circle')}</TabsTrigger>
-            <TabsTrigger value="chordscale" className="text-xs">{t('theory_tab_chord_scale')}</TabsTrigger>
-            <TabsTrigger value="positions" className="text-xs">{t('theory_tab_positions')}</TabsTrigger>
-            <TabsTrigger value="modes" className="text-xs">{t('theory_tab_modes')}</TabsTrigger>
-            <TabsTrigger value="intervals" className="text-xs">{t('theory_tab_intervals')}</TabsTrigger>
-          </TabsList>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <TabsList>
+              <TabsTrigger value="circle" className="text-xs">{t('theory_tab_circle')}</TabsTrigger>
+              <TabsTrigger value="chordscale" className="text-xs">{t('theory_tab_chord_scale')}</TabsTrigger>
+              <TabsTrigger value="positions" className="text-xs">{t('theory_tab_positions')}</TabsTrigger>
+              <TabsTrigger value="modes" className="text-xs">{t('theory_tab_modes')}</TabsTrigger>
+              <TabsTrigger value="intervals" className="text-xs">{t('theory_tab_intervals')}</TabsTrigger>
+            </TabsList>
+
+            {/* 图形大小：只放大本页的指板与五度圈，不动界面字号（那是设置里的「显示大小」）。
+                百分比按钮点一下回到 100%，否则用户调乱了只能一档档退回去。 */}
+            <div className="flex items-center gap-1" role="group" aria-label={t('theory_board_size')}>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={boardScale.decrease}
+                disabled={!boardScale.canDecrease}
+                aria-label={t('theory_board_size_smaller')}
+              >
+                <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+              <button
+                type="button"
+                onClick={boardScale.reset}
+                aria-label={t('theory_board_size_reset')}
+                title={t('theory_board_size_reset')}
+                className="min-w-[3rem] rounded-md px-1.5 py-1 text-xs font-mono tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                {Math.round(boardScale.scale * 100)}%
+              </button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={boardScale.increase}
+                disabled={!boardScale.canIncrease}
+                aria-label={t('theory_board_size_larger')}
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            </div>
+          </div>
 
           {/* ==================== 五度圈 ==================== */}
           <TabsContent value="circle" className="space-y-4">
@@ -432,7 +475,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
             <div className="flex flex-col lg:flex-row gap-4 items-start">
               {/* SVG 五度圈 */}
               <div className="shrink-0 mx-auto">
-                <svg viewBox="0 0 320 320" className="w-72 h-72 sm:w-80 sm:h-80">
+                <svg viewBox="0 0 320 320" className="theory-disc">
                   {/* 圈背景 */}
                   <circle cx="160" cy="160" r="145" fill="none" stroke="currentColor" strokeWidth="1" className="text-border" />
                   <circle cx="160" cy="160" r="97" fill="none" stroke="currentColor" strokeWidth="1" className="text-border" />
