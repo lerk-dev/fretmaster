@@ -32,7 +32,6 @@ import {
   NOTES,
   NOTES_FLAT,
 } from "@/lib/page-theory-data"
-import { resolveIntervalIndices } from "@/lib/interval-index"
 import { resolveAvailableStringIndexes } from "@/lib/string-index"
 import { shuffle } from "@/lib/interval-direction"
 import {
