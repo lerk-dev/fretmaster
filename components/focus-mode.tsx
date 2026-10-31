@@ -131,28 +131,44 @@ export const FocusMode = memo(function FocusMode({
   }, [])
 
   useEffect(() => {
-    if (pomodoroRunning) {
-      pomodoroRef.current = setInterval(() => {
-        const next = pomodoroTimeRef.current + 1
-        if (next >= phaseDurationRef.current) {
-          // ⚠️ 相位切换必须写在 setState **updater 之外**：updater 要求是纯函数，
-          // React StrictMode（Next.js 默认开启）会双重调用它来检测副作用，
-          // 而 setPomodoroCount(c => c + 1) 不幂等 —— 写在里面会让番茄计数翻倍
-          // （开发模式下跑满一个专注相位，完成数是 2 而不是 1）。
-          if (phaseRef.current === 'work') {
-            setPomodoroPhase('break')
-            setPomodoroCount(c => c + 1)
-          } else {
-            setPomodoroPhase('work')
-          }
-          pomodoroTimeRef.current = 0
-          setPomodoroTime(0)
+    if (!pomodoroRunning) return
+
+    // 按**墙钟**推进（审计 2026-10-31 第 6 项，与练习倒计时同一改法）：
+    // 原先 `pomodoroTimeRef.current + 1` 依赖 tick 次数，而后台标签页会被浏览器节流到
+    // 约 1 次/分钟 ⇒ 番茄钟走得比真实时间慢几十倍（专注 25 分钟实际要坐一小时）。
+    // 现在记「本相位起点」，每次 tick 用 `Date.now()` 差算已走秒数。
+    // 起点从「已走秒数」倒推 ⇒ 暂停恢复不丢、也不把暂停时间算进去。
+    let phaseStartedAt = Date.now() - pomodoroTimeRef.current * 1000
+
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - phaseStartedAt) / 1000)
+      if (elapsed >= phaseDurationRef.current) {
+        // ⚠️ 相位切换必须写在 setState **updater 之外**：updater 要求是纯函数，
+        // React StrictMode（Next.js 默认开启）会双重调用它来检测副作用，
+        // 而 setPomodoroCount(c => c + 1) 不幂等 —— 写在里面会让番茄计数翻倍
+        // （开发模式下跑满一个专注相位，完成数是 2 而不是 1）。
+        if (phaseRef.current === 'work') {
+          setPomodoroPhase('break')
+          setPomodoroCount(c => c + 1)
+          phaseRef.current = 'break'
         } else {
-          pomodoroTimeRef.current = next
-          setPomodoroTime(next)
+          setPomodoroPhase('work')
+          phaseRef.current = 'work'
         }
-      }, 1000)
+        // 新一轮从「现在」起算（不是从超出的那一刻），避免连续后台很久后一次补跑多轮
+        phaseStartedAt = Date.now()
+        pomodoroTimeRef.current = 0
+        setPomodoroTime(0)
+        return
+      }
+      if (elapsed !== pomodoroTimeRef.current) {
+        pomodoroTimeRef.current = elapsed
+        setPomodoroTime(elapsed)
+      }
     }
+
+    // 250ms 一跳：比显示精度密，被节流后也能在一秒内把秒数校正回来
+    pomodoroRef.current = setInterval(tick, 250)
     return () => {
       if (pomodoroRef.current) {
         clearInterval(pomodoroRef.current)

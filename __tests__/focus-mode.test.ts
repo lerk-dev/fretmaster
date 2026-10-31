@@ -147,6 +147,39 @@ describe('番茄钟计时', () => {
     p.unmount()
   })
 
+  /**
+   * 🚨 审计 2026-10-31 第 6 项：后台标签页 / 最小化窗口里浏览器把 setInterval 节流到
+   * 约 1 次/分钟。按 tick 次数累加的实现会「专注 25 分钟实际坐一小时」。
+   *
+   * 复现方式：**只把系统时钟往前推**（不跑定时器），再让一个 tick 落地 ——
+   * 这正是节流的形态（时钟走了很多、回调只来一次）。
+   */
+  it('★ 被节流后仍按墙钟校正：时钟跳 120 秒只来一次 tick，剩余也要跳 120 秒', () => {
+    const p = mount()
+    p.click(p.byLabel('继续')!)
+    p.tick(10)
+    expect(p.text()).toContain('04:50')
+
+    // 模拟后台：时钟前进 120 秒，但**不**触发任何定时器
+    act(() => { vi.setSystemTime(Date.now() + 120_000) })
+    // 节流后只来一个 tick
+    p.tick(0.25)
+
+    // 已走 130 秒 ⇒ 剩 170 秒 = 02:50（按 tick 累加的实现这里还是 04:49）
+    expect(p.text()).toContain('02:50')
+    p.unmount()
+  })
+
+  it('★ 节流期间若时钟跨过相位边界，也只切一次相位（不会连补多轮）', () => {
+    const p = mount()
+    p.click(p.byLabel('继续')!)
+    act(() => { vi.setSystemTime(Date.now() + 10 * 60_000) }) // 跳过 10 分钟（远超 5 分钟一轮）
+    p.tick(0.25)
+    expect(p.pomodoroCount()).toBe(1)
+    expect(p.text()).toContain('休息中')
+    p.unmount()
+  })
+
   // ★ 本轮修复的核心：只有 StrictMode 会暴露计数翻倍
   it('★ StrictMode 下跑满一个工作相位，计数仍是 1（钉住本轮修复）', () => {
     const p = mount({}, true)

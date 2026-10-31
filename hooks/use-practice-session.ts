@@ -208,6 +208,21 @@ export function usePracticeSession({
 
   // ==================== refs（身份恒定：定时器与唤醒锁） ====================
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  /**
+   * 倒计时的**基准**：`{ at: 时间戳, seconds: 那一刻的剩余秒数 }`。
+   *
+   * 🚨 为什么不是「每 tick 减 1」（审计 2026-10-31 第 6 项）：后台标签页 / 最小化窗口
+   * 里浏览器会把 setInterval 节流到约 1 次/分钟（Chrome 与 WebView2 都会）。按 tick
+   * 递减时 `timeLeft` 会落后真实时间几十倍 —— 设 5 分钟的练习 15 分钟还没结束，
+   * 而会话结束时的统计时长用的是**墙钟**（`Date.now() - startTime`）⇒ 进度条与统计
+   * 两个数据源互相矛盾。改成「基准 + 墙钟差」后，无论中间被节流多久，
+   * 一次 tick 就能把剩余时间校正到真实值。
+   */
+  const countdownBaseRef = useRef<{ at: number; seconds: number } | null>(null)
+  /** 上一次写出的剩余秒数（只用于「值没变就不 setState」，避免每 250ms 触发一次渲染） */
+  const lastTickRef = useRef<number | null>(null)
+  /** `timeLeft` 的镜像：让计时器 effect 不必把 `timeLeft` 放进 deps（否则每秒重建一次 interval） */
+  const timeLeftRef = useRef(300)
   // 屏幕常亮的句柄：练习开始时申请、停止/卸载/页面隐藏时释放
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
@@ -304,15 +319,55 @@ export function usePracticeSession({
     }
   }, [isPlaying, activeTab, score, recordPractice, practiceElapsedTime, isPracticePaused, practiceSessionStartTime])
 
-  // 计时器效果：仅负责递减 timeLeft；暂停时挂起（原实现未把 isPracticePaused 纳入依赖）
+  /**
+   * 外部改写剩余时间（重置 / 切换答题模式 / 恢复快照）——**返回给页面的就是它**。
+   *
+   * 🚨 必须同时重设倒计时基准：只 setState 的话，下一次 tick 会按**旧基准**把时间
+   * 「拉回」原样（用户刚重置成 5 分钟，一秒后又跳回 3 分 20 秒）。
+   * 反过来，靠「比较 ref 猜测是否被外部改过」的做法在批量更新下必然误判
+   * （一次 act / 一次 React 批处理里 tick 会连续跑多次，state 镜像永远落后于
+   * 上一次 tick 写出的值）—— 所以这里用**显式入口**而不是启发式判定。
+   */
+  const setTimeLeftAndResync = useCallback((next: number) => {
+    // 🚨 `Date.now()` 必须在 updater 外面取（铁律 1：updater 必须纯）
+    const now = Date.now()
+    countdownBaseRef.current = { at: now, seconds: next }
+    lastTickRef.current = next
+    setTimeLeft(next)
+  }, [])
+
+  // `timeLeft` 的镜像（声明在计时器 effect **之前**：同一 commit 里 effect 按顺序执行，
+  // 保证计时器读到的是本次渲染的最新值）
   useEffect(() => {
-    if (isPlaying && practiceTime > 0 && !isPracticePaused) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(prev => (prev <= 1 ? 0 : prev - 1))
-      }, 1000)
+    timeLeftRef.current = timeLeft
+  }, [timeLeft])
+
+  // 计时器效果：按**墙钟**算剩余时间，暂停时挂起。
+  //
+  // 250ms 一跳（不是 1000ms）：跳得比显示精度密，被节流后也能在一秒内把秒数校正回来；
+  // 每次只做一次减法与一次 setState（值没变就不 set）。
+  useEffect(() => {
+    if (!(isPlaying && practiceTime > 0) || isPracticePaused) return
+
+    // （重新）开始计时 = 从当前的剩余秒数起算（首次开始、暂停恢复、改时长都走这里）
+    countdownBaseRef.current = { at: Date.now(), seconds: timeLeftRef.current }
+    lastTickRef.current = timeLeftRef.current
+
+    const tick = () => {
+      const base = countdownBaseRef.current
+      if (!base) return
+      const elapsed = Math.floor((Date.now() - base.at) / 1000)
+      const remaining = Math.max(0, base.seconds - elapsed)
+      if (remaining !== lastTickRef.current) {
+        lastTickRef.current = remaining
+        setTimeLeft(remaining)
+      }
     }
+
+    timerRef.current = setInterval(tick, 250)
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
+      timerRef.current = null
     }
   }, [isPlaying, practiceTime, isPracticePaused])
 
@@ -530,7 +585,8 @@ export function usePracticeSession({
   //    不同步」的坏法（铁律 12：同一「量」不许两份判定）。
   return {
     timeLeft,
-    setTimeLeft,
+    /** 外部改写剩余时间（会同时重设倒计时基准，见 `setTimeLeftAndResync`） */
+    setTimeLeft: setTimeLeftAndResync,
     isPracticePaused,
     togglePausePractice,
     togglePractice,
