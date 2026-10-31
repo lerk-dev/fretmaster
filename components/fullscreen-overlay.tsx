@@ -4,13 +4,16 @@
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
 import { SCALE_MODES } from '@/lib/page-theory-data'
-import { formatDegree, getChordDegrees, getChordDisplayName, getScaleDisplayName, normalizeNoteName } from '@/lib/page-theory-functions'
+import { formatChordShape, formatDegree, getChordDegrees, getChordDisplayName, getScaleDisplayName, normalizeNoteName } from '@/lib/page-theory-functions'
 import { useAppStore, useIsPlaying, useUser, useChordSymbols } from '@/lib/store'
 import { GuitarRunFretboard } from '@/components/guitarrun-fretboard'
 import { PracticeFretboard } from '@/components/practice-fretboard'
 import type { ThreeNpsPreviewKind } from '@/lib/fretboard-cell-role'
 import { pickTabFretboardFlag } from '@/lib/tab-fretboard-toggle'
 import { intervalDirectionSymbol, type IntervalDirection } from '@/lib/interval-direction'
+import { formatThreeNpsLocation } from '@/lib/three-notes-per-string'
+import { PracticeScoreBadge, PracticeTimerBadge, type PracticeScore } from '@/components/practice-status'
+import type { NextThreeNpsView, ThreeNpsView } from '@/components/scale-sequence-display'
 
 interface FullscreenOverlayProps {
   /** 翻译函数 */
@@ -61,6 +64,17 @@ interface FullscreenOverlayProps {
   selectedScale: typeof SCALE_MODES.pentatonic[number]
   /** 音阶练习：下一题预览 */
   nextScaleExerciseInfo: { key: string; scaleName: string; sequence: string[] } | null
+  /**
+   * 音阶练习：一弦三音（3NPS）当前把位视图。
+   *
+   * 🚨 非 3NPS 时为 null。**必须显式传**：3NPS 的题面结构与普通音阶完全不同
+   * （把位进度 / 换把 / 连击 / 目标音+弦品 / 9 步滑窗），这些数据只存在于页面侧的
+   * 快照对象里，全屏层自己推不出来。类型与普通模式共用
+   * （`components/scale-sequence-display.tsx` 导出的 `ThreeNpsView`）。
+   */
+  threeNps: ThreeNpsView | null
+  /** 音阶练习：3NPS 的下一个把位预览（普通音阶模式为 null） */
+  nextThreeNps: NextThreeNpsView | null
   /** 音程练习：当前题目 */
   currentIntervalExercise: { rootNote: string; interval: { name: string; symbol: string; semitones: number }; targetNote: string; allIntervals: { name: string; symbol: string; semitones: number }[]; currentIntervalDisplay: string; completedIntervals: number[]; answered: boolean } | null
   /**
@@ -76,6 +90,20 @@ interface FullscreenOverlayProps {
   intervalExerciseQueue: number[]
   /** 音程练习：队列当前下标 */
   intervalCurrentQueueIndex: number
+  /**
+   * 本轮练习得分（`正确/总数`）。
+   *
+   * 🚨 全屏层是 `fixed inset-0 z-[9999]`，把顶栏整个盖住 —— 而得分徽章只在顶栏里
+   * 显示过 ⇒ 一进全屏就看不到「对了几题」。所以这里显式传进来自己显示一份。
+   * 徽章实现与顶栏共用 `components/practice-status.tsx`（含 70% 换色那条判定）。
+   */
+  score: PracticeScore
+  /** 剩余秒数（顶栏同一份数据；全屏盖住顶栏后靠它显示） */
+  timeLeft: number
+  /** 本轮设定的练习时长（分钟数换算后的秒数）；为 0 表示不限时 ⇒ 不显示倒计时 */
+  practiceTime: number
+  /** 秒 → mm:ss */
+  formatTime: (seconds: number) => string
   /** 找音练习：指板显隐 */
   showFretboard: boolean
   /** 音程练习：指板显隐 */
@@ -141,10 +169,16 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   scaleKey,
   selectedScale,
   nextScaleExerciseInfo,
+  threeNps,
+  nextThreeNps,
   currentIntervalExercise,
   intervalDirection,
   intervalExerciseQueue,
   intervalCurrentQueueIndex,
+  score,
+  timeLeft,
+  practiceTime,
+  formatTime,
   showFretboard,
   showIntervalFretboard,
   showChordFretboard,
@@ -214,6 +248,24 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     className="text-center p-8 w-full max-w-[400px] min-h-[300px] flex flex-col items-center justify-center cursor-default"
     onClick={(e) => e.stopPropagation()}
   >
+    {/*
+      🚨 得分 + 剩余时间（2026-10-31 补）。
+      这两样原先只在顶栏（`components/app-header.tsx`）里显示，而全屏层是
+      `fixed inset-0 z-[9999]`，把顶栏整个盖住 ⇒ 一进全屏，「对了几题 / 还剩几分钟」
+      全部消失（实测：全屏文本里只有题目本身）。练习中这两项恰恰是要一直看到的。
+
+      徽章实现与顶栏共用 `components/practice-status.tsx`（含 70% 换色的判定），
+      这里只负责摆位置；是否显示的分支也与顶栏同口径（练习中 + 本轮有设定时长）。
+    */}
+    {isPlaying && (
+      <div className="flex items-center justify-center gap-4 mb-6" data-fullscreen-status="">
+        <PracticeScoreBadge t={t} score={score} />
+        {practiceTime > 0 && (
+          <PracticeTimerBadge t={t} timeLeft={timeLeft} formatTime={formatTime} />
+        )}
+      </div>
+    )}
+
     {/* 根据当前练习模式显示不同内容 */}
     {activeTab === "practice" && isPlaying && (
       <div className="space-y-8">
@@ -256,8 +308,10 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
         {(() => {
           const nextChord = getNextChordDisplay()
           if (!nextChord) return null
-          const chordTypeName = getChordDisplayName(nextChord.type, chordScaleDisplay, chordSymbols)
-          const displayName = `${normalizeNoteName(nextChord.root)}${chordTypeName === getChordDisplayName('Major', chordScaleDisplay, chordSymbols) ? '' : normalizeNoteName(chordTypeName)}${nextChord.bass ? '/' + normalizeNoteName(nextChord.bass) : ''}`
+          // 拼装规则走 `lib/page-theory-functions.formatChordShape`（唯一真相源）。
+          // 这里原先内联了一份等价表达式（大三不带后缀 + 根音/低音归一化）——
+          // 与普通模式 `components/chord-degrees-display.tsx` 各写一份，单边一改就会分叉。
+          const displayName = formatChordShape(nextChord, chordScaleDisplay, chordSymbols)
           return (
             <div className="pt-8 mt-8 border-t border-border/30">
               <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
@@ -306,22 +360,117 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     {activeTab === "scale" && isPlaying && scaleExerciseSequence.length > 0 && (
       <div className="space-y-6">
         <div className="text-6xl font-bold text-primary">{normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</div>
-        <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
-          {scaleExerciseSequence.map((degree, i) => (
-            <span 
-              key={i} 
-              className={cn(
-                "text-4xl font-bold",
-                i === scaleExerciseCurrentStep ? "text-primary" : "text-muted-foreground",
-                i < scaleExerciseCurrentStep && "opacity-30"
-              )}
+
+        {/*
+          🚨 一弦三音（3NPS）必须换成「把位视图」（2026-10-31 补）。
+          原先这里**无条件**把 `scaleExerciseSequence` 全部铺成徽章行 —— 而 3NPS 的
+          序列是 35 步（3×6 上行 + 17 下行）⇒ 全屏里变成 5 行纯数字墙
+          （实测：`1 2 3 4 5 6 7 / 1 2 3 4 5 6 7 / 1 2 3 4 3 2 1 / …`），
+          把位进度、换把、连击、目标音在几弦几品、9 步滑窗**一个都没有**，
+          用户根本不知道弹到哪了、下一个该弹谁。
+
+          而这个问题在普通模式里早就被解决过：`components/scale-sequence-display.tsx`
+          的注释写着「35 步的音级标签横排根本看不出当前位置，这正是改用
+          9 步滑窗 + 当前步固定第 4 格的原因」。全屏层是同一道题的另一套版式，
+          信息项必须与普通模式对齐（数据同源：页面侧的 `threeNps` 快照）。
+        */}
+        {threeNps ? (
+          <>
+            {/* 把位进度 + 方向/换把 + 连击（与普通模式同批信息，放大显示） */}
+            <div
+              className="flex flex-wrap items-center justify-center gap-4 text-lg text-muted-foreground"
+              role="status"
+              aria-live="polite"
             >
-              {formatDegree(degree)}
-            </span>
-          ))}
-        </div>
-        {/* 下一题预览*/}
-        {nextScaleExerciseInfo && (
+              <span className="font-medium text-primary">
+                {t('three_nps_position_progress')
+                  .replace('{current}', String(threeNps.position))
+                  .replace('{total}', String(threeNps.totalPositions))}
+              </span>
+              <span>
+                {threeNps.isShift
+                  ? t('three_nps_shift').replace('{position}', String(threeNps.position))
+                  : threeNps.direction === 'up'
+                    ? t('three_nps_ascending')
+                    : t('three_nps_descending')}
+              </span>
+              <span>{t('three_nps_combo').replace('{combo}', String(threeNps.combo))}</span>
+            </div>
+
+            {/* 当前目标音 + 建议位置（同一音名别处也能弹，这里只是推荐位） */}
+            {threeNps.target && (
+              <div className="flex flex-col items-center gap-1">
+                <div
+                  className={cn(
+                    'w-28 h-28 rounded-xl flex items-center justify-center text-6xl font-bold',
+                    threeNps.target.isRoot ? 'bg-blue-400/20 text-blue-500' : 'bg-primary/10 text-primary'
+                  )}
+                >
+                  {formatDegree(threeNps.target.label)}
+                </div>
+                <div className="text-2xl font-medium">
+                  {threeNps.target.note}
+                  <span className="ml-2 text-base font-normal text-muted-foreground">
+                    {formatThreeNpsLocation(t, threeNps.target.stringIndex, threeNps.target.fret)}
+                  </span>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {threeNps.stepNow} / {threeNps.stepTotal}
+                </div>
+              </div>
+            )}
+
+            {/* 9 步滑窗：当前步固定第 4 格（普通模式同款，只是放大） */}
+            <div className="flex flex-wrap justify-center gap-2">
+              {threeNps.window.map((step, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    'inline-flex items-center justify-center w-12 h-12 px-2 rounded border text-xl font-mono',
+                    step.current
+                      ? 'bg-primary text-primary-foreground border-primary font-bold'
+                      : step.done
+                        ? 'border-border/40 text-muted-foreground/50'
+                        : 'border-border text-muted-foreground'
+                  )}
+                >
+                  {formatDegree(step.label)}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
+            {scaleExerciseSequence.map((degree, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'text-4xl font-bold',
+                  i === scaleExerciseCurrentStep ? 'text-primary' : 'text-muted-foreground',
+                  i < scaleExerciseCurrentStep && 'opacity-30'
+                )}
+              >
+                {formatDegree(degree)}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* 下一题预览：3NPS 是「下一个把位」，普通音阶是下一题的调性 + 序列 */}
+        {threeNps && nextThreeNps ? (
+          <div className="pt-6 mt-6 border-t border-border/30">
+            <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
+            <div className="text-xl font-medium mb-1">
+              {t('three_nps_next_position').replace('{position}', String(nextThreeNps.position))}
+              <span className="ml-2 text-base text-muted-foreground">
+                {normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}
+              </span>
+            </div>
+            <div className="text-lg text-muted-foreground/70">
+              {formatThreeNpsLocation(t, nextThreeNps.startStringIndex, nextThreeNps.startFret)}
+            </div>
+          </div>
+        ) : nextScaleExerciseInfo ? (
           <div className="pt-6 mt-6 border-t border-border/30">
             <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
             <div className="text-xl font-medium mb-1">
@@ -331,10 +480,10 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
               {nextScaleExerciseInfo.sequence.map(formatDegree).join(' ')}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     )}
-    
+
     {activeTab === "interval" && isPlaying && currentIntervalExercise && (
       <div className="space-y-8">
         {/*
@@ -358,6 +507,14 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
           </span>
         </div>
         <div className="text-8xl font-bold text-primary">{normalizeNoteName(currentIntervalExercise.rootNote)}</div>
+        {/* 本轮选中的音程集合（普通模式同款：作为背景信息，字号弱化）。
+            信息项与 `components/interval-question.tsx` 对齐 —— 全屏是同一道题的另一套版式，
+            普通模式有的上下文这里也该有。 */}
+        {currentIntervalExercise.allIntervals.length > 0 && (
+          <div className="text-base text-muted-foreground">
+            {currentIntervalExercise.allIntervals.map((i) => formatDegree(i.symbol)).join(' ')}
+          </div>
+        )}
         <div className="text-6xl font-bold">
           {currentIntervalExercise.currentIntervalDisplay.split(' ').map((interval, idx) => (
             <span 
@@ -371,6 +528,10 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
             </span>
           ))}
         </div>
+        {/* 答对后的目标音（普通模式同款：绿色给一次确认） */}
+        {currentIntervalExercise.answered && (
+          <div className="text-3xl text-green-600">{currentIntervalExercise.targetNote}</div>
+        )}
       </div>
     )}
   </div>

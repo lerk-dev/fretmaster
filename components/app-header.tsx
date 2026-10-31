@@ -2,7 +2,8 @@
 "use client"
 
 import { memo } from 'react'
-import { Guitar, Keyboard, Settings, Timer } from 'lucide-react'
+import { Guitar, Keyboard, Settings } from 'lucide-react'
+import { PracticeScoreBadge, PracticeTimerBadge } from '@/components/practice-status'
 import { Accordion } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -212,26 +213,14 @@ export const AppHeader = memo(function AppHeader({
     
     {/* 右：窄屏收紧间距（gap-1.5 = 6px vs 桌面 12px），把省下的 24px 留给设置按钮 */}
     <div className="flex items-center gap-1.5 sm:gap-3">
-      {/* Score display */}
-      {isPlaying && (
-        <div className="flex items-center gap-2" role="status" aria-live="polite" aria-label={t('score_aria_label').replace('{correct}', String(score.correct)).replace('{total}', String(score.total))}>
-          <Badge variant="outline" className="font-mono tabular-nums text-xs">
-            {score.correct}/{score.total}
-          </Badge>
-          {score.total > 0 && (
-            <Badge variant={score.correct / score.total >= 0.7 ? "default" : "secondary"} className="tabular-nums text-xs">
-              {Math.round((score.correct / score.total) * 100)}%
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Timer */}
+      {/* 得分 + 剩余时间
+          🚨 2026-10-31：这两块抽到 `components/practice-status.tsx` 由顶栏与全屏层共用 ——
+          全屏层是 `fixed inset-0 z-[9999]`，会把顶栏整个盖住 ⇒ 一进全屏「对了几题 /
+          还剩几分钟」全看不见。补的时候若在那边再写一份百分比判定，两处会各自演化。 */}
+      {/* Score display + Timer（实现见 components/practice-status.tsx，顶栏与全屏层共用） */}
+      {isPlaying && <PracticeScoreBadge t={t} score={score} />}
       {isPlaying && practiceTime > 0 && (
-        <Badge variant="outline" className="font-mono tabular-nums gap-1 text-xs" role="status" aria-live="off" aria-label={t('time_left_aria_label').replace('{time}', formatTime(timeLeft))}>
-          <Timer className="h-3 w-3" />
-          {formatTime(timeLeft)}
-        </Badge>
+        <PracticeTimerBadge t={t} timeLeft={timeLeft} formatTime={formatTime} />
       )}
 
       {/* Detected Pitch */}

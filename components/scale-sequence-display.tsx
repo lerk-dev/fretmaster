@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { formatDegree, getScaleDisplayName, normalizeNoteName } from '@/lib/page-theory-functions'
 import { useUser, useIsPlaying } from '@/lib/store'
 import { SCALE_MODES } from '@/lib/page-theory-data'
+import { formatThreeNpsLocation } from '@/lib/three-notes-per-string'
 
 /**
  * 一弦三音（3NPS）当前把位视图。
@@ -91,12 +92,10 @@ export const ScaleSequenceDisplay = memo(function ScaleSequenceDisplay({
   const chordScaleDisplay = user.chordScaleDisplay
   const isPlaying = useIsPlaying()
 
-  // 弦号按「1 起」显示（内部索引 0 = 最高音弦 = 1 弦）
-  const stringNumber = (stringIndex: number) => stringIndex + 1
+  // 弦号换算 + 模板替换走 `lib/three-notes-per-string.ts` 的唯一实现
+  // （全屏模式也用它 —— 这儿的 +1 抄错会「提示 2 弦、实际 1 弦」）
   const targetLocation = (stringIndex: number, fret: number) =>
-    t('three_nps_target_location')
-      .replace('{string}', String(stringNumber(stringIndex)))
-      .replace('{fret}', String(fret))
+    formatThreeNpsLocation(t, stringIndex, fret)
 
   return (
 <Card className="py-2">

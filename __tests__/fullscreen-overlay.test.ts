@@ -79,7 +79,13 @@ function mount(overrides: Record<string, unknown> = {}) {
     scaleKey: 'E',
     selectedScale: SCALE_MODES.pentatonic[0],
     nextScaleExerciseInfo: null,
+    threeNps: null,
+    nextThreeNps: null,
     currentIntervalExercise: null,
+    score: { correct: 0, total: 0 },
+    timeLeft: 285,
+    practiceTime: 300,
+    formatTime: (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`,
     intervalDirection: 'up' as const,
     intervalExerciseQueue: [] as number[],
     intervalCurrentQueueIndex: 0,
@@ -353,6 +359,40 @@ describe('按 tab 渲染对应内容', () => {
     expect(progress, '队列进度没有渲染出来').not.toBeNull()
     expect(progress!.textContent).toBe('2/4')
     p.unmount()
+  })
+
+  /**
+   * 🚨 与普通模式对齐的另外两项（2026-10-31 排查）：
+   *   · 本轮选中的音程集合（普通模式当作背景信息显示「3 5 ♭7」这类清单）；
+   *   · 答对后短暂显示的目标音（绿色确认）。
+   * 两项都在 `currentIntervalExercise` 里，不需要新 prop，但**必须真的渲染**。
+   */
+  it('显示本轮选中的音程集合（allIntervals）', () => {
+    setStore({ activeTab: 'interval' })
+    const p = mount({
+      currentIntervalExercise: {
+        ...intervalExercise,
+        allIntervals: [
+          { name: 'Major Third', symbol: '3', semitones: 4 },
+          { name: 'Perfect Fifth', symbol: '5', semitones: 7 },
+        ],
+      },
+    })
+    const text = p.text()
+    expect(text).toContain(formatDegree('3'))
+    expect(text).toContain(formatDegree('5'))
+    p.unmount()
+  })
+
+  it('答对后显示目标音（answered=true）', () => {
+    setStore({ activeTab: 'interval' })
+    const answered = mount({ currentIntervalExercise: { ...intervalExercise, answered: true } })
+    expect(answered.text(), '答对后没显示目标音').toContain('G♯')
+    answered.unmount()
+
+    const pending = mount({ currentIntervalExercise: { ...intervalExercise, answered: false } })
+    expect(pending.text(), '未答对不该提前泄露目标音').not.toContain('G♯')
+    pending.unmount()
   })
 
   it('方向 / 进度只在音程 tab 出现（不泄漏到别的练习）', () => {
@@ -707,6 +747,179 @@ describe('全屏布局：指板不被题目窄列压窄（2026-10-01 修）', ()
     p.click(p.buttons()[0]) // 点空弦（0 品）
     expect(p.handleFretClick).toHaveBeenCalledWith(0, 0)
     expect(p.setFullscreenMode, '点品格更不该顺带退出全屏').not.toHaveBeenCalled()
+    p.unmount()
+  })
+})
+
+/**
+ * 🚨 2026-10-31 排查发现的第二类缺口：**全屏层把顶栏盖住了**。
+ *
+ * 全屏层是 `fixed inset-0 z-[9999]`，而「得分（正确/总数 + 百分比）」与
+ * 「剩余时间」只在 `components/app-header.tsx` 里显示 ⇒ 一进全屏两样全没了。
+ * 练习中「对了几题」「还剩几分钟」恰恰是要一直看到的。
+ *
+ * 修法：徽章抽到 `components/practice-status.tsx`，顶栏与全屏共用；全屏在题目列
+ * 上方自己摆一行。以下用例钉住「真的显示出来了」，以及「与本轮时长/练习状态同口径」。
+ */
+describe('全屏状态条：得分 + 剩余时间', () => {
+  const score = { correct: 7, total: 10 }
+
+  it('五个练习 tab 都显示得分与倒计时', () => {
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ['practice', {}],
+      ['interval', { currentIntervalExercise: { rootNote: 'C', interval: { name: 'P5', symbol: '5', semitones: 7 }, targetNote: 'G', allIntervals: [], currentIntervalDisplay: '5', completedIntervals: [], answered: false } }],
+      ['chord_exercise', { chordExerciseTargetChord: { root: 'C', type: 'Major' }, chordExerciseSequence: ['1'], chordExerciseCurrentStep: 0 }],
+      ['scale', { scaleExerciseSequence: ['1', '2', '3'], scaleExerciseCurrentStep: 0 }],
+      ['chord', {}],
+    ]
+    for (const [tab, extra] of cases) {
+      setStore({ activeTab: tab })
+      const p = mount({ score, timeLeft: 285, practiceTime: 300, ...extra })
+      const status = p.container.querySelector('[data-fullscreen-status]')
+      expect(status, `${tab}：全屏没有状态条 ⇒ 得分/倒计时看不见`).not.toBeNull()
+      expect(status!.textContent, `${tab}：得分未显示`).toContain('7/10')
+      expect(status!.textContent, `${tab}：正确率未显示`).toContain('70%')
+      expect(status!.textContent, `${tab}：剩余时间未显示`).toContain('4:45')
+      p.unmount()
+    }
+  })
+
+  it('不限时（practiceTime=0）不显示倒计时，得分仍在', () => {
+    const p = mount({ score, practiceTime: 0 })
+    const status = p.container.querySelector('[data-fullscreen-status]')!
+    expect(status.textContent).toContain('7/10')
+    expect(status.textContent, '不限时不该出现倒计时').not.toContain('4:45')
+    p.unmount()
+  })
+
+  it('未开始（isPlaying=false）不显示状态条', () => {
+    setStore({ isPlaying: false })
+    const p = mount({ score })
+    expect(p.container.querySelector('[data-fullscreen-status]')).toBeNull()
+    p.unmount()
+  })
+
+  it('得分与顶栏同源：百分比口径一致（≥70% 用实心徽章）', () => {
+    const p = mount({ score: { correct: 7, total: 10 } })
+    const percent = [...p.container.querySelectorAll('[data-fullscreen-status] span')].find(
+      (el) => (el.textContent ?? '').trim() === '70%',
+    ) as HTMLElement | undefined
+    expect(percent, '没找到百分比徽章').toBeTruthy()
+    // 颜色判定是流程外可见的那一半：`secondary`（灰）说明 70% 被判成低分
+    expect(percent!.className, '70% 应判为达标（实心徽章），不该是 secondary').not.toContain('bg-secondary')
+    p.unmount()
+  })
+})
+
+/**
+ * 🚨 2026-10-31 排查发现的第三类缺口：**一弦三音（3NPS）在全屏里退化成 35 步数字墙**。
+ *
+ * 3NPS 的序列是 35 步（3×6 上行 + 17 下行）。普通模式早就改成「把位视图 +
+ * 9 步滑窗」，而全屏层**无条件**把整条序列铺成徽章 ⇒ 实测是一屏纯数字：
+ * `1 2 3 4 5 6 7 / 1 2 3 4 5 6 7 / 1 2 3 4 3 2 1 / 7 6 5 4 3 2 1 / 7 6 5 4 3 2 1`
+ * 把位、连击、目标音在几弦几品、当前位置全都没有。
+ *
+ * 这些数据由页面侧的 `threeNps` 快照提供（与普通模式同一个对象），组件不必推算。
+ */
+describe('一弦三音（3NPS）全屏用把位视图', () => {
+  const threeNps = {
+    position: 3,
+    totalPositions: 7,
+    combo: 5,
+    maxCombo: 9,
+    direction: 'up' as const,
+    isShift: false,
+    stepNow: 12,
+    stepTotal: 35,
+    target: { label: 'b3', note: 'E♭', stringIndex: 2, fret: 8, isRoot: false },
+    window: ['1', '2', '3', '4', '5', '6', '7', '1', '2'].map((label, i) => ({
+      label,
+      done: i < 4,
+      current: i === 4,
+    })),
+  }
+  const nextThreeNps = { position: 4, totalPositions: 7, startStringIndex: 0, startFret: 5 }
+  /** 35 步的真实序列（用来证明它**不再**被整条铺出来） */
+  const sequence35 = ['1', '2', '3', '4', '5', '6', '7', '1', '2', '3', '4', '5', '6', '7',
+    '1', '2', '3', '4', '3', '2', '1', '7', '6', '5', '4', '3', '2', '1', '7', '6', '5', '4', '3', '2', '1']
+
+  function mountThreeNps(overrides: Record<string, unknown> = {}) {
+    setStore({ activeTab: 'scale' })
+    return mount({
+      scaleKey: 'C',
+      scaleExerciseSequence: sequence35,
+      scaleExerciseCurrentStep: 11,
+      threeNps,
+      nextThreeNps,
+      ...overrides,
+    })
+  }
+
+  it('显示把位进度 / 方向 / 连击', () => {
+    const p = mountThreeNps()
+    const text = p.text()
+    expect(text, '缺「把位 3 / 7」').toContain('把位 3 / 7')
+    expect(text, '缺方向').toContain(tZh('three_nps_ascending'))
+    expect(text, '缺连击').toContain('连击 5×')
+    p.unmount()
+  })
+
+  it('显示目标音、音名与「第几弦第几品」（弦号 1 起）', () => {
+    const p = mountThreeNps()
+    const text = p.text()
+    expect(text).toContain('E♭')
+    // stringIndex=2（0 起）⇒ 用户看到「第 3 弦」
+    expect(text, '弦号换算错了（0 起 vs 1 起）').toContain('第 3 弦 · 第 8 品')
+    expect(text).toContain('12 / 35')
+    p.unmount()
+  })
+
+  it('9 步滑窗每步一格，当前步高亮、已完成变淡', () => {
+    const p = mountThreeNps()
+    const slots = [...p.container.querySelectorAll('span.font-mono')] as HTMLElement[]
+    const windowSlots = slots.filter((el) => el.className.includes('w-12 h-12'))
+    expect(windowSlots.length, `滑窗应有 9 格，实际 ${windowSlots.length}`).toBe(9)
+    expect(windowSlots[4].className, '当前步没高亮').toContain('bg-primary')
+    expect(windowSlots[0].className, '已完成步没变淡').toContain('border-border/40')
+    p.unmount()
+  })
+
+  it('🚨 不再把整条 35 步序列铺出来（那正是数字墙）', () => {
+    const p = mountThreeNps()
+    // 普通音阶分支的音级字号是 text-4xl；3NPS 下不该出现
+    const bigDegreeSpans = [...p.container.querySelectorAll('span')].filter((el) =>
+      el.className.includes('text-4xl'),
+    )
+    expect(bigDegreeSpans.length, `3NPS 下仍有 ${bigDegreeSpans.length} 个整条序列徽章`).toBe(0)
+    p.unmount()
+  })
+
+  it('下一题预览是「下一把位 4」+ 起始弦品，而不是整条序列', () => {
+    const p = mountThreeNps()
+    const text = p.text()
+    expect(text).toContain('下一把位 4')
+    expect(text, '起始位置弦号错了').toContain('第 1 弦 · 第 5 品')
+    expect(text).not.toContain(sequence35.join(' '))
+    p.unmount()
+  })
+
+  it('换把时方向位置显示「换把 → 把位 n」', () => {
+    const p = mountThreeNps({ threeNps: { ...threeNps, isShift: true } })
+    expect(p.text()).toContain('换把 → 把位 3')
+    p.unmount()
+  })
+
+  it('非 3NPS（threeNps=null）仍走普通音阶版式（不误伤）', () => {
+    setStore({ activeTab: 'scale' })
+    const p = mount({
+      scaleKey: 'C',
+      scaleExerciseSequence: ['1', '2', '3', '5', '6', '1'],
+      scaleExerciseCurrentStep: 0,
+      threeNps: null,
+      nextThreeNps: null,
+    })
+    expect(p.text()).toContain('1')
+    expect(p.text(), '普通音阶不该出现把位文案').not.toContain('把位')
     p.unmount()
   })
 })

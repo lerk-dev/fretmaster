@@ -134,8 +134,11 @@ describe('护栏：无障碍标签不得字面量中文', () => {
     expect(read('components/chord-structure-window.tsx')).toContain("t('chord_structure_close_label')")
     expect(read('app/page.tsx')).toContain("t('scale_structure_close_label')")
     expect(read('app/page.tsx')).toContain("t('chord_exercise_structure_close_label')")
-    expect(read('components/app-header.tsx')).toContain("t('score_aria_label')")
-    expect(read('components/app-header.tsx')).toContain("t('time_left_aria_label')")
+    // 🚨 2026-10-31 口径变更：得分/计时徽章抽到 `components/practice-status.tsx`，
+    // 顶栏与全屏层共用（避免全屏把顶栏盖住后两处各自演化）。这两个 aria-label
+    // 的渲染随之迁移到 practice-status.tsx，所以钉住的「必须走 t()」位置要跟着改。
+    expect(read('components/practice-status.tsx')).toContain("t('score_aria_label')")
+    expect(read('components/practice-status.tsx')).toContain("t('time_left_aria_label')")
   })
 
   it('2026-09-28 修掉的 4 处指板标签已走 t()（回归即失败）', () => {

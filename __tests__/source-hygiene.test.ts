@@ -172,3 +172,58 @@ describe('音程方向：唯一真相源 + 调用点接线', () => {
     }
   })
 })
+
+/**
+ * 🚨 全屏层是「另一套版式」，它的每一个信息项都得有人**真的传进来**。
+ *
+ * 2026-10-31 排查确认的两次事故都是同一个形状：
+ *   · 音程方向：组件没画 + page.tsx 没传；
+ *   · 一弦三音 / 得分 / 倒计时：组件没画 + page.tsx 没传。
+ * 组件级测试是**直接给 props** 的，天然盖不住「调用点漏传」，只能源码钉。
+ */
+describe('全屏层的信息项必须有接线（page.tsx 真的传了）', () => {
+  const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n')
+
+  it('FullscreenOverlay 收到 3NPS 快照与练习状态', () => {
+    const page = read('app/page.tsx')
+    const at = page.indexOf('<FullscreenOverlay')
+    expect(at, '找不到 <FullscreenOverlay —— 锚点失效').toBeGreaterThan(-1)
+    const call = page.slice(at, page.indexOf('/>', at))
+    for (const prop of [
+      'threeNps={threeNpsView}',
+      'nextThreeNps={nextThreeNpsView}',
+      'score={score}',
+      'timeLeft={timeLeft}',
+      'practiceTime={practiceTime}',
+      'formatTime={formatTime}',
+    ]) {
+      expect(call, `FullscreenOverlay 漏传 ${prop} ⇒ 全屏里看不到对应信息`).toContain(prop)
+    }
+  })
+
+  it('得分/剩余时间徽章只有一份实现（顶栏与全屏共用 practice-status）', () => {
+    const header = read('components/app-header.tsx')
+    const fullscreen = read('components/fullscreen-overlay.tsx')
+    for (const [file, src] of [['app-header.tsx', header], ['fullscreen-overlay.tsx', fullscreen]] as const) {
+      expect(src, `${file} 没有用共享徽章`).toContain('@/components/practice-status')
+    }
+    // 百分比换色那条判定不许再内联出现（`>= 0.7` 换 variant）
+    for (const [file, src] of [['app-header.tsx', header], ['fullscreen-overlay.tsx', fullscreen]] as const) {
+      expect(
+        /correct\s*\/\s*\w+\.total\s*>=\s*0\.7/.test(src),
+        `${file} 里又出现了一份「正确率 ≥ 70%」的内联判定（改用 PracticeScoreBadge）`,
+      ).toBe(false)
+    }
+  })
+
+  it('3NPS 弦号换算只在 lib 里（组件不许再写 stringIndex + 1）', () => {
+    for (const file of ['components/scale-sequence-display.tsx', 'components/fullscreen-overlay.tsx']) {
+      const src = read(file)
+      expect(src, `${file} 没有用 formatThreeNpsLocation`).toContain('formatThreeNpsLocation')
+      expect(
+        /stringIndex\s*\+\s*1/.test(src),
+        `${file} 里又出现了 stringIndex + 1（弦号 0 起/1 起混合，抄错会提示错弦）`,
+      ).toBe(false)
+    }
+  })
+})

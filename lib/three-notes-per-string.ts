@@ -303,3 +303,31 @@ export function positionCellKeys(notes: readonly ThreeNpsNote[]): Map<string, Th
   for (const n of notes) map.set(`${n.stringIndex}-${n.fret}`, n)
   return map
 }
+
+/**
+ * 「目标在几弦几品」的**显示文案**（唯一实现）。
+ *
+ * ## 为什么放在 lib 而不是组件里
+ *
+ * 一弦三音有两个显示点：普通模式的 `components/scale-sequence-display.tsx` 与
+ * 全屏模式（`components/fullscreen-overlay.tsx`）。两处都要把内部的
+ * `stringIndex`（**0 起、0 = 最高音弦**，见 `lib/string-index.ts`）转成用户看到的
+ * 「几弦」（**1 起**）再套进 i18n 模板。
+ *
+ * 这个 ±1 最容易抄错：抄错的表现是「提示 2 弦，实际在 1 弦」，而练习里用户会
+ * 照着提示去按错的弦 —— 又因为相邻弦音高相近，错了也不一定听得出来。
+ * 所以换算与模板替换收在这里，两处共用。
+ *
+ * @param t           翻译函数
+ * @param stringIndex 内部弦下标（0 = 最高音弦）
+ * @param fret        品（0 = 空弦）
+ */
+export function formatThreeNpsLocation(
+  t: (key: string) => string,
+  stringIndex: number,
+  fret: number
+): string {
+  return t('three_nps_target_location')
+    .replace('{string}', String(stringIndex + 1))
+    .replace('{fret}', String(fret))
+}
