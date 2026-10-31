@@ -97,9 +97,16 @@ impl WasapiExclusiveCapture {
     ///
     /// `buffer_size_frames`：设置里的缓冲区帧数。独占模式据此换算缓冲时长
     /// （帧数 ÷ 协商后采样率），下限 10ms、上限 500ms；None 或 0 时用默认 100ms。
+    ///
+    /// `gain`：与共享模式**同一个**增益原子量（用户拖滑块要立即生效）。
+    /// `capture_flag`：`AudioCapture::is_capturing` 的共享句柄。设备在运行中失效时
+    /// 必须由本线程置 false —— 否则上层以为还在采集，音高/电平会冻结在最后一帧
+    /// 且没有任何报错（`capture.rs` 的注释里曾声称"上层据此回退"，但那是另一个原子量）。
     pub(crate) fn start(
         ring: Arc<Mutex<crate::audio::capture::RingBuffer>>,
         buffer_size_frames: Option<usize>,
+        gain: crate::audio::capture::SharedGain,
+        capture_flag: Arc<AtomicBool>,
     ) -> Result<(Self, u32, u16, u32)> {
         let running = Arc::new(AtomicBool::new(true));
         let running_thread = running.clone();
@@ -108,7 +115,14 @@ impl WasapiExclusiveCapture {
         let handle = std::thread::Builder::new()
             .name("wasapi-exclusive".into())
             .spawn(move || {
-                if let Err(e) = run_capture_loop(ring, running_thread.clone(), &tx, buffer_size_frames) {
+                if let Err(e) = run_capture_loop(
+                    ring,
+                    running_thread.clone(),
+                    &tx,
+                    buffer_size_frames,
+                    gain,
+                    capture_flag,
+                ) {
                     let _ = tx.send(Err(e.to_string()));
                     log::error!("WASAPI 独占采集线程退出: {}", e);
                 }
@@ -152,6 +166,8 @@ fn run_capture_loop(
     running: Arc<AtomicBool>,
     tx: &mpsc::Sender<Result<(u32, u16, u32), String>>,
     buffer_size_frames: Option<usize>,
+    gain: crate::audio::capture::SharedGain,
+    capture_flag: Arc<AtomicBool>,
 ) -> Result<()> {
     unsafe {
         let hr = CoInitializeEx(std::ptr::null(), COINIT_MULTITHREADED);
@@ -360,6 +376,10 @@ fn run_capture_loop(
         let mut consecutive_errors: u32 = 0;
         let mut device_lost_hr: Option<i32> = None;
 
+        // 循环内复用的暂存区（静音帧 / i16 转换）—— 不在每帧分配堆内存
+        let mut silent_buf: Vec<f32> = Vec::new();
+        let mut conv_buf: Vec<f32> = Vec::new();
+
         while running.load(Ordering::SeqCst) {
             let mut data: *mut u8 = std::ptr::null_mut();
             let mut frames: u32 = 0;
@@ -390,18 +410,28 @@ fn run_capture_loop(
             }
             consecutive_errors = 0;
 
+            // 增益每帧读一次（与共享模式同一份原子量）
+            let gain_value = crate::audio::capture::load_gain(&gain);
+
             if flags & AUDCLNT_BUFFERFLAGS_SILENT != 0 || data.is_null() {
-                let zeros = vec![0.0f32; frames as usize * ch];
-                ring.lock().write(&zeros);
+                // 🚨 静音帧要按**帧数**写单声道零，不是按交错样本数（frames × ch）。
+                //    原先写 frames*ch 个零 ⇒ 环形缓冲区的时间轴被按声道数加速（立体声
+                //    快一倍）⇒ 起音检测的帧间隔抖动、静音恢复后首帧混入半段旧数据。
+                silent_buf.clear();
+                silent_buf.resize(frames as usize, 0.0);
+                ring.lock().write(&silent_buf);
             } else if is_float {
                 let total = frames as usize * ch;
                 let slice = std::slice::from_raw_parts(data as *const f32, total);
-                write_mono(&ring, slice, ch);
+                write_mono(&ring, slice, ch, gain_value);
             } else if (*format_ptr).bits_per_sample == 16 {
                 let total = frames as usize * ch;
                 let slice = std::slice::from_raw_parts(data as *const i16, total);
-                let converted: Vec<f32> = slice.iter().map(|&s| s as f32 / 32768.0).collect();
-                write_mono(&ring, &converted, ch);
+                // 复用缓冲：稳态零分配（这是采集线程的主循环）
+                conv_buf.clear();
+                conv_buf.reserve(total);
+                conv_buf.extend(slice.iter().map(|&s| s as f32 / 32768.0));
+                write_mono(&ring, &conv_buf, ch, gain_value);
             } else {
                 log::warn!(
                     "WASAPI 独占采集遇到未支持的位深 {}，跳过该帧",
@@ -419,6 +449,11 @@ fn run_capture_loop(
         if let Some(hr) = device_lost_hr {
             // 置回 false：上层（capture.rs）据此判断采集已死，才会回退到共享模式。
             running.store(false, Ordering::SeqCst);
+            // 🚨 关键：把**共享的采集标志**也清掉。`running` 是本线程私有的，
+            //    `AudioCapture::is_capturing` 是另一个原子量、上层只读后者
+            //    ⇒ 少了这一句，拔设备后 is_capturing 恒 true，pipeline 继续读旧样本，
+            //    表现为「调音表定格、电平条不动、练习继续计分」且全程无报错。
+            capture_flag.store(false, Ordering::SeqCst);
             log::error!(
                 "WASAPI 独占采集连续 {} 次 GetBuffer 失败 (hr=0x{:08X})，判定设备已失效并退出采集线程",
                 MAX_CONSECUTIVE_GET_BUFFER_ERRORS,
@@ -436,9 +471,19 @@ fn run_capture_loop(
 }
 
 /// 多声道交错样本 → 单声道，写入环形缓冲区。
-fn write_mono(ring: &Arc<Mutex<crate::audio::capture::RingBuffer>>, samples: &[f32], ch: usize) {
+fn write_mono(
+    ring: &Arc<Mutex<crate::audio::capture::RingBuffer>>,
+    samples: &[f32],
+    ch: usize,
+    gain: f32,
+) {
     if ch <= 1 {
-        ring.lock().write(samples);
+        let mut r = ring.lock();
+        if gain != 1.0 {
+            r.write_with_gain(samples, gain);
+        } else {
+            r.write(samples);
+        }
         return;
     }
     let frames = samples.len() / ch;
@@ -451,7 +496,13 @@ fn write_mono(ring: &Arc<Mutex<crate::audio::capture::RingBuffer>>, samples: &[f
         }
         mono.push(sum / ch as f32);
     }
-    ring.lock().write(&mono);
+    // 独占模式此前**完全没有**应用增益 ⇒ 同一个滑块在共享/独占下行为不同
+    let mut r = ring.lock();
+    if gain != 1.0 {
+        r.write_with_gain(&mono, gain);
+    } else {
+        r.write(&mono);
+    }
 }
 
 /// WAVEFORMATEXTENSIBLE 的 SubFormat 是否为 IEEE float。

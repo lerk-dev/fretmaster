@@ -1,6 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use parking_lot::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use anyhow::Result;
 
@@ -9,6 +9,34 @@ use anyhow::Result;
 /// 「界面显示 2048、后端实际跑别的」再次发生（护栏见本文件单测）。
 const DEFAULT_BUFFER_SIZE: usize = 2048;
 const RING_BUFFER_CAPACITY: usize = 16384;
+
+/// 输入增益的**共享句柄**：f32 以 `to_bits()` 存进 `AtomicU32`。
+///
+/// 🚨 为什么不是 `Mutex<f32>`：这个值要在音频回调里每帧读一次，而回调是硬实时期。
+/// 加锁会把「命令线程持锁」变成音频线程的等待（优先级倒置 ⇒ 爆音/丢帧）。
+/// 原子读无锁、无分配，是实时线程唯一可接受的可变共享方式。
+///
+/// 🚨 为什么不是普通 `f32` 字段：原先 `let gain = self.gain` 把值按值 move 进闭包，
+/// `set_gain` 只改结构体字段 —— 正在跑的回调永远用建流时的旧值，
+/// 用户在设置里拖动滑块（界面写着"立即生效"）实际毫无反应，且无任何报错。
+pub(crate) type SharedGain = Arc<AtomicU32>;
+
+/// 读取增益。`Relaxed` 足够：增益只是"乘多少"，不需要与其它状态建立顺序关系。
+#[inline]
+pub(crate) fn load_gain(gain: &AtomicU32) -> f32 {
+    f32::from_bits(gain.load(Ordering::Relaxed))
+}
+
+/// 写入增益（带钳制）。
+///
+/// ⚠️ 刻意不用 `gain.clamp(0.0, 10.0)`：两者对 NaN 语义不同 ——
+/// `f32::max(NaN, 0.0)` 返回 0.0（把异常值钳成静音），而 `clamp` 会把 NaN
+/// 原样传下去（下游全变 NaN）。这里是音频增益，前者更安全。
+#[inline]
+pub(crate) fn store_gain(gain: &AtomicU32, value: f32) {
+    let clamped = value.max(0.0).min(10.0);
+    gain.store(clamped.to_bits(), Ordering::Relaxed);
+}
 
 struct StreamHolder {
     stream: Option<cpal::Stream>,
@@ -44,7 +72,7 @@ impl RingBuffer {
         }
     }
 
-    fn write_with_gain(&mut self, samples: &[f32], gain: f32) {
+    pub(crate) fn write_with_gain(&mut self, samples: &[f32], gain: f32) {
         for &sample in samples {
             self.data[self.write_pos] = sample * gain;
             self.write_pos = (self.write_pos + 1) % self.capacity;
@@ -182,14 +210,16 @@ fn write_converted_into_ring<T: Copy>(
 fn make_input_callback(
     ring: Arc<Mutex<RingBuffer>>,
     is_capturing: Arc<AtomicBool>,
-    gain: f32,
+    gain: SharedGain,
     channels: u16,
 ) -> impl FnMut(&[f32], &cpal::InputCallbackInfo) + Send + 'static {
     move |data: &[f32], _: &cpal::InputCallbackInfo| {
         if !is_capturing.load(Ordering::Relaxed) {
             return;
         }
-        write_mono_into_ring(&ring, data, gain, channels);
+        // 🚨 每帧重新读增益（不是建流时捕获一次）—— 否则设置里的滑块运行中无效。
+        //    一次原子读 ≈ 1ns，远低于一次 memcpy，实时性无碍。
+        write_mono_into_ring(&ring, data, load_gain(&gain), channels);
     }
 }
 
@@ -219,7 +249,7 @@ fn i32_to_f32(s: i32) -> f32 {
 fn make_input_callback_raw(
     ring: Arc<Mutex<RingBuffer>>,
     is_capturing: Arc<AtomicBool>,
-    gain: f32,
+    gain: SharedGain,
     channels: u16,
     format: cpal::SampleFormat,
 ) -> impl FnMut(&cpal::Data, &cpal::InputCallbackInfo) + Send + 'static {
@@ -227,6 +257,8 @@ fn make_input_callback_raw(
         if !is_capturing.load(Ordering::Relaxed) {
             return;
         }
+        // 每帧读一次（理由同 make_input_callback）
+        let gain = load_gain(&gain);
         // 🚨 cpal 0.15 的 `Data::as_slice::<T>()` 返回 `Option<&[T]>`（格式不符时为 None）
         //    ⇒ 必须显式处理。用 `unwrap_or(&[])` 而不是 `unwrap()`：万一后端给的格式
         //    与我们声明的 format 不一致（极少见），宁可这一帧丢数据，也不要 panic
@@ -310,7 +342,8 @@ pub struct AudioCapture {
     buffer_size: usize,
     latency_ms: f32,
     calibration_offset: f32,
-    gain: f32,
+    /// 输入增益（共享原子量 —— 回调每帧读，见 `SharedGain` 的说明）
+    gain: SharedGain,
     backend: AudioBackend,
     #[cfg(target_os = "windows")]
     exclusive: Option<crate::audio::wasapi_exclusive::WasapiExclusiveCapture>,
@@ -328,7 +361,7 @@ impl AudioCapture {
             buffer_size: DEFAULT_BUFFER_SIZE,
             latency_ms: 0.0,
             calibration_offset: 0.0,
-            gain: 1.0,
+            gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
             backend: AudioBackend::default(),
             #[cfg(target_os = "windows")]
             exclusive: None,
@@ -395,6 +428,8 @@ impl AudioCapture {
         match crate::audio::wasapi_exclusive::WasapiExclusiveCapture::start(
             self.ring.clone(),
             Some(self.buffer_size),
+            self.gain.clone(),
+            self.is_capturing.clone(),
         ) {
             Ok((cap, sr, ch, frames)) => {
                 self.sample_rate = sr;
@@ -593,7 +628,7 @@ impl AudioCapture {
 
         let ring_clone = self.ring.clone();
         let is_capturing_clone = self.is_capturing.clone();
-        let gain = self.gain;
+        let gain = self.gain.clone();
 
         // 🚨 P3-14 快照进入时的采集态：失败回滚必须恢复到**快照值**、而不是硬编码 `false`。
         //    硬编码 false 的坑：重复调用 start（旧流仍活着）时建流失败 ⇒ 标志位被错标 false
@@ -603,7 +638,11 @@ impl AudioCapture {
         let was_capturing = self.is_capturing.load(Ordering::Relaxed);
         self.is_capturing.store(true, Ordering::Relaxed);
 
-        let err_fn = |err| log::error!("Audio stream error: {}", err);
+        // 🚨 流报错通常是**终态**（设备被拔 / 被独占抢走 / 驱动重置），此后回调不再被调用。
+        //    但 `is_capturing` 仍为 true ⇒ pipeline 的三处守卫放行，ring 里是旧样本
+        //    ⇒ 调音表定在一个音高、电平条定格、练习继续拿陈数据计分，全程无报错；
+        //    且 `start_should_short_circuit` 会短路，用户重开音频也"没反应"。
+        //    因此这里把标志清掉，让上层看到「没在采集」并能重启。
 
         // 建流优先用 raw + 显式样本格式（ASIO 必需），失败再回退到 f32 便捷封装
         // （极少数后端可能拒绝 raw 路径）。两条路共享同一份混音逻辑。
@@ -624,6 +663,7 @@ impl AudioCapture {
             ]
         };
 
+        let is_capturing_for_err = is_capturing_clone.clone();
         let mut built: Option<cpal::Stream> = None;
         let mut last_err: Option<String> = None;
         for (use_raw, fixed, label) in attempts {
@@ -635,6 +675,11 @@ impl AudioCapture {
                 },
                 ..config.clone()
             };
+            let err_flag = is_capturing_for_err.clone();
+            let err_fn = move |err| {
+                log::error!("Audio stream error: {}", err);
+                err_flag.store(false, Ordering::Relaxed);
+            };
             let result = if use_raw {
                 device.build_input_stream_raw(
                     &attempt_config,
@@ -642,7 +687,7 @@ impl AudioCapture {
                     make_input_callback_raw(
                         ring_clone.clone(),
                         is_capturing_clone.clone(),
-                        gain,
+                        gain.clone(),
                         channels,
                         sample_format,
                     ),
@@ -655,7 +700,7 @@ impl AudioCapture {
                     make_input_callback(
                         ring_clone.clone(),
                         is_capturing_clone.clone(),
-                        gain,
+                        gain.clone(),
                         channels,
                     ),
                     err_fn,
@@ -804,15 +849,16 @@ impl AudioCapture {
         }
     }
 
+    /// 设置输入增益（0.0–10.0）。
+    ///
+    /// 🚨 写的是**回调正在读的那个原子量**，所以运行中立即生效，不需要重建流。
+    ///    （原先写 `self.gain: f32`，回调按值捕获了建流时的旧值 ⇒ 静默无效。）
     pub fn set_gain(&mut self, gain: f32) {
-        // ⚠️ 刻意不用 `gain.clamp(0.0, 10.0)`：两者对 NaN 语义不同 ——
-        //    `f32::max(NaN, 0.0)` 返回 0.0（把异常值钳成静音），而 `clamp` 会把 NaN
-        //    原样传下去（下游全变 NaN）。这里是音频增益，现状更安全。
-        self.gain = gain.max(0.0).min(10.0);
+        store_gain(&self.gain, gain);
     }
 
     pub fn get_gain(&self) -> f32 {
-        self.gain
+        load_gain(&self.gain)
     }
 
     pub fn set_calibration_offset(&mut self, offset: f32) {
@@ -970,5 +1016,65 @@ mod tests {
         assert!(cap.set_buffer_size(999).is_err());
         // 拒绝后不得污染原值
         assert_eq!(cap.get_buffer_frame_size(), 4096);
+    }
+
+    // ---------------- 增益：运行中必须立即生效（审计 2026-10-31 第 1 项）
+
+    /// 🚨 这条钉的是原缺陷本身：回调按值捕获 `self.gain` ⇒ `set_gain` 改的是
+    /// 另一份数据，正在跑的回调永远用建流时的旧值。
+    /// 判据必须是「回调**持有的那个句柄**」看到的数变了，而不是 `get_gain()` 变了
+    /// （旧实现 get_gain 也是对的，只有回调那份是死的）。
+    #[test]
+    fn set_gain_writes_through_to_the_handle_the_callback_holds() {
+        let mut cap = AudioCapture::new();
+        let callback_view = cap.gain.clone(); // 建流时会被 move 进回调的那一份
+
+        cap.set_gain(2.5);
+
+        assert_eq!(
+            load_gain(&callback_view),
+            2.5,
+            "回调看到的增益没变 ⇒ 拖滑块运行中无效（这就是原来的 bug）"
+        );
+        assert_eq!(cap.get_gain(), 2.5, "get_gain 必须与回调同源");
+    }
+
+    /// 钳制与 NaN：与旧的 `set_gain` 语义**逐字一致**（NaN 必须落成 0，不能传下去）。
+    #[test]
+    fn set_gain_clamps_and_never_produces_nan() {
+        let mut cap = AudioCapture::new();
+
+        cap.set_gain(-3.0);
+        assert_eq!(cap.get_gain(), 0.0);
+        cap.set_gain(99.0);
+        assert_eq!(cap.get_gain(), 10.0);
+        cap.set_gain(f32::NAN);
+        assert_eq!(
+            cap.get_gain(),
+            0.0,
+            "NaN 必须钳成 0（max(0.0) 语义）；若用 clamp 会原样传下去把下游全变 NaN"
+        );
+        assert_eq!(load_gain(&cap.gain), 0.0, "钳制同样要写进共享句柄");
+    }
+
+    /// 增益真的乘到了写入 ring 的样本上，且多声道仍按声道数取平均。
+    #[test]
+    fn write_mono_into_ring_applies_gain_after_mixing() {
+        let ring = Arc::new(Mutex::new(RingBuffer::new(64)));
+        // 立体声交错：(0.5, 0.1) 与 (0.4, 0.2) ⇒ 单声道 0.3 / 0.3；×2.0 ⇒ 0.6
+        write_mono_into_ring(&ring, &[0.5, 0.1, 0.4, 0.2], 2.0, 2);
+        let out = ring.lock().read_latest(2);
+        assert_eq!(out.len(), 2, "6 个交错样本 = 2 帧，不能写出 4 个");
+        assert!((out[0] - 0.6).abs() < 1e-6, "先混音再乘增益，实得 {}", out[0]);
+        assert!((out[1] - 0.6).abs() < 1e-6);
+    }
+
+    /// 增益 1.0 走直通分支，样本值不得有任何变化（浮点乘 1 也不该引入误差）。
+    #[test]
+    fn write_mono_into_ring_passes_through_at_unity_gain() {
+        let ring = Arc::new(Mutex::new(RingBuffer::new(64)));
+        write_mono_into_ring(&ring, &[0.25, -0.75], 1.0, 1);
+        let out = ring.lock().read_latest(2);
+        assert_eq!(out, vec![0.25, -0.75]);
     }
 }
