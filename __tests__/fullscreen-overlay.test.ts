@@ -80,6 +80,9 @@ function mount(overrides: Record<string, unknown> = {}) {
     selectedScale: SCALE_MODES.pentatonic[0],
     nextScaleExerciseInfo: null,
     currentIntervalExercise: null,
+    intervalDirection: 'up' as const,
+    intervalExerciseQueue: [] as number[],
+    intervalCurrentQueueIndex: 0,
     showFretboard: false,
     showIntervalFretboard: false,
     showChordFretboard: false,
@@ -291,6 +294,90 @@ describe('按 tab 渲染对应内容', () => {
     )
     expect(spans[0].className).toContain('line-through')
     expect(spans[1].className).not.toContain('line-through')
+    p.unmount()
+  })
+
+  /**
+   * 🚨 用户报的真 bug（2026-10-31）：**音程练习进全屏后方向没了**。
+   *
+   * 普通模式的题面（`components/interval-question.tsx`）顶部有「计时 / 方向 / 进度」，
+   * 而全屏层这里原先只渲染「根音 + 音程串」—— 方向信息整个消失：
+   * 用户不知道该往上还是往下按；`either`（上下都对）与 `random`（每题随机）
+   * 更是连"有没有方向限制"都看不出来。
+   *
+   * 修法是把 `intervalDirection` / 队列进度显式传进来（方向不是题目的属性，
+   * 而是独立设置项，推不出来），符号走 `lib/interval-direction.ts` 的唯一真相源。
+   */
+  const intervalExercise = {
+    rootNote: 'E',
+    interval: { name: 'Major Third', symbol: '3', semitones: 4 },
+    targetNote: 'G♯',
+    allIntervals: [],
+    currentIntervalDisplay: '3',
+    completedIntervals: [],
+    answered: false,
+  }
+
+  it('★ 音程练习全屏：显示方向（四档符号都对）', () => {
+    setStore({ activeTab: 'interval' })
+    for (const [direction, symbol] of [
+      ['up', '↑'],
+      ['down', '↓'],
+      ['either', '↕'],
+      ['random', '🔀'],
+    ] as const) {
+      const p = mount({
+        currentIntervalExercise: intervalExercise,
+        intervalDirection: direction,
+        intervalExerciseQueue: [0, 1, 2],
+        intervalCurrentQueueIndex: 0,
+      })
+      const badge = p.container.querySelector('[data-interval-direction]')
+      expect(badge, `方向 ${direction} 没有渲染出来`).not.toBeNull()
+      expect(badge!.getAttribute('data-interval-direction'), '渲染的方向与传入的不一致').toBe(direction)
+      expect(badge!.textContent, `方向 ${direction} 应显示 ${symbol}`).toContain(symbol)
+      // 不能只有符号没有标签 —— 单独一个 ↑ 在超大字号下很像题目内容
+      expect(badge!.textContent).toContain(tZh('direction'))
+      p.unmount()
+    }
+  })
+
+  it('★ 音程练习全屏：显示队列进度（第几题 / 共几题）', () => {
+    setStore({ activeTab: 'interval' })
+    const p = mount({
+      currentIntervalExercise: intervalExercise,
+      intervalExerciseQueue: [0, 1, 2, 3],
+      intervalCurrentQueueIndex: 2,
+    })
+    const progress = p.container.querySelector('[data-interval-progress]')
+    expect(progress, '队列进度没有渲染出来').not.toBeNull()
+    expect(progress!.textContent).toBe('2/4')
+    p.unmount()
+  })
+
+  it('方向 / 进度只在音程 tab 出现（不泄漏到别的练习）', () => {
+    for (const tab of ['practice', 'chord', 'chord_exercise', 'scale']) {
+      setStore({ activeTab: tab })
+      const p = mount({
+        // 别的 tab 也可能拿到这些 prop（页面统一传），但不该渲染出来
+        currentIntervalExercise: intervalExercise,
+        intervalExerciseQueue: [0, 1, 2],
+        intervalCurrentQueueIndex: 1,
+      })
+      expect(p.container.querySelector('[data-interval-direction]'), `${tab} tab 出现了音程方向`).toBeNull()
+      expect(p.container.querySelector('[data-interval-progress]'), `${tab} tab 出现了音程进度`).toBeNull()
+      p.unmount()
+    }
+  })
+
+  it('未开始（isPlaying=false）不渲染音程信息', () => {
+    setStore({ activeTab: 'interval', isPlaying: false })
+    const p = mount({
+      currentIntervalExercise: intervalExercise,
+      intervalExerciseQueue: [0, 1],
+      intervalCurrentQueueIndex: 0,
+    })
+    expect(p.container.querySelector('[data-interval-direction]')).toBeNull()
     p.unmount()
   })
 })

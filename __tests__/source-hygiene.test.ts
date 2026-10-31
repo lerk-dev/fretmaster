@@ -121,3 +121,54 @@ describe('Web 专属流程必须用同步判定 isTauriEnv()，不能只看 stat
     expect(calls, `这段里出现 ${calls} 次 getUserMedia（预期 1 次，且在该函数内）`).toBe(1)
   })
 })
+
+/**
+ * 🚨 音程方向「只有一处真相源，且调用点必须真的传」。
+ *
+ * 用户报的现象：音程练习进全屏后**方向没了**。两个独立的缺口叠在一起才会出现：
+ *
+ *  ① `components/fullscreen-overlay.tsx` 根本没渲染方向（组件内缺口）；
+ *  ② `app/page.tsx` 也没把 `intervalDirection` 传给它（接线缺口）。
+ *
+ * ②不是①的附带品：即使组件补好了，漏传 prop 依然什么都不会显示，而组件级测试
+ * 是**直接给 props** 的（等于绕过了 page.tsx），盖不住这条缝。
+ *
+ * 另外钉住「不许再内联三元」：`↕`（双向）与 `🔀`（随机）只差一个字符，抄错之后
+ * 界面上完全看不出来 —— 这份映射只能有一份（`INTERVAL_DIRECTION_SYMBOLS`）。
+ */
+describe('音程方向：唯一真相源 + 调用点接线', () => {
+  const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n')
+
+  it('两个显示点都调 intervalDirectionSymbol()，不许内联方向三元', () => {
+    for (const file of ['components/interval-question.tsx', 'components/fullscreen-overlay.tsx']) {
+      const src = read(file)
+      expect(src, `${file} 没有使用方向符号的唯一真相源`).toContain('intervalDirectionSymbol(')
+      // 内联写法长这样：intervalDirection === 'up' ? '↑' : …
+      expect(
+        /intervalDirection\s*===\s*['"]up['"]\s*\?/.test(src),
+        `${file} 里又出现了一份内联的方向三元表达式（改成 intervalDirectionSymbol）`,
+      ).toBe(false)
+    }
+  })
+
+  it('fullscreen-overlay 的 props 里声明了方向与队列进度', () => {
+    const src = read('components/fullscreen-overlay.tsx')
+    for (const prop of ['intervalDirection:', 'intervalExerciseQueue:', 'intervalCurrentQueueIndex:']) {
+      expect(src, `Props 里缺少 ${prop}`).toContain(prop)
+    }
+  })
+
+  it('app/page.tsx 调用 FullscreenOverlay 时确实传了这三项', () => {
+    const page = read('app/page.tsx')
+    const at = page.indexOf('<FullscreenOverlay')
+    expect(at, '找不到 <FullscreenOverlay —— 锚点失效').toBeGreaterThan(-1)
+    const call = page.slice(at, page.indexOf('/>', at))
+    for (const prop of [
+      'intervalDirection={intervalDirection}',
+      'intervalExerciseQueue={intervalExerciseQueue}',
+      'intervalCurrentQueueIndex={intervalCurrentQueueIndex}',
+    ]) {
+      expect(call, `FullscreenOverlay 漏传 ${prop} ⇒ 全屏里不会显示`).toContain(prop)
+    }
+  })
+})

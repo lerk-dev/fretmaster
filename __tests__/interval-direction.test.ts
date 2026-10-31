@@ -18,6 +18,8 @@ import {
   resolveDownIndex,
   buildDirectionalQueue,
   shuffle,
+  intervalDirectionSymbol,
+  INTERVAL_DIRECTION_SYMBOLS,
 } from '@/lib/interval-direction'
 import { INTERVALS } from '@/lib/page-theory-data'
 
@@ -207,5 +209,41 @@ describe('shuffle：均匀洗牌（不改原数组、元素守恒）', () => {
     expect(shuffle(src, () => 0)).toEqual([2, 3, 1])
     // r = 0.999 ⇒ j = floor(0.999*(i+1)) = i ⇒ 不变
     expect(shuffle(src, () => 0.999)).toEqual([1, 2, 3])
+  })
+})
+
+// ------------------------------------------------ 显示层：方向符号（全屏模式复用）
+
+/**
+ * 🚨 这一组用例是「音程练习进全屏后方向消失」的护栏。
+ *
+ * 全屏层原先只显示根音与音程串，方向信息整个没了；补的时候必须复用同一份映射，
+ * 否则 `↕`（双向）与 `🔀`（随机）差一个字符，抄错之后界面上完全看不出来。
+ */
+describe('方向符号', () => {
+  it('四档方向各有符号：up ↑ / down ↓ / either ↕ / random 🔀', () => {
+    expect(intervalDirectionSymbol('up')).toBe('↑')
+    expect(intervalDirectionSymbol('down')).toBe('↓')
+    expect(intervalDirectionSymbol('either')).toBe('↕')
+    expect(intervalDirectionSymbol('random')).toBe('🔀')
+  })
+
+  it('四个符号**互不相同**（`↕` 与 `🔀` 只差一个字符，抄错无法肉眼发现）', () => {
+    const symbols = Object.values(INTERVAL_DIRECTION_SYMBOLS)
+    expect(new Set(symbols).size, `符号出现重复：${symbols.join(' ')}`).toBe(4)
+  })
+
+  it('映射表与 IntervalDirection 类型逐项对齐（四档，不多不少）', () => {
+    expect(Object.keys(INTERVAL_DIRECTION_SYMBOLS).sort()).toEqual(
+      ['down', 'either', 'random', 'up'],
+    )
+  })
+
+  it('未知 / 空值不返回 undefined（否则 React 会渲染出「undefined」字样）', () => {
+    for (const bad of ['sideways', '', null, undefined, 'UP']) {
+      const symbol = intervalDirectionSymbol(bad as never)
+      expect(typeof symbol, `${JSON.stringify(bad)} 返回了非字符串`).toBe('string')
+      expect(symbol).toBe('🔀') // 保守口径：不暗示方向
+    }
   })
 })

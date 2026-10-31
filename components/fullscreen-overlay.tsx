@@ -10,6 +10,7 @@ import { GuitarRunFretboard } from '@/components/guitarrun-fretboard'
 import { PracticeFretboard } from '@/components/practice-fretboard'
 import type { ThreeNpsPreviewKind } from '@/lib/fretboard-cell-role'
 import { pickTabFretboardFlag } from '@/lib/tab-fretboard-toggle'
+import { intervalDirectionSymbol, type IntervalDirection } from '@/lib/interval-direction'
 
 interface FullscreenOverlayProps {
   /** 翻译函数 */
@@ -62,6 +63,19 @@ interface FullscreenOverlayProps {
   nextScaleExerciseInfo: { key: string; scaleName: string; sequence: string[] } | null
   /** 音程练习：当前题目 */
   currentIntervalExercise: { rootNote: string; interval: { name: string; symbol: string; semitones: number }; targetNote: string; allIntervals: { name: string; symbol: string; semitones: number }[]; currentIntervalDisplay: string; completedIntervals: number[]; answered: boolean } | null
+  /**
+   * 音程练习：方向（↑ / ↓ / ↕ / 🔀）。
+   *
+   * 🚨 必须显式传进来，不能从 `currentIntervalExercise` 推 —— 方向是**独立的设置项**
+   * （`intervalPractice.direction`），一道题本身不携带它（`either` 模式下同一道题的
+   * 上行/下行甚至由队列顺序决定）。原先全屏层没接这个 prop ⇒ 进全屏后方向信息
+   * 整个消失，用户不知道该往上还是往下按。符号映射见 `lib/interval-direction.ts`。
+   */
+  intervalDirection: IntervalDirection
+  /** 音程练习：本轮练习队列（用于显示第几题 / 共几题） */
+  intervalExerciseQueue: number[]
+  /** 音程练习：队列当前下标 */
+  intervalCurrentQueueIndex: number
   /** 找音练习：指板显隐 */
   showFretboard: boolean
   /** 音程练习：指板显隐 */
@@ -128,6 +142,9 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   selectedScale,
   nextScaleExerciseInfo,
   currentIntervalExercise,
+  intervalDirection,
+  intervalExerciseQueue,
+  intervalCurrentQueueIndex,
   showFretboard,
   showIntervalFretboard,
   showChordFretboard,
@@ -320,6 +337,26 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     
     {activeTab === "interval" && isPlaying && currentIntervalExercise && (
       <div className="space-y-8">
+        {/*
+          🚨 方向 + 队列进度（2026-10-31 补）：这里原先**只有一个根音和一串音程**，
+             进全屏后方向信息整个消失 —— 用户不知道该往上还是往下按；
+             `either`（上下都行）与 `random`（每道题随机）更是完全没有提示。
+
+          信息项与普通模式的 `components/interval-question.tsx` 顶部栏对齐
+          （那边是「计时 / 方向 / 进度」三项；全屏不显示倒计时，所以只补后两项）。
+          符号走 `lib/interval-direction.ts` 的唯一真相源，不在两处各写一个三元。
+        */}
+        <div className="flex items-center justify-center gap-8 text-lg text-muted-foreground">
+          <span data-interval-direction={intervalDirection}>
+            {t('direction')}:{' '}
+            <span className="align-middle text-3xl text-foreground">
+              {intervalDirectionSymbol(intervalDirection)}
+            </span>
+          </span>
+          <span data-interval-progress="">
+            {intervalCurrentQueueIndex}/{intervalExerciseQueue.length}
+          </span>
+        </div>
         <div className="text-8xl font-bold text-primary">{normalizeNoteName(currentIntervalExercise.rootNote)}</div>
         <div className="text-6xl font-bold">
           {currentIntervalExercise.currentIntervalDisplay.split(' ').map((interval, idx) => (

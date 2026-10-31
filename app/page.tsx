@@ -2361,6 +2361,9 @@ export default function FretMasterPage() {
             selectedScale={selectedScale}
             nextScaleExerciseInfo={nextScaleExerciseInfo}
             currentIntervalExercise={currentIntervalExercise}
+            intervalDirection={intervalDirection}
+            intervalExerciseQueue={intervalExerciseQueue}
+            intervalCurrentQueueIndex={intervalCurrentQueueIndex}
             showFretboard={showFretboard}
             showIntervalFretboard={showIntervalFretboard}
             showChordFretboard={showChordFretboard}

@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDegree, normalizeNoteName } from '@/lib/page-theory-functions'
+import { intervalDirectionSymbol, type IntervalDirection } from '@/lib/interval-direction'
 
 interface IntervalQuestionProps {
   /** 翻译函数 */
@@ -15,8 +16,8 @@ interface IntervalQuestionProps {
   rootNote: string
   /** 音程练习：目标音 */
   targetNote: string
-  /** 音程方向 */
-  intervalDirection: "up" | "down" | "random" | "either"
+  /** 音程方向（符号映射见 lib/interval-direction.ts） */
+  intervalDirection: IntervalDirection
   /** 音程练习队列 */
   intervalExerciseQueue: number[]
   /** 音程队列当前下标 */
@@ -52,7 +53,8 @@ export const IntervalQuestion = memo(function IntervalQuestion({
           <span>{formatTime(timeLeft)}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span>{t('direction')}: {intervalDirection === 'up' ? '↑' : intervalDirection === 'down' ? '↓' : intervalDirection === 'either' ? '↕' : '🔀'}</span>
+          {/* 符号来自唯一真相源：全屏模式也读同一份，两处不会再各写一个三元 */}
+          <span>{t('direction')}: {intervalDirectionSymbol(intervalDirection)}</span>
         </div>
         <div className="flex items-center gap-2">
           <span>{intervalCurrentQueueIndex}/{intervalExerciseQueue.length}</span>

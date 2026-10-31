@@ -134,3 +134,49 @@ export function shuffle<T>(items: readonly T[], random: () => number = Math.rand
   }
   return out
 }
+
+// ---------------------------------------------------------------- 显示层
+
+/**
+ * 方向 → 显示符号（**界面唯一来源**）。
+ *
+ * ## 为什么放在这个文件
+ *
+ * 这份映射原先内联写在 `components/interval-question.tsx` 的一个三元表达式里。
+ * 全屏模式（`components/fullscreen-overlay.tsx`）是同一道题的另一套版式，
+ * 但它**完全没有**方向信息 ⇒ 进全屏后不知道该往上还是往下按
+ * （`either` 两个方向都对、`random` 每题随机，界面上一点提示都没有）。
+ *
+ * 补的时候如果照抄一份三元表达式，两处就会各自演化（`🔀` 与 `↕` 只差一个字符，
+ * 很容易抄错，而且错了没人看得出来）。所以符号与方向的映射统一放这里 ——
+ * 与上面「方向 → 队列」的映射同处一个模块，语义也刚好完整：
+ * 一个方向既有「怎么出题」，也有「怎么显示」。
+ *
+ * 护栏：`__tests__/interval-direction.test.ts` 钉住四个符号；
+ * `__tests__/source-hygiene.test.ts` 钉住两个组件都必须调
+ * `intervalDirectionSymbol()`（不许再内联三元）。
+ */
+export const INTERVAL_DIRECTION_SYMBOLS: Record<IntervalDirection, string> = {
+  /** 只往上（根音 → 更高的音） */
+  up: '↑',
+  /** 只往下 */
+  down: '↓',
+  /** 上下都行（队列里上下交替） */
+  either: '↕',
+  /** 每道题随机 */
+  random: '🔀',
+}
+
+/**
+ * 取方向的显示符号。
+ *
+ * ⚠️ 入参来自 store / 设置导入，可能被手改过（`"sideways"` 之类）。未知值**不抛错**
+ * 也不返回 `undefined`（那会让 React 真的渲染出 `undefined` 字样），按「随机」显示 ——
+ * 这是最保守的语义：不暗示方向。
+ */
+export function intervalDirectionSymbol(direction: string | null | undefined): string {
+  if (direction && direction in INTERVAL_DIRECTION_SYMBOLS) {
+    return INTERVAL_DIRECTION_SYMBOLS[direction as IntervalDirection]
+  }
+  return INTERVAL_DIRECTION_SYMBOLS.random
+}
