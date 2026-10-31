@@ -11,6 +11,22 @@ fn main() {
     env_logger::init();
     
     tauri::Builder::default()
+        // 🚨 单实例插件必须**第一个**注册（Tauri 文档要求：它要在其它插件初始化前
+        //    判断「已有实例在跑」并立即退出）。2026-10-31 审计第 10 项。
+        //
+        // 为什么非要有它：双击两次图标是 Windows 上的常规操作，而两个实例会
+        //   ① 各自持有音频采集（后启动的那个把设备抢走，前一个的音高从此冻结）；
+        //   ② 争同一个 SQLite —— 即使加了 busy_timeout，两次落库也会互相等/超时，
+        //      用户看到的是「这条记录没了」。
+        // 第二实例的行为不是报错弹窗，而是把已有窗口提到前台（用户预期就是「打开它」）。
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
