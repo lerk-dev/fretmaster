@@ -84,3 +84,40 @@ describe('生产目录不许 @ts-ignore（会永久吞掉同段其它类型错�
     expect(hits, `以下位置用了 @ts-ignore（请补真实类型或改用 @ts-expect-error）：\n${hits.join('\n')}`).toEqual([])
   })
 })
+
+/**
+ * 🚨 桌面端不许走「Web 专属」的浏览器权限流程。
+ *
+ * 2026-10-31 实测：打包后的 exe 一启动就弹系统麦克风权限框
+ * （`tauri.localhost 想要使用麦克风`）。原因不是 `isTauriEnv()` 判错了，
+ * 而是这段 effect 只看 **state** `isTauri`（初始 false，挂载后才翻转）
+ * ⇒ 桌面端第一次渲染落进 Web 分支 ⇒ `getUserMedia`。
+ *
+ * 这类错误用行为测试很难盖住（jsdom 里没有 `tauri.localhost`），只能钉源码。
+ */
+describe('Web 专属流程必须用同步判定 isTauriEnv()，不能只看 state isTauri', () => {
+  const PAGE = readFileSync('app/page.tsx', 'utf8').replace(/\r\n/g, '\n')
+
+  it('请求麦克风权限的那段 effect，分支条件里必须有 isTauriEnv()', () => {
+    const idx = PAGE.indexOf('requestPermissionAndGetDevices')
+    expect(idx, '找不到 requestPermissionAndGetDevices —— 锚点失效').toBeGreaterThan(-1)
+    const before = PAGE.slice(0, idx)
+    const branchAt = before.lastIndexOf('if (isTauri')
+    expect(branchAt, '这个 effect 里找不到 isTauri 分支').toBeGreaterThan(-1)
+    const branchLine = before.slice(branchAt).split('\n')[0]
+    expect(
+      branchLine,
+      '分支只看了 state isTauri ⇒ 打包后的桌面端首帧会掉进 Web 分支并弹麦克风权限框',
+    ).toContain('isTauriEnv()')
+  })
+
+  it('同一段里没有任何「无条件 getUserMedia」的旁路', () => {
+    const start = PAGE.indexOf('requestPermissionAndGetDevices')
+    const end = PAGE.indexOf('// 当设置面板打开时，刷新设备列表')
+    expect(end).toBeGreaterThan(start)
+    const region = PAGE.slice(start, end)
+    // getUserMedia 只允许出现在 `requestPermissionAndGetDevices` 内部（被上面的分支保护）
+    const calls = (region.match(/navigator\.mediaDevices\.getUserMedia/g) ?? []).length
+    expect(calls, `这段里出现 ${calls} 次 getUserMedia（预期 1 次，且在该函数内）`).toBe(1)
+  })
+})

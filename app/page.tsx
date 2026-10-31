@@ -891,7 +891,12 @@ export default function FretMasterPage() {
   // `devicechange`。两边都走同一个处理函数，用户能看到「接入/断开」。
   // ============================================================================
   useEffect(() => {
-    if (isTauri) {
+    // 🚨 必须是 `isTauri || isTauriEnv()`，不能只看 state（2026-10-31 实测）：
+    //    `isTauri` 的初始值是 false，要等挂载后的 effect 才翻转；而打包后的桌面端
+    //    第一次渲染就落进下面的 Web 分支 ⇒ `getUserMedia` ⇒ **启动即弹系统麦克风权限框**
+    //    （实测：`tauri.localhost 想要使用麦克风` 盖在整个应用上）。
+    //    `isTauriEnv()` 是同步判定（含 `tauri.localhost` 主机名兜底），首帧就是对的。
+    if (isTauri || isTauriEnv()) {
       let unlisten: (() => void) | null = null
       let cancelled = false
 
