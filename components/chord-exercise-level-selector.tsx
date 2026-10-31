@@ -96,6 +96,7 @@ function ChordExerciseLevelSelectorInner({
                         variant="ghost"
                         size="icon"
                         aria-label={t('view_details')}
+                        onKeyDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation()
                           onShowLevelInfo(level)

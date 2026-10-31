@@ -2,11 +2,13 @@
  * components/fullscreen-overlay.tsx 的契约测试（此前零测试）。
  *
  * 全屏练习覆盖层：按 store 的 activeTab + isPlaying 显示不同内容（找音/和弦/
- * 和弦练习/音阶/音程），带「下一题预览」和可交互指板；点击任意处或
- * Esc/Enter/Space 退出全屏（内层 stopPropagation 防止误退）。
+ * 和弦练习/音阶/音程），带「下一题预览」和可交互指板；点背景或 Esc 退出全屏
+ * （内层 stopPropagation 防止误退）。
  *
  * 契约重点：
- *  ① 退出：点外层 → setFullscreenMode(false)；Esc/Enter/Space 同样；其它键不退出；
+ *  ① 退出：点背景 → setFullscreenMode(false)；Esc 同样（**Enter/Space 不再退出** ——
+ *     它们归当前焦点控件与全局快捷键，见审计 2026-10-31 第 13 项）；
+ *     外层不再是 role=button（否则内部控件对读屏是装饰）；其它键不退出；
  *     点内层内容区不退出（stopPropagation）；
  *  ② 按 tab 只渲染对应内容：practice（分 fretboard/buttons 两种答题模式）、
  *     chord、chord_exercise、scale、interval —— 且都要求 isPlaying；
@@ -148,24 +150,44 @@ afterEach(() => {
 })
 
 describe('退出全屏', () => {
-  it('外层是 role=button，aria-label 走 i18n，点击即退出', () => {
+  /**
+   * 🚨 2026-10-31 审计第 13 项改了这条契约：外层**不再是** `role="button"`。
+   *
+   * 全屏层里有指板按钮、钢琴键。整块挂成 role=button 时，ARIA 规定它的子节点是
+   * presentational ⇒ 读屏把里面的控件全当装饰，全屏练习对读屏用户等于不可操作。
+   * 退出方式改为「点背景」+「Esc」，不再靠这一个巨型按钮。
+   */
+  it('外层不再是 role=button（读屏要把内部控件当控件），点击背景仍退出', () => {
     const p = mount()
-    expect(p.outer()!.getAttribute('role')).toBe('button')
-    expect(p.outer()!.getAttribute('aria-label')).toBe(tZh('fullscreen_exit_hint'))
-    p.click(p.outer())
+    const outer = p.outer()!
+    expect(outer.getAttribute('role')).toBeNull()
+    expect(outer.getAttribute('tabindex'), '也不该再进 Tab 序列').toBeNull()
+    p.click(outer)
     expect(p.setFullscreenMode).toHaveBeenCalledWith(false)
     p.unmount()
   })
 
-  it('Esc / Enter / Space 退出，其它键不触发', () => {
+  it('Esc 退出；Enter / Space 不再由本层退出（归当前控件与全局快捷键）', () => {
     const p = mount()
     p.press(p.outer(), 'Escape')
+    expect(p.setFullscreenMode).toHaveBeenCalledTimes(1)
+
+    // Enter / Space：本层不拦（否则全屏里按 Enter 激活格子会连带退出全屏）
     p.press(p.outer(), 'Enter')
     p.press(p.outer(), ' ')
-    expect(p.setFullscreenMode).toHaveBeenCalledTimes(3)
     p.press(p.outer(), 'a')
     p.press(p.outer(), 'ArrowUp')
-    expect(p.setFullscreenMode).toHaveBeenCalledTimes(3)
+    expect(p.setFullscreenMode).toHaveBeenCalledTimes(1)
+    p.unmount()
+  })
+
+  it('子控件已用掉这次按键（defaultPrevented）⇒ 本层不再退出', () => {
+    const p = mount()
+    const cell = document.createElement('button')
+    cell.addEventListener('keydown', (e) => e.preventDefault())
+    p.inner()!.appendChild(cell)
+    p.press(cell, 'Escape')
+    expect(p.setFullscreenMode).not.toHaveBeenCalled()
     p.unmount()
   })
 

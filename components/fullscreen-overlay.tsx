@@ -172,16 +172,22 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     showScaleFretboard,
   })
 
+  // 🚨 2026-10-31 审计第 13 项：这层**不再**挂 role="button" / tabIndex / aria-label。
+  //    原先整块全屏层（含指板按钮、钢琴键）是一个 role="button"：
+  //    ① 读屏会把里面的**所有**控件当装饰（ARIA 规定 role=button 的子节点是
+  //       presentational）⇒ 全屏练习里读屏用户既听不到、也操作不了指板；
+  //    ② 容器的 keydown 会收到子元素冒泡 ⇒ 按 Enter 想激活当前格子，结果**退出全屏**。
+  //    退出方式改为「点背景」+「Esc（全局快捷键 / 本层兜底）」，两者都在下面保留。
   return (
 <div
-  role="button"
-  tabIndex={0}
-  aria-label={t('fullscreen_exit_hint')}
-  className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center overflow-auto cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center overflow-auto cursor-pointer"
   style={{ margin: 0, padding: 0, width: '100vw', height: '100vh', top: 0, left: 0, right: 0, bottom: 0 }}
   onClick={() => setFullscreenMode(false)}
   onKeyDown={(e) => {
-    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+    // 子控件已经用掉这次按键（`activateOnEnterSpace` 会 preventDefault）⇒ 别再退出全屏
+    if (e.defaultPrevented) return
+    // 只认 Esc：Enter / Space 归当前焦点控件（激活格子）与全局快捷键（下一题）
+    if (e.key === 'Escape') {
       e.preventDefault()
       setFullscreenMode(false)
     }

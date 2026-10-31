@@ -165,6 +165,7 @@ function SongSelectorDialogInner({
                           variant="ghost"
                           size="icon"
                           aria-label={songFavorites.includes(song.name) ? t('remove_from_favorites') : t('add_to_favorites')}
+                          onKeyDown={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation()
                             toggleSongFavorite(song.name)
@@ -180,6 +181,7 @@ function SongSelectorDialogInner({
                           variant="ghost"
                           size="icon"
                           aria-label={t('view_details')}
+                          onKeyDown={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation()
                             onShowSongInfo(song)

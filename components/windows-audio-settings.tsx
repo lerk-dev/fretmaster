@@ -48,6 +48,17 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
   // （闭包捕获旧值）⇒ 纯靠它们做守卫挡不住「双击/连点」。必须再加一个**同步**互斥 ref，
   // 置位于首个 await 之前、在 finally 释放，封住异步窗口内的重入。
   const startingRef = useRef(false)
+  /**
+   * 组件是否还挂着（审计 2026-10-31 第 8 项）。
+   *
+   * 🚨 `startAudio` 里 `await startAudioCaptureWithBackend(...)` 之后**无条件**建
+   * 50ms 的轮询 interval。而这个面板挂在 Radix Accordion / Sheet 里，用户完全可能在
+   * IPC 返回前把它折叠/关掉（Radix 默认卸载子树）。卸载 effect 只在卸载那一刻清
+   * `intervalRef.current`，那时它还是 null ⇒ 这个 interval **永远停不下来**：
+   * 采集中则持续耗电，采集被停则每秒 20 次 `Pitch detection error` 刷控制台，
+   * 直到进程退出。所以 await 之后必须先问一句「我还活着吗」。
+   */
+  const aliveRef = useRef(true)
   // 使用 store 中的 micEnabled 作为音频启用状态，避免组件卸载后状态丢失
   const isCapturing = audioSettings.micEnabled
   
@@ -136,9 +147,11 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
     }
   }, [loadDevices])
   
-  // 清理定时器
+  // 清理定时器 + 标记已卸载（`startAudio` 的 await 之后据此判断是否继续建轮询）
   useEffect(() => {
+    aliveRef.current = true
     return () => {
+      aliveRef.current = false
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
@@ -176,6 +189,10 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
         setActiveBackend(status.backend)
       } catch { /* 忽略：仅用于显示 */ }
       
+      // 🚨 面板可能已经在 await 期间被卸载（折叠音频区块 / 关掉设置抽屉）：
+      //    此时不能再建轮询，否则它没有任何清理路径（见 `aliveRef` 的说明）。
+      if (!aliveRef.current) return
+
       // 开始检测音高
       // 这里不再做「先清旧句柄」的防御：`stopAudio` 已同步清 interval，且上面的
       // 同步互斥封住了重入 ⇒ 旧句柄不可能存活（铁律 14：同一量不做两份判定）。

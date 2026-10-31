@@ -532,6 +532,37 @@ describe('WindowsAudioSettings — 采集开关完整链路', () => {
     expect(mockNative.detectPitch.mock.calls.length, '卸载后不该继续轮询').toBe(before)
   })
 
+  /**
+   * 🚨 审计 2026-10-31 第 8 项：`startAudio` 在 **await 之后**才建 50ms 轮询。
+   * 面板挂在 Radix Accordion / Sheet 里，用户完全可能在 IPC 返回前把它折叠/关掉
+   * （Radix 默认卸载子树）。此时卸载 effect 清的是 `intervalRef.current`，而它还是
+   * null ⇒ 这个 interval **永远不会被清**：采集中持续耗电，采集被停则每秒 20 次
+   * `Pitch detection error` 刷控制台，直到进程退出。
+   *
+   * 上面那条「采集中卸载 → 清掉轮询」测不到这个洞：它是在 interval **已建立之后**
+   * 卸载的。这里反过来 —— 卸载发生在 await 窗口内。
+   */
+  it('🚨 await 期间被卸载 ⇒ 不再建轮询（否则这个 interval 没有任何清理路径）', async () => {
+    primeCapture()
+    let resolveStart: () => void = () => { /* 占位 */ }
+    mockNative.startAudioCaptureWithBackend.mockImplementation(
+      () => new Promise<void>((resolve) => { resolveStart = resolve }),
+    )
+    await mount()
+
+    act(() => { enableSwitch().dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
+    expect(mockNative.startAudioCaptureWithBackend).toHaveBeenCalledTimes(1)
+
+    // IPC 还没回来就卸载
+    act(() => { roots[roots.length - 1].unmount() })
+    // 会话随后成功返回
+    await act(async () => { resolveStart() })
+    await settle()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+
+    expect(mockNative.detectPitch, '卸载后才建起来的轮询会永久泄漏').not.toHaveBeenCalled()
+  })
+
   it('轮询里检测失败 → console.error 兜底，轮询不中断', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => { /* 静音 */ })
     primeCapture()

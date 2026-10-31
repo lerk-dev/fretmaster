@@ -126,6 +126,7 @@ function LevelSelectorDialogInner({
                         variant="ghost"
                         size="icon"
                         aria-label={levelFavorites.includes(level.id) ? t('remove_from_favorites') : t('add_to_favorites')}
+                        onKeyDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation()
                           toggleLevelFavorite(level.id)
@@ -141,6 +142,7 @@ function LevelSelectorDialogInner({
                         variant="ghost"
                         size="icon"
                         aria-label={t('view_details')}
+                        onKeyDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation()
                           const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
@@ -186,6 +188,7 @@ function LevelSelectorDialogInner({
                       variant="ghost"
                       size="icon"
                       aria-label={t('view_details')}
+                      onKeyDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
@@ -230,6 +233,7 @@ function LevelSelectorDialogInner({
                       variant="ghost"
                       size="icon"
                       aria-label={t('view_details')}
+                      onKeyDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
@@ -274,6 +278,7 @@ function LevelSelectorDialogInner({
                       variant="ghost"
                       size="icon"
                       aria-label={t('view_details')}
+                      onKeyDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
@@ -318,6 +323,7 @@ function LevelSelectorDialogInner({
                       variant="ghost"
                       size="icon"
                       aria-label={t('view_details')}
+                      onKeyDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
@@ -362,6 +368,7 @@ function LevelSelectorDialogInner({
                       variant="ghost"
                       size="icon"
                       aria-label={t('view_details')}
+                      onKeyDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         const fullLevel = ALL_PRACTICE_LEVELS.find(l => l.id === level.id)
@@ -406,6 +413,7 @@ function LevelSelectorDialogInner({
                       variant="ghost"
                       size="icon"
                       aria-label={t('view_details')}
+                      onKeyDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         onShowLevelInfo(level)
@@ -449,6 +457,7 @@ function LevelSelectorDialogInner({
                       variant="ghost"
                       size="icon"
                       aria-label={t('view_details')}
+                      onKeyDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         onShowLevelInfo(level)

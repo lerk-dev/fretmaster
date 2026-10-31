@@ -252,6 +252,42 @@ describe('收藏星标', () => {
     p.unmount()
   })
 
+  /**
+   * 🚨 审计 2026-10-31 第 9 项：内层图标的 `onClick` 有 stopPropagation（挡鼠标），
+   * 但**键盘**走 keydown，会冒泡到整行 `role="button"` 的 activateOnEnterSpace
+   * ⇒ 用户 Tab 到星标按 Enter，等级被切换、弹窗被关掉（以为点了星标，其实整行被选中）。
+   */
+  it('🚨 键盘 Enter/Space 落在星标上：不选中行、不关弹窗', () => {
+    for (const key of ['Enter', ' ']) {
+      const p = mount()
+      const level = SINGLE_CHORD_TONES_LEVELS[0]
+      const card = p.cardById(level.id)!
+      const star = p.iconButton(card, t('add_to_favorites'))!
+      // ⚠️ jsdom 不会为「按钮上的 Enter」合成 click（那是浏览器的默认动作），
+      //    所以这里手动补一次 click —— 顺序与真实浏览器一致：keydown 先冒泡，
+      //    再由默认动作触发 click。要钉的是 keydown 那一步别再冒泡到整行。
+      p.press(star, key)
+      p.click(star)
+      expect(useAppStore.getState().favorites.levelFavorites, `${key}：星标应当生效`).toEqual([level.id])
+      expect(p.onSelectLevel, `${key}：不该选中这一行`).not.toHaveBeenCalled()
+      expect(p.onOpenChange, `${key}：不该关弹窗`).not.toHaveBeenCalled()
+      p.unmount()
+      useAppStore.setState({ favorites: { levelFavorites: [], songFavorites: [] } })
+    }
+  })
+
+  it('🚨 键盘 Enter 落在「详情」上：不选中行、不关弹窗', () => {
+    const p = mount()
+    const card = p.cardById(SINGLE_CHORD_TONES_LEVELS[0].id)!
+    const info = p.iconButton(card, t('view_details'))!
+    p.press(info, 'Enter')
+    p.click(info)
+    expect(p.onShowLevelInfo).toHaveBeenCalledTimes(1)
+    expect(p.onSelectLevel).not.toHaveBeenCalled()
+    expect(p.onOpenChange).not.toHaveBeenCalled()
+    p.unmount()
+  })
+
   it('只有「基础练习」分组带星标（其余分组只有详情按钮）', () => {
     const p = mount()
     const basicCard = p.cardById(SINGLE_CHORD_TONES_LEVELS[0].id)!
