@@ -1,3 +1,25 @@
+/**
+ * 支持的语言代码（**唯一白名单**）。
+ *
+ * 用途：① 设置导入时校验 `language` 字段（手改过的文件里可能是 `'ja'`）；
+ * ② 语言选择器渲染。`TRANSLATIONS` 的键必须与本表逐项一致 ——
+ * 护栏见 `__tests__/i18n-language-fallback.test.ts`。
+ */
+export const SUPPORTED_LANGUAGES = ['zh-CN', 'en'] as const
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
+
+/**
+ * 把任意输入收敛成受支持的语言码（**导入设置时的唯一入口**）。
+ *
+ * 未知值一律 `zh-CN` —— 绝不能把 `'ja'` 原样写进 store：译文表查不到，
+ * 整个界面会显示 `nav_practice` 这类键名，且跨会话保留。
+ */
+export function normalizeLanguage(value: unknown): SupportedLanguage {
+  return typeof value === 'string' && (SUPPORTED_LANGUAGES as readonly string[]).includes(value)
+    ? (value as SupportedLanguage)
+    : 'zh-CN'
+}
+
 export const TRANSLATIONS = {
     'zh-CN': {
         'language': '语言',
@@ -1454,12 +1476,22 @@ export const TRANSLATIONS = {
 }
 
 /**
- * 取某语言的译文表（取不到 ⇒ undefined）。`TRANSLATIONS` 是对象字面量、没有索引签名，
- * 所以这里集中做一次 as 断言，别在每个调用点重复。
+ * 取某语言的译文表。
+ *
+ * 🚨 **未知语言码必须回退 zh-CN**（2026-10-31 审计第 7 项）。原先只做
+ * `tables[language || 'zh-CN']`：传 `'ja'` / `'fr'` 直接拿到 `undefined`，
+ * `translate()` 于是 `return key` —— **整个界面**（含语言选择器自己、错误提示、
+ * 返回按钮）全渲染成 `nav_practice` / `btn_cancel` 这类键名，并写进 localStorage
+ * 跨会话保留，用户连"去哪改回语言"都找不到。
+ *
+ * 触发路径：导入一份手改过 `"language": "ja"` 的设置文件（导入侧原先只校验
+ * "非空字符串"）。
+ *
+ * `TRANSLATIONS` 是对象字面量、没有索引签名，所以这里集中做一次 as 断言。
  */
 function tableOf(language: string | null | undefined): Record<string, string> | undefined {
   const tables = TRANSLATIONS as Record<string, Record<string, string> | undefined>
-  return tables[language || 'zh-CN']
+  return tables[language || 'zh-CN'] ?? tables['zh-CN']
 }
 
 /**

@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { clampMetronomeBpm, clampMetronomeBeats } from '@/lib/store'
 import type { useAppStore } from '@/lib/store'
-import type { createTranslator } from '@/lib/i18n'
+import { normalizeLanguage, type createTranslator } from '@/lib/i18n'
 
 type AppStore = ReturnType<typeof useAppStore.getState>
 
@@ -157,8 +157,13 @@ export function useSettingsIo(options: UseSettingsIoOptions) {
         const str = <T extends string>(v: unknown, fallback: T): T =>
           typeof v === 'string' && v.length > 0 ? (v as T) : fallback
 
-        setLanguage(str(settings.language, 'zh-CN'))
-        setChordScaleDisplay(str(settings.chordScaleDisplay, settings.language === 'en' ? 'english' : 'chinese'))
+        // 🚨 语言码必须走**白名单**（2026-10-31 审计第 7 项）：`str()` 只校验"非空字符串"，
+        //    手改过的文件里写 `"language": "ja"` 会被原样收下 ⇒ 译文表查不到 ⇒ 全站显示键名，
+        //    且写进 localStorage 跨会话保留（用户连"去哪改回语言"都找不到）。
+        //    未知语言码一律按 zh-CN 处理（`lib/i18n.ts` 的 tableOf 也有同样的兜底）。
+        const language = normalizeLanguage(settings.language)
+        setLanguage(language)
+        setChordScaleDisplay(str(settings.chordScaleDisplay, language === 'en' ? 'english' : 'chinese'))
         setNoteAccidentalDisplay(str(settings.noteAccidentalDisplay, 'sharp'))
         setTheme(str(settings.theme, 'dark'))
         setPracticeTime(num(settings.practiceTime, 60))

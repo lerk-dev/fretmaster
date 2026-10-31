@@ -11,7 +11,15 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import { TRANSLATIONS, createTranslator, hasTranslation, translateOr } from '@/lib/i18n'
+import {
+  TRANSLATIONS,
+  SUPPORTED_LANGUAGES,
+  createTranslator,
+  hasTranslation,
+  normalizeLanguage,
+  translate,
+  translateOr,
+} from '@/lib/i18n'
 import { ALL_PRACTICE_LEVELS } from '@/lib/practice-levels'
 import { SCALE_PRACTICE_SEQUENCES } from '@/lib/page-theory-data'
 
@@ -225,10 +233,19 @@ describe('translateOr —— t() 的真兜底（别再用 `t(k) || fallback`）'
     expect(t('no_such_key_xyz') || '').toBe('no_such_key_xyz')
   })
 
-  it('语言代码为空/undefined 时回退 zh-CN；未知语言码则整体退化为键名（→ 走兜底）', () => {
+  it('语言代码为空/undefined/未知 都回退 zh-CN（不再整体退化为键名）', () => {
     expect(translateOr(createTranslator(''), 'level_root', 'FALLBACK')).toBe(zh['level_root'])
     expect(translateOr(createTranslator(null), 'level_root', 'FALLBACK')).toBe(zh['level_root'])
-    expect(translateOr(createTranslator('fr'), 'level_root', 'FALLBACK')).toBe('FALLBACK')
+    // 🚨 2026-10-31（审计第 7 项）改了这条口径：未知语言码原先会让 `translate()`
+    //    退回键名、再由 `translateOr` 用代码里的兜底字面量。结果是**整个界面**
+    //    （连语言选择器自己）都变成 `nav_practice`，用户连"去哪改回语言"都找不到。
+    //    现在未知语言码回退 zh-CN 表 —— 产品级兜底比代码里的 FALLBACK 字面量更完整。
+    //    真正的语言合法性由 `normalizeLanguage()` 在导入侧拦下。
+    expect(translateOr(createTranslator('fr'), 'level_root', 'FALLBACK')).toBe(zh['level_root'])
+  })
+
+  it('真正缺键时仍然走兜底（回退 zh-CN 不等于「永远有字」）', () => {
+    expect(translateOr(createTranslator('fr'), 'no_such_key_xyz', 'FALLBACK')).toBe('FALLBACK')
   })
 
   it('🚨 缺键判据用 hasKey，不是「译文是否等于键名」—— 后者会把「译文恰为键名」误判成缺键', () => {
@@ -239,7 +256,11 @@ describe('translateOr —— t() 的真兜底（别再用 `t(k) || fallback`）'
     // 空串译文同样算「没有」（与 translate() 的 `|| key` 口径一致）
     expect(hasTranslation('zh-CN', 'level_root')).toBe(true)
     expect(hasTranslation('zh-CN', '')).toBe(false)
-    expect(hasTranslation('fr', 'level_root')).toBe(false)
+    // 🚨 口径在 2026-10-31 变了：未知语言码现在**回退 zh-CN 表**（审计第 7 项），
+    //    所以 `hasKey` 回答的是「这条键在界面上会不会有字」，而不是「法语有没有译过」。
+    //    真正的语言合法性由 `normalizeLanguage()` 在导入侧拦下，不该靠 hasKey 兜。
+    expect(hasTranslation('fr', 'level_root')).toBe(true)
+    expect(hasTranslation('fr', 'no_such_key_xyz')).toBe(false)
   })
 
   it('🚨 传入裸函数（测试替身/旧调用方）时退回旧判据，不炸', () => {
@@ -317,5 +338,56 @@ describe('假兜底护栏：组件里不得再出现 `t(...) || fallback`', () =
       })
     }
     expect(offenders, `\n${offenders.join('\n')}`).toEqual([])
+  })
+})
+
+// ---------------------------------------------------- 未知语言码（审计 2026-10-31 第 7 项）
+
+describe('🚨 未知语言码必须回退 zh-CN，不许让界面显示键名', () => {
+  const KEY = 'nav_practice'
+
+  it('基准：zh-CN 与 en 都能查到真实译文', () => {
+    expect(translate('zh-CN', KEY)).not.toBe(KEY)
+    expect(translate('en', KEY)).not.toBe(KEY)
+    expect(translate('zh-CN', KEY)).not.toBe(translate('en', KEY))
+  })
+
+  it.each(['ja', 'fr', 'zh', 'zh-TW', 'EN', ''])(
+    "未知语言码 '%s' 回退中文而不是返回键名",
+    (language) => {
+      const text = translate(language, KEY)
+      expect(text, `语言码 ${JSON.stringify(language)} 让界面显示了键名 ${KEY}`).not.toBe(KEY)
+      expect(text).toBe(TRANSLATIONS['zh-CN'][KEY])
+    },
+  )
+
+  it('null / undefined 同样回退中文', () => {
+    expect(translate(null, KEY)).toBe(TRANSLATIONS['zh-CN'][KEY])
+    expect(translate(undefined, KEY)).toBe(TRANSLATIONS['zh-CN'][KEY])
+  })
+
+  it('hasTranslation 与 translate 同口径（未知语言按中文判）', () => {
+    expect(hasTranslation('ja', KEY)).toBe(true)
+    expect(hasTranslation('ja', 'no_such_key_at_all')).toBe(false)
+  })
+
+  it('createTranslator 也吃到同一份兜底', () => {
+    const t = createTranslator('ja')
+    expect(t(KEY)).toBe(TRANSLATIONS['zh-CN'][KEY])
+    expect(t(KEY)).not.toBe(KEY)
+  })
+})
+
+describe('语言白名单', () => {
+  it('SUPPORTED_LANGUAGES 与 TRANSLATIONS 的键逐项一致', () => {
+    expect([...SUPPORTED_LANGUAGES].sort()).toEqual(Object.keys(TRANSLATIONS).sort())
+  })
+
+  it('normalizeLanguage：支持的语言原样通过，其余一律 zh-CN', () => {
+    expect(normalizeLanguage('zh-CN')).toBe('zh-CN')
+    expect(normalizeLanguage('en')).toBe('en')
+    for (const bad of ['ja', 'fr', '', 'zh', 'EN', 'english', null, undefined, 42, {}, []]) {
+      expect(normalizeLanguage(bad), `${JSON.stringify(bad)} 不该通过白名单`).toBe('zh-CN')
+    }
   })
 })
