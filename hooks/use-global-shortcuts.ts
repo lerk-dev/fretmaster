@@ -9,13 +9,19 @@ import { useAppStore } from '@/lib/store'
  *   S（打开设置）、1-5（切标签页）、空格 / → / PageDown（下一题）、
  *   ↑ / PageUp（显示指板）、↓（隐藏指板 + 下一题）、Enter（下一题）。
  *
- * ## 三条容易踩的坑（都有护栏，勿改）
+ * ## 四条容易踩的坑（都有护栏，勿改）
  *
  * 1. **专注模式下 Space / Esc 必须让位**（P2-7）—— 两个 window 级 keydown 同时存活时，
  *    按 Space 会既推进下一题**又**启停番茄钟；`preventDefault()` 拦不住另一个监听器
  *    （它只挡浏览器默认行为，不挡同页其它 handler）。这里的约定是「谁在场谁接管」。
  * 2. **带 Ctrl/Cmd/Alt 的组合一律放行**给浏览器（Ctrl+P / F / S 等系统快捷键）。
- * 3. **输入框 / textarea / contenteditable 里的按键必须跳过**，否则打字会触发全局动作。
+ * 3. **输入框 / textarea / contenteditable / select / 下拉浮层里的按键必须跳过**，
+ *    否则打字或选项导航会触发全局动作。
+ * 4. 🚨 **`event.defaultPrevented` 为真时一律放行**（2026-10-31 审计第 3 项）——
+ *    window 监听器在冒泡末端，组件自己的 onKeyDown（`lib/a11y.ts` 的
+ *    `activateOnEnterSpace`）已经用 preventDefault 认领了这次按键。preventDefault
+ *    **不阻断冒泡** ⇒ 不检查这个标志就会「按钮被取消激活 + 全局又推进一题」。
+ *    以后新增任何全局按键分支，都必须在这道守卫**之后**。
  *
  * ## 与页面的两处**有意改动**（其余逐行一致）
  *
@@ -87,6 +93,16 @@ export function useGlobalShortcuts(options: UseGlobalShortcutsOptions) {
   // 键盘事件监听 - 全局快捷键
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // 🚨 先让位给「已经认领这次按键」的控件（2026-10-31，审计第 3 项）。
+      //    本监听器挂在 window 上，是冒泡链的最末端；组件自己的 onKeyDown
+      //    （lib/a11y.ts 的 activateOnEnterSpace）会先 preventDefault 再执行动作。
+      //    而 `preventDefault()` **不阻断冒泡** ⇒ 少了这道守卫时，按 Enter 会
+      //    「按钮被取消激活 + 全局又推进一题」：等级弹窗里选中等级的同时换一题、
+      //    全屏层里退出全屏的同时换一题（都会污染统计）。
+      if (event.defaultPrevented) {
+        return
+      }
+
       // 忽略输入框/可编辑元素中的按键，避免与文本输入冲突
       const target = event.target as HTMLElement | null
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
@@ -94,6 +110,13 @@ export function useGlobalShortcuts(options: UseGlobalShortcutsOptions) {
       }
       // contenteditable 元素（如富文本编辑器）也跳过
       if (target && target.isContentEditable) {
+        return
+      }
+      // 🚨 `<select>` / 下拉浮层（combobox / listbox / menu）里的 Enter 与空格是
+      //    「展开 / 选中」语义，不能被当成「下一题」。这类控件不一定 preventDefault
+      //    （原生 select 靠默认行为展开，没有 JS handler），所以必须按标签/role 显式排除。
+      //    用 closest 而不是 `instanceof HTMLSelectElement`：事件目标可能是内部的 <option>。
+      if (target instanceof Element && target.closest('select, [role="combobox"], [role="listbox"], [role="menu"]')) {
         return
       }
 
