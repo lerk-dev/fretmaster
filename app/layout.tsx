@@ -1,6 +1,7 @@
 import './globals.css'
 import '@fontsource/noto-music'
 import { LayoutShell } from '@/components/layout-shell'
+import { SITE_TITLE, STATIC_DESCRIPTION } from '@/lib/site-meta'
 
 export const viewport = {
   width: 'device-width',
@@ -74,8 +75,10 @@ export default function RootLayout({
             if (el) { el.textContent = window.__fmerrors.join('\\n'); el.classList.remove('hidden'); }
           });
         `}} />
-        <title>FretMaster - 吉他指板练习工具</title>
-        <meta name="description" content="专业的吉他指板可视化练习工具，助你掌握指板音符位置" />
+        <title>{SITE_TITLE['zh-CN']}</title>
+        {/* 静态导出只有一份 HTML ⇒ 描述写**双语**（爬虫与分享预览读的是这一份）；
+            运行期由 layout-shell 按当前语言覆盖（见 lib/site-meta.ts）。 */}
+        <meta name="description" content={STATIC_DESCRIPTION} />
         <meta name="generator" content="v0.app" />
         <link rel="icon" href="/icon-light-32x32.png" media="(prefers-color-scheme: light)" />
         <link rel="icon" href="/icon-dark-32x32.png" media="(prefers-color-scheme: dark)" />

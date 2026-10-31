@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 import { ClientOnly } from '@/components/client-only'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { useAppStore, isLightTheme } from '@/lib/store'
+import { applySiteMeta } from '@/lib/site-meta'
 import { useEffect, useState } from 'react'
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {
@@ -17,13 +18,12 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   useEffect(() => setMounted(true), [])
   const sonnerTheme = mounted && isLightTheme(theme) ? 'light' : 'dark'
 
-  // 语言切换时同步文档标题与 <html lang> 标注
+  // 语言切换时同步文档标题 / meta description / <html lang> 标注。
+  // 🚨 描述也要同步（审计 2026-10-31 第 14 项）：静态导出只有一份 HTML，原先
+  //    `meta[name=description]` 永远是中文 ⇒ 英文用户分享出去的链接预览是中文。
+  //    站点元信息的文案与写入逻辑统一在 `lib/site-meta.ts`（可单测）。
   useEffect(() => {
-    if (typeof document === 'undefined') return
-    document.title = language === 'zh-CN'
-      ? 'FretMaster - 吉他指板练习工具'
-      : 'FretMaster - Guitar Fretboard Practice Tool'
-    document.documentElement.lang = language
+    applySiteMeta(language)
   }, [language])
 
   // 同步 isFullscreen 到 html/body 标签（html/body 在 server component 中渲染，需在此副作用操作 DOM）

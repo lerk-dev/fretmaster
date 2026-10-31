@@ -215,7 +215,10 @@ function MiniFretboard({ stringCount, tuning, startFret, endFret, cells, onCellC
     )
   }
   return (
-    <div className="inline-block" data-fretboard="mini">
+    // `mini-board`：给浏览器一个「这块可以先不算布局」的许可（见 globals.css 的注释）。
+    // 把位教学 tab 一次会挂 15 个这样的小指板（≈2250 个格子节点），
+    // 屏幕外的那些没必要参与每帧的布局计算。
+    <div className="inline-block mini-board" data-fretboard="mini">
       {/* 品号行 */}
       <div className="flex mb-0.5">
         <div className="mini-label shrink-0" />

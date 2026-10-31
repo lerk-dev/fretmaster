@@ -1545,3 +1545,17 @@ html body[data-scroll-locked] {
     height: calc(20rem * var(--board-scale, 1));
   }
 }
+
+/* ===== 理论页迷你指板：屏幕外跳过布局（2026-10-31 审计第 12 项）=====
+
+   「把位教学」tab 一次挂 15 个迷你指板（5 个把位 × 3 + CAGED 5 个形状），
+   每个 ≈150 个格子节点 ⇒ 约 2250 个带 margin 的 DOM 节点。配合刚加的
+   `--board-scale` 放大后，布局开销随倍率平方增长。
+
+   `content-visibility: auto` 让**屏幕外**的指板跳过渲染与布局（内容仍可被
+   查找/读屏访问，不同于 display:none）；`contain-intrinsic-size: auto 160px`
+   让浏览器记住上次渲染的高度，避免滚动条跳动（`auto` 关键字表示「用尺寸缓存」）。 */
+.mini-board {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}
