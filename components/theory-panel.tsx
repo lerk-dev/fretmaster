@@ -38,10 +38,12 @@ import {
 } from '@/lib/chord-theory'
 import {
   ScaleType,
+  SCALE_INTERVAL_DISPLAY,
   getScaleNotes,
   getScaleDisplayName,
   getScaleOptionsForChord,
 } from '@/lib/scale-theory'
+import { spellChord, spellDegreeForDisplay, spellDegrees } from '@/lib/note-spelling'
 import {
   generateScalePositions,
   getCagedShapes,
@@ -291,12 +293,20 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
     // 音阶音符（负调号用降号显示）
     const scaleType = isMinor ? ScaleType.naturalMinor : ScaleType.major
     const scale = getScaleNotes(pc as Note, scaleType)
+    // 🚨 音名必须按**调号**拼写（负调号用降号侧），不能用固定 12 音表：
+    //    固定表在 C♯/F♯ 上会输出「两个 F、没有 E」（审计 2026-10-31 第 5 项）。
+    const spelled = spellDegrees(
+      pc,
+      SCALE_INTERVAL_DISPLAY[scaleType] ?? [],
+      keySig < 0 ? 'flat' : 'sharp',
+    )
     return {
       pc,
       keySig,
       majorName,
       minorName,
       scale,
+      spelled,
     }
   }, [circleIndex, circleMode])
 
@@ -312,12 +322,19 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
     const notes = getChordNotes(chordRoot, chordType)
     const chordSymbol = `${pcName(chordRoot, rootPrefersFlat)}${getChordTypeUnicodeDisplayString(chordType)}`
     const options = getScaleOptionsForChord(chordType)
+    // 拼写偏好必须与和弦符号一致：选了 E♭ 就不能把音显示成 D♯（反之亦然）。
+    // 根音符号来自 `ROOT_PC_NAMES`（黑键混用拼写：C♯ 但 E♭/A♭/B♭），
+    // 所以这里只能在「整个和弦/音阶都按升号」与「都按降号」之间选一个。
+    const prefer = rootPrefersFlat ? 'flat' : 'sharp'
+    const spelledNotes = spellChord(chordRoot, CHORD_INTERVALS[chordType] ?? [], prefer)
     const scales = options.map(st => ({
       type: st,
       name: getScaleDisplayName(st, true, lang === 'en' ? 'en' : 'zh'),
       notes: getScaleNotes(chordRoot as Note, st),
+      // 见 circleDetail 的注释：音名按调号拼写，固定 12 音表在 C♯/F♯ 上会重字母
+      spelled: spellDegrees(chordRoot, SCALE_INTERVAL_DISPLAY[st] ?? [], prefer),
     }))
-    return { notes, chordSymbol, scales }
+    return { notes, spelledNotes, chordSymbol, scales }
   }, [chordRoot, chordType, lang, rootPrefersFlat])
 
   // ===== 把位指型 =====
@@ -345,6 +362,20 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
    * 「换根音」只挪动高亮而不移调（音集还是 C 调那一套）。
    */
   const modeCells = useMemo(() => {
+    // 先按调号把每个音级拼好音名（rel 半音 → 音名），再铺到整指板。
+    // 🚨 不能对每个格子调 `pcName(pc, …)`：那是固定 12 音表，C♯/F♯ 上会出现
+    //    「一个音阶里两个 F、没有 E」（审计 2026-10-31 第 5 项）。
+    const spelledByRel = new Map<number, string>()
+    modeScaleDef.notes.forEach((rel, idx) => {
+      // 用 display 版本：这里的 ♯/♭ 开关是用户偏好，点了必须看到变化
+      const name = spellDegreeForDisplay(
+        modesRoot,
+        modeScaleDef.intervals[idx] ?? '1',
+        modesPreferFlat ? 'flat' : 'sharp',
+      )
+      spelledByRel.set(rel, name)
+    })
+
     const cells = new Map<string, { label: string; isRoot: boolean }>()
     for (let s = 0; s < config.stringCount; s++) {
       for (let f = 0; f <= fretCount; f++) {
@@ -353,7 +384,9 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
         const idx = modeScaleDef.notes.indexOf(rel)
         if (idx < 0) continue
         cells.set(`${s}-${f}`, {
-          label: modesShowIntervals ? formatDegree(modeScaleDef.intervals[idx] ?? '') : pcName(pc, modesPreferFlat),
+          label: modesShowIntervals
+            ? formatDegree(modeScaleDef.intervals[idx] ?? '')
+            : spelledByRel.get(rel) ?? pcName(pc, modesPreferFlat),
           isRoot: rel === 0,
         })
       }
@@ -622,7 +655,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                           i === 0 ? 'bg-primary/15 text-primary font-bold' : 'bg-muted/60 text-foreground'
                         }`}
                       >
-                        {pcName(n, circleDetail.keySig < 0)}
+                        {circleDetail.spelled[i] ?? pcName(n, circleDetail.keySig < 0)}
                       </span>
                     ))}
                   </div>
@@ -669,7 +702,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                 <span className="text-xs text-muted-foreground">=</span>
                 {chordScaleInfo.notes.map((n, i) => (
                   <span key={`${n}-${i}`} className={`px-1.5 py-0.5 rounded text-xs font-mono ${i === 0 ? 'bg-primary/15 text-primary font-bold' : 'bg-muted/60'}`}>
-                    {pcName(n, rootPrefersFlat)}
+                    {chordScaleInfo.spelledNotes[i] ?? pcName(n, rootPrefersFlat)}
                   </span>
                 ))}
               </div>
@@ -683,7 +716,7 @@ export function TheoryPanel({ instrument, fretCount, language, fretMarkers }: Th
                   <div className="flex flex-wrap gap-1">
                     {scale.notes.map((n, i) => (
                       <span key={`${scale.type}-${n}-${i}`} className="px-1.5 py-0.5 rounded bg-muted/60 text-2xs font-mono">
-                        {pcName(n, rootPrefersFlat)}
+                        {scale.spelled[i] ?? pcName(n, rootPrefersFlat)}
                       </span>
                     ))}
                   </div>

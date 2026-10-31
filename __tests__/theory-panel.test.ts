@@ -268,6 +268,36 @@ describe('五度圈：选中与拼写', () => {
     p.unmount()
   })
 
+  /**
+   * 🚨 审计 2026-10-31 第 5 项：固定 12 音表在 F♯ 大调上输出
+   * `F♯ G♯ A♯ B C♯ D♯ F` —— **两个 F、没有 E**。对一个乐理教学工具来说这是硬伤，
+   * 而且肉眼扫一串音名很难发现，只有钉住整串才能防回归。
+   */
+  it('选 F♯ 大调：7 个音落在 7 个不同字母上（F♯ G♯ A♯ B C♯ D♯ E♯）', () => {
+    const p = mount()
+    p.click(p.nodeByLabel('F♯'))
+    expect(p.detailRow('调号')).toBe('♯♯♯♯♯♯(+6)')
+    const notes = p.scaleNoteTokens()
+    expect(notes).toEqual(['F♯', 'G♯', 'A♯', 'B', 'C♯', 'D♯', 'E♯'])
+    expect(new Set(notes.map((n) => n.charAt(0))).size, '字母必须唯一').toBe(7)
+    p.unmount()
+  })
+
+  it('降号侧不回退：D♭ 大调 = D♭ E♭ F G♭ A♭ B♭ C', () => {
+    const p = mount()
+    p.click(p.nodeByLabel('D♭'))
+    expect(p.detailRow('调号')).toBe('♭♭♭♭♭(-5)')
+    expect(p.scaleNoteTokens()).toEqual(['D♭', 'E♭', 'F', 'G♭', 'A♭', 'B♭', 'C'])
+    p.unmount()
+  })
+
+  it('F♯ 的关系小调（D♯m）同样按调号拼写', () => {
+    const p = mount()
+    p.click(p.nodeByLabel('D♯m'))
+    expect(p.scaleNoteTokens()).toEqual(['D♯', 'E♯', 'F♯', 'G♯', 'A♯', 'B', 'C♯'])
+    p.unmount()
+  })
+
   it('键盘 Enter / Space 与点击等效', () => {
     const p = mount()
     p.press(p.nodeByLabel('D'), 'Enter')
@@ -377,7 +407,10 @@ describe('和弦音阶：符号与音名必须与所选拼写一致', () => {
     p.switchTab('和弦音阶')
     p.pickOption(0, 'C♯')
     expect(p.text()).toContain('C♯7')
-    expect(p.chordToneTokens()).toEqual(['C♯', 'F', 'G♯', 'B'])
+    // 🚨 三音必须是 E♯ 而不是 F：C♯7 = C♯ E♯ G♯ B。
+    //    原断言写的是 ['C♯','F','G♯','B'] —— 那是固定 12 音表的输出（一个和弦里
+    //    出现两个 F 字母 = 音名错），2026-10-31 修拼写时一并改正。
+    expect(p.chordToneTokens()).toEqual(['C♯', 'E♯', 'G♯', 'B'])
     expect(p.text()).not.toContain('D♭7')
     p.unmount()
   })

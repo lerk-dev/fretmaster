@@ -19,6 +19,8 @@ import {
   parentKeyOf,
 } from '@/lib/theory-mode-guide'
 import { SCALE_MODES } from '@/lib/page-theory-data'
+import { degreeSemitoneMod12 } from '@/lib/degree-semitone'
+import { CHORD_INTERVALS, ChordType } from '@/lib/chord-theory'
 
 describe('调式族数据与 SCALE_MODES 的对齐契约', () => {
   it('三大调式族各 7 个调式，名字能在 SCALE_MODES 对应族里逐字找到', () => {
@@ -101,8 +103,33 @@ describe('chordToneLabel（和弦音位图的度数标签）', () => {
     expect(chordToneLabel(14)).toBe('9')
     expect(chordToneLabel(17)).toBe('11')
     expect(chordToneLabel(21)).toBe('13')
-    expect(chordToneLabel(15)).toBe('b9')
+    expect(chordToneLabel(13)).toBe('b9')
+    expect(chordToneLabel(15)).toBe('#9')
     expect(chordToneLabel(18)).toBe('#11')
+    expect(chordToneLabel(20)).toBe('b13')
+  })
+
+  /**
+   * 🚨 互推不变量：`chordToneLabel(n)` 的标签，其 mod-12 半音值必须等于 n mod 12。
+   *
+   * 这条用例是 2026-10-31 修正的护栏 —— 原表把 15 写成 `b9`、16 写成 `#9`、
+   * 21/22 写成 `13`/`b13`，从「标签看着都像模像样」这一点根本发现不了，
+   * 只有拿半音值回推才暴露（而它直接决定和弦音位图上的度数标注对不对）。
+   */
+  it('每个和弦音程的度数标签都与半音值自洽', () => {
+    for (const type of Object.values(ChordType) as ChordType[]) {
+      for (const interval of CHORD_INTERVALS[type] ?? []) {
+        const label = chordToneLabel(interval)
+        if (label === 'R') {
+          expect(interval % 12, `${type}: R 必须落在根音上`).toBe(0)
+          continue
+        }
+        expect(
+          degreeSemitoneMod12(label),
+          `${type} 的 ${interval} 半音标成了 ${label}（标签半音值对不上）`,
+        ).toBe(interval % 12)
+      }
+    }
   })
 })
 
