@@ -292,10 +292,16 @@ mod tests {
     const SOURCE: &str = include_str!("stats.rs");
 
     fn fn_body(name: &str) -> String {
-        let start = SOURCE
+        // 🚨 先统一行尾：`include_str!` 拿到的是**磁盘上的字节**，而本仓
+        // `core.autocrlf` 让检出是 CRLF、入库是 LF（铁律 36）。锚点里写死 `\n}\n`
+        // 在 CRLF 检出下必然 0 次命中 —— body 于是变成「从函数开头到文件末尾」，
+        // 断言看起来还在跑、实际检查的是整个文件（实测：cargo test 报
+        // 「save_practice_stats 里还有 db.execute(...)」，而那个函数里根本没有）。
+        let source = SOURCE.replace('\r', "");
+        let start = source
             .find(&format!("pub fn {name}"))
             .unwrap_or_else(|| panic!("找不到函数 {name} —— 锚点失效"));
-        let rest = &SOURCE[start..];
+        let rest = &source[start..];
         // 函数体截到下一个顶层闭合花括号（这几个函数体内没有嵌套的顶层花括号）
         let end = rest.find("\n}\n").map(|i| i + 2).unwrap_or(rest.len());
         rest[..end].to_string()
