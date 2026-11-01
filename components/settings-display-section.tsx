@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
 import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Switch } from '@/components/ui/switch'
 
 interface SettingsDisplaySectionProps {
   t: (key: string) => string
@@ -43,6 +44,12 @@ interface SettingsDisplaySectionProps {
   onPianoKeyboardStyleChange: (v: PianoKeyboardStyle) => void
   chordSymbols: ChordSymbolSettings
   onChordSymbolChange: (patch: Partial<ChordSymbolSettings>) => void
+  /** 是否显示「正确率统计」徽章（默认关） */
+  showAccuracy: boolean
+  onShowAccuracyChange: (show: boolean) => void
+  /** 是否显示「倒计时」徽章（默认关，仅时有练习生效） */
+  showTimer: boolean
+  onShowTimerChange: (show: boolean) => void
 }
 
 export function SettingsDisplaySection({
@@ -65,6 +72,10 @@ export function SettingsDisplaySection({
   onPianoKeyboardStyleChange,
   chordSymbols,
   onChordSymbolChange,
+  showAccuracy,
+  onShowAccuracyChange,
+  showTimer,
+  onShowTimerChange,
 }: SettingsDisplaySectionProps) {
   return (
     <AccordionItem value="display" className="border-b-0">
@@ -503,6 +514,36 @@ export function SettingsDisplaySection({
           ? '属七降九和弦（7b9）在和弦音阶练习中对应的音阶：Altered（变化音阶）/ 全半减音阶 / 半全减音阶。'
           : 'Scale used for 7b9 chords in chord-scale exercises: Altered / Whole-Half Diminished / Half-Whole Diminished.'}
       </p>
+    </div>
+
+    <Separator className="my-1" />
+    <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 pt-1">
+      <Music className="h-3.5 w-3.5" />
+      {language === 'zh-CN' ? '练习状态显示' : 'Practice Status Display'}
+    </div>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <div className="text-sm">{t('show_accuracy')}</div>
+          <div className="text-xs text-muted-foreground">{t('show_accuracy_desc')}</div>
+        </div>
+        <Switch
+          checked={showAccuracy}
+          onCheckedChange={onShowAccuracyChange}
+          aria-label={t('show_accuracy')}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <div className="text-sm">{t('show_timer')}</div>
+          <div className="text-xs text-muted-foreground">{t('show_timer_desc')}</div>
+        </div>
+        <Switch
+          checked={showTimer}
+          onCheckedChange={onShowTimerChange}
+          aria-label={t('show_timer')}
+        />
+      </div>
     </div>
       </AccordionContent>
     </AccordionItem>

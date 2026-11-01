@@ -195,6 +195,22 @@ export interface UserSettings {
    * 用户既不知道也关不掉。
    */
   agcEnabled: boolean
+  /**
+   * 是否在练习中（普通模式与全屏模式）显示「正确率统计」徽章。
+   *
+   * 默认 false（不显示）。用户可在「设置 → 显示与外观」里打开。
+   * 显示源：components/practice-status.tsx 的 PracticeScoreBadge，
+   * 调用方（app-header / fullscreen-overlay）用本开关做门控。
+   */
+  showAccuracy: boolean
+  /**
+   * 是否在练习中（普通模式与全屏模式）显示「倒计时」徽章。
+   *
+   * 默认 false（不显示）。用户可在「设置 → 显示与外观」里打开。
+   * 显示源：components/practice-status.tsx 的 PracticeTimerBadge，
+   * 调用方（app-header / fullscreen-overlay）用本开关做门控。
+   */
+  showTimer: boolean
 }
 
 // Premium功能状态
@@ -513,6 +529,10 @@ export interface AppActions {
   setAgcEnabled: (enabled: boolean) => void
   setShowPracticeSuggestion: (show: boolean) => void
   setCurrentPracticeSuggestion: (suggestion: string | null) => void
+  /** 显示/隐藏「正确率统计」徽章（设置 → 显示与外观） */
+  setShowAccuracy: (show: boolean) => void
+  /** 显示/隐藏「倒计时」徽章（设置 → 显示与外观） */
+  setShowTimer: (show: boolean) => void
   
   // Premium操作
   setPremiumFeature: (feature: keyof PremiumFeatures, enabled: boolean) => void
@@ -738,6 +758,8 @@ const initialState: AppState = {
     fretboardStyle: 'classic' as FretboardStyle,
     pianoKeyboardStyle: 'classic' as PianoKeyboardStyle,
     agcEnabled: true,
+    showAccuracy: false,
+    showTimer: false,
   },
   
   premium: {
@@ -815,6 +837,14 @@ export function migratePersistedState(persistedState: any, version: number): any
       // 与 Rust 的 agc_enabled 默认值同源；漏补的话 UI 会显示「关」而后端实际开着。
       if (persistedState.user.agcEnabled === undefined) {
         persistedState.user.agcEnabled = true
+      }
+      // 「正确率统计」与「倒计时」徽章开关：2026-10 新增，默认关（用户主动打开）。
+      // 老 blob 没有这两个字段 ⇒ 补 false，避免 undefined 被当成 truthy 而意外显示。
+      if (persistedState.user.showAccuracy === undefined) {
+        persistedState.user.showAccuracy = false
+      }
+      if (persistedState.user.showTimer === undefined) {
+        persistedState.user.showTimer = false
       }
     }
     // audio.micUserDisabled：2026-10-02 新增（「桌面端音频输入默认开」语义）。
@@ -1033,6 +1063,8 @@ export const useAppStore = create<AppState & AppActions>()(
       setAgcEnabled: (agcEnabled) => set((state) => ({ user: { ...state.user, agcEnabled } })),
       setShowPracticeSuggestion: (show) => set((state) => ({ user: { ...state.user, showPracticeSuggestion: show } })),
       setCurrentPracticeSuggestion: (suggestion) => set({ currentPracticeSuggestion: suggestion }),
+      setShowAccuracy: (show) => set((state) => ({ user: { ...state.user, showAccuracy: show } })),
+      setShowTimer: (show) => set((state) => ({ user: { ...state.user, showTimer: show } })),
       
       // Premium操作
       setPremiumFeature: (feature, enabled) => set((state) => ({ premium: { ...state.premium, [feature]: enabled } })),

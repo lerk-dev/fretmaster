@@ -70,6 +70,10 @@ function mount(props: Props = {}, lang: 'zh-CN' | 'en' = 'zh-CN') {
     onFretboardStyleChange: track('fretboardStyle'),
     pianoKeyboardStyle: 'classic' as const,
     onPianoKeyboardStyleChange: track('pianoKeyboardStyle'),
+    showAccuracy: false,
+    onShowAccuracyChange: track('showAccuracy'),
+    showTimer: false,
+    onShowTimerChange: track('showTimer'),
     ...props,
   }
   const container = document.createElement('div')
@@ -683,11 +687,57 @@ describe('SettingsDisplaySection', () => {
       expect(CJK.test(zhHint!)).toBe(true)
       zh.unmount()
 
-      const en = mount({}, 'en')
-      const enHint = hintAbout(en.container, 'MusMath')
-      expect(enHint).toBeTruthy()
-      expect(CJK.test(enHint!), enHint).toBe(false)
-      en.unmount()
-    })
+    const en = mount({}, 'en')
+    const enHint = hintAbout(en.container, 'MusMath')
+    expect(enHint).toBeTruthy()
+    expect(CJK.test(enHint!), enHint).toBe(false)
+    en.unmount()
+  })
+  })
+})
+
+/**
+ * 「显示与外观」里的两个开关：正确率统计 / 倒计时。
+ * 默认关（unchecked）；点击回传的是**新值**（radix Switch 的 onCheckedChange 语义）。
+ */
+describe('练习状态显示开关（正确率 / 倒计时）', () => {
+  it('两组文案都出现，且默认 unchecked', () => {
+    const p = mount()
+    expect(p.text()).toContain(tZh('show_accuracy'))
+    expect(p.text()).toContain(tZh('show_accuracy_desc'))
+    expect(p.text()).toContain(tZh('show_timer'))
+    expect(p.text()).toContain(tZh('show_timer_desc'))
+
+    const acc = p.container.querySelector(`[aria-label="${tZh('show_accuracy')}"]`) as HTMLElement | null
+    expect(acc, '应渲染正确率开关').toBeTruthy()
+    expect(acc!.getAttribute('aria-checked')).toBe('false')
+
+    const timer = p.container.querySelector(`[aria-label="${tZh('show_timer')}"]`) as HTMLElement | null
+    expect(timer, '应渲染倒计时开关').toBeTruthy()
+    expect(timer!.getAttribute('aria-checked')).toBe('false')
+    p.unmount()
+  })
+
+  it('点击正确率开关回传新值（true→false，false→true）', () => {
+    const p = mount({ showAccuracy: true })
+    const acc = p.container.querySelector(`[aria-label="${tZh('show_accuracy')}"]`) as HTMLElement
+    expect(acc.getAttribute('aria-checked')).toBe('true')
+    p.click(acc)
+    expect(p.calls.showAccuracy).toEqual([false])
+    p.unmount()
+
+    const p2 = mount({ showAccuracy: false })
+    const acc2 = p2.container.querySelector(`[aria-label="${tZh('show_accuracy')}"]`) as HTMLElement
+    p2.click(acc2)
+    expect(p2.calls.showAccuracy).toEqual([true])
+    p2.unmount()
+  })
+
+  it('点击倒计时开关回传新值', () => {
+    const p = mount({ showTimer: true })
+    const timer = p.container.querySelector(`[aria-label="${tZh('show_timer')}"]`) as HTMLElement
+    p.click(timer)
+    expect(p.calls.showTimer).toEqual([false])
+    p.unmount()
   })
 })

@@ -101,6 +101,8 @@ function render(props: Record<string, unknown> = {}) {
       resetSettings: noop,
       exportSettings: noop,
       importSettings: noop,
+      showAccuracy: true,
+      showTimer: true,
       ...props,
     } as never))
   })
@@ -308,6 +310,25 @@ describe('无障碍标签（2026-09-26 修复：此前硬编码中文）', () =>
       [...en.container.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label')),
     ).toContain('Time remaining 2:05')
     en.unmount()
+  })
+
+  it('showAccuracy=false 时不渲染得分区（受「显示与外观」开关门控）', () => {
+    act(() => {
+      useAppStore.setState({ isPlaying: true, score: { correct: 3, total: 4 } })
+    })
+    const p = render({ showAccuracy: false })
+    const labels = [...p.container.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label'))
+    expect(labels.some((v) => v?.includes('得分')), '关掉正确率后不该有得分区').toBe(false)
+    p.unmount()
+  })
+
+  it('showTimer=false 时即使时有练习也不渲染计时区', () => {
+    useAppStore.setState({ isPlaying: true })
+    act(() => { useAppStore.getState().setPracticeTime(5) })
+    const p = render({ showTimer: false, timeLeft: 125 })
+    const labels = [...p.container.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label'))
+    expect(labels.some((v) => v?.includes('剩余时间') || v?.includes('Time remaining')), '关掉倒计时后不该有计时区').toBe(false)
+    p.unmount()
   })
 })
 
