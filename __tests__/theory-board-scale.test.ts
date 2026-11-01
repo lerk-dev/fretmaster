@@ -208,8 +208,11 @@ describe('源码护栏：倍率必须真的接到图上', () => {
   })
 
   it('圆点字号也乘了倍率（只放大容器 = 假修：圆点变大、音名还是小字）', () => {
-    expect(css).toMatch(/font-size: calc\(0\.75rem \* var\(--board-scale, 1\)\)/)
-    expect(css).toMatch(/font-size: calc\(0\.8125rem \* var\(--board-scale, 1\)\)/)
+    // ⚠️ 这里钉的是**具体数值**：2026-10-31 用户要求「指板音名 音级 再调大两号」⇒
+    //    Trainer 皮肤圆点内字号 12px → 14px（小屏）、13px → 16px（≥640px）。
+    //    意图不变：**字号必须跟着 --board-scale 一起缩放**（只放大圆点 = 假修）。
+    expect(css).toMatch(/font-size: calc\(0\.875rem \* var\(--board-scale, 1\)\)/)
+    expect(css).toMatch(/font-size: calc\(1rem \* var\(--board-scale, 1\)\)/)
   })
 
   it('mini 指板与五度圈的类带倍率，且组件里不再写死像素宽高', () => {

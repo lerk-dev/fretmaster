@@ -1667,6 +1667,8 @@ export default function FretMasterPage() {
           resetSettings={resetSettings}
           exportSettings={exportSettings}
           importSettings={importSettings}
+          showAccuracy={user.showAccuracy}
+          showTimer={user.showTimer}
         />
 
         {/* Main Content */}
@@ -2351,6 +2353,7 @@ export default function FretMasterPage() {
             getCurrentChordDisplay={getCurrentChordDisplay}
             getNextChordDisplay={getNextChordDisplay}
             getLevelOptions={getLevelOptions}
+            chordDegreeCurrentStep={chordDegreeCurrentStep}
             chordExerciseTargetChord={chordExerciseTargetChord}
             chordExerciseSequence={chordExerciseSequence}
             chordExerciseCurrentStep={chordExerciseCurrentStep}
@@ -2370,6 +2373,8 @@ export default function FretMasterPage() {
             timeLeft={timeLeft}
             practiceTime={practiceTime}
             formatTime={formatTime}
+            showAccuracy={user.showAccuracy}
+            showTimer={user.showTimer}
             showFretboard={showFretboard}
             showIntervalFretboard={showIntervalFretboard}
             showChordFretboard={showChordFretboard}

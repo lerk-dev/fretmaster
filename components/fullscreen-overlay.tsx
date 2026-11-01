@@ -1,7 +1,7 @@
 // 全屏练习覆盖层：按 tab 显示练习内容 + 下一题预览 + 可交互指板（按 ↑/↓ 显隐）
 "use client"
 
-import { memo } from 'react'
+import { memo, useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { SCALE_MODES } from '@/lib/page-theory-data'
 import { formatChordShape, formatDegree, getChordDegrees, getChordDisplayName, getScaleDisplayName, normalizeNoteName } from '@/lib/page-theory-functions'
@@ -46,6 +46,14 @@ interface FullscreenOverlayProps {
   getNextChordDisplay: () => { index: number; root: string; type: string; bass?: string; degrees: string[] } | null
   /** 等级选项（传给 getChordDegrees） */
   getLevelOptions: () => { forceNaturalFive?: boolean; endOnStartingInterval?: boolean; usePassingNoteBebopScale?: boolean; sevenFlatNineScaleChoice?: 'altered' | 'diminishedWholeHalf' | 'diminishedHalfWhole' }
+  /**
+   * 和弦进行：**当前音级下标**（= 已弹对的音的数量）。
+   * 与普通模式 `components/chord-degrees-display.tsx` 同源 —— 那边早就按它逐个把
+   * 已弹对的音级 `opacity-50` 变灰、当前音级高亮；全屏层原先**根本没接这个状态**，
+   * 三个音级从头到尾都是 `text-primary` ⇒ 用户看不出弹到哪个音了
+   * （只能等整和弦弹完切下一和弦）。2026-10-31 用户反馈后补上。
+   */
+  chordDegreeCurrentStep: number
   /** 和弦练习：目标和弦 */
   chordExerciseTargetChord: { root: string; type: string } | null
   /** 和弦练习：音级序列 */
@@ -104,6 +112,10 @@ interface FullscreenOverlayProps {
   practiceTime: number
   /** 秒 → mm:ss */
   formatTime: (seconds: number) => string
+  /** 是否显示「正确率统计」徽章（设置 → 显示与外观，默认关） */
+  showAccuracy: boolean
+  /** 是否显示「倒计时」徽章（设置 → 显示与外观，默认关；仅时有练习生效） */
+  showTimer: boolean
   /** 找音练习：指板显隐 */
   showFretboard: boolean
   /** 音程练习：指板显隐 */
@@ -160,6 +172,7 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   getCurrentChordDisplay,
   getNextChordDisplay,
   getLevelOptions,
+  chordDegreeCurrentStep,
   chordExerciseTargetChord,
   chordExerciseSequence,
   chordExerciseCurrentStep,
@@ -179,6 +192,8 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   timeLeft,
   practiceTime,
   formatTime,
+  showAccuracy,
+  showTimer,
   showFretboard,
   showIntervalFretboard,
   showChordFretboard,
@@ -199,6 +214,29 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   const isPlaying = useIsPlaying()
   const user = useUser()
   const chordSymbols = useChordSymbols()
+
+  // 「点击退出全屏」提示的自动显隐：
+  // 进入全屏后先显示 3 秒 → 自动隐藏；鼠标/触摸移动时再显示，停下 3 秒后继续隐藏（循环）。
+  // 用墙钟无关的计数器：只在状态翻转时 setState，移动时频繁触发只重置定时器不重渲。
+  const EXIT_HINT_VISIBLE_MS = 3000
+  const [exitHintVisible, setExitHintVisible] = useState(true)
+  const exitHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleHideExitHint = useRef(() => {
+    if (exitHintTimer.current) clearTimeout(exitHintTimer.current)
+    exitHintTimer.current = setTimeout(() => setExitHintVisible(false), EXIT_HINT_VISIBLE_MS)
+  })
+  useEffect(() => {
+    setExitHintVisible(true)
+    scheduleHideExitHint.current()
+    return () => {
+      if (exitHintTimer.current) clearTimeout(exitHintTimer.current)
+    }
+  }, [])
+  const handleExitHintActivity = () => {
+    // React 在值不变（true === true）时会自动跳过重渲，故每次移动直接置 true 即可
+    setExitHintVisible(true)
+    scheduleHideExitHint.current()
+  }
   // 🚨 弦数 / 调弦 / 品数**不再在这里派生**：经典皮肤已改为复用 `PracticeFretboard`，
   // 这三者的唯一来源（`resolveInstrumentConfig(user.instrument)` 与 `practiceSettings.fretCount`）
   // 都在那个组件内部；GuitarRun 皮肤则由 `GuitarRunFretboard` 自己读。两处都不必再传。
@@ -231,9 +269,19 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   //    退出方式改为「点背景」+「Esc（全局快捷键 / 本层兜底）」，两者都在下面保留。
   return (
 <div
-  className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center overflow-auto cursor-pointer"
+  /* 🚨 `safe-center-y`（手写类，见 `app/globals.css`；不是裸 `justify-center`）：
+     内容比视口高时，裸 center 会把溢出的那一半甩到**顶部之外** —— 顶部被裁掉
+     **且滚不回去**（实测 1366×768：调式名「C 伊奥尼亚调式」只剩「调式」两个字）。
+     `safe center` 在放不下时自动退回 `start` ⇒ 顶部可达、可正常滚动。
+
+     ⚠️ **不能用 Tailwind 任意值**：`justify-[safe_center]` 在 Tailwind 3.4.19 下
+     **不生成任何 CSS 规则**（实测，连 `justify-[center]` 也不生成）⇒ 类名进了产物
+     JS、样式表里却没有 ⇒ 静默失效、页面退回默认 `flex-start`。 */
+  className="fixed inset-0 z-[9999] bg-background flex flex-col items-center safe-center-y overflow-auto cursor-pointer"
   style={{ margin: 0, padding: 0, width: '100vw', height: '100vh', top: 0, left: 0, right: 0, bottom: 0 }}
   onClick={() => setFullscreenMode(false)}
+  onMouseMove={handleExitHintActivity}
+  onTouchMove={handleExitHintActivity}
   onKeyDown={(e) => {
     // 子控件已经用掉这次按键（`activateOnEnterSpace` 会 preventDefault）⇒ 别再退出全屏
     if (e.defaultPrevented) return
@@ -245,7 +293,21 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   }}
 >
   <div
-    className="text-center p-8 w-full max-w-[400px] min-h-[300px] flex flex-col items-center justify-center cursor-default"
+    /* 🚨 `shrink-0`：**必须**禁掉 flex 压缩。
+       根容器是 `flex flex-col` + 固定 `height:100vh`，子项默认 `flex-shrink:1`。
+       内容总高超过视口（1366×768 ⇒ 768px）时，根容器会**压缩**子项来「装下」：
+         · 窄列有 `min-h-[300px]` ⇒ 只能压到 472px，而它的**内容**是 565px
+           ⇒ 溢出 93px，**直接画到兄弟节点（指板）上面**（实测「下一把位」文字压在指板格子上）；
+         · 指板那格没有 min-height ⇒ 压得更狠，内容从自己的盒子溢出去。
+       禁掉压缩后，内容按自然高度排开，根容器 `overflow-auto` 负责滚动。
+       ⚠️ 这也解释了「**只有开指板才出问题**」：不开指板时根容器只有一个 flex 子项，
+          压不动 ⇒ 不触发；有指板才有第二个子项一起被压。
+
+       `p-4`：窄列是**透明**的，padding 只影响「内容相对这 400px 盒子边的距离」，
+       肉眼几乎看不出来；但它**同时**是竖向（上下各 16px ⇒ 省 32px）与横向
+       （内容宽 336 → 368px，9 步滑窗每格多 3.5px）的资源。
+       竖向那 32px 正是 768p 笔记本「题目 + 指板一起放不下」的关键差额。 */
+    className="text-center p-4 w-full max-w-[400px] min-h-[300px] flex flex-col items-center justify-center cursor-default shrink-0"
     onClick={(e) => e.stopPropagation()}
   >
     {/*
@@ -259,8 +321,8 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     */}
     {isPlaying && (
       <div className="flex items-center justify-center gap-4 mb-6" data-fullscreen-status="">
-        <PracticeScoreBadge t={t} score={score} />
-        {practiceTime > 0 && (
+        {showAccuracy && <PracticeScoreBadge t={t} score={score} />}
+        {showTimer && practiceTime > 0 && (
           <PracticeTimerBadge t={t} timeLeft={timeLeft} formatTime={formatTime} />
         )}
       </div>
@@ -292,15 +354,45 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     
     {activeTab === "chord" && (
       <div className="space-y-8">
-        <div className="text-7xl font-bold text-primary">{getCurrentChordDisplay()}</div>
+        {/*
+          🚨 和弦名必须**一行**放得下：`whitespace-nowrap` 防换行（换行会改高度 ⇒
+          整块内容上下跳，正是用户反馈的「影响其他部分」）。
+          字号按断点收，保证**最长的中文和弦名**（「属七升五降九和弦」8 字 + 调性）
+          在任何视口宽度都不出屏（出屏会顶出横向滚动条）：
+            <640  text-4xl (36px) ⇒ 8×36+22 ≈ 310px < 358（390 手机的内容宽）
+            ≥640  text-6xl (48px) ⇒ 8×48+29 ≈ 413px < 640
+            ≥1024 text-7xl (72px) ⇒ 8×72+43 ≈ 619px < 1024
+        */}
+        <div data-fullscreen-title="" className="text-4xl sm:text-6xl lg:text-7xl font-bold text-primary whitespace-nowrap">{getCurrentChordDisplay()}</div>
         <div className="flex flex-wrap justify-center gap-4">
           {(() => {
             const chords = transposedChords
             const currentChord = chords[currentChordIndex]
             if (!currentChord) return null
             const degrees = getChordDegrees(currentChord.type, practiceLevel, getLevelOptions())
+            /*
+             * 🚨 逐音变灰（与普通模式 `components/chord-degrees-display.tsx` 同源口径）：
+             *   `i < chordDegreeCurrentStep` 已弹对 ⇒ 变灰；
+             *   `i === chordDegreeCurrentStep` 当前要弹 ⇒ 高亮（实心）；
+             *   其余 ⇒ 待弹（暗色）。
+             * 全屏层原先**根本没接 `chordDegreeCurrentStep`**，三个音级从头到尾都是
+             * `text-primary` ⇒ 弹没弹对全一个样，用户只能等整和弦弹完切下一和弦才反应过来。
+             * 2026-10-31 用户反馈后补上。
+             */
             return degrees.map((degree, i) => (
-              <span key={i} className="text-5xl font-bold text-primary">{formatDegree(degree)}</span>
+              <span
+                key={i}
+                data-chord-degree=""
+                data-done={i < chordDegreeCurrentStep ? '1' : '0'}
+                className={cn(
+                  'text-5xl font-bold transition-colors',
+                  i < chordDegreeCurrentStep && 'text-muted-foreground/50',
+                  i === chordDegreeCurrentStep && 'text-primary',
+                  i > chordDegreeCurrentStep && 'text-muted-foreground/80',
+                )}
+              >
+                {formatDegree(degree)}
+              </span>
             ))
           })()}
         </div>
@@ -325,7 +417,8 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     
     {activeTab === "chord_exercise" && isPlaying && chordExerciseTargetChord && (
       <div className="space-y-8">
-        <div className="text-7xl font-bold text-primary">
+        {/* 🚨 和弦名一行放得下（`whitespace-nowrap`）—— 同和弦转换分支的说明与字号断点 */}
+        <div data-fullscreen-title="" className="text-4xl sm:text-6xl lg:text-7xl font-bold text-primary whitespace-nowrap">
           {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay, chordSymbols))}
         </div>
         <div className="flex flex-wrap justify-center gap-4">
@@ -358,8 +451,13 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     )}
     
     {activeTab === "scale" && isPlaying && scaleExerciseSequence.length > 0 && (
-      <div className="space-y-6">
-        <div className="text-6xl font-bold text-primary">{normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</div>
+      /* `space-y-3`：全屏竖向空间紧张（窄列 + 指板要一起放下），`space-y-4` 就已经
+         多吃掉 16px，挤到 768p 笔记本就得滚动。 */
+      <div className="space-y-3">
+        {/* 🚨 音阶名必须**一行**放得下：`whitespace-nowrap` 防换行（换行改高度 ⇒ 内容上下跳）。
+            字号按断点收，保证**最长的中文音阶名**（「变化属音阶bb7」= 5 中文 + 3 拉丁 + 调性）
+            任何视口都不出屏：<640 text-3xl(30px)≈240px <358；≥640 text-5xl(48px)≈384px <640。 */}
+        <div data-fullscreen-title="" className="text-3xl sm:text-5xl font-bold text-primary whitespace-nowrap">{normalizeNoteName(scaleKey)} {getScaleDisplayName(selectedScale.name, chordScaleDisplay)}</div>
 
         {/*
           🚨 一弦三音（3NPS）必须换成「把位视图」（2026-10-31 补）。
@@ -402,13 +500,15 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
               <div className="flex flex-col items-center gap-1">
                 <div
                   className={cn(
-                    'w-28 h-28 rounded-xl flex items-center justify-center text-6xl font-bold',
+                    /* `w-20 h-20 text-4xl`：原来的 `w-28 h-28 text-6xl`(112px) 在全屏里
+                       纯属浪费竖向空间 —— 一屏要同时装下「题目 + 指板」，高度是稀缺资源。 */
+                    'w-20 h-20 rounded-xl flex items-center justify-center text-4xl font-bold',
                     threeNps.target.isRoot ? 'bg-blue-400/20 text-blue-500' : 'bg-primary/10 text-primary'
                   )}
                 >
                   {formatDegree(threeNps.target.label)}
                 </div>
-                <div className="text-2xl font-medium">
+                <div className="text-xl font-medium">
                   {threeNps.target.note}
                   <span className="ml-2 text-base font-normal text-muted-foreground">
                     {formatThreeNpsLocation(t, threeNps.target.stringIndex, threeNps.target.fret)}
@@ -420,13 +520,20 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
               </div>
             )}
 
-            {/* 9 步滑窗：当前步固定第 4 格（普通模式同款，只是放大） */}
-            <div className="flex flex-wrap justify-center gap-2">
+            {/* 9 步滑窗：当前步固定第 4 格（普通模式同款，只是放大）
+                🚨 格子**不许用固定宽度**。
+                全屏窄列的内容宽只有 336px（`max-w-[400px]` − `p-8`×2），而 9 个固定
+                `w-12`(48px) + 8 个 `gap-2`(8px) = **496px** ⇒ `flex-wrap` 永远换行成
+                2 排（实测 `rowCount=2`），「滑窗」变成两行数字，视觉语义直接崩掉。
+                改成 `flex-1 basis-0 min-w-0` ⇒ 9 格平分列宽，**永远一行**，
+                且列宽随视口变化时自动跟着变（窄屏也不会换行）。 */}
+            <div className="flex flex-nowrap justify-center gap-1">
               {threeNps.window.map((step, i) => (
                 <span
                   key={i}
+                  data-three-nps-step=""
                   className={cn(
-                    'inline-flex items-center justify-center w-12 h-12 px-2 rounded border text-xl font-mono',
+                    'inline-flex items-center justify-center flex-1 basis-0 min-w-0 h-12 px-0.5 rounded border text-lg font-mono',
                     step.current
                       ? 'bg-primary text-primary-foreground border-primary font-bold'
                       : step.done
@@ -458,7 +565,7 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
 
         {/* 下一题预览：3NPS 是「下一个把位」，普通音阶是下一题的调性 + 序列 */}
         {threeNps && nextThreeNps ? (
-          <div className="pt-6 mt-6 border-t border-border/30">
+          <div className="pt-3 mt-3 border-t border-border/30">
             <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
             <div className="text-xl font-medium mb-1">
               {t('three_nps_next_position').replace('{position}', String(nextThreeNps.position))}
@@ -471,7 +578,7 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
             </div>
           </div>
         ) : nextScaleExerciseInfo ? (
-          <div className="pt-6 mt-6 border-t border-border/30">
+          <div className="pt-3 mt-3 border-t border-border/30">
             <p className="text-sm text-muted-foreground mb-2">{t('next_chord')}</p>
             <div className="text-xl font-medium mb-1">
               {normalizeNoteName(nextScaleExerciseInfo.key)} {getScaleDisplayName(nextScaleExerciseInfo.scaleName, chordScaleDisplay)}
@@ -543,7 +650,8 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     <div
       /* 探针：契约测试靠它断言「指板是题目窄列的**兄弟**、且宽度上限不受 400px 约束」 */
       data-fullscreen-fretboard=""
-      className="w-full max-w-6xl mt-8 px-4 cursor-default"
+      /* `shrink-0`：同窄列 —— 指板绝不能被根容器压缩（压缩 ⇒ 内容溢出到退出提示/视口外） */
+      className="w-full max-w-6xl mt-8 px-4 cursor-default shrink-0"
       onClick={(e) => e.stopPropagation()}
     >
       {user.fretboardStyle !== 'classic' ? (
@@ -610,10 +718,24 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
     </div>
   )}
 
-    {/* 提示文字 */}
-    <div className="mt-12 text-sm text-muted-foreground">
-      {t('click_to_exit_fullscreen')}
-    </div>
+    {/*
+      提示文字：进入全屏前 3 秒显示，之后自动隐藏；鼠标/触摸移动时再显示，停下 3 秒后继续隐藏。
+      🚨 **必须脱离文档流**（`fixed`）：原来是流式布局里的一个块 + `mt-12` ⇒ 它一出现/消失，
+      根容器的 `safe center` 居中基线就跟着动，**上面整块题目上下跳一下**（用户原话「有跳动的感觉，
+      影响练习」）。改成 `fixed` 后它不参与 flex 布局 ⇒ 出现/消失完全不动其它元素的位置与大小。
+
+      ⚠️ `pointer-events-none`：浮动后它可能压在指板底部（窄屏内容刚好放满时），
+      若可点击就会**抢走品 格的点击**。提示语「点击退出全屏」说的是「点背景任意处即退出」
+      （外层 onClick），本身不需要自己可点。
+    */}
+    {exitHintVisible && (
+      <div
+        data-exit-control=""
+        className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[10000] rounded-full bg-background/70 px-3 py-1 text-sm text-muted-foreground backdrop-blur-sm whitespace-nowrap pointer-events-none"
+      >
+        {t('click_to_exit_fullscreen')}
+      </div>
+    )}
 </div>
   )
 })

@@ -222,13 +222,15 @@ describe('指板字体 —— 两套皮肤都引用同一个变量', () => {
       return m![0]
     }
 
-    expect(literalWith('h-8 sm:h-10 text-2xs sm:text-xs'), '空弦（0 品）').toContain('font-fretboard')
-    // 音符格字号：2026-10-07 按用户要求上移一档（`text-4xs sm:text-2xs` → `text-3xs sm:text-xs`）。
+    expect(literalWith('h-8 sm:h-10 text-xs sm:text-base'), '空弦（0 品）').toContain('font-fretboard')
+    // 音符格字号：2026-10-07 按用户要求上移一档（`text-4xs sm:text-2xs` → `text-3xs sm:text-xs`）；
+    // 2026-10-31 再按用户要求上移两档（`text-3xs sm:text-xs` → `text-2xs-plus sm:text-base`，
+    // 即移动端 9→11px、桌面 12→16px）。
     // ⚠️ 这串是**锚点**，不是「值不重要」——它一变测试就得跟着改，等于强制确认「换字号是有意的」。
-    expect(literalWith('h-8 sm:h-10 text-3xs sm:text-xs'), '1 品及以上').toContain('font-fretboard')
-    expect(code, '品数行').toContain('"text-2xs font-fretboard"')
+    expect(literalWith('h-8 sm:h-10 text-2xs-plus sm:text-base'), '1 品及以上').toContain('font-fretboard')
+    expect(code, '品数行').toContain('"text-xs font-fretboard"')
     // 反向：旧的「品数行不带字体类」写法必须已消失
-    expect(code, '品数行又变回没有字体类').not.toMatch(/"text-2xs",\s*isMarker/)
+    expect(code, '品数行又变回没有字体类').not.toMatch(/"text-xs",\s*isMarker/)
     expect(code, '经典皮肤里又出现 font-mono ⇒ 与 GuitarRun 分叉').not.toMatch(/\bfont-mono\b/)
   })
 })
@@ -241,9 +243,11 @@ describe('指板字体 —— GuitarRun 皮肤跟随显示缩放（字号与其�
   })
 
   it('🚨 四个字号档的 rem 值与迁移前的 px **一一等值**（÷16，防静默字号漂移）', () => {
-    // 源码顺序：.gr-fret-numbers(10) → .gr-fret-number--open(9) → .gr-note-dot(11) → ≤639 的圆点(7)
+    // 源码顺序：.gr-fret-numbers(10) → .gr-fret-number--open(9) → .gr-note-dot(15) → ≤639 的圆点(9)
+    // 🚨 2026-10-31 用户要求「音名 音级 再调大两号」⇒ .gr-note-dot 由 11px 提到 15px、
+    //    小屏由 7px 提到 9px。**圆点直径没动**（34/18px 仍装得下）⇒ 只改字号这一项。
     const rems = [...gr.matchAll(/font-size:\s*([\d.]+)rem/g)].map((m) => Number(m[1]))
-    expect(rems.map((r) => r * ROOT_PX)).toEqual([10, 9, 11, 7])
+    expect(rems.map((r) => r * ROOT_PX)).toEqual([10, 9, 15, 9])
   })
 
   it('🚨 圆点 / 行高 / 空弦列宽（含 ≥640 档）都是 rem 且与迁移前等值', () => {

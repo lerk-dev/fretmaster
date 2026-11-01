@@ -70,6 +70,7 @@ function mount(overrides: Record<string, unknown> = {}) {
     getCurrentChordDisplay: () => 'C',
     getNextChordDisplay: () => null,
     getLevelOptions: () => ({}),
+    chordDegreeCurrentStep: 0,
     chordExerciseTargetChord: null,
     chordExerciseSequence: [] as string[],
     chordExerciseCurrentStep: 0,
@@ -86,6 +87,8 @@ function mount(overrides: Record<string, unknown> = {}) {
     timeLeft: 285,
     practiceTime: 300,
     formatTime: (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`,
+    showAccuracy: true,
+    showTimer: true,
     intervalDirection: 'up' as const,
     intervalExerciseQueue: [] as number[],
     intervalCurrentQueueIndex: 0,
@@ -469,7 +472,11 @@ describe('全屏指板', () => {
       },
     })
     expect(p.buttons().length, '四弦 × (1 空弦 + 15 品)').toBe(4 * (1 + 15))
-    expect(p.container.querySelectorAll('div.pointer-events-none').length, '分隔线 = 弦数 - 1').toBe(3)
+    // 🚨 断言要**限定在指板内**：退出提示也是 `div.pointer-events-none`（2026-10-31 起
+    //    改为浮动提示），不限定范围就会把它的数量算进来 ⇒ 这条会假红。
+    const board = p.container.querySelector('[data-fullscreen-fretboard]') as HTMLElement | null
+    expect(board, '护栏自检：找不到全屏指板容器').toBeTruthy()
+    expect(board!.querySelectorAll('div.pointer-events-none').length, '分隔线 = 弦数 - 1').toBe(3)
 
     // ③ 格子里的字（空弦）
     expect(p.cellSpan(0).text).toBe('G')
@@ -811,6 +818,76 @@ describe('全屏状态条：得分 + 剩余时间', () => {
   })
 })
 
+describe('全屏状态条受「显示与外观」开关门控', () => {
+  it('showAccuracy=false 时不显示得分徽章', () => {
+    const p = mount({ score: { correct: 7, total: 10 }, showAccuracy: false, showTimer: true })
+    const status = p.container.querySelector('[data-fullscreen-status]')!
+    expect(status.textContent, '关掉正确率后不该出现 7/10').not.toContain('7/10')
+    expect(status.textContent, '倒计时仍应显示').toContain('4:45')
+    p.unmount()
+  })
+
+  it('showTimer=false 时不显示倒计时（即使时有练习）', () => {
+    const p = mount({ score: { correct: 7, total: 10 }, showAccuracy: true, showTimer: false })
+    const status = p.container.querySelector('[data-fullscreen-status]')!
+    expect(status.textContent, '得分仍应显示').toContain('7/10')
+    expect(status.textContent, '关掉倒计时后不该出现 4:45').not.toContain('4:45')
+    p.unmount()
+  })
+
+  it('两个都关时不渲染任何徽章', () => {
+    const p = mount({ score: { correct: 7, total: 10 }, showAccuracy: false, showTimer: false })
+    const status = p.container.querySelector('[data-fullscreen-status]')!
+    expect(status.textContent?.trim()).toBe('')
+    p.unmount()
+  })
+})
+
+/**
+ * 「点击退出全屏」提示自动显隐：进入全屏先显示 3 秒 → 隐藏；鼠标/触摸移动再显示 → 停下 3 秒后隐藏。
+ */
+describe('退出提示自动显隐', () => {
+  it('进入后显示，3 秒后自动隐藏；移动时再现，停下 3 秒再隐藏', () => {
+    vi.useFakeTimers()
+    try {
+      const p = mount()
+      const exitControl = () => p.container.querySelector('[data-exit-control]')
+      // 进入即显示
+      expect(exitControl(), '进入全屏应立即显示退出提示').not.toBeNull()
+      expect(p.text()).toContain(tZh('click_to_exit_fullscreen'))
+
+      // 3 秒后自动隐藏
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(exitControl(), '3 秒后应自动隐藏退出提示').toBeNull()
+
+      // 鼠标移动 → 再次出现
+      const outer = p.outer()!
+      act(() => {
+        outer.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }))
+      })
+      expect(exitControl(), '鼠标移动应让退出提示再现').not.toBeNull()
+
+      // 停下 3 秒 → 再次隐藏
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(exitControl(), '停下 3 秒后退出提示应再次隐藏').toBeNull()
+
+      p.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('点击退出提示（冒泡到外层）也会退出全屏', () => {
+    const p = mount()
+    const ctrl = p.container.querySelector('[data-exit-control]') as HTMLElement
+    expect(ctrl).not.toBeNull()
+    p.click(ctrl)
+    expect(p.setFullscreenMode).toHaveBeenCalledTimes(1)
+    expect(p.setFullscreenMode).toHaveBeenCalledWith(false)
+    p.unmount()
+  })
+})
+
 /**
  * 🚨 2026-10-31 排查发现的第三类缺口：**一弦三音（3NPS）在全屏里退化成 35 步数字墙**。
  *
@@ -876,11 +953,44 @@ describe('一弦三音（3NPS）全屏用把位视图', () => {
 
   it('9 步滑窗每步一格，当前步高亮、已完成变淡', () => {
     const p = mountThreeNps()
-    const slots = [...p.container.querySelectorAll('span.font-mono')] as HTMLElement[]
-    const windowSlots = slots.filter((el) => el.className.includes('w-12 h-12'))
+    // 🚨 用**语义属性** `data-three-nps-step` 选格子，不再按尺寸 class（`w-12 h-12`）选：
+    //    格子必须能改成自适应宽度（固定 48px × 9 在 400px 窄列里必然换行 ⇒ 见下一组护栏），
+    //    一旦按尺寸选，这条断言就会跟着「一起坏掉」而失去牙齿。
+    const windowSlots = [...p.container.querySelectorAll('span[data-three-nps-step]')] as HTMLElement[]
     expect(windowSlots.length, `滑窗应有 9 格，实际 ${windowSlots.length}`).toBe(9)
     expect(windowSlots[4].className, '当前步没高亮').toContain('bg-primary')
     expect(windowSlots[0].className, '已完成步没变淡').toContain('border-border/40')
+    p.unmount()
+  })
+
+  /**
+   * 🚨 滑窗不许用固定宽度（2026-10-31 修）。
+   *
+   * 全屏窄列的内容宽只有 368px（`max-w-[400px]` − `p-4`×2），而 9 个固定 `w-12`(48px)
+   * + 8 个 `gap`(8px) = **496px** ⇒ `flex-wrap` 永远换行成 2 排（实测 `rowCount=2`），
+   * 「滑窗」变成两行数字，视觉语义直接崩掉。
+   *
+   * 断言方式：**不许出现任何固定宽 token**（`^w-\d+$`），且必须是 `flex-1`（靠平分宽度）。
+   * jsdom 没有布局引擎，量不出实际宽度 —— 所以这里钉的是**成因**（固定宽 ⇒ 必然换行），
+   * 实际宽度由 CDP 探针在真实浏览器里复核。
+   */
+  it('9 步滑窗格子是自适应宽度（不许固定宽）+ 容器不许换行', () => {
+    const p = mountThreeNps()
+    const cells = [...p.container.querySelectorAll('span[data-three-nps-step]')] as HTMLElement[]
+    expect(cells.length, `滑窗应有 9 格，实际 ${cells.length}`).toBe(9)
+    for (const cell of cells) {
+      const t = cell.className.split(/\s+/).filter(Boolean)
+      expect(t, '格子必须靠 flex 平分宽度（basis-0），才能在窄列里排成一行').toContain('flex-1')
+      expect(
+        t.filter((x) => /^w-\d+$/.test(x)),
+        '格子不许有固定宽度（48px×9 + gap 在 368px 窄列里必然换行成两排）',
+      ).toEqual([])
+    }
+    const box = cells[0].parentElement as HTMLElement
+    expect(
+      box.className.split(/\s+/).filter(Boolean),
+      '滑窗容器不许换行（flex-wrap 会把「当前步固定第 4 格」冲掉）',
+    ).toContain('flex-nowrap')
     p.unmount()
   })
 
@@ -920,6 +1030,159 @@ describe('一弦三音（3NPS）全屏用把位视图', () => {
     })
     expect(p.text()).toContain('1')
     expect(p.text(), '普通音阶不该出现把位文案').not.toContain('把位')
+    p.unmount()
+  })
+})
+
+/**
+ * 🚨 2026-10-31 修：全屏 + 一弦三音 + **开指板** ⇒ 「题目区压在指板上」+「顶部被裁」。
+ *
+ * 用户原话：「一弦三音的练习，如果开指板显示，在全屏模式中会已显示不全/重叠」。
+ * CDP 实测（无头 Chrome 156，1366×768）：
+ *   · 题目窄列 `clientH=472` 而 `scrollH=565` ⇒ **内容溢出 93px**，
+ *     「下一把位」那段文字直接画在指板第一行格子上（截图可见）；
+ *   · 调式名「C 伊奥尼亚调式」只剩「调式」两个字 —— 顶部被裁**且滚不回去**。
+ *
+ * 两个成因都是**布局**的，jsdom 没有布局引擎 ⇒ 量不出重叠；但**成因本身可以钉死**：
+ *
+ *  ① **重叠** = 根容器 `flex flex-col` + 固定 `height:100vh` ⇒ 子项默认 `flex-shrink:1`。
+ *     内容总高超过视口时根容器会**压缩**子项来「装下」；窄列有 `min-h-[300px]`
+ *     ⇒ 压不到内容高度 ⇒ 内容从自己的盒子溢出去，盖在兄弟节点（指板）上。
+ *     ⇒ 三个子项必须都带 `shrink-0`。
+ *     ⚠️「**只有开指板才出现**」不是巧合：不开指板时根容器只有一个 flex 子项，压不动。
+ *
+ *  ② **顶部被裁** = 裸 `justify-center` 在内容高于容器时把溢出甩到**顶部之外**，
+ *     而 `overflow-auto` 只能往下滚 ⇒ 顶部永久不可达。
+ *     ⇒ 必须用 `justify-[safe_center]`（放不下时自动退回 `start`）。
+ */
+describe('全屏布局：窄列不被压缩、顶部不被裁（2026-10-31 修）', () => {
+  const tokens = (el: HTMLElement) => el.className.split(/\s+/).filter(Boolean)
+
+  it('根容器用 safe center（放不下时退回顶部对齐），不用裸 justify-center', () => {
+    const p = mount()
+    const t = tokens(p.outer()!)
+    expect(t, '全屏根容器必须用 safe-center-y').toContain('safe-center-y')
+    expect(t, '裸 justify-center 会把溢出的顶部裁掉且滚不回去').not.toContain('justify-center')
+    // ⚠️ 类名存在 ≠ 样式存在：这条规则是**手写**在 globals.css 里的
+    //    （Tailwind 3.4.19 不生成 `justify-[safe_center]` 任意值 ⇒ 静默失效）。
+    const css = readFileSync('app/globals.css', 'utf8')
+    expect(css, 'globals.css 里没有 .safe-center-y 的定义（手写类被删 ⇒ 类名进了 JS 但没样式）')
+      .toMatch(/\.safe-center-y\s*\{[^}]*justify-content:\s*safe center/)
+    p.unmount()
+  })
+
+  it('根容器的**流式**子项都带 shrink-0；退出提示必须脱离文档流（否则出现/消失会顶动上下）', () => {
+    const p = mount({ showFretboard: true })
+    const kids = [...p.outer()!.children] as HTMLElement[]
+    // 护栏自检：子项数量变了说明结构变了，下面会空转
+    expect(kids.length, '根容器下应有「题目窄列 + 指板 + 退出提示」三个子项').toBe(3)
+    const hint = kids.find((k) => k.getAttribute('data-exit-control') !== null) as HTMLElement | undefined
+    expect(hint, '护栏自检：找不到退出提示').toBeTruthy()
+    for (const kid of kids.filter((k) => k !== hint)) {
+      const name = kid.getAttribute('data-fullscreen-fretboard') !== null ? '指板' : '题目窄列'
+      expect(tokens(kid), `${name} 缺 shrink-0：会被根容器压扁，内容溢出后盖住兄弟节点`).toContain('shrink-0')
+    }
+    // 🚨 退出提示必须**脱离文档流**：它在流里的话，一出现/消失就改变根容器的内容高度，
+    //    `safe center` 的居中基线跟着动 ⇒ 上面整块题目上下跳（用户原话「有跳动的感觉，影响练习」）。
+    expect(
+      tokens(hint!).filter((x) => x === 'fixed' || x === 'absolute' || x === 'sticky'),
+      '退出提示必须脱离文档流（fixed/absolute/sticky），否则出现/消失会让上面内容跳动',
+    ).not.toEqual([])
+    // 且不许抢点击：浮动后可能压在指板底部（窄屏内容刚好放满时），可点击会吃掉品格的点击。
+    // 提示语「点击退出全屏」说的是「点背景任意处即退出」（外层 onClick），本身不需要自己可点。
+    expect(tokens(hint!), '退出提示必须 pointer-events-none').toContain('pointer-events-none')
+    p.unmount()
+  })
+})
+
+/**
+ * 🚨 2026-10-31 用户反馈的两条（都是「全屏层是另一套版式 ⇒ 没跟普通模式对齐」的缺口）：
+ *
+ *  ① **和弦转换：弹对的音要逐个变灰**。普通模式 `components/chord-degrees-display.tsx`
+ *     早就按 `chordDegreeCurrentStep` 逐个 `opacity-50` + 当前音高亮；全屏层**根本没接
+ *     这个 prop**，三个音级从头到尾都是 `text-primary` ⇒ 弹没弹对全一个样，用户只能
+ *     等整和弦弹完、切到下一和弦才反应过来（用户原话「修改成弹对哪个音哪个音变灰」）。
+ *  ② **和弦名 / 音阶名必须一行**（`whitespace-nowrap`）：换行会改变该块高度，
+ *     整块内容跟着上下跳（正是用户说的「影响其他部分」）。
+ */
+describe('全屏：和弦转换逐音变灰 + 名称一行不换行（2026-10-31 修）', () => {
+  const chordProps = {
+    transposedChords: [{ root: 'C', type: 'Major' }],
+    currentChordIndex: 0,
+    // 🚨 必须是「三个和弦音」这一档：`single_chord_tones_root` 只出 1 个音级，
+    //    没法断言「已弹 / 当前 / 未弹」三态。
+    practiceLevel: 'three_chord_tones_root_3rd_5th',
+    getCurrentChordDisplay: () => 'Cmaj7UNIQUE',
+    getNextChordDisplay: () => null,
+    getLevelOptions: () => ({}),
+  }
+  const degreeCells = (p: ReturnType<typeof mount>) =>
+    [...p.container.querySelectorAll('[data-chord-degree]')] as HTMLElement[]
+
+  it('和弦转换：已弹对的音变灰、当前音高亮、未弹的暗（口径与普通模式一致）', () => {
+    setStore({ activeTab: 'chord' })
+    const p = mount({ ...chordProps, chordDegreeCurrentStep: 1 })
+    const cells = degreeCells(p)
+    expect(cells.length, '护栏自检：应渲染出和弦音级格').toBeGreaterThan(1)
+    expect(cells[0].getAttribute('data-done'), '第 0 个音已弹对').toBe('1')
+    expect(cells[0].className, '已弹对的音必须变灰').toContain('text-muted-foreground/50')
+    expect(cells[1].getAttribute('data-done'), '第 1 个是当前要弹的').toBe('0')
+    expect(cells[1].className, '当前音必须高亮').toContain('text-primary')
+    expect(cells[2]?.className ?? '', '未弹的音必须是暗色（待弹）').toContain('text-muted-foreground/80')
+    expect(cells[2]?.className ?? '', '未弹的音不该高亮').not.toContain('text-primary')
+    p.unmount()
+  })
+
+  it('全部弹完 ⇒ 所有音级都变灰（弹对哪个哪个灰，而不是等切和弦才反应）', () => {
+    setStore({ activeTab: 'chord' })
+    const p = mount({ ...chordProps, chordDegreeCurrentStep: 99 })
+    const cells = degreeCells(p)
+    expect(cells.length, '护栏自检：应渲染出和弦音级格').toBeGreaterThan(0)
+    for (const c of cells) {
+      expect(c.getAttribute('data-done'), `「${c.textContent}」应已弹对`).toBe('1')
+      expect(c.className, `「${c.textContent}」应变灰`).toContain('text-muted-foreground/50')
+    }
+    p.unmount()
+  })
+
+  it('和弦名 / 音阶名都是 whitespace-nowrap（换行会改高度 ⇒ 内容上下跳）', () => {
+    setStore({ activeTab: 'chord' })
+    const chord = mount(chordProps)
+    const chordTitle = chord.container.querySelector('[data-fullscreen-title]') as HTMLElement | null
+    expect(chordTitle, '找不到和弦名元素').toBeTruthy()
+    expect(
+      chordTitle!.className.split(/\s+/),
+      '和弦名必须 whitespace-nowrap（换行会让整块内容跳动）',
+    ).toContain('whitespace-nowrap')
+    expect((chordTitle!.textContent ?? '').trim(), '和弦名元素要真的渲染出名字').toBe('Cmaj7UNIQUE')
+    chord.unmount()
+
+    setStore({ activeTab: 'scale' })
+    const scale = mount({
+      scaleKey: 'C',
+      selectedScale: SCALE_MODES.pentatonic[0],
+      scaleExerciseSequence: ['1', '2', '3'],
+      scaleExerciseCurrentStep: 0,
+    })
+    const scaleTitle = scale.container.querySelector('[data-fullscreen-title]') as HTMLElement | null
+    expect(scaleTitle, '找不到音阶名元素').toBeTruthy()
+    expect(
+      scaleTitle!.className.split(/\s+/),
+      '音阶名必须 whitespace-nowrap（换行会让整块内容跳动）',
+    ).toContain('whitespace-nowrap')
+    scale.unmount()
+  })
+
+  it('和弦练习的和弦名也是一行（同一套版式，别只修了和弦转换）', () => {
+    setStore({ activeTab: 'chord_exercise' })
+    const p = mount({
+      chordExerciseTargetChord: { root: 'C', type: 'Major' },
+      chordExerciseSequence: ['1', '3', '5'],
+      chordExerciseCurrentStep: 0,
+    })
+    const title = p.container.querySelector('[data-fullscreen-title]') as HTMLElement | null
+    expect(title, '找不到和弦练习的和弦名').toBeTruthy()
+    expect(title!.className.split(/\s+/)).toContain('whitespace-nowrap')
     p.unmount()
   })
 })

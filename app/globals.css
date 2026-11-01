@@ -926,7 +926,10 @@
   height: var(--gr-dot);
   border-radius: 50%;
   font-family: var(--font-fretboard);
-  font-size: 0.6875rem; /* 11px 基准 */
+  /* 2026-10-31 用户要求「音名 音级 再调大两号」：11px → 15px（0.6875rem → 0.9375rem）。
+     圆点**不用动**：34px 圆（半径 17）装 15px 的两字符音级（≈19×15，外接半径 ≈11.7）装得下；
+     圆点若跟着放大，整块指板会变高、挤掉别的内容 —— 而文字变大并不需要它。 */
+  font-size: 0.9375rem; /* 15px 基准 */
   font-weight: 600;
   line-height: 1;
   color: transparent;
@@ -934,7 +937,7 @@
 }
 @media (max-width: 639px) {
   .gr-note-dot {
-    font-size: 0.4375rem; /* 7px 基准 */
+    font-size: 0.5625rem; /* 9px 基准（18px 圆装得下） */
   }
 }
 /* 文字可见性由 data-visible 控制（不靠 opacity，便于测试断言） */
@@ -1285,8 +1288,11 @@
   border-radius: 50%;
   border: 2px solid #ffffff;
   font-family: var(--font-fretboard);
-  /* 字号必须与圆点同倍率：只放大圆点会让里面的音名显得更小（容器放大、字不放大 = 假修） */
-  font-size: calc(0.75rem * var(--board-scale, 1)); /* 12px 基准（小屏）；≥640px 提到 0.8125rem */
+  /* 字号必须与圆点同倍率：只放大圆点会让里面的音名显得更小（容器放大、字不放大 = 假修）。
+     2026-10-31 用户要求「音名 音级 再调大两号」：小屏 12→14px、桌面 13→16px。
+     圆点**不用动**：小屏 24px 圆（半径 12）装 14px 两字符（≈17×14，外接半径 ≈10.9）、
+     桌面 32px 圆（半径 16）装 16px 两字符（≈19×16，外接半径 ≈12.5）—— 都装得下。 */
+  font-size: calc(0.875rem * var(--board-scale, 1)); /* 14px 基准（小屏）；≥640px 提到 1rem */
   font-weight: 700;
   line-height: 1;
   color: #ffffff;
@@ -1298,7 +1304,7 @@
 }
 @media (min-width: 640px) {
   .ft-dot {
-    font-size: calc(0.8125rem * var(--board-scale, 1)); /* 13px 基准 */
+    font-size: calc(1rem * var(--board-scale, 1)); /* 16px 基准 */
   }
 }
 .ft-dot[data-visible='1'] {
@@ -1558,4 +1564,23 @@ html body[data-scroll-locked] {
 .mini-board {
   content-visibility: auto;
   contain-intrinsic-size: auto 160px;
+}
+
+/* ===== 全屏练习层：竖向「安全居中」（2026-10-31 修全屏 3NPS + 指板的重叠）=====
+
+   全屏层是 `flex flex-col` + 固定 `height:100vh`，内容（题目窄列 + 指板）总高
+   常超过视口。此时：
+     · 裸 `justify-content: center` 把溢出的那一半甩到**顶部之外** ⇒
+       顶部被裁掉**且滚不回去**（实测 1366×768：调式名只剩「调式」两个字）；
+     · `safe center` 在放不下时自动退回 `start` ⇒ 顶部可达、可正常滚动，
+       放得下时仍然是竖向居中。
+
+   ⚠️ 这里**手写**这条规则，而不是用 Tailwind 任意值：
+   实测 Tailwind 3.4.19 **不生成** `justify-[safe_center]`（连 `justify-[center]`
+   也不生成 ⇒ 类名进了产物 JS、样式表里却没有 ⇒ 静默失效）。
+   任意属性写法 `[justify-content:safe_center]` 是可以的，但手写更直白、
+   也不会因为 Tailwind 升级/改配置而悄悄消失。
+   护栏：__tests__/fullscreen-overlay.test.ts */
+.safe-center-y {
+  justify-content: safe center;
 }

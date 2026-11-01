@@ -196,6 +196,9 @@ describe('全屏层的信息项必须有接线（page.tsx 真的传了）', () =
       'timeLeft={timeLeft}',
       'practiceTime={practiceTime}',
       'formatTime={formatTime}',
+      // 2026-10-31：和弦转换的逐音变灰要用它。全屏层曾**根本没接**这个 prop ⇒
+      // 三个音级从头到尾都是 text-primary（弹没弹对全一个样）。
+      'chordDegreeCurrentStep={chordDegreeCurrentStep}',
     ]) {
       expect(call, `FullscreenOverlay 漏传 ${prop} ⇒ 全屏里看不到对应信息`).toContain(prop)
     }

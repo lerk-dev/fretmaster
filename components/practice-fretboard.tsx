@@ -263,7 +263,10 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                 // 🚨 字体与 1..n 品**必须同一条栈**（Globals.css 的 --font-fretboard）：
                 // 空弦原来是 `font-mono`、其余品是默认 sans ⇒ 同一个音名在第 0 品与第 1 品
                 // 字形不同（Consolas vs Segoe UI），字号也差一档。护栏 fretboard-font-parity。
-                "flex-[0.8] h-8 sm:h-10 text-2xs sm:text-xs font-fretboard font-semibold transition-all duration-150 relative",
+                // 2026-10-31 用户要求「音名 音级 再调大两号」⇒ 由 `text-2xs sm:text-xs`(10/12px)
+                // 上移到 `text-xs sm:text-base`(12/16px)。经典皮肤的文字**直接放在格子里**
+                // （没有圆点约束），所以放大不会撑破格子。
+                "flex-[0.8] h-8 sm:h-10 text-xs sm:text-base font-fretboard font-semibold transition-all duration-150 relative",
                 "flex items-center justify-center",
                 isStringEnabled 
                   ? cn("text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(openCell.note, stringIndex, 0))
@@ -293,8 +296,12 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                   className={cn(
                     // 🚨 音名字号比空弦列小一档是**刻意**的（刻度 4xs8 < 3xs9 < 2xs10 < xs12）；
                     // 2026-10-07 用户要求「音字体调大一号」⇒ 由 `text-4xs sm:text-2xs` 上移一档。
-                    // 此串被 `__tests__/fretboard-font-parity.test.ts` 当锚点钉住，改字号要同步改那边。
-                    "flex-1 h-8 sm:h-10 text-3xs sm:text-xs font-fretboard font-medium transition-all duration-150 min-w-[20px] sm:min-w-[28px]",
+                    // 2026-10-31 用户要求「再调大两号」⇒ 由 `text-3xs sm:text-xs`(9/12px) 上移到
+                    // `text-2xs-plus sm:text-base`(11/16px)：移动端走自定义 token（2xs-plus=11px，
+                    // 两档 3xs→2xs→2xs-plus），桌面走标准档（xs→sm→base=16px）。
+                    // ⚠️ 音级符号（b3 / #4 / b7）最长两字符：16px 时约 19px 宽，
+                    //    桌面格 `min-w-[28px]`、移动端 11px 约 13px 宽 / `min-w-[20px]` ⇒ 都装得下。
+                    "flex-1 h-8 sm:h-10 text-2xs-plus sm:text-base font-fretboard font-medium transition-all duration-150 min-w-[20px] sm:min-w-[28px]",
                     "flex items-center justify-center relative z-10",
                     "border-r",
                     isStringEnabled
@@ -328,7 +335,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
           return (
             <div key={actualFret} className="flex-1 flex justify-center min-w-[20px] sm:min-w-[28px]">
               <span className={cn(
-                "text-2xs font-fretboard",
+                "text-xs font-fretboard",
                 isMarker ? "text-primary font-semibold" : "text-muted-foreground"
               )}>
                 {actualFret}
