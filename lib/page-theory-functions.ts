@@ -1181,18 +1181,32 @@ const ENHARMONIC_MAP: Record<string, string> = {
   'A#': 'B♭', 'B♭': 'A#', 'A♯': 'B♭',
 }
 
+/**
+ * 拆分「音名 + 后缀」：检测/MIDI 反馈音可带八度后缀（`F♯2`、`Bb4`）。
+ *
+ * 🚨 只有音名部分参与等音转换与列表匹配，后缀原样保留。
+ *    旧实现拿整串去 `.includes(...)` 匹配 ⇒ `'F♯2'` 永远命不中 `'F♯'` 列表，
+ *    flat 偏好下不转写成 `'G♭2'`，与用户选择的 ♭ 记谱偏好不一致。
+ */
+const splitNoteSuffix = (note: string): [string, string] => {
+  const m = /^([A-Ga-g][#♯b♭]{0,2})(.*)$/.exec(note)
+  return m ? [m[1], m[2]] : [note, '']
+}
+
 export const preferSharp = (note: string): string => {
-  const normalized = normalizeNoteName(note)
+  const [name, suffix] = splitNoteSuffix(note)
+  const normalized = normalizeNoteName(name)
   // 使用 normalized 进行匹配，避免传入 # 形式时无法命中 b 形式列表
-  if (['D♭', 'E♭', 'G♭', 'A♭', 'B♭'].includes(normalized)) return normalizeNoteName(ENHARMONIC_MAP[normalized] || ENHARMONIC_MAP[note] || note)
-  return normalized
+  if (['D♭', 'E♭', 'G♭', 'A♭', 'B♭'].includes(normalized)) return normalizeNoteName(ENHARMONIC_MAP[normalized] || ENHARMONIC_MAP[name] || name) + suffix
+  return normalized + suffix
 }
 
 export const preferFlat = (note: string): string => {
-  const normalized = normalizeNoteName(note)
+  const [name, suffix] = splitNoteSuffix(note)
+  const normalized = normalizeNoteName(name)
   // 使用 normalized 进行匹配（♯ 形式），避免传入 b 形式时无法命中
-  if (['C♯', 'D♯', 'F♯', 'G♯', 'A♯'].includes(normalized)) return normalizeNoteName(ENHARMONIC_MAP[normalized] || ENHARMONIC_MAP[note] || note)
-  return normalized
+  if (['C♯', 'D♯', 'F♯', 'G♯', 'A♯'].includes(normalized)) return normalizeNoteName(ENHARMONIC_MAP[normalized] || ENHARMONIC_MAP[name] || name) + suffix
+  return normalized + suffix
 }
 
 export const generateScaleSequence = (scale: typeof SCALE_MODES.basic[0], sequenceType: string, order: string) => {

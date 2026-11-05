@@ -351,3 +351,113 @@ describe('handleMIDINoteInput：MIDI 路径', () => {
     expect(actions.setScore).not.toHaveBeenCalled()
   })
 })
+
+// ============================================================ 音频：按钮模式 / 音程回弹根音（2026-11-03）
+
+/**
+ * 两条回归：
+ *   · 按钮答题模式下，音频确认放行后**仍不得**自动判定（与 MIDI 路径同一口径）；
+ *   · 音程「回弹根音」时音频不按顺序匹配，`1` 可能先于音程被弹掉。
+ *     整题完成后必须直接出新题，不能停在 answered=true 等一个序列里已不存在的根音。
+ */
+describe('processPracticeMatch：按钮模式与回弹根音', () => {
+  const FRAME_MS = 128
+  const E2 = 82.41
+  const B2 = 123.47
+
+  function mountAudioWith(overrides: Parameters<typeof makeAnswerOptions>[0] = {}) {
+    const actions = {
+      recordPositionStat: vi.fn(),
+      setScore: vi.fn(),
+      triggerCorrectFeedback: vi.fn(),
+      triggerWrongFeedback: vi.fn(),
+      playFeedbackSound: vi.fn(),
+      setHighlightedFrets: vi.fn(),
+    }
+    const state = createNoteConfirmState()
+    const h = renderHook(() =>
+      usePracticeMatch(
+        makeAnswerOptions({
+          ...overrides,
+          // runtime / audio 要在 overrides 之后合并，避免用例覆盖 activeTab 时丢掉 isPlaying
+          runtime: { isPlaying: true, isPlayingRef: { current: true }, ...(overrides.runtime ?? {}) },
+          audio: { noteConfirmStateRef: { current: state }, ...(overrides.audio ?? {}) },
+          actions,
+        }),
+      ),
+    )
+    const feed = (frequency: number, isNoteOnset = false, note = 'E2') =>
+      act(() =>
+        h.current.processPracticeMatch({
+          frequency,
+          note,
+          probability: 0.95,
+          isNoteOnset,
+          rawFrequency: frequency,
+          frameMs: FRAME_MS,
+        }),
+      )
+    return { h, actions, feed }
+  }
+
+  it('按钮答题模式 ⇒ 音频放行后不判分、不反馈、不推进', () => {
+    const { actions, feed } = mountAudioWith({
+      runtime: {
+        practiceAnswerModeRef: { current: 'buttons' },
+        activeTab: 'practice',
+        activeTabRef: { current: 'practice' },
+      },
+      practice: { targetNote: 'E', targetNoteRef: { current: 'E' } },
+    })
+
+    feed(E2, true)
+    feed(E2)
+
+    expect(actions.setScore).not.toHaveBeenCalled()
+    expect(actions.recordPositionStat).not.toHaveBeenCalled()
+    expect(actions.triggerCorrectFeedback).not.toHaveBeenCalled()
+  })
+
+  it('回弹根音 + 先弹根音：整题完成即出新题（不得停在 answered 等已弹过的根音）', () => {
+    const exercise = {
+      rootNote: 'E',
+      interval: { name: 'Perfect 5th', symbol: '5', semitones: 7 },
+      targetNote: 'B',
+      allIntervals: [{ name: 'Perfect 5th', symbol: '5', semitones: 7 }],
+      currentIntervalDisplay: '5 1',
+      completedIntervals: [] as number[],
+      answered: false,
+    }
+    const exerciseRef = { current: exercise }
+    const setCurrentIntervalExercise = vi.fn()
+    const generateIntervalExercise = vi.fn()
+    const { actions, feed } = mountAudioWith({
+      runtime: { activeTab: 'interval', activeTabRef: { current: 'interval' } },
+      interval: {
+        currentIntervalExerciseRef: exerciseRef,
+        currentIntervalExercise: exercise,
+        setCurrentIntervalExercise,
+        generateIntervalExerciseRef: { current: generateIntervalExercise },
+        findRootFirstRef: { current: false },
+        addRootBackRef: { current: true },
+      },
+    })
+
+    // 音频不按顺序匹配：先弹回弹根音 `1`（index 1），只算完成一步
+    feed(E2, true)
+    feed(E2)
+    expect(actions.setScore).not.toHaveBeenCalled()
+    expect(setCurrentIntervalExercise).toHaveBeenCalledWith(
+      expect.objectContaining({ completedIntervals: [1] }),
+    )
+    // 模拟页面把新 state 同步回 ref
+    exerciseRef.current = { ...exercise, completedIntervals: [1] }
+
+    // 再弹五度音程 `5`（index 0）⇒ 全部完成
+    feed(B2, true, 'B2')
+    feed(B2, false, 'B2')
+
+    expect(actions.setScore).toHaveBeenCalledTimes(1)
+    expect(generateIntervalExercise).toHaveBeenCalledTimes(1)
+  })
+})

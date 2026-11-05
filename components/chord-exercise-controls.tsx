@@ -228,9 +228,13 @@ export const ChordExerciseControls = memo(function ChordExerciseControls({
                     }}
                     className="h-7 text-xs px-2"
                   >
-                    {/* Major 的 symbol 是空串（和弦记谱里不写，如 C 而非 CMaj），
-                        这里会回退到英文 name —— 中文界面下改用中文术语（大三和弦等） */}
-                    {type.symbol || (language === 'zh-CN' ? getChordDisplayName(type.name, 'chinese') : type.name)}
+                    {/* 类型标签统一走「界面语言」一条口径：中文界面用中文术语
+                        （大三和弦 / 小三和弦 / 减三和弦…），英文界面用英文类型名。
+                        此前是 `type.symbol || 中文回退` ⇒ 只有 Major（symbol 为空串）
+                        显示中文、其余全是 m/dim/7 这类缩写，同一排里中英混用。 */}
+                    {language === 'zh-CN'
+                      ? getChordDisplayName(type.name, 'chinese') || type.name
+                      : type.name}
                   </Button>
                 ))}
               </div>

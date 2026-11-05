@@ -4,6 +4,7 @@ import {
   normalizeIntervalSymbol,
   intervalIndexBySymbol,
   resolveIntervalIndices,
+  effectiveFretboardIntervals,
 } from '@/lib/interval-index'
 
 /**
@@ -116,5 +117,52 @@ describe('interval-index（音程符号 → INTERVALS 下标）', () => {
   it('全量不变量：对 INTERVALS 全体符号，解析结果必须是 0..n-1 的一个排列', () => {
     const all = resolveIntervalIndices(INTERVALS.map((i) => i.symbol))
     expect(all).toEqual(INTERVALS.map((_, idx) => idx))
+  })
+})
+
+/**
+ * 护栏：指板度数标注集合 = 选中集 ∪ 当前题显示集。
+ *
+ * 背景：down/random/either 方向队列放**互补音程**（选中 b3 + 下行 ⇒ 题面符号是 6、
+ * 目标音在根音 +9 半音）。此前指板只按选中集标注 ⇒ 下行题的目标度数格不亮、
+ * 反而亮着题面没问的 b3 格。详见 lib/interval-index.ts 的 effectiveFretboardIntervals 注释。
+ */
+describe('effectiveFretboardIntervals（指板标注集 = 选中 ∪ 当前题）', () => {
+  const idxOf = (sym: string) => INTERVALS.findIndex((i) => i.symbol === sym)
+
+  it('无当前题（undefined）时就是选中集本身', () => {
+    const sel = [idxOf('b3'), idxOf('5')]
+    expect(effectiveFretboardIntervals(sel)).toEqual(sel)
+    expect(effectiveFretboardIntervals(sel, undefined)).toEqual(sel)
+    expect(effectiveFretboardIntervals([], undefined)).toEqual([])
+  })
+
+  it('🚨 下行互补场景：选中 [b3] + 题面显示 "6" ⇒ 并集里必须有 6 的下标', () => {
+    const sel = [idxOf('b3')]
+    const eff = effectiveFretboardIntervals(sel, '6')
+    expect(eff).toContain(idxOf('6'))
+    expect(eff).toContain(idxOf('b3'))
+  })
+
+  it('「先找根音」的 "1 6" 复合显示：1 归根音分支管、不入集，6 入集', () => {
+    const eff = effectiveFretboardIntervals([], '1 6')
+    expect(eff).toEqual([idxOf('6')])
+    // Unicode 变体等价
+    expect(effectiveFretboardIntervals([], '1 ♭3')).toEqual([idxOf('b3')])
+  })
+
+  it('当前题派生项在前（异名同音撞格时题面符号优先当标签），选中项补尾、整体去重', () => {
+    const eff = effectiveFretboardIntervals([idxOf('bb7'), idxOf('5')], '6')
+    expect(eff[0]).toBe(idxOf('6')) // 题面符号 6 先于同半音的 bb7
+    expect(eff).toContain(idxOf('bb7'))
+    expect(eff).toContain(idxOf('5'))
+    expect(new Set(eff).size).toBe(eff.length) // 无重复
+  })
+
+  it('重复选中与重复显示都去重；未命中符号被忽略', () => {
+    const eff = effectiveFretboardIntervals([idxOf('5'), idxOf('5')], '5 zzz')
+    expect(eff).toEqual([idxOf('5')])
+    // 复合音程符号照常解析（% 12 语义由标注层负责）
+    expect(effectiveFretboardIntervals([], '9')).toEqual([idxOf('9')])
   })
 })

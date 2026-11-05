@@ -58,19 +58,20 @@ afterEach(() => {
 })
 
 describe('ChordExerciseQuestion — 当前题目', () => {
-  it('未练习：提示点击开始，不渲染音级徽章', () => {
+  it('未练习：不显示开始提示，也不渲染音级徽章', () => {
     const c = mount({
       chordExerciseTargetChord: { root: 'C', type: 'Major' },
       chordExerciseSequence: ['1', '3', '5'],
     })
-    expect(c.textContent).toContain('click_start_to_begin')
+    // 2026-11-03 产品调整：移除「点击开始按钮开始练习」
+    expect(c.textContent).not.toContain('点击开始按钮开始练习')
     expect(degreeSpans(c).length).toBe(0)
   })
 
-  it('练习但无目标和弦：仍显示开始提示', () => {
+  it('练习但无目标和弦：同样不显示开始提示', () => {
     setStore(true)
     const c = mount({ chordExerciseTargetChord: null, chordExerciseSequence: [] })
-    expect(c.textContent).toContain('click_start_to_begin')
+    expect(c.textContent).not.toContain('点击开始按钮开始练习')
   })
 
   it('练习中：标题为「根音 + 和弦名」（根音与和弦名都归一化）', () => {

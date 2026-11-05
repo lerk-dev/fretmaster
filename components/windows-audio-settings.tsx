@@ -351,7 +351,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
           onValueChange={setSelectedAudioDevice}
           disabled={isCapturing}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={language === 'zh-CN' ? '选择设备' : 'Select Device'} />
           </SelectTrigger>
           <SelectContent>
@@ -448,7 +448,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             onValueChange={(v) => setAudioBackend(v as 'wasapi_shared' | 'wasapi_exclusive' | 'asio')}
             disabled={isCapturing}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -482,7 +482,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             }}
             disabled={isCapturing}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -512,7 +512,7 @@ export const WindowsAudioSettings = memo(function WindowsAudioSettings({ languag
             }}
             disabled={isCapturing}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

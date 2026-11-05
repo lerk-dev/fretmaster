@@ -9,7 +9,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { PracticeSummaryDialog, type PracticeSummaryData } from '@/components/practice-summary-dialog'
+import { PracticeSummaryDialog, type PracticeSummaryData, answerSpeedPerMinute, formatDuration } from '@/components/practice-summary-dialog'
 import { TRANSLATIONS } from '@/lib/i18n'
 
 class ResizeObserverStub {
@@ -169,19 +169,57 @@ describe('PracticeSummaryDialog', () => {
       p3.unmount()
     })
 
-    it('时长格式化为 M:SS（秒位补零）', () => {
+    it('时长格式化：<1 小时 M:SS（秒位补零），≥1 小时 H:MM:SS（增强后行为）', () => {
+      // 🚨 增强（2026-11-03）：≥1 小时的会话从 '61:01' 改为 '1:01:01'。
+      // 旧写法把 3725 秒显示成 '62:05'，长会话读起来像 62 分钟；此处是**有意**的行为变更。
       const cases: [number, string][] = [
         [0, '0:00'],
         [59, '0:59'],
         [60, '1:00'],
         [125, '2:05'],
-        [3661, '61:01'],
+        [3599, '59:59'],
+        [3600, '1:00:00'],
+        [3661, '1:01:01'],
+        [3725, '1:02:05'],
+        [7325, '2:02:05'],
       ]
       for (const [duration, expected] of cases) {
         const p = mount({ data: { correct: 1, total: 1, duration } })
         expect(p.statValues()[3], `duration=${duration}`).toBe(expected)
         p.unmount()
       }
+    })
+  })
+
+  describe('答题速度（增强）', () => {
+    const speedText = (total: number, duration: number) => {
+      const p = mount({ data: { correct: 1, total, duration } })
+      const node = document.body.querySelector('[data-testid="practice-summary-speed"]')
+      const out = node?.textContent ?? null
+      p.unmount()
+      return out
+    }
+
+    it('显示「题/分钟」，保留 1 位小数：10 题 / 125 秒 = 4.8', () => {
+      expect(speedText(10, 125)).toContain('4.8')
+      // 标签走 i18n
+      expect(speedText(10, 125)).toContain(tZh('practice_summary_speed'))
+    })
+
+    it('total=0 或 duration=0 时整行不渲染（不显示 0 或 Infinity）', () => {
+      expect(speedText(0, 125)).toBeNull()
+      expect(speedText(10, 0)).toBeNull()
+      expect(speedText(0, 0)).toBeNull()
+    })
+
+    it('纯函数口径：answerSpeedPerMinute / formatDuration', () => {
+      expect(answerSpeedPerMinute(10, 125)).toBe(4.8)
+      expect(answerSpeedPerMinute(3, 60)).toBe(3)
+      expect(answerSpeedPerMinute(0, 60)).toBeNull()
+      expect(answerSpeedPerMinute(5, 0)).toBeNull()
+      expect(formatDuration(3725)).toBe('1:02:05')
+      expect(formatDuration(125)).toBe('2:05')
+      expect(formatDuration(-5)).toBe('0:00') // 负数兜底
     })
   })
 

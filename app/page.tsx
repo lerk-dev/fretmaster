@@ -32,6 +32,7 @@ import {
   NOTES,
   NOTES_FLAT,
 } from "@/lib/page-theory-data"
+import { effectiveFretboardIntervals } from "@/lib/interval-index"
 import { resolveAvailableStringIndexes } from "@/lib/string-index"
 import { shuffle } from "@/lib/interval-direction"
 import {
@@ -1470,6 +1471,18 @@ export default function FretMasterPage() {
     focusModeEnabled: focusMode?.enabled,
   })
 
+  // 指板标注的音程集合 = 用户选中 ∪ 当前题显示的音程（含 down/random/either 方向的互补音程，
+  // 否则下行题的目标度数格不标注、与题面符号矛盾 —— 见 lib/interval-index.ts 的注释）。
+  // 仅影响指板/配色层的「度数标注」；interval-controls 的勾选框仍用原始 selectedIntervals。
+  const fretboardIntervals = useMemo(
+    () =>
+      effectiveFretboardIntervals(
+        selectedIntervals,
+        currentIntervalExercise?.currentIntervalDisplay
+      ),
+    [selectedIntervals, currentIntervalExercise]
+  )
+
   // 获取音符颜色
   // 获取音符颜色（判定已抽到 lib/fretboard-note-button-color.ts —— 那里可单测，
   // 并与 lib/fretboard-cell-role.ts 做「两套皮肤结论一致」的行为护栏）
@@ -1480,7 +1493,7 @@ export default function FretMasterPage() {
           activeTab, isPlaying, showAllNotes, targetNote, practiceAnswerMode,
           highlightedTargetPosition, highlightedFrets,
           fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount,
-          chordExerciseTargetChord, rootNote, selectedIntervals,
+          chordExerciseTargetChord, rootNote, selectedIntervals: fretboardIntervals,
           scaleKey, selectedScale, scaleExerciseSequence,
           transposedChords, currentChordIndex,
           threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells,
@@ -1489,7 +1502,7 @@ export default function FretMasterPage() {
         stringIndex,
         fret,
       ),
-    [activeTab, highlightedFrets, targetNote, showAllNotes, isPlaying, chordExerciseTargetChord, rootNote, selectedIntervals, scaleKey, selectedScale, currentChordIndex, practiceAnswerMode, highlightedTargetPosition, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, scaleExerciseSequence, transposedChords, threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells]
+    [activeTab, highlightedFrets, targetNote, showAllNotes, isPlaying, chordExerciseTargetChord, rootNote, fretboardIntervals, scaleKey, selectedScale, currentChordIndex, practiceAnswerMode, highlightedTargetPosition, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, scaleExerciseSequence, transposedChords, threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells]
   )
 
   // 格式化时间
@@ -1617,7 +1630,7 @@ export default function FretMasterPage() {
     <TooltipProvider>
       <div
         data-display-scale-root
-        className="app-height bg-background flex flex-col relative overflow-hidden"
+        className="app-canvas app-height bg-background flex flex-col relative overflow-hidden"
         style={{ height: '100dvh' }}
       >
         {/* 节拍器闪烁层 */}
@@ -1677,7 +1690,7 @@ export default function FretMasterPage() {
           <aside
             data-onboarding="practice-tabs"
             className={cn(
-              "border-r border-border/50 bg-card hidden md:flex flex-col shadow-[2px_0_10px_rgba(0,0,0,0.03)]",
+              "app-sidebar border-r border-border/50 bg-card hidden md:flex flex-col",
               sidebarCollapsed ? "w-14" : "w-56"
             )}
             style={{ transition: 'width 0.2s ease-in-out' }}
@@ -1691,7 +1704,7 @@ export default function FretMasterPage() {
                     "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm",
                     activeTab === mode.id
                       ? "bg-primary/10 text-primary font-medium"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                   )}
                   style={{ willChange: 'background-color, color' }}
                   title={mode.label}
@@ -1705,10 +1718,10 @@ export default function FretMasterPage() {
               ))}
             </div>
             
-            <div className="mt-auto p-2">
+            <div className="mt-auto p-2 border-t border-border/40">
               <button
                 onClick={() => setSidebarCollapsed()}
-                className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-accent transition-colors"
+                className="w-full flex items-center justify-center p-2 rounded-lg text-muted-foreground hover:bg-secondary/70 hover:text-foreground transition-colors"
                 aria-label={sidebarCollapsed ? t('btn_expand_sidebar') : t('btn_collapse_sidebar')}
                 title={sidebarCollapsed ? t('btn_expand_sidebar') : t('btn_collapse_sidebar')}
               >
@@ -1738,7 +1751,7 @@ export default function FretMasterPage() {
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg lg:text-xl font-semibold leading-none">
+                    <h2 className="section-title text-lg lg:text-xl font-semibold leading-none">
                       {activeTab === "practice" && t('nav_practice')}
                       {activeTab === "interval" && t('nav_interval')}
                       {activeTab === "chord_exercise" && t('nav_chord_exercise')}
@@ -2162,7 +2175,7 @@ export default function FretMasterPage() {
                     highlightedFrets={highlightedFrets}
                     selectedStrings={selectedStrings}
                     rootNote={rootNote}
-                    selectedIntervals={selectedIntervals}
+                    selectedIntervals={fretboardIntervals}
                     scaleKey={scaleKey}
                     selectedScale={selectedScale}
                     scaleExerciseSequence={scaleExerciseSequence}
@@ -2189,7 +2202,7 @@ export default function FretMasterPage() {
                   highlightedFrets={highlightedFrets}
                   selectedStrings={selectedStrings}
                   rootNote={rootNote}
-                  selectedIntervals={selectedIntervals}
+                  selectedIntervals={fretboardIntervals}
                   scaleKey={scaleKey}
                   selectedScale={selectedScale}
                   scaleExerciseSequence={scaleExerciseSequence}
@@ -2245,7 +2258,10 @@ export default function FretMasterPage() {
                   🚨 **不能带 `!showChordFretboard`**：显示指板是**辅助**（课程文案明确要求
                   「先用『显示指板』辅助，再关闭它凭记忆找音」），题目区与指板必须**同屏**。
                   带上这个条件 ⇒ 一开指板题目区就被卸载，用户不知道要弹什么，直接没法练。 */}
-              {activeTab === "chord" && (
+              {/* 未开始练习时不渲染题目卡：此前这三块在 `activeTab` 命中时就挂载，
+                  即便内部内容全空也会留下一个空卡片（用户反馈「提示没了但框还在」）。
+                  interval 早就是 `isPlaying` 门控，这里与之对齐。 */}
+              {activeTab === "chord" && isPlaying && (
                 <ChordDegreesDisplay
                   t={t}
                   transposedChords={transposedChords}
@@ -2260,7 +2276,7 @@ export default function FretMasterPage() {
               )}
               
               {/* 音阶练习 - 显示练习序列（与指板同屏，理由同上） */}
-              {activeTab === "scale" && (
+              {activeTab === "scale" && isPlaying && (
                 <ScaleSequenceDisplay
                   t={t}
                   scaleKey={scaleKey}
@@ -2274,7 +2290,7 @@ export default function FretMasterPage() {
               )}
               
               {/* 和弦练习 - 显示当前题目（与指板同屏，理由同上） */}
-              {activeTab === "chord_exercise" && (
+              {activeTab === "chord_exercise" && isPlaying && (
                 <ChordExerciseQuestion
                   t={t}
                   chordExerciseTargetChord={chordExerciseTargetChord}
@@ -2385,7 +2401,7 @@ export default function FretMasterPage() {
             FRET_MARKERS={FRET_MARKERS}
             highlightedTargetPosition={highlightedTargetPosition}
             rootNote={rootNote}
-            selectedIntervals={selectedIntervals}
+            selectedIntervals={fretboardIntervals}
             threeNpsTarget={threeNpsTarget}
             threeNpsCellKeys={threeNpsCellKeys}
             nextThreeNpsCells={nextThreeNpsCells}

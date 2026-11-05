@@ -76,18 +76,20 @@ afterEach(() => {
 
 describe('ScaleSequenceDisplay', () => {
   describe('未开始 / 空序列', () => {
-    it('isPlaying=false 时显示「点击开始按钮开始练习」，不显示标题与徽章', () => {
+    it('isPlaying=false 时不显示任何提示，也不显示标题与徽章', () => {
       setPlaying(false)
       const p = mount()
-      expect(p.text()).toContain(t('click_start_to_begin'))
+      // 2026-11-03 产品调整：移除「点击开始按钮开始练习」
+      expect(p.text()).not.toContain('点击开始按钮开始练习')
       expect(p.badges()).toHaveLength(0)
       expect(p.text()).not.toContain(getScaleDisplayName(SCALE.name, 'chinese'))
       p.unmount()
     })
 
-    it('isPlaying=true 但序列为空 → 同样显示占位提示', () => {
+    it('isPlaying=true 但序列为空 → 不再显示占位提示、无徽章', () => {
       const p = mount({ scaleExerciseSequence: [] })
-      expect(p.text()).toContain(t('click_start_to_begin'))
+      // 2026-11-03 产品调整：移除「点击开始按钮开始练习」
+      expect(p.text()).not.toContain('点击开始按钮开始练习')
       expect(p.badges()).toHaveLength(0)
       p.unmount()
     })
@@ -320,10 +322,11 @@ describe('一弦三音把位视图', () => {
     p.unmount()
   })
 
-  it('未开始时把位块也不显示（只显示「点击开始」占位）', () => {
+  it('未开始时把位块也不显示（也不显示开始提示）', () => {
     setPlaying(false)
     const p = mount({ threeNps: NPS_VIEW })
-    expect(p.text()).toContain(t('click_start_to_begin'))
+    // 2026-11-03 产品调整：移除「点击开始按钮开始练习」
+    expect(p.text()).not.toContain('点击开始按钮开始练习')
     expect(p.text()).not.toContain(t('three_nps_ascending'))
     p.unmount()
   })

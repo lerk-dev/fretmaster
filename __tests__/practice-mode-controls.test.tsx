@@ -61,7 +61,14 @@ function mount(props: Props) {
   act(() => {
     root.render(createElement(PracticeModeControls as never, props as never))
   })
-  return { container, unmount: () => act(() => root.unmount()) }
+  return {
+    container,
+    unmount: () => act(() => root.unmount()),
+    rerender: (next: Props) =>
+      act(() => {
+        root.render(createElement(PracticeModeControls as never, next as never))
+      }),
+  }
 }
 
 const text = () => document.body.textContent ?? ''
@@ -370,6 +377,54 @@ describe('PracticeModeControls — 按钮答题的判定与计分', () => {
     })
     expect(generateNewTarget).toHaveBeenCalledTimes(1)
     expect(onHighlightedFretsChange).toHaveBeenLastCalledWith(new Map())
+  })
+
+  it('🚨 同一题 800ms 窗口内连点：只判一次（分数与位置统计不叠加）', () => {
+    const onScoreChange = vi.fn()
+    const recordPositionStat = vi.fn()
+    mount(
+      baseProps({
+        practiceAnswerMode: 'buttons',
+        isPlaying: true,
+        highlightedTargetPosition: { stringIndex: 0, fret: 2 },
+        onScoreChange,
+        recordPositionStat,
+      }),
+    )
+    vi.useFakeTimers()
+    act(() => buttonByName('F#').click())
+    act(() => buttonByName('F#').click()) // 换题前的连点
+    act(() => buttonByName('C').click()) // 连点换个音名也不该再判
+    expect(onScoreChange).toHaveBeenCalledTimes(1)
+    expect(recordPositionStat).toHaveBeenCalledTimes(1)
+  })
+
+  it('新题目到达（目标位置变化）后解锁，可再次作答', () => {
+    const onScoreChange = vi.fn()
+    const recordPositionStat = vi.fn()
+    const p = baseProps({
+      practiceAnswerMode: 'buttons',
+      isPlaying: true,
+      highlightedTargetPosition: { stringIndex: 0, fret: 2 },
+      onScoreChange,
+      recordPositionStat,
+    })
+    const { rerender } = mount(p)
+    act(() => buttonByName('F#').click())
+    expect(onScoreChange).toHaveBeenCalledTimes(1)
+    // 新题：目标位置换成新对象（等价于 generateNewTarget 产出下一题）
+    rerender(
+      baseProps({
+        practiceAnswerMode: 'buttons',
+        isPlaying: true,
+        highlightedTargetPosition: { stringIndex: 1, fret: 3 },
+        onScoreChange,
+        recordPositionStat,
+      }),
+    )
+    act(() => buttonByName('F#').click())
+    expect(onScoreChange).toHaveBeenCalledTimes(2)
+    expect(recordPositionStat).toHaveBeenCalledTimes(2)
   })
 })
 

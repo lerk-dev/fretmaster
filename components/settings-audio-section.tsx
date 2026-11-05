@@ -220,7 +220,7 @@ export function SettingsAudioSection({
         )}
         
         <Select value={selectedAudioDevice} onValueChange={onSelectedAudioDeviceChange}>
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={t('hint_select_device')} />
           </SelectTrigger>
           <SelectContent>
@@ -308,7 +308,7 @@ export function SettingsAudioSection({
             value={pitchAlgorithm} 
             onValueChange={(value) => onPitchAlgorithmChange(value as 'standard' | 'solo')}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -383,7 +383,7 @@ export function SettingsAudioSection({
         <Switch checked={midiEnabled} onCheckedChange={onMidiEnabledChange} />
       </div>
       <Select value={selectedMidiDevice} onValueChange={onSelectedMidiDeviceChange} disabled={!midiEnabled}>
-        <SelectTrigger>
+        <SelectTrigger size="sm">
           <SelectValue placeholder={t('midi_select_device')} />
         </SelectTrigger>
         <SelectContent>

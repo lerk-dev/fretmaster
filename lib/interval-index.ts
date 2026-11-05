@@ -58,3 +58,39 @@ export function resolveIntervalIndices(symbols: readonly string[]): number[] {
   })
   return out
 }
+
+/**
+ * 指板要标注的音程集合 = 用户选中集 ∪ **当前题目**显示的音程集。
+ *
+ * ## 🚨 为什么需要并集（2026-11-03 bug 修复）
+ *
+ * `lib/interval-direction.ts` 的方向队列在 down/random/either 下放的是**互补音程**：
+ * 选中「♭3 + 下行」出的题显示符号是 `6`（目标音 = 根音 +9 半音）。
+ * 而指板度数标注（`lib/fretboard-cell-role.ts` / `lib/fretboard-note-button-color.ts`）
+ * 只按用户原始 `selectedIntervals` 匹配 ⇒ 下行题的目标度数格**不亮**、反而亮着题目没问的
+ * `♭3` 格，与题面符号矛盾。并集后：原始选中集照常作参考图，当前题的度数也一定标出。
+ *
+ * 顺序：当前题派生的下标在前（异名同音撞格时优先用**题面符号**当标签），
+ * 其余按 `selectedIntervals` 原顺序补尾；整体去重。根音符号 `1` 不入集（root 由专属分支管）。
+ */
+export function effectiveFretboardIntervals(
+  selectedIntervals: readonly number[],
+  currentIntervalDisplay?: string
+): number[] {
+  const seen = new Set<number>()
+  const out: number[] = []
+  const push = (idx: number) => {
+    if (idx >= 0 && !seen.has(idx)) {
+      seen.add(idx)
+      out.push(idx)
+    }
+  }
+  if (currentIntervalDisplay) {
+    for (const sym of currentIntervalDisplay.split(/\s+/).filter(Boolean)) {
+      if (normalizeIntervalSymbol(sym) === '1') continue
+      push(intervalIndexBySymbol(sym))
+    }
+  }
+  for (const idx of selectedIntervals) push(idx)
+  return out
+}

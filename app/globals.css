@@ -33,6 +33,18 @@
   --font-fretboard: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New',
     'Segoe UI Symbol', 'Noto Music', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB',
     'Noto Sans SC', monospace, sans-serif;
+
+  /* ===== 材质层（「制琴师工作台」视觉语言）=====
+     这些**不是**语义色，而是装饰材质：黄铜件、纸面高光、投影色。
+     从主题色派生或按明暗给不同值 ⇒ 22 套主题共享同一套材质语言，不会各自漂移。 */
+  /* 黄铜：分隔线、选中标记、小圆点（深色下提亮，见 .dark） */
+  --brass: 36 55% 46%;
+  /* 展示字体：只用于品牌字与英文标题，正文/中文标题仍走 sans（可读性优先） */
+  --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Songti SC', 'Noto Serif SC', serif;
+  /* 投影色：浅色用暖褐，深色用纯黑 —— 别拿近白的前景色当阴影 */
+  --shadow-color: 28 25% 18%;
+  /* 卡片顶部 1px 内高光：浅色靠白、深色靠极弱白 */
+  --hairline-top: 0 0% 100%;
 }
 
 /* 应用高度：优先动态视口（100dvh），回退固定视口（100vh）。
@@ -45,30 +57,37 @@
 }
 
 /* ============================================
-   经典主题（重设计：暖象牙白替代纯白）
-   中性偏暖的浅灰背景，翠绿强调色克制有力
+   经典主题（重设计：暖羊皮纸 + 墨绿 + 黄铜）
+   “浅色不是白”：底色带 26% 暖褐饱和度、卡片是奶油纸、边框是褐色发丝线。
+   三层明度（背景 86% / 次级 92% / 卡片 95%）= 纸叠纸的层次，而不是白底贴白卡。
+   ⚠️ 改 --background 必须同步 app/layout.tsx 内联 THEME_BG、lib/theme-colors.ts
+      与 __tests__/theme-colors.test.ts，否则首绘会闪一个色。
    ============================================ */
 .light {
   color-scheme: light;
-  --background: 40 12% 89%;
-  --foreground: 220 18% 14%;
-  --card: 40 18% 95%;
-  --card-foreground: 220 18% 14%;
-  --popover: 40 18% 95%;
-  --popover-foreground: 220 18% 14%;
-  --primary: 142 68% 30%;
-  --primary-foreground: 40 18% 95%;
-  --secondary: 40 10% 86%;
-  --secondary-foreground: 220 18% 14%;
-  --muted: 40 10% 85%;
-  --muted-foreground: 220 10% 32%;
-  --accent: 25 85% 48%;
-  --accent-foreground: 40 18% 95%;
-  --destructive: 0 72% 52%;
-  --destructive-foreground: 40 18% 95%;
-  --border: 40 10% 78%;
-  --input: 40 10% 82%;
-  --ring: 142 68% 30%;
+  --background: 38 26% 84%;
+  --foreground: 25 22% 15%;
+  --card: 40 38% 95%;
+  --card-foreground: 25 22% 15%;
+  --popover: 40 40% 96%;
+  --popover-foreground: 25 22% 15%;
+  --primary: 148 42% 28%;
+  --primary-foreground: 40 38% 95%;
+  --secondary: 38 20% 90%;
+  --secondary-foreground: 25 22% 15%;
+  --muted: 38 16% 80%;
+  --muted-foreground: 28 12% 31%;
+  --accent: 22 64% 45%;
+  --accent-foreground: 40 38% 96%;
+  --destructive: 0 68% 48%;
+  --destructive-foreground: 40 38% 96%;
+  --border: 38 16% 74%;
+  --input: 38 16% 78%;
+  --ring: 148 42% 28%;
+  /* 浅色材质：黄铜压暗一档、投影走暖褐、卡顶高光走纯白 */
+  --brass: 34 52% 42%;
+  --shadow-color: 26 30% 20%;
+  --hairline-top: 0 0% 100%;
 }
 
 .dark {
@@ -92,6 +111,10 @@
   --border: 220 12% 20%;
   --input: 220 12% 16%;
   --ring: 142 65% 48%;
+  /* 深色材质：黄铜提亮（深底上黄铜易糊）、投影纯黑、卡顶高光极弱 */
+  --brass: 38 62% 62%;
+  --shadow-color: 0 0% 0%;
+  --hairline-top: 0 0% 100%;
 }
 
 /* ============================================
@@ -724,12 +747,16 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 4px;
+  /* 细杆 + 内缩描边：像纸边的一道浅槽，而不是系统灰块 */
+  background: hsl(var(--border) / 0.9);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: hsl(var(--brass) / 0.55);
+  background-clip: padding-box;
 }
 
 /* ===== 和弦符号专业字体 ===== */
@@ -1583,4 +1610,160 @@ html body[data-scroll-locked] {
    护栏：__tests__/fullscreen-overlay.test.ts */
 .safe-center-y {
   justify-content: safe center;
+}
+
+/* ==========================================================================
+   材质与装饰层 —— 「制琴师工作台」（2026-11-03 UI 改版）
+
+   设计意图：把界面从「组件堆叠」变成「一张工作台上的纸与黄铜件」。
+     · 纸：主画布带暖褐斜纹纤维 + 双光源晕染，卡片是奶油纸并以 1px 发丝线收边；
+     · 黄铜：只在**结构位置**出现（页头下沿、导航选中标记、小节标题前的菱形铆钉），
+       不做大面积金色，避免廉价感；
+     · 深度：卡片顶部 1px 内高光 + 双层投影（近影定形、远影托起），使纸面浮在纸面之上。
+
+   ⚠️ 全部用主题变量派生 ⇒ 22 套主题自动跟随，不写死任何十六进制色。
+   ⚠️ 装饰层一律 pointer-events:none，不参与命中测试；不做大面积模糊（Tauri WebView 上耗 GPU）。
+   ========================================================================== */
+
+/* ---- 1. 主画布：纸纹 + 双光源 ---- */
+.app-canvas {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1; /* 落在根节点背景之上、内容之下（isolation 保证不穿到 body 外） */
+  pointer-events: none;
+  background-image:
+    /* 顶部主光：来自左上的暖光，像台灯照着桌面 */
+    radial-gradient(120% 70% at 22% -8%, hsl(var(--foreground) / 0.055), transparent 62%),
+    /* 右下补光：黄铜反射 */
+    radial-gradient(90% 65% at 100% 104%, hsl(var(--brass) / 0.10), transparent 68%),
+    /* 纤维：两向 115°/25° 极细交叉线，模拟纸浆纹理（3% 以内才不刺眼） */
+    repeating-linear-gradient(115deg, hsl(var(--foreground) / 0.022) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(25deg, hsl(var(--foreground) / 0.014) 0 1px, transparent 1px 11px);
+}
+
+/* 深色主题下纸纹会显脏：只留光源，去掉两向纤维的强对比 */
+.dark .app-canvas::before {
+  background-image:
+    radial-gradient(120% 70% at 22% -8%, hsl(var(--brass) / 0.06), transparent 60%),
+    radial-gradient(90% 65% at 100% 104%, hsl(var(--primary) / 0.07), transparent 66%),
+    repeating-linear-gradient(115deg, hsl(0 0% 100% / 0.018) 0 1px, transparent 1px 9px);
+}
+
+/* ---- 2. 纸卡：发丝边 + 顶高光 + 双层投影 + 入场抬起 ---- */
+.surface-card {
+  position: relative;
+  border-color: hsl(var(--border) / 0.8);
+  background-image: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--hairline-top) / 0.6),
+    0 1px 1px hsl(var(--shadow-color) / 0.05),
+    0 14px 30px -20px hsl(var(--shadow-color) / 0.42);
+  /* 入场：纸张抬起的微动效，仅挂载时一次；reduced-motion 由 724 行的通配块压平 */
+  animation: surface-rise 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+/* 卡顶中段的一条短高光：只覆盖中间 70%，像纸边受光，两端收暗不显呆板 */
+.surface-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, hsl(var(--hairline-top) / 0.55), transparent);
+}
+
+.dark .surface-card {
+  border-color: hsl(var(--border) / 0.7);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.05),
+    0 1px 1px hsl(0 0% 0% / 0.35),
+    0 18px 36px -22px hsl(0 0% 0% / 0.75);
+}
+
+/* ---- 3. 页头：底部黄铜发丝线（两端淡出，中段最亮） ---- */
+.app-header {
+  position: relative;
+  background-image: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%);
+  border-bottom-color: hsl(var(--border) / 0.6);
+}
+
+.app-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(var(--brass) / 0.55) 16%,
+    hsl(var(--brass) / 0.22) 50%,
+    transparent 84%
+  );
+}
+
+/* ---- 4. 侧栏：选中项 = 黄铜「琴格标记」 ---- */
+.app-sidebar [role='tab'] {
+  position: relative;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+/* 选中项左缘的 3px 黄铜竖线，像指板上的品位标记 */
+.app-sidebar [role='tab'][aria-selected='true']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 58%;
+  border-radius: 0 3px 3px 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, hsl(var(--brass)), hsl(var(--primary) / 0.85));
+}
+
+/* ---- 5. 小节标题：前置菱形黄铜铆钉 ---- */
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-title::before {
+  content: '';
+  flex: none;
+  width: 0.4rem;
+  height: 0.4rem;
+  transform: rotate(45deg);
+  border-radius: 1px;
+  background: hsl(var(--brass));
+  box-shadow: 0 0 0 3px hsl(var(--brass) / 0.13);
+}
+
+/* ---- 6. 品牌字：衬线 + 黄铜下划线（只用于拉丁字母品牌名） ---- */
+.brand-wordmark {
+  font-family: var(--font-display);
+  letter-spacing: 0.035em;
+}
+
+/* ---- 7. 入场 keyframes（被上面 .surface-card 使用；定义在此便于统一查阅） ---- */
+@keyframes surface-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

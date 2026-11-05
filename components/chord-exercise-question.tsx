@@ -62,11 +62,7 @@ export const ChordExerciseQuestion = memo(function ChordExerciseQuestion({
               ))}
             </div>
           </>
-        ) : (
-          <div className="text-muted-foreground py-4">
-            <p className="text-sm">{t('click_start_to_begin')}</p>
-          </div>
-        )}
+        ) : null}
       </div>
 
       {/* 下一题预览*/}

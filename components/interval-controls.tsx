@@ -47,7 +47,7 @@ interface IntervalControlsProps {
   /** 已选音程下标 */
   selectedIntervals: number[]
   onToggleInterval: (index: number) => void
-  /** 练习进行中（未开始则显示提示） */
+  /** 练习进行中。保留在接口上供页面统一传参；面板本身不再据此显示任何提示。 */
   isPlaying: boolean
 }
 
@@ -78,7 +78,6 @@ export const IntervalControls = memo(function IntervalControls({
   onIntervalRandomizeOrderChange,
   selectedIntervals,
   onToggleInterval,
-  isPlaying,
 }: IntervalControlsProps) {
   return (
 <div className="space-y-2">
@@ -193,7 +192,7 @@ export const IntervalControls = memo(function IntervalControls({
     {/* 自动推进 + 指板时长 */}
     <div className="space-y-0.5">
       <div className="text-2xs text-muted-foreground leading-3">&nbsp;</div>
-      <div className="flex items-center gap-2 h-8 px-2 bg-card/30 rounded-md border border-border/30">
+      <div className="flex items-center gap-2 min-h-8 px-2 bg-card/30 rounded-md border border-border/30">
         <div className="flex items-center gap-1.5">
           <Switch
             id="intervalAutoAdvance"
@@ -208,7 +207,7 @@ export const IntervalControls = memo(function IntervalControls({
           <>
             <Separator orientation="vertical" className="h-4" />
             <Select value={String(intervalFretboardDuration)} onValueChange={(v) => onIntervalFretboardDurationChange(Number(v))}>
-              <SelectTrigger className="w-[52px] h-7 text-xs px-1.5">
+              <SelectTrigger className="w-[52px] h-8 text-xs px-1.5">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -254,13 +253,6 @@ export const IntervalControls = memo(function IntervalControls({
       ))}
     </div>
   </div>
-
-  {/* 开始练习提示*/}
-  {!isPlaying && (
-    <div className="text-muted-foreground text-sm py-4">
-      {t('click_start_to_begin')}
-    </div>
-  )}
 </div>
   )
 })

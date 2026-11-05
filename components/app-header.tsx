@@ -201,18 +201,18 @@ export const AppHeader = memo(function AppHeader({
   const setSelectedAudioDevice = store.setSelectedAudioDevice
 
   return (
-<header className="border-b border-border/50 bg-card sticky top-0 z-50 shadow-sm">
+<header className="app-header border-b border-border/50 bg-card sticky top-0 z-50">
   <div className="container mx-auto px-4 h-14 flex items-center justify-between">
     {/* 左：logo + 标题。窄屏（≈360px）练习中时右组（得分/计时/三个按钮）约 250px，
         标题块必须能收缩，否则**整组控件被挤出屏幕右缘**（真机实测：设置按钮落在 x=370→402，
         父级 `overflow-hidden` 直接裁掉 ⇒ 练习中根本点不到设置）。
         `min-w-0` + `truncate` 让它优雅退让，而不是把别人挤出去。 */}
     <div className="flex items-center gap-3 min-w-0">
-      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 ring-1 ring-primary/15">
         <Guitar className="h-5 w-5 text-primary" />
       </div>
       <div className="min-w-0">
-        <h1 className="text-base font-semibold text-foreground truncate">FretMaster</h1>
+        <h1 className="text-base brand-wordmark font-semibold text-foreground truncate">FretMaster</h1>
         <p className="text-2xs text-muted-foreground truncate">{t('app_title').replace('🎸 ', '')}</p>
       </div>
     </div>

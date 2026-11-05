@@ -23,7 +23,7 @@ import type { ThemeMode } from './store'
 
 /** 22 个主题（11 种风格 × 明暗）的底色，与 globals.css 的 --background 对应 */
 export const THEME_BACKGROUNDS: Record<ThemeMode, string> = {
-  light: '#eeebe6',
+  light: '#e1d9cc',
   dark: '#101317',
   'forest-light': '#dbe5d6',
   'forest-dark': '#0d1410',

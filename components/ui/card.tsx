@@ -7,7 +7,9 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card"
       className={cn(
-        'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm',
+        // `surface-card`（app/globals.css）= 纸卡材质：发丝边 + 顶高光 + 双层投影 + 入场抬起。
+        // 这里不再叠 Tailwind 的 shadow-sm，避免两套阴影互相覆盖。
+        'bg-card text-card-foreground surface-card flex flex-col gap-6 rounded-xl border py-6',
         className,
       )}
       {...props}

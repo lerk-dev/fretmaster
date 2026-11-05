@@ -322,6 +322,29 @@ describe('preferSharp / preferFlat', () => {
     expect(preferSharp('F#')).toBe('F♯')
     expect(preferFlat('Gb')).toBe('G♭')
   })
+
+  it('🚨 带八度后缀的检测音也必须转换（后缀保留）——旧实现整串匹配命不中列表', () => {
+    // flat 偏好：F♯2 → G♭2（旧实现原样返回 'F♯2'）
+    expect(preferFlat('F♯2')).toBe('G♭2')
+    expect(preferFlat('C#4')).toBe('D♭4')
+    expect(preferFlat('A#3')).toBe('B♭3')
+    // sharp 偏好：Bb4 → A♯4（旧实现原样返回 'B♭4'）
+    expect(preferSharp('Bb4')).toBe('A♯4')
+    expect(preferSharp('Eb2')).toBe('D♯2')
+    // 无变化的音名 + 八度照旧不动
+    expect(preferFlat('B2')).toBe('B2')
+    expect(preferSharp('C4')).toBe('C4')
+    // 八度后缀不被吞掉
+    expect(preferFlat('F♯2').endsWith('2')).toBe(true)
+    expect(preferSharp('Bb4').endsWith('4')).toBe(true)
+  })
+
+  it('非音名字符串行为与旧实现一致（不做等音转换）', () => {
+    expect(preferFlat('zzz')).toBe('zzz')
+    expect(preferSharp('')).toBe('')
+    expect(preferFlat('Ab')).toBe('A♭')
+    expect(preferSharp('Ab')).toBe('G♯')
+  })
 })
 
 // ------------------------------------------------ 序列兜底

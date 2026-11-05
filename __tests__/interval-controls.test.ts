@@ -307,13 +307,14 @@ describe('下拉与复选框的回调（String→Number 转换点）', () => {
   })
 })
 
-describe('开始提示', () => {
-  it('未开始时显示提示，进行中隐藏', () => {
+describe('开始提示（已移除）', () => {
+  it('未开始与进行中都不再显示「点击开始按钮开始练习」', () => {
+    // 2026-11-03 产品调整：面板不再渲染该提示，未开始时保持纯设置面板。
     const off = render({ isPlaying: false })
-    expect(off.text).toContain('[click_start_to_begin]')
+    expect(off.text).not.toContain('点击开始按钮开始练习')
     off.unmount()
     const on = render({ isPlaying: true })
-    expect(on.text).not.toContain('[click_start_to_begin]')
+    expect(on.text).not.toContain('点击开始按钮开始练习')
     on.unmount()
   })
 })

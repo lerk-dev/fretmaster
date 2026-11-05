@@ -9,7 +9,7 @@ export const viewport = {
   viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: dark)', color: '#101317' },
-    { media: '(prefers-color-scheme: light)', color: '#eeebe6' },
+    { media: '(prefers-color-scheme: light)', color: '#e1d9cc' },
   ],
 }
 
@@ -29,7 +29,7 @@ export default function RootLayout({
               var THEME_CLASSES = ['light','dark','forest-light','forest-dark','ocean-light','ocean-dark','sunset-light','sunset-dark','monochrome-light','monochrome-dark','rose-light','rose-dark','midnight-light','midnight-dark','sand-light','sand-dark','celadon-light','celadon-dark','lavender-light','lavender-dark','carbon-light','carbon-dark'];
               // 各主题的初始背景色（与 globals.css 中 --background 对应）
               var THEME_BG = {
-                'light': '#eeebe6', 'dark': '#101317',
+                'light': '#e1d9cc', 'dark': '#101317',
                 'forest-light': '#dbe5d6', 'forest-dark': '#0d1410',
                 'ocean-light': '#d9e6f2', 'ocean-dark': '#0a1420',
                 'sunset-light': '#f5e0d4', 'sunset-dark': '#1a0e0a',

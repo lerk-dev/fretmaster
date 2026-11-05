@@ -60,7 +60,8 @@ describe('主题底色：内联表与 lib/theme-colors.ts 必须逐项一致', (
 describe('themeBackgroundColor 的兜底', () => {
   it('已知主题返回对应色号', () => {
     expect(themeBackgroundColor('dark')).toBe('#101317')
-    expect(themeBackgroundColor('light')).toBe('#eeebe6')
+    // 2026-11-03 UI 改版：经典浅色改为暖羊皮纸（不再是近白灰）
+    expect(themeBackgroundColor('light')).toBe('#e1d9cc')
     expect(themeBackgroundColor('ocean-dark')).toBe('#0a1420')
   })
 
@@ -74,5 +75,47 @@ describe('themeBackgroundColor 的兜底', () => {
 
   it('不把原型链上的键当成主题（防 `toString` 之类）', () => {
     expect(themeBackgroundColor('toString')).toBe(FALLBACK_THEME_BACKGROUND)
+  })
+})
+
+
+/**
+ * 🚨 2026-11-05：经典浅色在**三个**地方各写了一份底色 ——
+ *   · app/globals.css 的 `.light { --background: H S% L% }`（页面最终渲染色）
+ *   · app/layout.tsx 的 `themeColor` + 内联 `THEME_BG.light`（首绘 / 浏览器 UI 色）
+ *   · lib/theme-colors.ts 的 `THEME_BACKGROUNDS.light`（Tauri WebView 常驻底色）
+ * 上面的护栏只比对后两份，**CSS 那份没人钉** ⇒ 2026-11-03 UI 改版把 CSS 改成
+ * `hsl(38 26% 84%)`（浏览器实测 = #e1d9cc），手抄的 hex 却写成 `#eed9cc`（R 差 13）
+ * ⇒ 桌面端过扫描边 / 滚动回弹露出偏红的底色、首绘也会闪一下。
+ * 这里把 CSS 一并纳入：三份必须逐字节一致。
+ */
+describe('CSS --background 与内联表 / lib 表三处一致（经典浅色）', () => {
+  function hslToHex(h: number, s: number, l: number): string {
+    s /= 100
+    l /= 100
+    const c = (1 - Math.abs(2 * l - 1)) * s
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+    const m = l - c / 2
+    let r: number, g: number, b: number
+    if (h < 60) { r = c; g = x; b = 0 }
+    else if (h < 120) { r = x; g = c; b = 0 }
+    else if (h < 180) { r = 0; g = c; b = x }
+    else if (h < 240) { r = 0; g = x; b = c }
+    else if (h < 300) { r = x; g = 0; b = c }
+    else { r = c; g = 0; b = x }
+    return '#' + [r, g, b].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('')
+  }
+
+  it('CSS 的 .light --background(HSL) 换算后 == lib 表 == 内联表 == themeColor', () => {
+    const css = readFileSync('app/globals.css', 'utf8')
+    const at = css.indexOf('.light {')
+    expect(at, 'globals.css 里找不到 .light 规则块（锚点失效）').toBeGreaterThan(-1)
+    const body = css.slice(at, css.indexOf('}', at))
+    const m = body.match(/--background:\s*([0-9.]+)\s+([0-9.]+)%\s+([0-9.]+)%/)
+    expect(m, '.light 块里没有 HSL 格式的 --background').not.toBeNull()
+    const fromCss = hslToHex(Number(m![1]), Number(m![2]), Number(m![3]))
+    expect(THEME_BACKGROUNDS.light, `CSS 换算出 ${fromCss}，lib 表却不是这个值`).toBe(fromCss)
+    expect(inlineBackgrounds().light, '内联 THEME_BG.light 与 CSS 不一致（首绘闪色）').toBe(fromCss)
+    expect(layoutSrc, 'viewport.themeColor 的 light 与 CSS 不一致（浏览器 UI 色差）').toContain(`color: '${fromCss}'`)
   })
 })

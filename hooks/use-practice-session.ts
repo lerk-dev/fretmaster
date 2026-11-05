@@ -26,8 +26,9 @@
  * 1. **`pausePractice` 里 `Date.now()` 必须在 updater 之外取** —— 铁律 1：`setPracticeElapsedTime`
  *    的 updater 在 StrictMode 下会被双调用，两次 `Date.now()` 不同 ⇒ 暂停时长漂移，
  *    且**只在 dev 复现**（生产不复现，最难查的一类）。护栏 `setstate-updater-purity.test.ts`。
- * 2. **暂停时长单位是【秒】** —— `practiceElapsedTime` 全程按秒累计（`recordPractice` 里
- *    再 `* 1000`）。历史上这里按毫秒累加过，恢复后时长被放大 1000 倍。
+ * 2. **计时单位是【秒】** —— `practiceElapsedTime`（已结束活跃段的累计秒数）与
+ *    `practiceSessionStartTime`（当前活跃段起点，暂停期间为 `null`）全程按秒计算。
+ *    历史上这里按毫秒累加过，恢复后时长被放大 1000 倍。
  * 3. **`timeLeft` / `isPracticePaused` 的唯一写者是本 hook** —— 页面只**读**这两个值
  *    （时间条、暂停/恢复按钮的图标与 title）；`setIsPracticePaused` **刻意不暴露**，
  *    唯一的翻转入口是 `togglePausePractice`。多一条写路径就会多一种
@@ -80,7 +81,7 @@ export interface UsePracticeSessionOptions {
   practiceSessionStartTime: number | null
   setPracticeSessionStartTime: (v: number | null) => void
   practiceElapsedTime: number
-  /** 需要 updater 形态（暂停时 `prev + 本次暂停秒数`） */
+  /** 需要 updater 形态（暂停时 `prev + 本次活跃段秒数`） */
   setPracticeElapsedTime: (v: number | ((prev: number) => number)) => void
   scoreRef: { current: { correct: number; total: number } }
   recordPractice: (
@@ -226,7 +227,21 @@ export function usePracticeSession({
   // 屏幕常亮的句柄：练习开始时申请、停止/卸载/页面隐藏时释放
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
+  // 快照字段的镜像：`savePracticeState` 身份恒定，不必随 timeLeft 每秒重建闭包。
+  // effect 无 deps ⇒ 每次渲染后刷新镜像；事件回调（beforeunload）总在 commit 之后触发，
+  // 读到的一定是最新的快照字段。
+  const practiceStateSnapshotRef = useRef({ isPlaying, activeTab, score, timeLeft, isPracticePaused })
+  useEffect(() => {
+    practiceStateSnapshotRef.current = { isPlaying, activeTab, score, timeLeft, isPracticePaused }
+  })
+
+  // 🚨 性能：`savePracticeState` 的字段含 `timeLeft`（练习中每秒变一次）——
+  // 旧实现 deps 跟着它变、订阅 effect 挂在 `[savePracticeState]` 上 ⇒ **每秒**
+  // remove+add 一次 beforeunload 监听器，还每秒造一个新闭包（300 秒练习 ≈ 300 次无谓重挂）。
+  // 改成「ref 镜像最新字段 + 身份恒定的回调 + 挂载一次订阅」：快照内容照旧是最新值。
+  // 护栏：__tests__/use-practice-session-timer.test.ts「beforeunload 订阅不随 tick 增长」。
   const savePracticeState = useCallback(() => {
+    const { isPlaying, activeTab, score, timeLeft, isPracticePaused } = practiceStateSnapshotRef.current
     if (typeof window === 'undefined' || !isPlaying) return
     const state = {
       activeTab,
@@ -240,7 +255,7 @@ export function usePracticeSession({
     } catch (e) {
       logger.error('保存练习状态快照失败:', e)
     }
-  }, [isPlaying, activeTab, score, timeLeft, isPracticePaused])
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -299,25 +314,31 @@ export function usePracticeSession({
     const sessionEnded = !isPlaying && sessionStartRef.current !== null
     const tabSwitchedAway = isPlaying && sessionStartRef.current !== null && !currentType
     if (sessionEnded || tabSwitchedAway) {
-      const startTime = sessionStartRef.current
       const sessionScore = sessionScoreRef.current
       const sessionType = sessionTabRef.current
       sessionStartRef.current = null
       sessionTabRef.current = null
+      // 会话时长 = 各【活跃段】之和，暂停段不计入：
+      //   · practiceElapsedTime = 已结束活跃段的累计秒数（暂停时并入）
+      //   · practiceSessionStartTime = 当前活跃段起点（暂停期间为 null）
+      // 🚨 旧实现把 practiceElapsedTime 当成「已累计暂停秒数」从墙钟里扣（wall - elapsed），
+      //    正好扣反：暂停 10s、活跃 20s 的会话被记成 10s，暂停越久时长反而越短。
+      //    护栏 use-practice-session-timer.test.ts。
+      const activeSec = practiceElapsedTime +
+        (practiceSessionStartTime !== null ? (Date.now() - practiceSessionStartTime) / 1000 : 0)
       // 仅在用户实际有答题时才记录，避免"开始后立即停止"也被计入
       if (sessionType && sessionScore.total > 0) {
         const accuracy = Math.round((sessionScore.correct / sessionScore.total) * 100)
-        // 扣除暂停时间：practiceElapsedTime 是已累计的暂停秒数；
-        // 若当前正处于暂停中，还要再减去本次暂停已持续的时间。
-        const pausedSec = practiceElapsedTime +
-          (isPracticePaused && practiceSessionStartTime ? (Date.now() - practiceSessionStartTime) / 1000 : 0)
-        const duration = Math.max(1, Math.round((Date.now() - startTime!) / 1000 - pausedSec))
+        const duration = Math.max(1, Math.round(activeSec))
         // detailName 用类型对应的中文名（唯一真相源 lib/practice-type-labels.ts，
         // 读侧 reloadStats 靠同一张表把 exercise_type 翻回 PracticeType）
         recordPractice(sessionType, PRACTICE_TYPE_LABELS[sessionType], { score: accuracy, duration, accuracy })
       }
+      // 结算后清空计时，避免上一轮残留污染下一轮（下一轮开始时也会重置）
+      setPracticeSessionStartTime(null)
+      setPracticeElapsedTime(0)
     }
-  }, [isPlaying, activeTab, score, recordPractice, practiceElapsedTime, isPracticePaused, practiceSessionStartTime])
+  }, [isPlaying, activeTab, score, recordPractice, practiceElapsedTime, practiceSessionStartTime, setPracticeSessionStartTime, setPracticeElapsedTime])
 
   /**
    * 外部改写剩余时间（重置 / 切换答题模式 / 恢复快照）——**返回给页面的就是它**。
@@ -432,17 +453,19 @@ export function usePracticeSession({
   const pausePractice = useCallback(() => {
     if (isPlaying && !isPracticePaused) {
       setIsPracticePaused(true)
-      // practiceElapsedTime 的单位是【秒】（见 recordPractice 中 *1000 的使用），
+      // 关闭当前活跃段：把本段秒数并入累计，并把起点置空（暂停期间不再计时）。
+      // practiceElapsedTime 的单位是【秒】（见结算 effect 中的 `Math.round(activeSec)`）。
       // 原实现直接累加毫秒差，导致恢复后时长被放大 1000 倍。
       // 🚨 P3-1：`Date.now()` 必须在 updater **外面**取（铁律 1：updater 必须纯）。
       //    StrictMode 会双调用 updater，两次 `Date.now()` 不同 ⇒ 第二次的基准漂移，
       //    且这个漂移在 dev 下才出现、生产不复现（最难查的一类）。
       const now = Date.now()
-      const sessionStart = practiceSessionStartTime ?? now
-      const elapsedSeconds = (now - sessionStart) / 1000
+      const segmentStart = practiceSessionStartTime ?? now
+      const elapsedSeconds = (now - segmentStart) / 1000
       setPracticeElapsedTime(prev => prev + elapsedSeconds)
+      setPracticeSessionStartTime(null)
     }
-  }, [isPlaying, isPracticePaused, practiceSessionStartTime, setPracticeElapsedTime])
+  }, [isPlaying, isPracticePaused, practiceSessionStartTime, setPracticeElapsedTime, setPracticeSessionStartTime])
 
   const resumePractice = useCallback(() => {
     if (isPlaying && isPracticePaused) {
@@ -526,7 +549,9 @@ export function usePracticeSession({
       setIsPracticePaused(false)
       setHighlightedFrets(new Map())
       setHighlightedTargetPosition(null)
-      setPracticeSessionStartTime(null)
+      // 🚨 这里**不要**清空 practiceSessionStartTime / practiceElapsedTime：
+      //    结算 effect 还要用它们补上「停止瞬间才结束」的最后一段活跃时间。
+      //    清空发生在 effect 内（记录之后），见上方会话统计 effect。
       // P3-2：结束练习时把「答完延迟」的两个定时器一并清掉 —— 否则它们仍会跑
       //（100ms 那条会走 handleMIDINoteInput 记分），把这一局结束后才到达的点击
       // 算进上一局。
@@ -550,8 +575,13 @@ export function usePracticeSession({
     setHighlightedTargetPosition(null)
     setIntervalPracticeStep("root")
     setCurrentIntervalExercise(null)
-    setPracticeSessionStartTime(null)
-    setPracticeElapsedTime(0)
+    // 切 tab / 点「重置」都会走到这里。若会话仍在进行（isPlaying=true），**不能**在
+    // 结算 effect 之前把计时清零 —— 否则本次会话时长会被算成 0（下限 1 秒）。
+    // 会话进行中由结算 effect 在记录后清空；只有本来就没在练习时才直接清。
+    if (!isPlaying) {
+      setPracticeSessionStartTime(null)
+      setPracticeElapsedTime(0)
+    }
     setShowFretboard(false)
     setShowIntervalFretboard(false)
     setShowChordFretboard(false)
@@ -577,7 +607,7 @@ export function usePracticeSession({
     isCoolingDownRef.current = false
     // 同上：`cooldownRef` / `isCoolingDownRef` 是收音域返回的 ref，身份恒定。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [practiceTime, setChordExerciseCurrentStep, setChordExerciseSequence, setChordExerciseTargetChord, setCurrentIntervalExercise, setIntervalPracticeStep, setIsPlaying, setNextChordExerciseInfo, setPracticeElapsedTime, setPracticeSessionStartTime, setScore, setShowChordExerciseFretboard, setShowIntervalFretboard])
+  }, [isPlaying, practiceTime, setChordExerciseCurrentStep, setChordExerciseSequence, setChordExerciseTargetChord, setCurrentIntervalExercise, setIntervalPracticeStep, setIsPlaying, setNextChordExerciseInfo, setPracticeElapsedTime, setPracticeSessionStartTime, setScore, setShowChordExerciseFretboard, setShowIntervalFretboard])
 
   // 只暴露页面真正要用的：两个只读值 + 剩余时间的显式改写 + 三个会话动作。
   // 🚨 刻意**不**返回 `setIsPracticePaused` / `pausePractice` / `resumePractice`：

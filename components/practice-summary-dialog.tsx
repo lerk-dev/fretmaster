@@ -17,6 +17,31 @@ export interface PracticeSummaryData {
   duration: number
 }
 
+/**
+ * 秒 → 时长串：不足 1 小时 `m:ss`，≥1 小时 `h:mm:ss`。
+ *
+ * 🚨 旧实现直接 `Math.floor(d/60)}:{d%60}` ⇒ 3725 秒显示成 `62:05`，
+ * 长会话（如 2 小时马拉松练习）读起来像 62 分钟。多一位小时位后无歧义。
+ */
+export function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds))
+  const hours = Math.floor(s / 3600)
+  const minutes = Math.floor((s % 3600) / 60)
+  const seconds = s % 60
+  const mm = String(minutes).padStart(2, '0')
+  const ss = String(seconds).padStart(2, '0')
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${minutes}:${ss}`
+}
+
+/**
+ * 答题速度（题/分钟）：只在有时长且有作答时给出，保留 1 位小数。
+ * duration ≤ 0 时返回 null（不显示该行，避免除零/0 题误导）。
+ */
+export function answerSpeedPerMinute(total: number, durationSeconds: number): number | null {
+  if (total <= 0 || durationSeconds <= 0) return null
+  return Math.round((total / (durationSeconds / 60)) * 10) / 10
+}
+
 interface PracticeSummaryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -70,10 +95,15 @@ export function PracticeSummaryDialog({
             <div className="text-xs text-muted-foreground">{t('practice_summary_accuracy')}</div>
           </div>
           <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-accent">{Math.floor(data.duration / 60)}:{String(data.duration % 60).padStart(2, '0')}</div>
+            <div className="text-2xl font-bold text-accent">{formatDuration(data.duration)}</div>
             <div className="text-xs text-muted-foreground">{t('practice_summary_duration')}</div>
           </div>
         </div>
+        {answerSpeedPerMinute(data.total, data.duration) !== null && (
+          <div className="text-center text-sm text-muted-foreground mb-2" data-testid="practice-summary-speed">
+            {t('practice_summary_speed')}: {answerSpeedPerMinute(data.total, data.duration)}
+          </div>
+        )}
         <div className="flex gap-3">
           <Button
             variant="outline"

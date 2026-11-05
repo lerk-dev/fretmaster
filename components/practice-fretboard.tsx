@@ -268,9 +268,12 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                 // （没有圆点约束），所以放大不会撑破格子。
                 "flex-[0.8] h-8 sm:h-10 text-xs sm:text-base font-fretboard font-semibold transition-all duration-150 relative",
                 "flex items-center justify-center",
+                // 琴枕（0 品与 1 品之间）的竖线与各品之间的线用同一组颜色/宽度：
+                // 之前空弦格没有 border，这条线全靠底色对比，浅色主题下几乎看不见。
+                "border-r",
                 isStringEnabled 
-                  ? cn("text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(openCell.note, stringIndex, 0))
-                  : "text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
+                  ? cn("border-border/50 dark:border-zinc-600/50 text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(openCell.note, stringIndex, 0))
+                  : "border-border/30 dark:border-zinc-800/50 text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
               )}
             >
               <span className={cn(

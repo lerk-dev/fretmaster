@@ -71,6 +71,7 @@ import {
   duplicateSong,
   transposeSong,
 } from '@/lib/custom-song-editor'
+import { normalizeNoteName } from '@/lib/page-theory-functions'
 
 interface CustomSongEditorProps {
   language: 'zh-CN' | 'en'
@@ -699,13 +700,14 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                         value={chord.rootNote}
                         onValueChange={(v) => handleUpdateChord(chord.id, { rootNote: v as RootNote })}
                       >
-                        <SelectTrigger className="h-7 w-16 text-xs">
+                        <SelectTrigger className="h-8 w-16 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {ROOT_NOTES.map(n => (
                             <SelectItem key={n.id} value={n.id} className="text-xs">
-                              {n.name}
+                              {/* 编辑器数据里的音名是 ASCII（C#/Db），下拉里必须转成 ♯/♭ 显示 */}
+                              {normalizeNoteName(n.name)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -715,7 +717,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                         value={chord.chordType}
                         onValueChange={(v) => handleUpdateChord(chord.id, { chordType: v as ChordType })}
                       >
-                        <SelectTrigger className="h-7 w-24 text-xs">
+                        <SelectTrigger className="h-8 w-24 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -750,7 +752,7 @@ export const CustomSongEditor = memo(function CustomSongEditor({
                         value={chord.function || 'none'}
                         onValueChange={(v) => handleUpdateChord(chord.id, { function: v === 'none' ? undefined : v })}
                       >
-                        <SelectTrigger className="h-7 w-14 text-xs">
+                        <SelectTrigger className="h-8 w-14 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

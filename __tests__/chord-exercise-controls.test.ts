@@ -5,8 +5,9 @@
  * 同模式，但多两块有分量的逻辑：
  *
  *  ① **和弦类型按分组渲染**：CHORD_TYPES 按 group 归组，组标题中文界面用 groupZh、
- *     英文用 groupName（或 name）；类型按钮 65 个，label = symbol，
- *     **Major 的 symbol 是空串** → 回退：中文界面用中文术语（大三和弦）、英文用 name；
+ *     英文用 groupName（或 name）；类型按钮 65 个，label **跟随界面语言**——
+ *     中文界面一律中文术语（大三和弦 / 小三和弦 / …），英文界面一律英文类型名。
+ *     （2026-11-05 修正：此前是 `symbol || 中文回退`，只有 Major 显示中文、其余是英文缩写。）
  *  ② **多选 toggle**：点已选中的从数组移除、点未选中的追加；「全选/清空」直接回传
  *     全部 name / 空数组。
  *
@@ -66,9 +67,9 @@ function render(props: Record<string, unknown> = {}) {
     buttons,
     comboboxes: [...container.querySelectorAll('[role="combobox"]')] as HTMLButtonElement[],
     switches: [...container.querySelectorAll('[role="switch"]')] as HTMLElement[],
-    /** 类型按钮：label 是 symbol 或中文名，数量应与 CHORD_TYPES 一致 */
+    /** 类型按钮：label 跟随界面语言（中文界面 = 中文术语），数量应与 CHORD_TYPES 一致 */
     typeButtons: buttons.filter((b) =>
-      CHORD_TYPES.some((ct) => (ct.symbol || getChordDisplayName(ct.name, 'chinese')) === b.textContent),
+      CHORD_TYPES.some((ct) => getChordDisplayName(ct.name, 'chinese') === b.textContent),
     ),
     click(el: HTMLElement) {
       act(() => { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
@@ -95,11 +96,14 @@ describe('和弦类型多选', () => {
     r.unmount()
   })
 
-  it('Major 的 symbol 为空串 → 中文界面回退为中文术语「大三和弦」', () => {
+  it('中文界面下所有类型按钮都用中文术语（不再中英混用）', () => {
     const r = render()
     const major = CHORD_TYPES.find((ct) => ct.name === 'Major')!
     expect(major.symbol).toBe('')
-    expect(r.text).toContain(getChordDisplayName('Major', 'chinese'))
+    // 每一个类型按钮的文案都应是「中文显示模式」下的名字，而不是 m / dim / 7 这类缩写
+    for (const ct of CHORD_TYPES) {
+      expect(r.text, `${ct.name} 应显示中文名`).toContain(getChordDisplayName(ct.name, 'chinese'))
+    }
     r.unmount()
   })
 
@@ -113,7 +117,7 @@ describe('和弦类型多选', () => {
 
   it('点击未选中的类型 → 回传「追加后的新数组」；点击已选中的 → 回传「移除后的新数组」', () => {
     const r = render({ selectedTypes: ['Major'] })
-    const m7Btn = r.typeButtons.find((b) => b.textContent === 'm7')!
+    const m7Btn = r.typeButtons.find((b) => b.textContent === getChordDisplayName('m7', 'chinese'))!
     r.click(m7Btn)
     expect(r.calls.types).toEqual([['Major', 'm7']])
 

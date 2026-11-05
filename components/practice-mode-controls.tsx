@@ -111,6 +111,15 @@ export const PracticeModeControls = memo(function PracticeModeControls({
     []
   )
 
+  // 一题一答锁：作答后到下一题到达前，忽略重复点击。
+  // 🚨 此前「连点不叠加」只挡了定时器叠加（先清上一个 setTimeout），**没挡计分叠加** ——
+  // 800ms 换题窗口内再点一次，onScoreChange / recordPositionStat 会为同一题再记一次，
+  // 分数与逐位置掌握度都被灌水。answeredRef 在目标位置变化（= 新题目）时复位解锁。
+  const answeredRef = useRef(false)
+  useEffect(() => {
+    answeredRef.current = false
+  }, [highlightedTargetPosition])
+
   return (
 <div className="space-y-2">
   <div className="flex flex-wrap items-end gap-2">
@@ -250,6 +259,9 @@ export const PracticeModeControls = memo(function PracticeModeControls({
               // 天然处理等音，如 C♯ = D♭）。这里原用 `isEquivalentNote` 自算一份，
               // 是全仓第五处「答对判定」实现。
               if (highlightedTargetPosition) {
+                // 一题只判一次：800ms 换题窗口内的连点直接忽略（防重复计分，见 answeredRef）
+                if (answeredRef.current) return
+                answeredRef.current = true
                 const { stringIndex, fret } = highlightedTargetPosition
                 const correctNote = getNoteAtPosition(stringIndex, fret)
                 const correctIdx = noteNameToPitchClass(correctNote)

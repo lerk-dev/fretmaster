@@ -330,9 +330,10 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
           setCurrentIntervalExercise({ ...exercise, completedIntervals: newCompletedIntervals, answered: true })
           const delta = scoreDeltaFor(true)
           setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
-          if (addRootBackRef.current && matchedInterval !== '1') {
-            setIntervalPracticeStep('root')
-          } else if (generateIntervalExerciseRef.current) {
+          // 整题完成（序列里的每个音级都已命中）就必须出新题。
+          // 音频路径不按显示顺序匹配，「回弹根音」的 `1` 可能在音程之前就被弹掉；
+          // 此时再等一个序列里已经不存在的根音，会让题目停在 answered=true 永远不推进。
+          if (generateIntervalExerciseRef.current) {
             generateIntervalExerciseRef.current()
           }
         } else {

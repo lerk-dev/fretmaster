@@ -33,9 +33,19 @@ let probe: { setScore: (v: { correct: number; total: number }) => void } | null 
 function Probe({ options }: { options: UsePracticeSessionOptions }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [score, setScore] = useState({ correct: 0, total: 0 })
+  // 会话计时 state 在生产里由 `usePracticeStats` 持有，这里必须同样由 Probe 持有：
+  // 若沿用 makeOptions 里的 noop setter，hook 写入的起点/累计永远回不来，
+  // 结算时长会恒为下限 1 秒（测不出计时逻辑）。
+  const [practiceSessionStartTime, setPracticeSessionStartTime] = useState<number | null>(null)
+  const [practiceElapsedTime, setPracticeElapsedTime] = useState(0)
   playing = isPlaying
   probe = { setScore }
-  api = usePracticeSession({ ...options, isPlaying, setIsPlaying, score, setScore })
+  api = usePracticeSession({
+    ...options,
+    isPlaying, setIsPlaying, score, setScore,
+    practiceSessionStartTime, setPracticeSessionStartTime,
+    practiceElapsedTime, setPracticeElapsedTime,
+  })
   return null
 }
 
@@ -202,6 +212,27 @@ describe('练习倒计时按墙钟走', () => {
   })
 })
 
+describe('beforeunload 订阅不随 tick 增长（性能护栏）', () => {
+  it('🚨 练习中 timeLeft 每秒变，但 beforeunload 监听器只挂一次（旧实现每秒 remove+add）', () => {
+    let beforeunloadAdds = 0
+    const origAdd = window.addEventListener.bind(window)
+    const spy = vi
+      .spyOn(window, 'addEventListener')
+      .mockImplementation(((type: string, ...rest: unknown[]) => {
+        if (type === 'beforeunload') beforeunloadAdds++
+        ;(origAdd as (...a: unknown[]) => void)(type, ...rest)
+      }) as never)
+
+    mount()
+    start()
+    runFor(10) // 10 个 tick 秒：旧实现会重挂 10 次
+    expect(beforeunloadAdds, 'beforeunload 订阅次数不得随练习时长增长').toBe(1)
+    expect(api!.timeLeft, '时钟本身照常走').toBe(290)
+
+    spy.mockRestore()
+  })
+})
+
 describe('练习会话：停止时记录（时长走墙钟）', () => {
   it('开始后没有任何答题 ⇒ 不记录（避免「开始即停止」也计入统计）', () => {
     const recordPractice = vi.fn()
@@ -226,5 +257,68 @@ describe('练习会话：停止时记录（时长走墙钟）', () => {
     const [type, , opts] = recordPractice.mock.calls[0] as [string, string, { duration: number }]
     expect(type).toBe('scale') // activeTab='scale' ⇒ PracticeType 'scale'
     expect(opts.duration).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// ==================================================== 暂停 / 切 tab 的时长统计（2026-11-03）
+/**
+ * 记进 SQLite 的 `duration` 必须等于**真实活跃时长**（暂停段不计入）。
+ *
+ * 旧实现的 bug 是「扣反了」：`pausePractice` 累加的是活跃段秒数，而结算 effect
+ * 把这个累计当成「暂停秒数」从墙钟里减去（`wall - elapsed`）。于是
+ * 「活跃 10s、暂停 30s、再活跃 20s」的会话被记成 10s（墙钟 60 - 累计 50），
+ * 暂停越长时长越短；而未暂停的会话恰好不受影响，所以问题长期没被发现。
+ *
+ * 另一条路径：切 tab 会调用 `resetPractice`，它原本在结算 effect 之前就把
+ * `practiceElapsedTime` / `practiceSessionStartTime` 归零 ⇒ 本次会话被记成 1 秒。
+ */
+describe('练习会话：暂停与切 tab 不计入时长', () => {
+  /** 最近一次 recordPractice 的 duration（秒） */
+  const lastDuration = (mock: ReturnType<typeof vi.fn>) =>
+    (mock.mock.calls[0][2] as { duration: number }).duration
+
+  it('活跃 10s + 暂停 30s + 活跃 20s ⇒ 记录 30s（不是墙钟 60s）', () => {
+    const recordPractice = vi.fn()
+    mount({ recordPractice })
+
+    start()
+    act(() => { probe!.setScore({ correct: 1, total: 1 }) })
+    runFor(10)                                  // 活跃段 1
+    act(() => { api!.togglePausePractice() })   // 暂停
+    runFor(30)                                  // 挂起 30s（时钟前进，计时器挂起）
+    act(() => { api!.togglePausePractice() })   // 恢复
+    runFor(20)                                  // 活跃段 2
+    act(() => { api!.togglePractice() })        // 停止 ⇒ 结算
+
+    expect(recordPractice).toHaveBeenCalledTimes(1)
+    expect(lastDuration(recordPractice)).toBe(30)
+  })
+
+  it('暂停中直接停止 ⇒ 只记录已结束的活跃段（10s）', () => {
+    const recordPractice = vi.fn()
+    mount({ recordPractice })
+
+    start()
+    act(() => { probe!.setScore({ correct: 1, total: 1 }) })
+    runFor(10)
+    act(() => { api!.togglePausePractice() })
+    runFor(30)                                  // 暂停期间流逝的时间不该计入
+    act(() => { api!.togglePractice() })        // 暂停态下停止
+
+    expect(recordPractice).toHaveBeenCalledTimes(1)
+    expect(lastDuration(recordPractice)).toBe(10)
+  })
+
+  it('播放中切 tab（resetPractice）⇒ 记录本次会话时长，不被归零成 1 秒', () => {
+    const recordPractice = vi.fn()
+    mount({ recordPractice })
+
+    start()
+    act(() => { probe!.setScore({ correct: 1, total: 1 }) })
+    runFor(45)
+    act(() => { api!.resetPractice() })         // 页面 handleTabChange 的路径
+
+    expect(recordPractice).toHaveBeenCalledTimes(1)
+    expect(lastDuration(recordPractice)).toBe(45)
   })
 })
