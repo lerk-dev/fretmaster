@@ -456,3 +456,57 @@ describe('PracticeModeControls — 剩余时间与练习建议', () => {
     expect(text()).not.toContain('practice_suggestion_title')
   })
 })
+
+describe('PracticeModeControls — 单音全指板：开关在控件行里，点开才展开', () => {
+  const singleNoteBase = (enabled: boolean) => ({
+    note: 'E',
+    randomNote: false,
+    cycle: false,
+    prompt: 'none' as const,
+    quota: 'all' as const,
+    showLines: true,
+    enabled,
+    done: 0,
+    total: 8,
+    canSkip: false,
+    lastHit: null,
+  })
+
+  it('未启用时只有开关，不渲染详细设置（不单独占一行）', () => {
+    mount(baseProps({
+      singleNote: singleNoteBase(false),
+      onSingleNoteChange: vi.fn(),
+    }))
+    expect(document.querySelector('#single-note-toggle'), '开关应始终可见').not.toBeNull()
+    // 开关与「显示所有音符」同一排：在同一层 flex-wrap 容器里，而不是各自独占一行
+    const row = document.querySelector('#single-note-toggle')?.closest('.flex-wrap')
+    expect(row, '开关应落在控件行内').not.toBeNull()
+    expect(row!.contains(buttonByName('show_all_notes'))).toBe(true)
+    // 关闭态：详细设置（齿轮 + 目标音 / 次数）一概不出现
+    expect(document.querySelector('[aria-label="single_note_settings"]')).toBeNull()
+    expect(text()).not.toContain('single_note_target')
+    expect(text()).not.toContain('single_note_quota')
+  })
+
+  it('启用后：行内只多一个齿轮，详细设置不占版面', () => {
+    mount(baseProps({
+      singleNote: singleNoteBase(true),
+      onSingleNoteChange: vi.fn(),
+    }))
+    expect(document.querySelector('[aria-label="single_note_settings"]'), '齿轮应出现').not.toBeNull()
+    // 设置收进了 Popover：未点开时文档里没有这些标签
+    expect(text()).not.toContain('single_note_target')
+    expect(text()).not.toContain('single_note_quota')
+  })
+
+  it('点开关回传 { enabled: true }', () => {
+    const onSingleNoteChange = vi.fn()
+    mount(baseProps({
+      singleNote: singleNoteBase(false),
+      onSingleNoteChange,
+    }))
+    const sw = document.querySelector('#single-note-toggle') as HTMLElement
+    act(() => { sw.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
+    expect(onSingleNoteChange).toHaveBeenCalledWith({ enabled: true })
+  })
+})

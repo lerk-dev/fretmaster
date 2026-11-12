@@ -224,17 +224,25 @@ describe('PracticeSummaryDialog', () => {
   })
 
   describe('两个按钮', () => {
-    it('「关闭」只回传 onOpenChange(false)', () => {
+    it('「关闭」走 onClose（未传时回退 onOpenChange(false)）', () => {
       const p = mount()
       p.click(p.btn(tZh('practice_summary_close')))
       expect(p.seq).toEqual(['close'])
       p.unmount()
+
+      // 传了 onClose ⇒ 不再回传 onOpenChange：调用方靠这个区分「关闭」与「再练一次」
+      let closeCalls = 0
+      const q = mount({ onClose: () => { closeCalls++ } })
+      q.click(q.btn(tZh('practice_summary_close')))
+      expect(closeCalls).toBe(1)
+      expect(q.seq).toEqual([])
+      q.unmount()
     })
 
-    it('「再练一次」**先关弹窗、再触发回调**', () => {
+    it('「再练一次」只触发回调，不自作主张关弹窗（关弹窗由调用方负责）', () => {
       const p = mount()
       p.click(p.btn(tZh('practice_summary_again')))
-      expect(p.seq).toEqual(['close', 'again'])
+      expect(p.seq).toEqual(['again'])
       p.unmount()
     })
 

@@ -44,7 +44,10 @@ export const ChordExerciseQuestion = memo(function ChordExerciseQuestion({
       <div className="mb-3">
         {isPlaying && chordExerciseTargetChord ? (
           <>
-            <h3 className="text-lg font-semibold">
+            <h3
+              key={`${chordExerciseTargetChord.root}-${chordExerciseTargetChord.type}`}
+              className="chord-swap text-lg font-semibold"
+            >
               {normalizeNoteName(chordExerciseTargetChord.root)} {normalizeNoteName(getChordDisplayName(chordExerciseTargetChord.type, chordScaleDisplay, chordSymbols))}
             </h3>
             <div className="flex flex-wrap justify-center gap-2 mt-3">
@@ -54,6 +57,7 @@ export const ChordExerciseQuestion = memo(function ChordExerciseQuestion({
                   variant={i === chordExerciseCurrentStep ? "default" : "outline"}
                   className={cn(
                     "text-lg px-4 py-2",
+                    i === chordExerciseCurrentStep && "chord-swap",
                     i < chordExerciseCurrentStep && "opacity-50"
                   )}
                 >

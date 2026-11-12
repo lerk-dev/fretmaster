@@ -221,6 +221,15 @@ describe('回归：输入框里的按键不触发全局动作', () => {
     pressKey(document.body, 'p', { ctrlKey: true })
     expect(opts.togglePractice).not.toHaveBeenCalled()
   })
+
+  it('🚨 单音全指板：↓ 只隐藏指板，不清空本轮', () => {
+    const opts = makeOptions({ singleNoteActive: true })
+    mount(opts)
+    pressKey(document.body, 'ArrowDown')
+    expect(opts.setTabFretboardFlag).toHaveBeenCalledWith('practice', false)
+    // 单音模式没有「下一题」，↓ 若调 generateNewTarget 会把本轮找到/跳过记录清空
+    expect(opts.generateNewTarget).not.toHaveBeenCalled()
+  })
 })
 
 // --------------------------------------------------------- 源码护栏

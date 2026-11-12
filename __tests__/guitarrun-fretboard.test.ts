@@ -521,3 +521,87 @@ describe('接线护栏：判定必须来自 lib（防止两套皮肤分叉）', 
     expect(src).not.toMatch(/semitone\s*===/)
   })
 })
+
+/**
+ * 🚨 3D 琴颈（skin='trainer'）的单音全指板提示。
+ *
+ * 真出过的 bug：3D 琴颈里「精确提示选中的那一格」和别的落点长得一模一样，
+ * 因为 trainer 分支把圆点可见性直接绑成 `showText`，而单音模式为了不泄露答案不写音名
+ * ⇒ 整张指板一个圆点都不画。用户看到的就是「提示选中了，但没有提示效果」。
+ */
+describe('🚨 3D 琴颈：单音全指板的提示要看得见', () => {
+  const trainerProps = { skin: 'trainer', showAllNotes: false, singleNoteTarget: 'E' }
+  const dotAt = (container: HTMLElement, s: number, f: number) =>
+    container.querySelector(`.ft-cell[data-string="${s}"][data-fret="${f}"] .ft-dot`) as HTMLElement | null
+
+  it('精确提示的那一格：圆点可见 + data-state=prompt（不写音名，但必须画出来）', () => {
+    setStore({ activeTab: 'practice' })
+    const p = mount({ ...trainerProps, highlightedTargetPosition: { stringIndex: 1, fret: 5 } })
+    const dot = dotAt(p.container, 1, 5)! // 2 弦 5 品 = E
+    expect(dot.getAttribute('data-visible')).toBe('1')
+    expect(dot.getAttribute('data-state')).toBe('prompt')
+    expect(dot.textContent).toBe('')
+  })
+
+  it('其他还没找到的落点：pending（空心圈），不是和提示格一样的实心', () => {
+    setStore({ activeTab: 'practice' })
+    const p = mount({ ...trainerProps, highlightedTargetPosition: { stringIndex: 1, fret: 5 } })
+    const dot = dotAt(p.container, 2, 9)! // 3 弦 9 品 = E
+    expect(dot.getAttribute('data-state')).toBe('pending')
+    expect(dot.getAttribute('data-visible')).toBe('1')
+  })
+
+  it('已找到 / 已跳过：found / skipped', () => {
+    setStore({ activeTab: 'practice' })
+    const p = mount({ ...trainerProps, singleNoteFound: [{ stringIndex: 1, fret: 5 }] })
+    expect(dotAt(p.container, 1, 5)!.getAttribute('data-state')).toBe('found')
+    p.rerender({ singleNoteSkipped: [{ stringIndex: 2, fret: 9 }] })
+    expect(dotAt(p.container, 2, 9)!.getAttribute('data-state')).toBe('skipped')
+  })
+
+  it('连线：connectPoints ≥ 2 时 3D 琴颈也要画出覆盖层', () => {
+    setStore({ activeTab: 'practice' })
+    const p = mount({
+      ...trainerProps,
+      connectPoints: [
+        { stringIndex: 1, fret: 5 },
+        { stringIndex: 2, fret: 9 },
+      ],
+    })
+    const svg = p.container.querySelector('.fretboard-path-overlay')
+    expect(svg).not.toBeNull()
+    expect(svg!.querySelectorAll('line').length).toBe(1)
+  })
+
+  it('无提示模式（hideUnfound）：未找到的一个都不画，但提示格仍然亮', () => {
+    setStore({ activeTab: 'practice' })
+    const p = mount({
+      ...trainerProps,
+      singleNoteHideUnfound: true,
+      highlightedTargetPosition: { stringIndex: 1, fret: 5 },
+    })
+    expect(dotAt(p.container, 1, 5)!.getAttribute('data-visible')).toBe('1')
+    expect(dotAt(p.container, 1, 5)!.getAttribute('data-state')).toBe('prompt')
+    const other = dotAt(p.container, 0, 12)! // 12 品也是 E
+    expect(other.getAttribute('data-visible')).toBe('0')
+    expect(other.getAttribute('data-state')).toBeNull()
+  })
+})
+
+/**
+ * 🚨 GuitarRun 圆点皮肤：提示格与「已找到」都是 target 角色的橙色实心圆，
+ * 光靠角色类分不出来 —— 必须另有 `gr-cell--prompt`（呼吸光环）才看得懂「现在就弹这格」。
+ */
+describe('🚨 GuitarRun 皮肤：单音全指板的提示格要能区分', () => {
+  it('精确提示的那一格带 gr-cell--prompt，已找到的落点不带', () => {
+    setStore({ activeTab: 'practice' })
+    const p = mount({
+      showAllNotes: false,
+      singleNoteTarget: 'E',
+      singleNoteFound: [{ stringIndex: 2, fret: 9 }],
+      highlightedTargetPosition: { stringIndex: 1, fret: 5 },
+    })
+    expect(p.classesOf(p.cellAt(1, 5))).toContain('gr-cell--prompt')
+    expect(p.classesOf(p.cellAt(2, 9))).not.toContain('gr-cell--prompt')
+  })
+})

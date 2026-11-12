@@ -58,9 +58,17 @@ import {
   createNoteConfirmState,
   createOnsetState,
   detectOnset,
+  resetNoteConfirmState,
   type NoteConfirmState,
   type OnsetState,
 } from '@/lib/note-confirm'
+import {
+  createNoteReleaseState,
+  markNoPitch,
+  markPitch,
+  RELEASE_SILENCE_MS,
+  type NoteReleaseState,
+} from '@/lib/note-release'
 import {
   formatNoisePercent,
   onsetGateFromNoiseFloor,
@@ -196,7 +204,7 @@ export interface UseAudioInputOptions {
    * 经 ref 取值才能拿到最新闭包（页面里的 `handleMIDINoteInput` 依赖
    * 练习状态，每次渲染重建）。
    */
-  handleMIDINoteInputRef: { current: ((note: string) => void) | null }
+  handleMIDINoteInputRef: { current: ((note: string, octave?: number) => void) | null }
 
   // ---------------- 练习 / 调音器 ----------------
   isPlaying: boolean
@@ -292,6 +300,12 @@ export function useAudioInput(options: UseAudioInputOptions): AudioInputHandle {
   if (onsetStateRef.current === null) onsetStateRef.current = createOnsetState()
   const noteConfirmStateRef = useRef<NoteConfirmState | null>(null)
   if (noteConfirmStateRef.current === null) noteConfirmStateRef.current = createNoteConfirmState()
+  // 松音检测状态（详见 lib/note-release.ts）：静音满 RELEASE_SILENCE_MS 后清空确认记忆，
+  // 让「同一个音连弹」在没有起音信号时也能重新计数（单音全指板的整轮目标音不变）。
+  const noteReleaseStateRef = useRef<NoteReleaseState | null>(null)
+  if (noteReleaseStateRef.current === null) noteReleaseStateRef.current = createNoteReleaseState()
+  /** Tauri 路径没有静音事件，只记「上一条有效音高」的时刻，用间隔回推松开 */
+  const lastPitchEventAtRef = useRef(0)
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null)
   const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null)
   const gainNodeRef = useRef<GainNode | null>(null)
@@ -517,6 +531,10 @@ export function useAudioInput(options: UseAudioInputOptions): AudioInputHandle {
       }
       
       if (!yinResult || !yinResult.frequency) {
+        // 松音检测：粗帧路径（~186ms/帧）一帧没音高就已经超过静音阈值
+        if (markNoPitch(noteReleaseStateRef.current!, performance.now())) {
+          resetNoteConfirmState(noteConfirmStateRef.current!)
+        }
         return
       }
       
@@ -531,6 +549,9 @@ export function useAudioInput(options: UseAudioInputOptions): AudioInputHandle {
       //   · 底噪高（校准到 0.02 ⇒ 门限 0.03）时它更宽松 ⇒ 纯环境抖动被当成有信号送进匹配。
       // 护栏见 __tests__/onset-gate.test.ts 的 ④（双向缝隙证明 + 源码解析）。
       if (energy < getOnsetGate()) {
+        if (markNoPitch(noteReleaseStateRef.current!, performance.now())) {
+          resetNoteConfirmState(noteConfirmStateRef.current!)
+        }
         return
       }
       
@@ -571,6 +592,9 @@ export function useAudioInput(options: UseAudioInputOptions): AudioInputHandle {
         lastDetectedPitch = detectedNote
       }
       
+      // 本帧有可用音高 ⇒ 结束「静音段」，允许下一次静音再次触发松音
+      markPitch(noteReleaseStateRef.current!)
+
       // 调用共用的练习匹配逻辑（Web 和 Tauri 两条路径共用）
       // `?.` 是防御性的：页面在渲染期就把它赋成 `processPracticeMatch`，首帧回调之前已非 null。
       processMatchRef.current?.({
@@ -617,9 +641,25 @@ export function useAudioInput(options: UseAudioInputOptions): AudioInputHandle {
       }
       
       
+      const hasUsablePitch =
+        !!pitchData.frequency &&
+        pitchData.hasSignal &&
+        pitchData.probability > (confidenceThresholdRef.current || 0.8)
+
+      // 松音检测：worklet 每帧都会发消息（没音高时 frequency=null），是唯一能直接看到
+      // 「静音」的 Web 路径。静音满 120ms ⇒ 清空多帧确认记忆（含 firedNote），
+      // 否则同一个音连弹时第二个音会被 firedNote 锁死（详见 lib/note-release.ts）。
+      if (hasUsablePitch) {
+        markPitch(noteReleaseStateRef.current!)
+      } else if (markNoPitch(noteReleaseStateRef.current!, performance.now())) {
+        resetNoteConfirmState(noteConfirmStateRef.current!)
+      }
+
       // 处理音高检测结果 - 使用与 ScriptProcessorNode 相同的逻辑
-      if (pitchData.frequency && pitchData.hasSignal && pitchData.probability > (confidenceThresholdRef.current || 0.8)) {
-        const detectedNote = frequencyToNoteName(pitchData.frequency)
+      if (hasUsablePitch) {
+        // `hasUsablePitch` 是布尔变量，TS 无法据此收窄 `frequency` 的类型
+        const frameFrequency = pitchData.frequency as number
+        const detectedNote = frequencyToNoteName(frameFrequency)
         if (detectedNote) {
           setDetectedPitch(detectedNote)
           
@@ -627,7 +667,7 @@ export function useAudioInput(options: UseAudioInputOptions): AudioInputHandle {
           if (isPlayingRef.current && !isCoolingDownRef.current) {
             // `?.` 是防御性的：页面在渲染期就把它赋成 `processPracticeMatch`，首帧回调之前已非 null。
       processMatchRef.current?.({
-              frequency: pitchData.frequency,
+              frequency: frameFrequency,
               note: detectedNote,
               probability: pitchData.probability,
               isNoteOnset: pitchData.isNoteOnset,
@@ -939,8 +979,10 @@ export function useAudioInput(options: UseAudioInputOptions): AudioInputHandle {
         setDetectedPitch(noteName)
         
         // 处理MIDI输入 - 使用ref避免循环依赖
+        // 🚨 八度必须一起传：MIDI note 号是绝对值（60 = C4），只给音名会让单音全指板
+        //    把「弹响的八度」判错，落点显示/可弹范围都会串到别的八度。
         if (handleMIDINoteInputRef.current) {
-          handleMIDINoteInputRef.current(noteName)
+          handleMIDINoteInputRef.current(noteName, Math.floor(note / 12) - 1)
         }
       }
     }
@@ -1184,6 +1226,15 @@ export function useAudioInput(options: UseAudioInputOptions): AudioInputHandle {
             lastDisplayUpdateTime = now
             lastDisplayedNote = detectedNote
           }
+
+          // 松音检测：Rust 只在有音高时发事件，没有静音帧可看 —— 用「距上一条有效音高
+          // 的间隔」回推。间隔超过静音阈值 ⇒ 中间那段是静音，清空确认记忆，
+          // 否则整轮只找一个音时第二个音会被 firedNote 锁死。
+          const nowMs = performance.now()
+          if (nowMs - lastPitchEventAtRef.current >= RELEASE_SILENCE_MS) {
+            resetNoteConfirmState(noteConfirmStateRef.current!)
+          }
+          lastPitchEventAtRef.current = nowMs
 
           // 复用 Web 版的练习匹配逻辑
           // isNoteOnset 是 PitchStreamEvent 的兄弟字段（不在 pitch 里），由 Rust 的

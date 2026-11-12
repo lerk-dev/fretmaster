@@ -10,6 +10,8 @@ import { resolveFretCellRole, type FretboardRoleContext, type ThreeNpsPreviewKin
 import { formatDegree } from '@/lib/page-theory-functions'
 import { useAppStore, useIsPlaying, useUser, usePracticeSettings } from '@/lib/store'
 import { stringIndexToNumber } from '@/lib/string-index'
+import { useFretboardLines, type PathPoint } from '@/hooks/use-fretboard-lines'
+import { FretboardPathOverlay } from '@/components/fretboard-path-overlay'
 
 interface PracticeFretboardProps {
   /** 翻译函数 */
@@ -44,6 +46,19 @@ interface PracticeFretboardProps {
   chordExerciseTargetChord: { root: string; type: string } | null
   /** 找音练习：目标音名 */
   targetNote: string
+  /**
+   * 单音全指板：该音名的全部落点都以 target 角色高亮。
+   * 省略 = 未开启该模式（行为与旧版完全一致）。
+   */
+  singleNoteTarget?: string
+  /**
+   * 单音全指板：按弹奏顺序连线的位置（已找到的位置）。
+   * 少于 2 个点时覆盖层不渲染。
+   *
+   * 注：「已找到 / 未找到」的配色差异不在这里做 —— 经典皮肤的配色由页面注入的
+   * `getNoteButtonColor` 统一计算（见 `lib/fretboard-note-button-color.ts`）。
+   */
+  connectPoints?: ReadonlyArray<PathPoint>
   /** 找音练习：答题方式（`buttons` = 按钮答题） */
   practiceAnswerMode: string
   /** 找音练习（按钮答题）：本轮要求点的格子 */
@@ -88,6 +103,8 @@ export const PracticeFretboard = memo(function PracticeFretboard({
   currentChordIndex,
   chordExerciseTargetChord,
   targetNote,
+  singleNoteTarget,
+  connectPoints,
   practiceAnswerMode,
   highlightedTargetPosition,
   threeNpsTarget,
@@ -142,6 +159,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
       practiceAnswerMode,
       highlightedTargetPosition,
       targetNote,
+      singleNoteTarget,
       showAllNotes,
       highlightedFrets,
       fretZoneEnabled: practiceSettings.fretZoneEnabled,
@@ -168,6 +186,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
       practiceAnswerMode,
       highlightedTargetPosition,
       targetNote,
+      singleNoteTarget,
       showAllNotes,
       highlightedFrets,
       practiceSettings.fretZoneEnabled,
@@ -213,6 +232,12 @@ export const PracticeFretboard = memo(function PracticeFretboard({
     }
   }
   /**
+   * 单音全指板的连线路由：坐标靠真实 DOM 矩形测量（空弦列更窄、手机端会压缩，
+   * 解析计算会漂）。未传 `connectPoints` 时这个 hook 不做任何事。
+   */
+  const { containerRef, linePoints } = useFretboardLines(connectPoints)
+
+  /**
    * 指板主体：弦分隔线 + 空弦/各品按钮 + 品数行。**全仓只有这一份实现。**
    *
    * 🚨 2026-10-01 去重：此前 `components/fullscreen-overlay.tsx` 里经典皮肤自带**第二份复制**，
@@ -224,7 +249,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
   const boardBody = (
     <>
     {/* 指板外层容器 - 统一圆角 */}
-    <div className="relative rounded-lg overflow-hidden border border-border bg-muted/30 dark:bg-zinc-900/30">
+    <div ref={containerRef} className="relative rounded-lg overflow-hidden border border-border bg-muted/30 dark:bg-zinc-900/30">
       {/* 琴弦之间的虚线分隔 - 深浅主题都显示，浅色主题使用更浅的颜色*/}
       {Array.from({ length: STRING_COUNT - 1 }).map((_, i) => (
         <div
@@ -237,6 +262,9 @@ export const PracticeFretboard = memo(function PracticeFretboard({
           }}
         />
       ))}
+
+      {/* 单音全指板：把已找到的位置按弹奏顺序连成一条黄铜虚线 */}
+      <FretboardPathOverlay points={linePoints} />
 
       {/* String labels and frets */}
       {tuning.map((_, stringIndex) => {
@@ -258,6 +286,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
               onClick={() => isStringEnabled && handleFretClick(stringIndex, 0)}
               disabled={!isStringEnabled}
               data-role={openCell.role}
+              data-position={`${stringIndex}-0`}
               aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(openCell.note)).replace('{string}', String(stringIndexToNumber(stringIndex))).replace('{fret}', '0') : undefined}
               className={cn(
                 // 🚨 字体与 1..n 品**必须同一条栈**（Globals.css 的 --font-fretboard）：
@@ -295,6 +324,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                   onClick={() => isStringEnabled && handleFretClick(stringIndex, actualFret)}
                   disabled={!isStringEnabled}
                   data-role={role}
+                  data-position={`${stringIndex}-${actualFret}`}
                   aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(note)).replace('{string}', String(stringIndexToNumber(stringIndex))).replace('{fret}', String(actualFret)) : undefined}
                   className={cn(
                     // 🚨 音名字号比空弦列小一档是**刻意**的（刻度 4xs8 < 3xs9 < 2xs10 < xs12）；

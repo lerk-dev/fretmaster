@@ -22,6 +22,8 @@ import {
   type ThreeNpsPreviewKind,
 } from '@/lib/fretboard-cell-role'
 import { TrainerFretboard, type TrainerCellView } from '@/components/trainer-fretboard'
+import { useFretboardLines, type PathPoint } from '@/hooks/use-fretboard-lines'
+import { FretboardPathOverlay } from '@/components/fretboard-path-overlay'
 
 export interface GuitarRunFretboardProps {
   t: (key: string) => string
@@ -41,6 +43,22 @@ export interface GuitarRunFretboardProps {
   FRET_MARKERS: number[]
   /** 找音练习：目标音名 */
   targetNote: string
+  /**
+   * 单音全指板：该音名的全部落点都以 target 角色高亮。
+   * 省略 = 未开启该模式（行为与旧版完全一致）。
+   */
+  singleNoteTarget?: string
+  /** 单音全指板：已找到的位置（位置地图，已找到实心 / 未找到空心圈） */
+  singleNoteFound?: ReadonlyArray<{ stringIndex: number; fret: number }>
+  /** 单音全指板：已跳过（放弃）的位置 —— 画成灰色斜线圈，与「未找到」区分 */
+  singleNoteSkipped?: ReadonlyArray<{ stringIndex: number; fret: number }>
+  /**
+   * 单音全指板「无提示」：未找到的落点不画（只显示已找到的），
+   * 否则等于把答案直接圈在指板上。
+   */
+  singleNoteHideUnfound?: boolean
+  /** 单音全指板：按巡游顺序连线（已找到的位置），少于 2 个点不画；`dashed` = 跨过缺口的段 */
+  connectPoints?: ReadonlyArray<PathPoint>
   /** 找音练习：答题方式 */
   practiceAnswerMode: string
   /** 找音练习（按钮答题）：本轮要求点的格子 */
@@ -114,6 +132,11 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
   chordExerciseTargetChord,
   FRET_MARKERS,
   targetNote,
+  singleNoteTarget,
+  singleNoteFound,
+  singleNoteSkipped,
+  singleNoteHideUnfound,
+  connectPoints,
   practiceAnswerMode,
   highlightedTargetPosition,
   threeNpsTarget,
@@ -142,6 +165,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
       practiceAnswerMode,
       highlightedTargetPosition,
       targetNote,
+      singleNoteTarget,
       showAllNotes,
       highlightedFrets,
       fretZoneEnabled: practiceSettings.fretZoneEnabled,
@@ -168,6 +192,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
       practiceAnswerMode,
       highlightedTargetPosition,
       targetNote,
+      singleNoteTarget,
       showAllNotes,
       highlightedFrets,
       practiceSettings.fretZoneEnabled,
@@ -201,17 +226,61 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
     [strings, fretCount, ctx],
   )
 
+  // 单音全指板路径：坐标同样靠真实 DOM 矩形测量（grid 列宽随容器变化）
+  const { containerRef, linePoints } = useFretboardLines(connectPoints, skin)
+
+  /** 已找到位置集合：位置地图里区分「实心 / 空心圈」 */
+  const singleNoteFoundKeys = useMemo(
+    () => (singleNoteFound && singleNoteFound.length > 0
+      ? new Set(singleNoteFound.map((p) => `${p.stringIndex}-${p.fret}`))
+      : null),
+    [singleNoteFound],
+  )
+
+  /** 已跳过位置集合：画灰色斜线圈（与「未找到」的空心圈区分） */
+  const singleNoteSkippedKeys = useMemo(
+    () => (singleNoteSkipped && singleNoteSkipped.length > 0
+      ? new Set(singleNoteSkipped.map((p) => `${p.stringIndex}-${p.fret}`))
+      : null),
+    [singleNoteSkipped],
+  )
+
   if (skin === 'trainer') {
     const cells = new Map<string, TrainerCellView>()
     for (let stringIndex = 0; stringIndex < rows.length; stringIndex++) {
       for (let fret = 0; fret < rows[stringIndex].length; fret++) {
         const { role, degree, showText, note } = rows[stringIndex][fret]
-        cells.set(`${stringIndex}-${fret}`, {
+        const key = `${stringIndex}-${fret}`
+        const isSingleNoteCell = !!singleNoteTarget && role === 'target'
+        /** 精确提示：这一格就是「现在要弹的位置」 */
+        const isPromptCell =
+          isSingleNoteCell &&
+          highlightedTargetPosition?.stringIndex === stringIndex &&
+          highlightedTargetPosition?.fret === fret
+        const isFoundCell = isSingleNoteCell && !!singleNoteFoundKeys?.has(key)
+        const isSkippedCell = isSingleNoteCell && !!singleNoteSkippedKeys?.has(key)
+        // 无提示：未找到的落点连角色都不给（不画圈、不上色）
+        const hidden =
+          isSingleNoteCell && !!singleNoteHideUnfound && !isFoundCell && !isPromptCell
+        cells.set(key, {
           text: showText ? (degree ? formatDegree(degree) : formatNoteByAccidentalSetting(note)) : '',
-          role: TRAINER_ROLE[role],
-          visible: showText,
+          role: TRAINER_ROLE[hidden ? 'none' : role],
+          // 🚨 圆点可见性 ≠ 文字可见性：单音模式的目标落点**不写音名**（写出来就是答案），
+          // 但圆点本身必须画出来。之前这里直接等于 `showText`，于是 3D 琴颈下
+          // 「精确提示选中的那一格」和没选中完全一样 —— 屏幕上什么都没有。
+          visible: showText || (!hidden && role !== 'none'),
           // 音名**恒给**（即便这格不显示文字）—— 读屏标签里要用，见 TrainerCellView.note 的说明
           note: formatNoteByAccidentalSetting(note),
+          // 单音全指板的位置地图：精确提示 / 已找到 / 未找到 / 已跳过，四种外观
+          state: isSingleNoteCell && !hidden
+            ? isSkippedCell
+              ? 'skipped'
+              : isFoundCell
+                ? 'found'
+                : isPromptCell
+                  ? 'prompt'
+                  : 'pending'
+            : undefined,
         })
       }
     }
@@ -227,6 +296,10 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
         isCellEnabled={(stringIndex) =>
           activeTab !== 'practice' || selectedStrings.includes(stringIndexToNumber(stringIndex))
         }
+        // 连线：3D 皮肤的格子结构与 GuitarRun 完全不同，但测量只看 `[data-position]`，
+        // 所以同一个 hook / 同一个覆盖层可以直接复用。
+        overlayRef={containerRef}
+        overlay={<FretboardPathOverlay points={linePoints} />}
       />
     )
   }
@@ -235,7 +308,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
     <div className="gr-stage" data-onboarding="fretboard">
       <div className="gr-scroll">
         <div className="gr-grid">
-          <div className="gr-fretboard" style={{ gridTemplateColumns }}>
+          <div ref={containerRef} className="gr-fretboard relative" style={{ gridTemplateColumns }}>
             {rows.map((stringRow, stringIndex) => {
               // 找音练习：未被选中的弦不可点击（与经典皮肤一致）
               const isStringEnabled = activeTab !== 'practice' || selectedStrings.includes(stringIndexToNumber(stringIndex))
@@ -245,6 +318,17 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
                 const isOpen = fret === 0
                 const isMarker = !isOpen && FRET_MARKERS.includes(fret) && stringIndex === STRING_COUNT - 1
                 const text = degree ? formatDegree(degree) : formatNoteByAccidentalSetting(note)
+                // 单音全指板「位置地图」：未找到的落点画成空心圈（已找到/当前提示保持实心）
+                const isSingleNoteCell = !!singleNoteTarget && role === 'target'
+                const isPromptCell =
+                  isSingleNoteCell &&
+                  highlightedTargetPosition?.stringIndex === stringIndex &&
+                  highlightedTargetPosition?.fret === fret
+                const isFoundCell = isSingleNoteCell && !!singleNoteFoundKeys?.has(`${stringIndex}-${fret}`)
+                const isSkippedCell = isSingleNoteCell && !!singleNoteSkippedKeys?.has(`${stringIndex}-${fret}`)
+                // 无提示：未找到的落点不画（只显示弹对之后的实心点）
+                const isHiddenCell =
+                  isSingleNoteCell && !!singleNoteHideUnfound && !isFoundCell && !isPromptCell
                 cells.push(
                   <button
                     key={fret}
@@ -263,11 +347,17 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
                       'gr-cell',
                       isOpen && 'gr-cell--open',
                       !isStringEnabled && 'gr-cell--disabled',
-                      ROLE_CLASS[role],
+                      ROLE_CLASS[isHiddenCell ? 'none' : role],
+                      // 当前位置提示：和「已找到」同为目标角色，光靠实心圆分不出来，
+                      // 再加一层呼吸光环（样式见 app/globals.css 的 .gr-cell--prompt）
+                      isPromptCell && 'gr-cell--prompt',
+                      isSingleNoteCell && !isPromptCell && !isFoundCell && !isSkippedCell && !isHiddenCell && 'gr-cell--pending',
+                      isSkippedCell && 'gr-cell--skipped',
                     )}
                     data-string={stringIndex}
                     data-fret={fret}
-                    data-role={role}
+                    data-position={`${stringIndex}-${fret}`}
+                    data-role={isHiddenCell ? 'none' : role}
                     data-marker={isMarker ? '1' : undefined}
                     style={{ ['--gr-string-w' as string]: `${stringLineWidth(stringIndex)}px` }}
                   >
@@ -279,6 +369,9 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
               }
               return cells
             })}
+
+            {/* 单音全指板：已找到位置的黄铜虚线路径（绝对定位，不参与 grid 布局） */}
+            <FretboardPathOverlay points={linePoints} />
           </div>
 
           {/* 品号行：0 品显示为「空弦」（GuitarRun 写 OPEN），品记位强调 */}

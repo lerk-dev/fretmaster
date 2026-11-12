@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { logger } from '@/lib/logger'
 import { confirmNote } from '@/lib/note-confirm'
 import { evaluatePitchMatch, findBestIntervalMatch, targetSemitoneOf } from '@/lib/pitch-match'
@@ -14,6 +14,7 @@ import { CHORD_TYPES, DEGREE_TO_SEMITONE } from '@/lib/page-theory-data'
 import { ALL_PRACTICE_LEVELS } from '@/lib/practice-levels'
 import { resolveScaleTargetNoteIndex } from '@/lib/scale-target-note'
 import { guitarPositionToMidi } from '@/lib/guitar-sound'
+import { frequencyToNote } from '@/lib/pitch-detection'
 import {
   noteToSemitones,
   intervalToSemitones,
@@ -26,6 +27,7 @@ import {
 } from '@/lib/page-theory-functions'
 import type { DetectedPitchForMatch } from '@/hooks/use-audio-input'
 import type { NoteConfirmState } from '@/lib/note-confirm'
+import type { CellPos } from '@/lib/single-note-tour'
 
 /**
  * usePracticeMatch —— 音频答题路径（processPracticeMatch）的唯一真相源。
@@ -102,6 +104,36 @@ export interface AnswerPracticeDeps {
   targetNote: string
   generateNewTargetRef: { current: (() => void) | null }
   generateNewTarget: () => void
+  /**
+   * 「单音全指板」精确提示：校验点击位置是否就是题目要求的位置。
+   * 返回 false 时该次点击判错（页面不提供此回调 ⇒ 只校验音名，行为与旧版一致）。
+   * 🚨 音频路径不调用它 —— 麦克风只能拿到音名，拿不到弦/品。
+   */
+  isPracticePositionAllowed?: (position: CellPos) => boolean
+  /**
+   * 找音命中后的自定义推进（单音全指板需要按「位置/次数」记账）。
+   * 返回 true = 已自行推进，跳过默认的 `generateNewTarget`。
+   */
+  onPracticeCorrect?: (payload: {
+    via: 'audio' | 'click'
+    position?: CellPos
+    /**
+     * 音频命中时的绝对八度（YIN 检测，如 E2 = 2）。点击路径没有这个值。
+     * 单音全指板用它把「弹响的八度」对到正确的落点；缺省时页面按当前提示位置记账。
+     */
+    octave?: number
+  }) => boolean
+  /**
+   * 找音练习命中后的冷却时长（ms）。缺省 800。
+   *
+   * 🚨 「单音全指板」必须传 0：整轮都在弹同一个音名，用户就是要**连续**弹多个位置。
+   *    800ms 冷却期间收音链路连帧都不往下送（`use-audio-input` 的
+   *    `!isCoolingDownRef.current` 守卫），于是第二下拨弦的**起音信号被整帧丢掉**，
+   *    表现为「弹完一个，第二个要等很久 / 干脆没反应」。
+   *    去掉冷却不会重复计分：同一个音仍受 `confirmNote` 的 `firedNote` 锁约束
+   *    （见 lib/note-confirm.ts + lib/note-release.ts）。
+   */
+  hitCooldownMs?: number
 }
 
 export interface AnswerIntervalDeps {
@@ -159,10 +191,22 @@ export interface AnswerChordDeps {
   shouldVoiceLeadRef: { current: boolean }
   nextChordInfoRef: { current: { index: number; root: string; type: string; bass?: string; degrees: string[] } | null }
   lastChordNoteRef: { current: string | null }
+  /**
+   * 和弦练习的琶音顺序（设置项 `chordExerciseOrder`）。
+   * `asc` / `desc` 现在会**按实际音高**校验：下一个音必须比上一个弹对的音更高/更低；
+   * `random` 不判方向。没有绝对音高（老硬件/MIDI 无八度）时自动退回只看音级。
+   */
+  chordExerciseOrder: 'asc' | 'desc' | 'random'
 }
 
 export interface AnswerActionsDeps {
-  recordPositionStat: (isCorrect: boolean) => void
+  /**
+   * 逐位置掌握度：`pos` 为**这一次判定对应的格子**。
+   * 点击路径显式传入自己的位置；音频/MIDI 路径没有位置 ⇒ 省略，由页面回退到当前目标位置。
+   * 🚨 不要再用「共享 ref + 下游消费」传递点击位置：点击后 100ms 才推进，
+   *    期间别的路径一跑就会把位置偷走（连点记错位置、单音模式多记命中）。
+   */
+  recordPositionStat: (isCorrect: boolean, pos?: CellPos) => void
   setScore: (fn: (prev: { correct: number; total: number }) => { correct: number; total: number }) => void
   triggerCorrectFeedback: (note: string) => void
   triggerWrongFeedback: (note: string) => void
@@ -170,7 +214,6 @@ export interface AnswerActionsDeps {
   playFeedbackSound: (isCorrect: boolean, midi?: number) => void
   setHighlightedFrets: (fn: (prev: Map<string, boolean>) => Map<string, boolean>) => void
   clearFretClickTimers: () => void
-  lastFretClickPositionRef: { current: { stringIndex: number; fret: number } | null }
   fretClickTimersRef: { current: Array<ReturnType<typeof setTimeout>> }
   fretZoneEnabled: boolean
   fretZoneStart: number
@@ -187,6 +230,8 @@ interface IntervalExercise {
   currentIntervalDisplay: string
   completedIntervals: number[]
   answered: boolean
+  /** 本题方向（由 use-interval-exercise 逐题写入）；缺省 = 不做方向判定 */
+  direction?: 'up' | 'down'
 }
 
 /** 出题的 level 选项（页面 getLevelOptions 的返回形状） */
@@ -195,6 +240,79 @@ interface LevelOptions {
   endOnStartingInterval: boolean
   usePassingNoteBebopScale: boolean
   sevenFlatNineScaleChoice: 'altered' | 'diminishedWholeHalf' | 'diminishedHalfWhole'
+}
+
+/** 音名 + 八度 → 绝对 MIDI 音高（上下行判定用）。缺八度（老输入源）返回 null ⇒ 不做方向判定。 */
+function midiFromNoteOctave(note: string, octave?: number): number | null {
+  if (octave === undefined) return null
+  const pitchClass = noteNameToPitchClass(note)
+  return pitchClass < 0 ? null : 12 * (octave + 1) + pitchClass
+}
+
+/** 麦克风频率 → 最近的 MIDI 音高（A4 = 69）。 */
+function frequencyToMidi(frequency: number): number | null {
+  if (!Number.isFinite(frequency) || frequency <= 0) return null
+  return Math.round(69 + 12 * Math.log2(frequency / 440))
+}
+
+/** 指板位置 → 绝对 MIDI 音高（点击路径的八度来源）。 */
+function positionToMidi(position?: CellPos | null): number | null {
+  if (!position) return null
+  return guitarPositionToMidi(position.stringIndex, position.fret) ?? null
+}
+
+/** 音程题的题目指纹：换题（根音 / 音程串变化）后「根音基准」立即失效。 */
+function intervalSignatureOf(exercise: IntervalExercise): string {
+  return `${exercise.rootNote}|${exercise.currentIntervalDisplay}`
+}
+
+/**
+ * 音程「相对上下行」判定（方案 B：不给根音定绝对八度）。
+ *
+ * 基准是**本题用户实际弹下的根音音高**。拿不到基准（没开先找根音 / 根音还没弹 /
+ * 输入源没有八度）就**不判方向** —— 宁可退回「只看音级」，也不要凭空拒绝正确答案。
+ *
+ * 为什么要比八度：`down` 档的题目是**互补音程**（下行大三度 → 问六度，见
+ * lib/interval-direction.ts），音级相同、八度不同。只比音级的话，用户在根音上方
+ * 弹同一个音级也会算对 ⇒ 上下行形同虚设。
+ */
+function isIntervalDirectionOk(
+  exercise: IntervalExercise,
+  label: string,
+  midi: number | null,
+  root: { signature: string; midi: number } | null,
+): boolean {
+  const direction = exercise.direction
+  // 没有逐题方向 / 根音本身没有上下之分（同度）/ 拿不到音高 ⇒ 不判
+  if (!direction || label === '1' || midi === null) return true
+  if (!root || root.signature !== intervalSignatureOf(exercise)) return true
+  return direction === 'up' ? midi > root.midi : midi < root.midi
+}
+
+/** 和弦练习的题目指纹（目标和弦 + 音级序列）。换和弦后旧基准失效。 */
+function chordExerciseSignatureOf(
+  target: { root: string; type: string } | null,
+  sequence: readonly string[],
+): string {
+  return target ? `${target.root}|${target.type}|${sequence.join(' ')}` : ''
+}
+
+/**
+ * 和弦练习 asc / desc 的**音高**方向判定：与**上一个弹对的音**比较。
+ *
+ * 音级序列本身已按 asc/desc 排好（见 `generateChordSequence`），这里只补「八度也得对」：
+ * 上行必须真的更高、下行必须真的更低。第一音没有基准 ⇒ 接受并成为基准；
+ * `random` 不判方向；拿不到音高 ⇒ 不判。
+ */
+function isChordExerciseDirectionOk(
+  order: 'asc' | 'desc' | 'random',
+  midi: number | null,
+  last: { signature: string; midi: number } | null,
+  signature: string,
+): boolean {
+  if (order === 'random' || midi === null) return true
+  if (!last || last.signature !== signature) return true
+  return order === 'asc' ? midi > last.midi : midi < last.midi
 }
 
 export function usePracticeMatch(options: UsePracticeMatchOptions) {
@@ -209,6 +327,7 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
   } = audio
   const {
     targetNoteRef, targetNote, generateNewTargetRef, generateNewTarget,
+    isPracticePositionAllowed, onPracticeCorrect, hitCooldownMs,
   } = practice
   const {
     currentIntervalExerciseRef, currentIntervalExercise, setCurrentIntervalExercise, setIntervalPracticeStep,
@@ -227,14 +346,29 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
     getTransposedChordsRef, currentChordIndexRef, currentChordIndex, nextChordRef,
     chordDegreeCurrentStepRef, setChordDegreeCurrentStep, practiceLevelRef, practiceLevel,
     getLevelOptions, levelOptionsRef, shouldVoiceLeadRef, nextChordInfoRef,
-    lastChordNoteRef,
+    lastChordNoteRef, chordExerciseOrder,
   } = chord
   const {
     recordPositionStat, setScore, triggerCorrectFeedback, triggerWrongFeedback,
-    playFeedbackSound, setHighlightedFrets, clearFretClickTimers, lastFretClickPositionRef,
+    playFeedbackSound, setHighlightedFrets, clearFretClickTimers,
     fretClickTimersRef, fretZoneEnabled, fretZoneStart, fretZoneSize,
     fretCount,
   } = actions
+
+  /**
+   * 音程「相对上下行」的基准：**本题用户实际弹下的根音音高**。
+   *
+   * 用户选定的是方案 B（不给根音定绝对八度），所以基准只能来自「先找根音」时
+   * 用户自己弹的那一次。没弹根音（未开启先找根音 / 根音还没弹）⇒ 没有基准，
+   * 判定退回只看音级（与旧行为一致），不会凭空拒绝正确答案。
+   * `signature` 用来区分题目：换题后旧基准立即失效。
+   */
+  const intervalRootMidiRef = useRef<{ signature: string; midi: number } | null>(null)
+  /**
+   * 和弦练习 asc/desc 的基准：**本题上一个弹对的音高**。
+   * 同样带 `signature`，换和弦（目标和弦 / 音级序列变化）后旧基准不起作用。
+   */
+  const chordExerciseLastMidiRef = useRef<{ signature: string; midi: number } | null>(null)
 
   const processPracticeMatch = useCallback(({ frequency, note, probability, isNoteOnset, rawFrequency, frameMs }: DetectedPitchForMatch) => {
     const currentIsPlaying = isPlayingRef.current
@@ -286,15 +420,30 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
       setScore(prev => ({ correct: prev.correct + practiceDelta.correct, total: prev.total + practiceDelta.total }))
       if (matched) {
         logger.debug('找音练习匹配成功:', note, '音分差:', adjustedCents.toFixed(1))
-        isCoolingDownRef.current = true
         triggerCorrectFeedback(note)
-        if (generateNewTargetRef.current) {
+        // 单音全指板：页面自行记账并决定是否换题；未提供回调时走默认换题。
+        // 带上八度：同一音名在不同把位是不同八度，页面据此把「实际弹响的八度」对到正确的落点
+        // （弱校验：对不上也照样计分，只是不点亮提示位置以外的地方）。
+        const handled =
+          onPracticeCorrect?.({ via: 'audio', octave: frequencyToNote(frequency).octave }) ?? false
+        if (!handled && generateNewTargetRef.current) {
           generateNewTargetRef.current()
         }
-        cooldownRef.current = setTimeout(() => {
-          isCoolingDownRef.current = false
-          cooldownRef.current = null
-        }, 800)
+        // 冷却 0 = 不设冷却（单音全指板：整轮同一个音名，必须能连续弹）。
+        // 重复计分由 `confirmNote` 的 firedNote 锁挡住，见 practice.hitCooldownMs 的说明。
+        const practiceCooldownMs = hitCooldownMs ?? 800
+        if (practiceCooldownMs > 0) {
+          isCoolingDownRef.current = true
+          cooldownRef.current = setTimeout(() => {
+            isCoolingDownRef.current = false
+            cooldownRef.current = null
+          }, practiceCooldownMs)
+        }
+      } else {
+        // 找音练习弹了别的音：给一个轻量反馈（右上角胶囊）。
+        // 之前这里是静默的 —— 单音全指板里用户分不清「弹错了」「弹了别的音」还是「没识别到」。
+        // 只做视觉提示，不改判定、不加惩罚（计分已经在上面按 matched 记过）。
+        triggerWrongFeedback(note)
       }
     } else if (currentActiveTab === 'interval') {
       // 音程练习 - 使用音分差匹配
@@ -322,6 +471,17 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
 
       if (matchedIndex !== null) {
         const matchedInterval = intervals[matchedIndex]
+        // 相对上下行：音级对了还要站在根音的正确一侧（拿不到基准时不判，见 isIntervalDirectionOk）
+        const playedMidi = frequencyToMidi(frequency)
+        if (!isIntervalDirectionOk(exercise, matchedInterval, playedMidi, intervalRootMidiRef.current)) {
+          const delta = scoreDeltaFor(false)
+          setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
+          return
+        }
+        // 先找根音：用户弹下的根音音高就是本题「相对上下行」的基准
+        if (matchedInterval === '1' && playedMidi !== null) {
+          intervalRootMidiRef.current = { signature: intervalSignatureOf(exercise), midi: playedMidi }
+        }
         logger.debug('音程练习匹配成功:', matchedInterval, '音分差:', minCents.toFixed(1))
         triggerCorrectFeedback(note)
         const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
@@ -433,13 +593,25 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
         confidenceThreshold: currentConfidenceThreshold,
       })
 
-      if (matched) {
+      // asc / desc 的真方向：与上一个弹对的音比八度
+      const chordSignature = chordExerciseSignatureOf(targetChord, sequence)
+      const playedMidi = frequencyToMidi(frequency)
+      const directionOk = isChordExerciseDirectionOk(
+        chordExerciseOrder, playedMidi, chordExerciseLastMidiRef.current, chordSignature,
+      )
+
+      if (matched && directionOk) {
         logger.debug('和弦练习音高匹配成功:', note, '音分差:', adjustedCents.toFixed(1), '阈值:', matchThreshold.toFixed(1))
         triggerCorrectFeedback(note)
+        // 记下这个音，作为下一音的「上行/下行」基准
+        if (playedMidi !== null) {
+          chordExerciseLastMidiRef.current = { signature: chordSignature, midi: playedMidi }
+        }
 
         const nextStep = step + 1
         if (nextStep >= sequence.length) {
           // 完成整个和弦，设置 answered 状态
+          chordExerciseLastMidiRef.current = null
           setChordExerciseIsAnswered(true)
           chordExerciseIsAnsweredRef.current = true
           const delta = scoreDeltaFor(true)
@@ -519,8 +691,15 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
     } else if (currentActiveTab === 'tuner') {
       // 调音表模式 - 只显示音高，不需要答题逻辑
     }
-  }, [isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef, cooldownRef, noteConfirmStateRef, practiceAnswerModeRef, targetNoteRef, generateNewTargetRef, currentIntervalExerciseRef, setCurrentIntervalExercise, setIntervalPracticeStep, generateIntervalExerciseRef, findRootFirstRef, addRootBackRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, selectedScaleRef, scaleComboRef, scaleMaxComboRef, setScaleCombo, setScaleMaxCombo, setScaleExerciseCurrentStep, nextScaleExerciseRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, setChordExerciseIsAnswered, setChordExerciseCurrentStep, nextChordExerciseRef, nextChordRef, currentChordIndexRef, chordDegreeCurrentStepRef, setChordDegreeCurrentStep, practiceLevelRef, levelOptionsRef, shouldVoiceLeadRef, nextChordInfoRef, lastChordNoteRef, getTransposedChordsRef, recordPositionStat, setScore, triggerCorrectFeedback])
-  const handleMIDINoteInput = useCallback((note: string) => {
+  }, [isPlayingRef, activeTabRef, sensitivityRef, confidenceThresholdRef, isCoolingDownRef, cooldownRef, noteConfirmStateRef, practiceAnswerModeRef, targetNoteRef, generateNewTargetRef, onPracticeCorrect, hitCooldownMs, currentIntervalExerciseRef, setCurrentIntervalExercise, setIntervalPracticeStep, generateIntervalExerciseRef, findRootFirstRef, addRootBackRef, scaleKeyRef, scaleExerciseSequenceRef, scaleExerciseCurrentStepRef, selectedScaleRef, scaleComboRef, scaleMaxComboRef, setScaleCombo, setScaleMaxCombo, setScaleExerciseCurrentStep, nextScaleExerciseRef, chordExerciseTargetChordRef, chordExerciseSequenceRef, chordExerciseCurrentStepRef, chordExerciseIsAnsweredRef, setChordExerciseIsAnswered, setChordExerciseCurrentStep, nextChordExerciseRef, nextChordRef, currentChordIndexRef, chordDegreeCurrentStepRef, setChordDegreeCurrentStep, practiceLevelRef, levelOptionsRef, shouldVoiceLeadRef, nextChordInfoRef, lastChordNoteRef, getTransposedChordsRef, recordPositionStat, setScore, triggerCorrectFeedback, triggerWrongFeedback, chordExerciseOrder, intervalRootMidiRef, chordExerciseLastMidiRef])
+  /**
+   * MIDI / 指板点击 / 按钮 的统一入口。
+   *
+   * 🚨 参数顺序是 `(note, octave?, position?)`：`use-audio-input` 的 MIDI note-on
+   * 按 `(noteName, octave)` 调用同一个 callback（见 `handleMIDINoteInputRef`），
+   * 八度必须是第二个参数，否则会落到 position 上。
+   */
+  const handleMIDINoteInput = useCallback((note: string, octave?: number, position?: CellPos) => {
     logger.debug('handleMIDINoteInput 被调用', note, 'isPlaying:', isPlaying, 'activeTab:', activeTab)
     if (!isPlaying) {
       logger.debug('未在练习中，忽略输入')
@@ -543,12 +722,28 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
           buildSingleTargetExpectation({ label: targetNote, targetSemitone: practiceTargetIdx }),
           practicePlayedIdx,
         )
-        // 逐位置掌握度统计：指板点击路径优先用点击位置，否则用目标位置
-        recordPositionStat(practiceVerdict.hit)
-        const practiceDelta = scoreDeltaFor(practiceVerdict.hit)
+        // 点击路径传进来的位置（MIDI 设备/音频路径没有）。**只读参数，不读共享 ref**：
+        // 点击后会延迟 100ms 才走到这里，用 ref 传位置会被这 100ms 里的其它路径偷走。
+        const clickedPosition = position ?? null
+        // 精确提示：音名对了但位置不对 ⇒ 判错（未提供回调时只看音名）
+        const positionAllowed =
+          !clickedPosition || !isPracticePositionAllowed || isPracticePositionAllowed(clickedPosition)
+        const practiceHit = practiceVerdict.hit && positionAllowed
+        // 逐位置掌握度统计：点击路径用点击位置，否则回退到页面记录的当前目标位置
+        if (clickedPosition) recordPositionStat(practiceHit, clickedPosition)
+        else recordPositionStat(practiceHit)
+        const practiceDelta = scoreDeltaFor(practiceHit)
         setScore(prev => ({ correct: prev.correct + practiceDelta.correct, total: prev.total + practiceDelta.total }))
         // 音高识别统计改为按会话记录，不在此处累加 —— 见 pitchFindingSession 统计 effect
-        if (practiceVerdict.hit) generateNewTarget()
+        if (practiceHit) {
+          const handled = onPracticeCorrect?.({
+            via: clickedPosition ? 'click' : 'audio',
+            position: clickedPosition ?? undefined,
+            // 音频 / MIDI 路径能拿到绝对八度；纯点击路径没有（页面按提示位置记账）
+            ...(octave !== undefined ? { octave } : {}),
+          }) ?? false
+          if (!handled) generateNewTarget()
+        }
         break
       }
       case "interval": {
@@ -576,9 +771,18 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
         const verdict = judgeExpectation(expectation, playedIdx)
         const matchedIndex = verdict.matchedIndex
         const intervals = exercise.currentIntervalDisplay.split(' ')
+        // 相对上下行：MIDI 有八度、点击有位置 ⇒ 两者都能拿到绝对音高
+        const playedMidi = midiFromNoteOctave(note, octave) ?? positionToMidi(position)
+        const directionOk = verdict.hit && matchedIndex !== null
+          ? isIntervalDirectionOk(exercise, intervals[matchedIndex], playedMidi, intervalRootMidiRef.current)
+          : false
 
-        if (verdict.hit && matchedIndex !== null) {
+        if (verdict.hit && matchedIndex !== null && directionOk) {
           const matchedInterval = intervals[matchedIndex]
+          // 先找根音：用户弹下的根音音高就是本题「相对上下行」的基准
+          if (matchedInterval === '1' && playedMidi !== null) {
+            intervalRootMidiRef.current = { signature: intervalSignatureOf(exercise), midi: playedMidi }
+          }
           // 添加到已完成列表
           const newCompletedIntervals = [...exercise.completedIntervals, matchedIndex]
 
@@ -763,11 +967,22 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
             playedNoteIdx,
           )
 
-          if (exerciseVerdict.hit) {
-            // 答对了
+          // asc / desc 的真方向：与上一个弹对的音比八度（MIDI 有八度、点击有位置）
+          const chordSignature = chordExerciseSignatureOf(chordExerciseTargetChord, chordExerciseSequence)
+          const playedMidi = midiFromNoteOctave(note, octave) ?? positionToMidi(position)
+          const directionOk = isChordExerciseDirectionOk(
+            chordExerciseOrder, playedMidi, chordExerciseLastMidiRef.current, chordSignature,
+          )
+
+          if (exerciseVerdict.hit && directionOk) {
+            // 答对了 —— 记下这个音，作为下一音的「上行/下行」基准
+            if (playedMidi !== null) {
+              chordExerciseLastMidiRef.current = { signature: chordSignature, midi: playedMidi }
+            }
             const nextStep = chordExerciseCurrentStep + 1
             if (nextStep >= chordExerciseSequence.length) {
               // 完成当前和弦，使用预览的下一题
+              chordExerciseLastMidiRef.current = null
               const delta = scoreDeltaFor(true)
               setScore(prev => ({ correct: prev.correct + delta.correct, total: prev.total + delta.total }))
               // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
@@ -787,7 +1002,7 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
         }
         break
     }
-  }, [isPlaying, activeTab, recordPositionStat, targetNote, currentIntervalExercise, setScore, generateNewTarget, findRootFirst, setCurrentIntervalExercise, generateIntervalExerciseRef, setIntervalPracticeStep, transposedChords, currentChordIndex, practiceLevel, getLevelOptions, scaleExerciseSequence, scaleExerciseCurrentStep, selectedScale, scaleKey, nextScaleExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, nextChordExercise, setChordExerciseCurrentStep, scaleComboRef, scaleMaxComboRef, setScaleCombo, setScaleMaxCombo, setScaleExerciseCurrentStep, lastChordNoteRef, practiceAnswerModeRef, shouldVoiceLeadRef])
+  }, [isPlaying, activeTab, recordPositionStat, targetNote, currentIntervalExercise, setScore, generateNewTarget, onPracticeCorrect, isPracticePositionAllowed, findRootFirst, setCurrentIntervalExercise, generateIntervalExerciseRef, setIntervalPracticeStep, transposedChords, currentChordIndex, practiceLevel, getLevelOptions, scaleExerciseSequence, scaleExerciseCurrentStep, selectedScale, scaleKey, nextScaleExercise, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, nextChordExercise, setChordExerciseCurrentStep, scaleComboRef, scaleMaxComboRef, setScaleCombo, setScaleMaxCombo, setScaleExerciseCurrentStep, lastChordNoteRef, practiceAnswerModeRef, shouldVoiceLeadRef, chordExerciseOrder, intervalRootMidiRef, chordExerciseLastMidiRef])
 
   const handleFretClick = useCallback((stringIndex: number, fret: number) => {
     const clickedNote = getNoteAtPosition(stringIndex, fret)
@@ -820,8 +1035,12 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
               buildSingleTargetExpectation({ label: targetNote, targetSemitone: targetIdx }),
               clickedIdx,
             ).hit
-          // 逐位置统计：暂存点击位置，供随后 handleMIDINoteInput 记录
-          lastFretClickPositionRef.current = { stringIndex, fret }
+          // 单音全指板的「精确提示」：音名对了但没点要求的位置 ⇒ 红（真正推进在 100ms 后的
+          // handleMIDINoteInput 里用同一条校验，两处结论必须一致）
+          if (isCorrect && isPracticePositionAllowed && !isPracticePositionAllowed({ stringIndex, fret })) {
+            isCorrect = false
+          }
+          // 逐位置统计：位置在 100ms 后的 handleMIDINoteInput 里随调用**显式**传下去
           break
         }
 
@@ -841,6 +1060,16 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
                 }),
                 clickedIdx,
               ).hit
+              // asc / desc 的真方向：与 MIDI 路径同一口径（基准由 100ms 后的
+              // handleMIDINoteInput 写入，两处结论必须一致，否则「显示绿色却判错」）
+              if (isCorrect) {
+                isCorrect = isChordExerciseDirectionOk(
+                  chordExerciseOrder,
+                  positionToMidi({ stringIndex, fret }),
+                  chordExerciseLastMidiRef.current,
+                  chordExerciseSignatureOf(chordExerciseTargetChord, chordExerciseSequence),
+                )
+              }
             }
           }
           break
@@ -885,7 +1114,17 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
               allIntervals: currentIntervalExercise.allIntervals,
               fallbackSemitoneOf: (label) => DEGREE_TO_SEMITONE[label],
             })
-            isCorrect = clickedIdx >= 0 && judgeExpectation(expectation, clickedIdx).hit
+            const verdict = judgeExpectation(expectation, clickedIdx)
+            isCorrect =
+              clickedIdx >= 0 &&
+              verdict.hit &&
+              // 相对上下行：与 MIDI / 音频路径同一口径（基准由根音那次点击写入）
+              isIntervalDirectionOk(
+                currentIntervalExercise,
+                verdict.matchedLabel ?? '',
+                positionToMidi({ stringIndex, fret }),
+                intervalRootMidiRef.current,
+              )
           }
           break
         }
@@ -942,11 +1181,13 @@ export function usePracticeMatch(options: UsePracticeMatchOptions) {
           })
         }, 500),
         setTimeout(() => {
-          handleMIDINoteInput(clickedNote)
+          // 🚨 位置**随调用传参**（不是共享 ref）：连点时每次点击都带着自己的格子推进，
+          //    不会出现「A 的定时器消费了 B 的位置」。
+          handleMIDINoteInput(clickedNote, undefined, { stringIndex, fret })
         }, 100),
       ]
     }
-  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, selectedScale, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords, clearFretClickTimers, practiceLevel, getLevelOptions, fretClickTimersRef, lastChordNoteRef, lastFretClickPositionRef, setHighlightedFrets, shouldVoiceLeadRef])
+  }, [isPlaying, handleMIDINoteInput, activeTab, targetNote, isPracticePositionAllowed, chordExerciseTargetChord, chordExerciseSequence, chordExerciseCurrentStep, scaleExerciseSequence, scaleExerciseCurrentStep, scaleKey, selectedScale, currentIntervalExercise, currentChordIndex, playFeedbackSound, findRootFirst, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, triggerCorrectFeedback, triggerWrongFeedback, transposedChords, clearFretClickTimers, practiceLevel, getLevelOptions, fretClickTimersRef, lastChordNoteRef, setHighlightedFrets, shouldVoiceLeadRef, chordExerciseOrder, intervalRootMidiRef, chordExerciseLastMidiRef])
 
   return { processPracticeMatch, handleMIDINoteInput, handleFretClick }
 }

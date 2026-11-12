@@ -271,7 +271,7 @@ export const ChordProgressionControls = memo(function ChordProgressionControls({
       <Button
         onClick={nextChord}
         variant="outline"
-        className="h-8 px-3 text-xs"
+        className="press-scale h-8 px-3 text-xs"
         disabled={!isPlaying}
       >
         <SkipForward className="h-3.5 w-3.5 mr-1" />

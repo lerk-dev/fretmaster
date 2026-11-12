@@ -40,6 +40,20 @@ export interface NoteButtonColorContext {
   isPlaying: boolean
   showAllNotes: boolean
   targetNote: string
+  /**
+   * 单音全指板：该音名的所有落点都以主色高亮；精确提示的当前格再加一圈强调环。
+   * 省略 = 未开启该模式。
+   */
+  singleNoteTarget?: string
+  /** 单音全指板：已找到的位置（key = `${stringIndex}-${fret}`），用于「实心/空心」位置地图 */
+  singleNoteFoundKeys?: ReadonlySet<string>
+  /** 单音全指板：已跳过（放弃）的位置，画成灰色 → 与「未找到」区分 */
+  singleNoteSkippedKeys?: ReadonlySet<string>
+  /**
+   * 单音全指板「无提示」：未找到的落点**一个都不画**。
+   * 无提示模式下把该音的所有落点圈出来 = 直接把答案印在指板上，所以只显示已找到的。
+   */
+  singleNoteHideUnfound?: boolean
   practiceAnswerMode: string
   highlightedTargetPosition: { stringIndex: number; fret: number } | null
   highlightedFrets: ReadonlyMap<string, boolean>
@@ -90,6 +104,10 @@ export function getNoteButtonColor(
     isPlaying,
     showAllNotes,
     targetNote,
+    singleNoteTarget,
+    singleNoteFoundKeys,
+    singleNoteSkippedKeys,
+    singleNoteHideUnfound,
     practiceAnswerMode,
     highlightedTargetPosition,
     highlightedFrets,
@@ -153,8 +171,31 @@ export function getNoteButtonColor(
         }
       }
       
-      if (showAllNotes && note === targetNote) {
+      // 🚨 单音全指板开启时忽略「显示全部音名」：否则目标音的全部落点会被这里提前
+      //    染成实心主色，下面的位置地图（已找到实心 / 未找到空心 / 已跳过灰）全部失效，
+      //    「无提示」模式更是等于把答案直接印在指板上。
+      if (!singleNoteTarget && showAllNotes && note === targetNote) {
         return "bg-primary/80 text-primary-foreground"
+      }
+      // 单音全指板：目标音的所有落点都亮起（未开启时 singleNoteTarget 为空，不进入）
+      if (singleNoteTarget && note === singleNoteTarget) {
+        const isPromptCell =
+          !!highlightedTargetPosition &&
+          highlightedTargetPosition.stringIndex === stringIndex &&
+          highlightedTargetPosition.fret === fret
+        if (isPromptCell) {
+          return "bg-primary/80 text-primary-foreground ring-2 ring-inset ring-accent"
+        }
+        // 位置地图：已找到 = 实心色块，已跳过 = 灰色（放弃），未找到 = 空心圈（等着被找到）
+        const found = !!singleNoteFoundKeys?.has(key)
+        // 无提示：未找到的落点不画（画出来就等于把答案圈在指板上）
+        if (!found && singleNoteHideUnfound) return "hover:bg-muted"
+        if (singleNoteSkippedKeys?.has(key)) {
+          return "bg-transparent text-muted-foreground/50 ring-1 ring-inset ring-muted-foreground/30 line-through"
+        }
+        return found
+          ? "bg-primary/60 text-primary-foreground"
+          : "bg-transparent text-primary ring-1 ring-inset ring-primary/50 hover:bg-primary/10"
       }
       // 未开始练习时只显示 hover 效果
       if (!isPlaying) {

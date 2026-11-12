@@ -46,7 +46,12 @@ export function PracticeScoreBadge({ t, score }: PracticeScoreBadgeProps) {
         .replace('{correct}', String(score.correct))
         .replace('{total}', String(score.total))}
     >
-      <Badge variant="outline" className="font-mono tabular-nums text-xs">
+      {/* key 随得分变化 ⇒ 每次答题徽章重新挂载，触发一次 300ms 的轻微弹跳（不是持续动画） */}
+      <Badge
+        key={`${score.correct}-${score.total}`}
+        variant="outline"
+        className="score-pop font-mono tabular-nums text-xs"
+      >
         {score.correct}/{score.total}
       </Badge>
       {score.total > 0 && (
@@ -76,10 +81,12 @@ interface PracticeTimerBadgeProps {
  * 这里不再判一次，否则同一个条件会有两份实现。
  */
 export function PracticeTimerBadge({ t, timeLeft, formatTime }: PracticeTimerBadgeProps) {
+  // 最后 10 秒：徽章转警示色 + 红圈缓慢呼吸（.timer-low 见 globals.css 第 9 节）
+  const low = timeLeft > 0 && timeLeft <= 10
   return (
     <Badge
       variant="outline"
-      className="font-mono tabular-nums gap-1 text-xs"
+      className={`font-mono tabular-nums gap-1 text-xs${low ? ' timer-low' : ''}`}
       role="status"
       aria-live="off"
       aria-label={t('time_left_aria_label').replace('{time}', formatTime(timeLeft))}

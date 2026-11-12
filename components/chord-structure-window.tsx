@@ -108,7 +108,7 @@ export const ChordStructureWindow = memo(function ChordStructureWindow({
               <Badge
                 key={index}
                 variant={index === currentChordIndex ? "default" : "secondary"}
-                className="text-2xs py-0 px-1"
+                className={"text-2xs py-0 px-1" + (index === currentChordIndex ? " chord-swap" : "")}
               >
                 {formatChordName(chord, t)}
               </Badge>

@@ -106,6 +106,7 @@ export function makeAnswerOptions(overrides: DeepPartial<UsePracticeMatchOptions
       shouldVoiceLeadRef: ref(false),
       nextChordInfoRef: ref(null),
       lastChordNoteRef: ref(null),
+      chordExerciseOrder: 'asc',
     },
     actions: {
       recordPositionStat: vi.fn(),
@@ -115,7 +116,6 @@ export function makeAnswerOptions(overrides: DeepPartial<UsePracticeMatchOptions
       playFeedbackSound: vi.fn(),
       setHighlightedFrets: vi.fn(),
       clearFretClickTimers: vi.fn(),
-      lastFretClickPositionRef: ref(null),
       fretClickTimersRef: ref([]),
       fretZoneEnabled: false,
       fretZoneStart: 0,

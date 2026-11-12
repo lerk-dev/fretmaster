@@ -274,6 +274,26 @@ describe('generateIntervalExercise', () => {
     h.unmount()
   })
 
+  it('逐题方向写进题目：either 下同一音程先上行、后下行（判定侧靠它比八度）', () => {
+    const h = mount()
+    act(() => { api!.setSelectedIntervals([THIRD]) })
+    act(() => { api!.setIntervalDirection('down') })
+    act(() => { api!.generateIntervalExercise() })
+    expect(api!.currentIntervalExercise!.direction).toBe('down')
+    // 下行大三度 → 题目换成互补音程（音级相同、八度不同）
+    expect(api!.currentIntervalExercise!.interval).toEqual(INTERVALS[resolveDownIndex(THIRD)])
+
+    act(() => { api!.setIntervalDirection('either') })
+    act(() => { api!.generateIntervalExercise() }) // 设置变了 ⇒ 队列重建
+    expect(api!.intervalExerciseQueue).toEqual([THIRD, resolveDownIndex(THIRD)])
+    expect(api!.currentIntervalExercise!.direction).toBe('up')
+
+    act(() => { api!.generateIntervalExercise() }) // 队列里的第二题
+    expect(api!.currentIntervalExercise!.direction).toBe('down')
+    expect(api!.currentIntervalExercise!.interval).toEqual(INTERVALS[resolveDownIndex(THIRD)])
+    h.unmount()
+  })
+
   it('findRootFirst 时显示「1 X」；addRootBack 只补根音 →「1 X 1」', () => {
     const h = mount()
     act(() => { api!.setSelectedIntervals([THIRD]) })

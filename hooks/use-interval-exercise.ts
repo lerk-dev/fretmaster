@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 
 import { NOTES, INTERVALS } from '@/lib/page-theory-data'
 import { normalizeNoteName, getNoteIndex } from '@/lib/page-theory-functions'
-import { buildDirectionalQueue, shuffle } from '@/lib/interval-direction'
+import { buildDirectionalQueueEntries, shuffle, type DirectionalQueueEntry } from '@/lib/interval-direction'
 import { useAppStore } from '@/lib/store'
 
 /**
@@ -36,6 +36,13 @@ export function useIntervalExercise() {
     currentIntervalDisplay: string;
     completedIntervals: number[];
     answered: boolean;
+    /**
+     * 这道题该按哪个方向判（上行 / 下行）。
+     * 🚨 必须**逐题**记录：`either`/`random` 下同一音程上下行都会出现，
+     * 只看设置里的方向没法知道当前这题要求往哪边走。拿不到（外部注入队列）则省略，
+     * 判定侧退回「只看音级」。
+     */
+    direction?: 'up' | 'down';
   } | null>(null)
 
   // 音程练习状态
@@ -66,31 +73,52 @@ export function useIntervalExercise() {
    */
   const queueSignatureRef = useRef<string | null>(null)
 
+  /**
+   * 当前队列每一题的**方向**（与 `intervalExerciseQueue` 一一对应）。
+   *
+   * 用 `queue` 的**数组身份**做归属校验：页面重置/单测注入会直接
+   * `setIntervalExerciseQueue([])` 或塞一个新数组，这时身份对不上 ⇒ 视为「没有方向」，
+   * 判定退回只看音级（不会拿上一轮的旧方向去卡新队列）。
+   */
+  const queueDirectionsRef = useRef<{
+    queue: number[]
+    directions: Array<'up' | 'down'>
+  } | null>(null)
+
   const buildQueueSignature = useCallback(() => (
     `${[...selectedIntervals].sort((a, b) => a - b).join(',')}` +
     `|${intervalDirection}|${findRootFirst ? '1' : '0'}|${intervalRandomizeOrder ? '1' : '0'}`
   ), [selectedIntervals, intervalDirection, findRootFirst, intervalRandomizeOrder])
 
-  const generateIntervalExerciseQueue = useCallback(() => {
+  const buildIntervalQueueEntries = useCallback((): DirectionalQueueEntry[] => {
     if (selectedIntervals.length === 0) return []
-    
+
     let effectiveIntervals = [...selectedIntervals]
     if (findRootFirst) {
       effectiveIntervals = effectiveIntervals.filter(idx => idx !== 0)
     }
     if (effectiveIntervals.length === 0) return []
-    
+
     // 方向映射 / 洗牌的唯一真相源在 lib/interval-direction.ts：
     // 旧实现用 (12 - s) % 12 + 半音数反查，对复合音程取到负数、且异名同音判错边
     // （2026-10-10 全仓审查 P1-1）。此处只负责「先找根音过滤」与编排。
-    let queue = buildDirectionalQueue(effectiveIntervals, intervalDirection)
+    // 🚨 用 entries 版本：每道题要带自己的方向，判定上下行时才知道该往哪边比。
+    let entries = buildDirectionalQueueEntries(effectiveIntervals, intervalDirection)
 
     if (intervalRandomizeOrder) {
-      queue = shuffle(queue)
+      entries = shuffle(entries)
     }
 
-    return queue
+    return entries
   }, [selectedIntervals, intervalRandomizeOrder, intervalDirection, findRootFirst])
+
+  const generateIntervalExerciseQueue = useCallback(() => {
+    const entries = buildIntervalQueueEntries()
+    const queue = entries.map((entry) => entry.index)
+    // 与 queue **同一个数组对象**记下方向，供 generateIntervalExercise 用身份校验取回
+    queueDirectionsRef.current = { queue, directions: entries.map((entry) => entry.direction) }
+    return queue
+  }, [buildIntervalQueueEntries])
 
   const generateIntervalExercise = useCallback(() => {
     if (selectedIntervals.length === 0) return
@@ -119,6 +147,11 @@ export function useIntervalExercise() {
     // 获取当前音程
     const intervalIndex = queue[nextIndex]
     const selectedInterval = INTERVALS[intervalIndex]
+    // 本题方向：只有在队列是我们自己生成的时候才可信（见 queueDirectionsRef 注释）
+    const directionPlan = queueDirectionsRef.current
+    const questionDirection = directionPlan && directionPlan.queue === queue
+      ? directionPlan.directions[nextIndex]
+      : undefined
     
     // 随机选择根音
     let exerciseRoot = rootNote
@@ -151,7 +184,8 @@ export function useIntervalExercise() {
       allIntervals: selectedIntervalObjects,
       currentIntervalDisplay: currentIntervalDisplay + rootBackDisplay,
       completedIntervals: [] as number[],
-      answered: false
+      answered: false,
+      direction: questionDirection,
     })
     
     // 重置步骤到根音

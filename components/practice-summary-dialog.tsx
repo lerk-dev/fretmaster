@@ -46,7 +46,13 @@ interface PracticeSummaryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   data: PracticeSummaryData
-  /** 点击「再练一次」时回调（调用方需自行关闭弹窗） */
+  /**
+   * 点击「关闭」按钮时回调；不传则回退到 `onOpenChange(false)`（遮罩/Esc 仍走 onOpenChange）。
+   * 单列一个回调是为了让调用方能区分「关闭」与「再练一次」——
+   * 例如全屏里做完练习时，只有「关闭」才应该退出全屏。
+   */
+  onClose?: () => void
+  /** 点击「再练一次」时回调（调用方需自行关闭弹窗并重新开始，勿与「关闭」混用） */
   onPracticeAgain: () => void
   t: (key: string) => string
 }
@@ -55,6 +61,7 @@ export function PracticeSummaryDialog({
   open,
   onOpenChange,
   data,
+  onClose,
   onPracticeAgain,
   t,
 }: PracticeSummaryDialogProps) {
@@ -108,16 +115,16 @@ export function PracticeSummaryDialog({
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => onOpenChange(false)}
+            onClick={() => {
+              if (onClose) onClose()
+              else onOpenChange(false)
+            }}
           >
             {t('practice_summary_close')}
           </Button>
           <Button
             className="flex-1"
-            onClick={() => {
-              onOpenChange(false)
-              onPracticeAgain()
-            }}
+            onClick={() => onPracticeAgain()}
           >
             {t('practice_summary_again')}
           </Button>

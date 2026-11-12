@@ -273,6 +273,31 @@ describe('3. 找音练习（activeTab = practice）', () => {
     })
     expect(roleAt(c, 0, 0)).toBe('none')
   })
+
+  it('单音全指板：目标音的**所有落点**都是 target，其余 none（且不写音名）', () => {
+    const c = ctx({ activeTab: 'practice', isPlaying: true, singleNoteTarget: 'E' })
+    const hit = at(c, 0, 12) // 一弦 12 品 = E
+    expect(hit.role).toBe('target')
+    expect(hit.degree).toBe('')
+    expect(hit.showText).toBe(false)
+    expect(roleAt(c, 0, 1)).toBe('none') // 一品 F
+    expect(roleAt(c, 5, 12)).toBe('target') // 六弦 12 品 = E，低把位外同样高亮
+    // 空弦列是弦标签：音名恒显（即使它是目标音），与其它模式口径一致
+    expect(at(c, 0, 0).showText).toBe(true)
+  })
+
+  it('单音全指板：showAllNotes 打开时「全部显示」优先（音名可见、目标音仍高亮）', () => {
+    const c = ctx({
+      activeTab: 'practice',
+      isPlaying: true,
+      showAllNotes: true,
+      targetNote: 'E',
+      singleNoteTarget: 'E',
+    })
+    const hit = at(c, 0, 0)
+    expect(hit.role).toBe('target')
+    expect(hit.showText).toBe(true)
+  })
 })
 
 describe('4. 和弦练习 / 和弦转换练习', () => {

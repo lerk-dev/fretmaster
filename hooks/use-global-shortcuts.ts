@@ -63,6 +63,15 @@ export interface UseGlobalShortcutsOptions {
   nextChord: () => void
   /** 专注模式开着时 Space/Esc 让位（见文件头第 1 条） */
   focusModeEnabled: boolean | undefined
+  /**
+   * 单音全指板模式是否生效。生效时空格/Enter 换成「跳过当前位置 / 重开本轮」，
+   * 不再是「下一题」——这一轮只有一个目标音，换题没有意义。
+   */
+  singleNoteActive?: boolean
+  /** 空格：跳过当前提示位置（仅单音全指板） */
+  onSingleNoteSkip?: () => void
+  /** Enter：重开本轮（仅单音全指板） */
+  onSingleNoteRestart?: () => void
 }
 
 export function useGlobalShortcuts(options: UseGlobalShortcutsOptions) {
@@ -83,6 +92,9 @@ export function useGlobalShortcuts(options: UseGlobalShortcutsOptions) {
     handleTabChange,
     setTabFretboardFlag,
     generateNewTarget,
+    singleNoteActive,
+    onSingleNoteSkip,
+    onSingleNoteRestart,
     generateIntervalExerciseRef,
     nextChordExercise,
     nextScaleExercise,
@@ -211,10 +223,17 @@ export function useGlobalShortcuts(options: UseGlobalShortcutsOptions) {
       }
 
       // 空格/右箭头/PageDown - 下一题（练习中）
-      if ((event.key === ' ' || event.key === 'ArrowRight' || event.key === 'PageDown') && isPlaying) {
+      // 单音全指板例外：它没有「下一题」，空格 = 跳过当前提示位置，且不要求练习已开始
+      //（否则刚打开开关还没按 P 时快捷键是死的，容易以为功能坏了）
+      if ((event.key === ' ' || event.key === 'ArrowRight' || event.key === 'PageDown') && (isPlaying || singleNoteActive)) {
         event.preventDefault()
         if (activeTab === 'practice') {
-          generateNewTarget()
+          // 单音全指板这一轮只有一个目标音，「下一题」没有意义 ⇒ 改成「跳过当前提示位置」。
+          if (singleNoteActive && onSingleNoteSkip) {
+            onSingleNoteSkip()
+          } else {
+            generateNewTarget()
+          }
         } else if (activeTab === 'interval') {
           generateIntervalExerciseRef.current?.()
         } else if (activeTab === 'chord_exercise') {
@@ -244,7 +263,9 @@ export function useGlobalShortcuts(options: UseGlobalShortcutsOptions) {
         setTabFretboardFlag(activeTab, false)
         setShowAllNotes(false)
         // 练习中同时生成下一题
-        if (isPlaying) {
+        // 🚨 单音全指板例外：它只有一整轮（同一批位置），↓ 只能隐藏指板，
+        //    否则会把本轮找到/跳过记录整个清空，用户以为「刚弹的进度丢了」。
+        if (isPlaying && !(activeTab === 'practice' && singleNoteActive)) {
           if (activeTab === 'practice') {
             generateNewTarget()
           } else if (activeTab === 'interval') {
@@ -260,11 +281,16 @@ export function useGlobalShortcuts(options: UseGlobalShortcutsOptions) {
         return
       }
 
-      // Enter - 下一题（练习中）
-      if (event.key === 'Enter' && isPlaying) {
+      // Enter - 下一题（练习中；单音全指板 = 重开本轮，同样不要求练习已开始）
+      if (event.key === 'Enter' && (isPlaying || singleNoteActive)) {
         event.preventDefault()
         if (activeTab === 'practice') {
-          generateNewTarget()
+          // 单音全指板：Enter = 重开本轮（同一个音、同一批位置，重新数一遍）
+          if (singleNoteActive && onSingleNoteRestart) {
+            onSingleNoteRestart()
+          } else {
+            generateNewTarget()
+          }
         } else if (activeTab === 'interval') {
           generateIntervalExerciseRef.current?.()
         } else if (activeTab === 'chord_exercise') {
@@ -283,5 +309,5 @@ export function useGlobalShortcuts(options: UseGlobalShortcutsOptions) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isFullscreen, isPlaying, togglePractice, activeTab, generateNewTarget, nextChordExercise, nextScaleExercise, nextChord, handleTabChange, setFullscreenMode, setIsPlaying, setMicUserPreference, isTauri, setSettingsOpen, generateIntervalExerciseRef, setTabFretboardFlag, focusModeEnabled, setHighlightedFrets, setHighlightedTargetPosition, setShowShortcutsHelp, setShowAllNotes])
+  }, [isFullscreen, isPlaying, togglePractice, activeTab, generateNewTarget, nextChordExercise, nextScaleExercise, nextChord, handleTabChange, setFullscreenMode, setIsPlaying, setMicUserPreference, isTauri, setSettingsOpen, generateIntervalExerciseRef, setTabFretboardFlag, focusModeEnabled, setHighlightedFrets, setHighlightedTargetPosition, setShowShortcutsHelp, setShowAllNotes, singleNoteActive, onSingleNoteSkip, onSingleNoteRestart])
 }

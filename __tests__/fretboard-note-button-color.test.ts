@@ -351,6 +351,90 @@ describe('⑥ selectedIntervals 含越界下标（配色层此前缺守卫，会
   })
 })
 
+describe('⑧ 单音全指板「位置地图」：已找到实心 / 未找到空心圈', () => {
+  const base = {
+    activeTab: 'practice' as const,
+    isPlaying: true,
+    practiceAnswerMode: 'fretboard' as const,
+    targetNote: 'E',
+    singleNoteTarget: 'E',
+  }
+
+  it('未找到的落点：透明底 + 描边（空心圈），不是实心色块', () => {
+    const cls = getNoteButtonColor(makeCtx({ ...base }), 'E', 0, 12)
+    expect(cls).toContain('bg-transparent')
+    expect(cls).toContain('ring-1')
+    expect(cls).not.toContain('bg-primary/60')
+  })
+
+  it('已找到的落点：实心主色', () => {
+    const cls = getNoteButtonColor(
+      makeCtx({ ...base, singleNoteFoundKeys: new Set(['0-12']) }),
+      'E',
+      0,
+      12,
+    )
+    expect(cls).toContain('bg-primary/60')
+  })
+
+  it('当前提示格优先于「已找到」判定：始终带强调环', () => {
+    const cls = getNoteButtonColor(
+      makeCtx({
+        ...base,
+        singleNoteFoundKeys: new Set(['0-12']),
+        highlightedTargetPosition: { stringIndex: 0, fret: 12 },
+      }),
+      'E',
+      0,
+      12,
+    )
+    expect(cls).toContain('ring-2')
+    expect(cls).toContain('ring-accent')
+  })
+
+  it('已跳过的落点：灰色 + 删除线，且不与「已找到 / 未找到」混淆', () => {
+    const cls = getNoteButtonColor(
+      makeCtx({ ...base, singleNoteSkippedKeys: new Set(['0-12']) }),
+      'E',
+      0,
+      12,
+    )
+    expect(cls).toContain('text-muted-foreground')
+    expect(cls).toContain('line-through')
+    expect(cls).not.toContain('bg-primary/60')
+    expect(cls).not.toContain('ring-primary/50')
+  })
+
+  it('无提示模式：未找到的落点不画（不圈答案），弹对之后才显示', () => {
+    const hidden = getNoteButtonColor(
+      makeCtx({ ...base, singleNoteHideUnfound: true }),
+      'E',
+      0,
+      12,
+    )
+    // 既不实心也不描边 —— 无提示模式下指板上看不出任何「这个音在哪」的痕迹
+    expect(hidden).not.toContain('bg-primary/60')
+    expect(hidden).not.toContain('ring-1')
+    expect(hidden).not.toContain('ring-primary/50')
+
+    const found = getNoteButtonColor(
+      makeCtx({ ...base, singleNoteHideUnfound: true, singleNoteFoundKeys: new Set(['0-12']) }),
+      'E',
+      0,
+      12,
+    )
+    expect(found).toContain('bg-primary/60')
+  })
+
+  it('开启「显示全部音名」也不会短路位置地图（单音模式忽略 showAllNotes）', () => {
+    const cls = getNoteButtonColor(makeCtx({ ...base, showAllNotes: true }), 'E', 0, 12)
+    // 仍是「未找到」的空心圈，而不是 showAllNotes 的实心色块
+    expect(cls).toContain('bg-transparent')
+    expect(cls).toContain('ring-1')
+    expect(cls).not.toBe('bg-primary/80 text-primary-foreground')
+  })
+})
+
 describe('⑦ 一弦三音「下一把位预览」：两套皮肤同一口径（2026-10-01 修）', () => {
   /**
    * 修前的两个独立缺陷，叠在一起让这个提示**一次都没显示过**（两套皮肤都没有 ——

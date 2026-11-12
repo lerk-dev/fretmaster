@@ -53,7 +53,11 @@ export const ChordDegreesDisplay = memo(function ChordDegreesDisplay({
     <div className="text-center">
       {/* 当前题目 */}
       <div className="mb-3">
-        <h3 className="text-lg font-semibold">{getCurrentChordDisplay()}</h3>
+        {/* key 随和弦变化 ⇒ 换和弦时标题重挂载并播放一次翻牌动画 */}
+        <h3
+          key={`${currentChordIndex}-${getCurrentChordDisplay()}`}
+          className="chord-swap text-lg font-semibold"
+        >{getCurrentChordDisplay()}</h3>
         <div className="flex flex-wrap justify-center gap-2 mt-2">
           {(() => {
             const chords = transposedChords
@@ -66,6 +70,7 @@ export const ChordDegreesDisplay = memo(function ChordDegreesDisplay({
                 variant={i === chordDegreeCurrentStep ? "default" : "outline"}
                 className={cn(
                   "text-lg px-4 py-2",
+                  i === chordDegreeCurrentStep && "chord-swap",
                   i < chordDegreeCurrentStep && "opacity-50"
                 )}
               >

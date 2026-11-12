@@ -11,7 +11,7 @@ interface IntervalQuestionProps {
   /** 翻译函数 */
   t: (key: string) => string
   /** 音程练习：当前题目（外层条件已保证非空） */
-  currentIntervalExercise: { rootNote: string; interval: { name: string; symbol: string; semitones: number }; targetNote: string; allIntervals: { name: string; symbol: string; semitones: number }[]; currentIntervalDisplay: string; completedIntervals: number[]; answered: boolean }
+  currentIntervalExercise: { rootNote: string; interval: { name: string; symbol: string; semitones: number }; targetNote: string; allIntervals: { name: string; symbol: string; semitones: number }[]; currentIntervalDisplay: string; completedIntervals: number[]; answered: boolean; direction?: 'up' | 'down' }
   /** 音程练习：根音 */
   rootNote: string
   /** 音程练习：目标音 */
@@ -53,16 +53,20 @@ export const IntervalQuestion = memo(function IntervalQuestion({
           <span>{formatTime(timeLeft)}</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* 符号来自唯一真相源：全屏模式也读同一份，两处不会再各写一个三元 */}
-          <span>{t('direction')}: {intervalDirectionSymbol(intervalDirection)}</span>
+          {/* 符号来自唯一真相源：全屏模式也读同一份，两处不会再各写一个三元。
+              逐题方向优先：`either`/`random` 下每道题的上/下行不同，只看设置会把方向说反。 */}
+          <span>{t('direction')}: {intervalDirectionSymbol(currentIntervalExercise.direction ?? intervalDirection)}</span>
         </div>
         <div className="flex items-center gap-2">
           <span>{intervalCurrentQueueIndex}/{intervalExerciseQueue.length}</span>
         </div>
       </div>
       
-      {/* 根音显示 */}
-      <div className="text-6xl font-bold">
+      {/* 根音显示（换题时翻牌一次） */}
+      <div
+        key={`${currentIntervalExercise.rootNote}-${intervalCurrentQueueIndex}`}
+        className="chord-swap text-6xl font-bold"
+      >
         {normalizeNoteName(currentIntervalExercise.rootNote)}
       </div>
       {/* 音程题目显示 */}

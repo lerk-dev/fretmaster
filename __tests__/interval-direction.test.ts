@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest'
 import {
   resolveDownIndex,
   buildDirectionalQueue,
+  buildDirectionalQueueEntries,
   shuffle,
   intervalDirectionSymbol,
   INTERVAL_DIRECTION_SYMBOLS,
@@ -180,6 +181,58 @@ describe('buildDirectionalQueue：四档方向', () => {
 
   it('空选择 ⇒ 空队列', () => {
     expect(buildDirectionalQueue([], 'either')).toEqual([])
+  })
+})
+
+describe('buildDirectionalQueueEntries：逐题方向', () => {
+  it('与 buildDirectionalQueue 同源：下标序列逐项相等', () => {
+    const sel = [idxOf('3'), idxOf('5'), idxOf('9')]
+    for (const dir of ['up', 'down', 'either', 'random'] as const) {
+      const entries = buildDirectionalQueueEntries(sel, dir, () => 0.9)
+      expect(entries.map((e) => e.index)).toEqual(buildDirectionalQueue(sel, dir, () => 0.9))
+    }
+  })
+
+  it('up ⇒ 每题都按上行判；down ⇒ 每题都按下行判', () => {
+    const sel = [idxOf('3'), idxOf('5')]
+    expect(buildDirectionalQueueEntries(sel, 'up').map((e) => e.direction)).toEqual(['up', 'up'])
+    expect(buildDirectionalQueueEntries(sel, 'down').map((e) => e.direction)).toEqual(['down', 'down'])
+  })
+
+  it('复合音程无下行等价项 ⇒ 仍按上行判（否则永远判错）', () => {
+    const compound = ALL.filter((i) => semiOf(i) >= 12)
+    expect(compound.length).toBeGreaterThan(0)
+    for (const i of compound) {
+      const [entry] = buildDirectionalQueueEntries([i], 'down')
+      expect(entry.index).toBe(i)
+      expect(entry.direction).toBe('up')
+    }
+  })
+
+  it('三全音自补是**真的下行**：下标不变但方向仍是 down', () => {
+    for (const sym of ['#4', 'b5']) {
+      const [entry] = buildDirectionalQueueEntries([idxOf(sym)], 'down')
+      expect(entry.index).toBe(idxOf(sym))
+      expect(entry.direction).toBe('down')
+    }
+  })
+
+  it('either ⇒ 上下成对，方向交替', () => {
+    const sel = [idxOf('3')]
+    expect(buildDirectionalQueueEntries(sel, 'either')).toEqual([
+      { index: idxOf('3'), direction: 'up' },
+      { index: resolveDownIndex(idxOf('3')), direction: 'down' },
+    ])
+  })
+
+  it('random ⇒ 随机源决定每题方向', () => {
+    const sel = [idxOf('3'), idxOf('5')]
+    expect(buildDirectionalQueueEntries(sel, 'random', () => 0.9).map((e) => e.direction)).toEqual(['down', 'down'])
+    expect(buildDirectionalQueueEntries(sel, 'random', () => 0.1).map((e) => e.direction)).toEqual(['up', 'up'])
+  })
+
+  it('空选择 ⇒ 空队列', () => {
+    expect(buildDirectionalQueueEntries([], 'either')).toEqual([])
   })
 })
 

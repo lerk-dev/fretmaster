@@ -13,6 +13,7 @@ import { pickTabFretboardFlag } from '@/lib/tab-fretboard-toggle'
 import { intervalDirectionSymbol, type IntervalDirection } from '@/lib/interval-direction'
 import { formatThreeNpsLocation } from '@/lib/three-notes-per-string'
 import { PracticeScoreBadge, PracticeTimerBadge, type PracticeScore } from '@/components/practice-status'
+import type { PathPoint } from '@/hooks/use-fretboard-lines'
 import type { NextThreeNpsView, ThreeNpsView } from '@/components/scale-sequence-display'
 
 interface FullscreenOverlayProps {
@@ -84,14 +85,15 @@ interface FullscreenOverlayProps {
   /** 音阶练习：3NPS 的下一个把位预览（普通音阶模式为 null） */
   nextThreeNps: NextThreeNpsView | null
   /** 音程练习：当前题目 */
-  currentIntervalExercise: { rootNote: string; interval: { name: string; symbol: string; semitones: number }; targetNote: string; allIntervals: { name: string; symbol: string; semitones: number }[]; currentIntervalDisplay: string; completedIntervals: number[]; answered: boolean } | null
+  currentIntervalExercise: { rootNote: string; interval: { name: string; symbol: string; semitones: number }; targetNote: string; allIntervals: { name: string; symbol: string; semitones: number }[]; currentIntervalDisplay: string; completedIntervals: number[]; answered: boolean; direction?: 'up' | 'down' } | null
   /**
    * 音程练习：方向（↑ / ↓ / ↕ / 🔀）。
    *
-   * 🚨 必须显式传进来，不能从 `currentIntervalExercise` 推 —— 方向是**独立的设置项**
-   * （`intervalPractice.direction`），一道题本身不携带它（`either` 模式下同一道题的
-   * 上行/下行甚至由队列顺序决定）。原先全屏层没接这个 prop ⇒ 进全屏后方向信息
-   * 整个消失，用户不知道该往上还是往下按。符号映射见 `lib/interval-direction.ts`。
+   * 🚨 必须显式传进来：这是**设置项**（`intervalPractice.direction`）。
+   * `either`/`random` 下这道题实际走上行还是下行由队列逐题决定，题目对象自带
+   * `direction`（由 `use-interval-exercise` 写入）⇒ 显示时**逐题方向优先**，
+   * 否则会把本道题的方向说反（用户照着反方向弹就被判错）。
+   * 符号映射见 `lib/interval-direction.ts`。
    */
   intervalDirection: IntervalDirection
   /** 音程练习：本轮练习队列（用于显示第几题 / 共几题） */
@@ -145,6 +147,17 @@ interface FullscreenOverlayProps {
   threeNpsCellKeys: ReadonlyMap<string, unknown>
   /** 一弦三音：下一把位预览 */
   nextThreeNpsCells: ReadonlyMap<string, ThreeNpsPreviewKind>
+  // —— 单音全指板：全屏层必须和主区用同一份输入，否则进全屏后位置地图/连线整个消失 ——
+  /** 单音全指板：目标音名（未开启为 undefined） */
+  singleNoteTarget?: string
+  /** 单音全指板：已找到的位置 */
+  singleNoteFound?: ReadonlyArray<{ stringIndex: number; fret: number }>
+  /** 单音全指板：已跳过（放弃）的位置 */
+  singleNoteSkipped?: ReadonlyArray<{ stringIndex: number; fret: number }>
+  /** 单音全指板「无提示」：未找到的落点不画 */
+  singleNoteHideUnfound?: boolean
+  /** 单音全指板：按巡游顺序连线 */
+  connectPoints?: ReadonlyArray<PathPoint>
 }
 
 /**
@@ -208,6 +221,11 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   threeNpsTarget,
   threeNpsCellKeys,
   nextThreeNpsCells,
+  singleNoteTarget,
+  singleNoteFound,
+  singleNoteSkipped,
+  singleNoteHideUnfound,
+  connectPoints,
 }: FullscreenOverlayProps) {
 // store 派生值：与页面用同一套 selector / 推导，正文里的名字保持不变
   const activeTab = useAppStore((s) => s.activeTab)
@@ -603,10 +621,10 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
           符号走 `lib/interval-direction.ts` 的唯一真相源，不在两处各写一个三元。
         */}
         <div className="flex items-center justify-center gap-8 text-lg text-muted-foreground">
-          <span data-interval-direction={intervalDirection}>
+          <span data-interval-direction={currentIntervalExercise.direction ?? intervalDirection}>
             {t('direction')}:{' '}
             <span className="align-middle text-3xl text-foreground">
-              {intervalDirectionSymbol(intervalDirection)}
+              {intervalDirectionSymbol(currentIntervalExercise.direction ?? intervalDirection)}
             </span>
           </span>
           <span data-interval-progress="">
@@ -674,6 +692,11 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
               chordExerciseTargetChord={chordExerciseTargetChord}
               FRET_MARKERS={FRET_MARKERS}
               targetNote={targetNote}
+              singleNoteTarget={singleNoteTarget}
+              singleNoteFound={singleNoteFound}
+              singleNoteSkipped={singleNoteSkipped}
+              singleNoteHideUnfound={singleNoteHideUnfound}
+              connectPoints={connectPoints}
               practiceAnswerMode={practiceAnswerMode}
               highlightedTargetPosition={highlightedTargetPosition}
               threeNpsTarget={threeNpsTarget}
@@ -707,6 +730,8 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
           currentChordIndex={currentChordIndex}
           chordExerciseTargetChord={chordExerciseTargetChord}
           targetNote={targetNote}
+          singleNoteTarget={singleNoteTarget}
+          connectPoints={connectPoints}
           practiceAnswerMode={practiceAnswerMode}
           highlightedTargetPosition={highlightedTargetPosition}
           threeNpsTarget={threeNpsTarget}

@@ -87,6 +87,11 @@ export interface FretboardRoleContext {
   highlightedTargetPosition?: { stringIndex: number; fret: number } | null
   /** 找音练习：当前目标音名 */
   targetNote?: string
+  /**
+   * 单音全指板：该音名的**所有位置**都按 `target` 角色高亮（不写字，除非 showAllNotes）。
+   * 省略 / 空串 = 未开启该模式，行为与旧版完全一致。
+   */
+  singleNoteTarget?: string
   showAllNotes: boolean
   /** 点击反馈：key = `${stringIndex}-${fret}`，value = 对/错 */
   highlightedFrets: ReadonlyMap<string, boolean>
@@ -264,6 +269,11 @@ function resolveBaseRole(
     // 「显示全部音符」= 所有格子都亮出音名（与经典皮肤的 showAllNotes 同义）；目标音额外强调
     if (ctx.showAllNotes) {
       return result(ctx.targetNote && note === ctx.targetNote ? 'target' : 'none', '', true)
+    }
+    // 单音全指板：目标音的每个落点都是「要弹的目标」，但不写音名（写出来就是答案）。
+    // 🚨 只在 showAllNotes 之后判：用户显式要求看全部音名时，让「全部显示」优先。
+    if (ctx.singleNoteTarget) {
+      return result(note === ctx.singleNoteTarget ? 'target' : 'none', '', false)
     }
     return result('none', '', false)
   }

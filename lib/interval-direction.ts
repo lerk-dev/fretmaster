@@ -87,6 +87,57 @@ export function resolveDownIndex(index: number): number {
 /** 方向档位（与 store 的 `IntervalPracticeSettings.direction` 一致）。 */
 export type IntervalDirection = 'up' | 'down' | 'random' | 'either'
 
+/** 队列条目：`INTERVALS` 下标 + **这道题真正的方向**（判定上下行用）。 */
+export interface DirectionalQueueEntry {
+  index: number
+  direction: 'up' | 'down'
+}
+
+/**
+ * 把「选中的音程下标」按方向编译成**带方向的出题队列**。
+ *
+ * 与 `buildDirectionalQueue` 的唯一区别：每条还带着它该按上行还是下行判定。
+ * 为什么必须记方向：`down` 档换成了互补音程（下行大三度 → 问六度），
+ * 只看音级的话，用户在根音上方弹同样音级也会算对 ⇒ 上下行形同虚设（2026-11-12）。
+ *
+ * 三个特例（不是下行）：
+ * - **复合音程**（≥ 12 半音）没有下行等价项，`resolveDownIndex` 原样返回 ⇒ 按上行判；
+ * - **同度**（0 半音）没有上下之分 ⇒ 方向值无意义，判定侧直接跳过；
+ * - **三全音自补**（`#4`/`b5`）下标不变但确实是「下方三全音」⇒ 仍按下行判。
+ */
+export function buildDirectionalQueueEntries(
+  selected: readonly number[],
+  direction: IntervalDirection,
+  random: () => number = Math.random
+): DirectionalQueueEntry[] {
+  const base = [...selected]
+  const upEntry = (index: number): DirectionalQueueEntry => ({ index, direction: 'up' })
+  const downEntry = (index: number): DirectionalQueueEntry => {
+    const downIndex = resolveDownIndex(index)
+    const semitones = INTERVALS[index]?.semitones ?? 0
+    const keepsUpQuestion = downIndex === index && semitones >= COMPOUND_MIN_SEMITONES
+    return { index: downIndex, direction: keepsUpQuestion ? 'up' : 'down' }
+  }
+
+  if (direction === 'up') return base.map(upEntry)
+
+  if (direction === 'down') {
+    return base.map(downEntry)
+  }
+
+  if (direction === 'random') {
+    return base.map((idx) => (random() > 0.5 ? downEntry(idx) : upEntry(idx)))
+  }
+
+  // either：上行与下行**同时**入队，每个音程产生两个条目
+  const expanded: DirectionalQueueEntry[] = []
+  for (const idx of base) {
+    expanded.push(upEntry(idx))
+    expanded.push(downEntry(idx))
+  }
+  return expanded
+}
+
 /**
  * 把「选中的音程下标」按方向编译成**出题队列**。
  *
@@ -99,25 +150,7 @@ export function buildDirectionalQueue(
   direction: IntervalDirection,
   random: () => number = Math.random
 ): number[] {
-  const base = [...selected]
-
-  if (direction === 'up') return base
-
-  if (direction === 'down') {
-    return base.map(resolveDownIndex)
-  }
-
-  if (direction === 'random') {
-    return base.map((idx) => (random() > 0.5 ? resolveDownIndex(idx) : idx))
-  }
-
-  // either：上行与下行**同时**入队，每个音程产生两个条目
-  const expanded: number[] = []
-  for (const idx of base) {
-    expanded.push(idx)
-    expanded.push(resolveDownIndex(idx))
-  }
-  return expanded
+  return buildDirectionalQueueEntries(selected, direction, random).map((entry) => entry.index)
 }
 
 /**

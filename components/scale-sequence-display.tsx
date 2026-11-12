@@ -129,10 +129,13 @@ export const ScaleSequenceDisplay = memo(function ScaleSequenceDisplay({
                 {/* 当前目标音 + 建议位置（同一音名别处也能弹，这里只是推荐位） */}
                 {threeNps.target && (
                   <div className="mt-3 flex flex-col items-center gap-0.5">
-                    <div className={cn(
-                      "w-16 h-16 rounded-lg flex items-center justify-center text-3xl font-bold",
-                      threeNps.target.isRoot ? "bg-blue-400/20 text-blue-500" : "bg-primary/10 text-primary"
-                    )}>
+                    <div
+                      key={`${threeNps.target.note}-${threeNps.target.stringIndex}-${threeNps.target.fret}`}
+                      className={cn(
+                        "target-pop w-16 h-16 rounded-lg flex items-center justify-center text-3xl font-bold",
+                        threeNps.target.isRoot ? "bg-blue-400/20 text-blue-500" : "bg-primary/10 text-primary"
+                      )}
+                    >
                       {formatDegree(threeNps.target.label)}
                     </div>
                     <div className="text-sm font-medium">
@@ -155,7 +158,7 @@ export const ScaleSequenceDisplay = memo(function ScaleSequenceDisplay({
                       className={cn(
                         "inline-flex items-center justify-center min-w-[26px] h-7 px-1.5 rounded border text-xs font-mono",
                         step.current
-                          ? "bg-primary text-primary-foreground border-primary font-bold"
+                          ? "bg-primary text-primary-foreground border-primary font-bold chord-swap"
                           : step.done
                             ? "border-border/40 text-muted-foreground/50"
                             : "border-border text-muted-foreground"
@@ -174,6 +177,7 @@ export const ScaleSequenceDisplay = memo(function ScaleSequenceDisplay({
                     variant={i === scaleExerciseCurrentStep ? "default" : "outline"}
                     className={cn(
                       "text-lg px-4 py-2",
+                      i === scaleExerciseCurrentStep && "chord-swap",
                       i < scaleExerciseCurrentStep && "opacity-50"
                     )}
                   >

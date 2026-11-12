@@ -201,7 +201,7 @@ export const AppHeader = memo(function AppHeader({
   const setSelectedAudioDevice = store.setSelectedAudioDevice
 
   return (
-<header className="app-header border-b border-border/50 bg-card sticky top-0 z-50">
+<header className={cn('app-header border-b border-border/50 bg-card sticky top-0 z-50', isPlaying && 'app-header--live')}>
   <div className="container mx-auto px-4 h-14 flex items-center justify-between">
     {/* 左：logo + 标题。窄屏（≈360px）练习中时右组（得分/计时/三个按钮）约 250px，
         标题块必须能收缩，否则**整组控件被挤出屏幕右缘**（真机实测：设置按钮落在 x=370→402，
@@ -225,6 +225,12 @@ export const AppHeader = memo(function AppHeader({
           还剩几分钟」全看不见。补的时候若在那边再写一份百分比判定，两处会各自演化。 */}
       {/* Score display + Timer（实现见 components/practice-status.tsx，顶栏与全屏层共用）
           门控：showAccuracy / showTimer 来自「设置 → 显示与外观」，默认关。 */}
+      {/* 练习中：三根黄铜色均衡器小条（纯装饰，读屏忽略）+ 页头发丝线微光（见 .app-header--live） */}
+      {isPlaying && (
+        <span className="live-eq" aria-hidden="true" data-live-indicator="">
+          <i /><i /><i />
+        </span>
+      )}
       {isPlaying && showAccuracy && <PracticeScoreBadge t={t} score={score} />}
       {isPlaying && showTimer && practiceTime > 0 && (
         <PracticeTimerBadge t={t} timeLeft={timeLeft} formatTime={formatTime} />

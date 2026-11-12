@@ -60,6 +60,15 @@ const LOCAL_PRACTICE_MODE_GROUPS = PRACTICE_MODE_GROUPS
 import { resolveInstrumentConfig } from "@/lib/practice-suggestions"
 import { recordPositionResult, getPositionWeight, loadPositionStats } from "@/lib/position-stats"
 import { getTabFretboardFlag, type TabFretboardFlag } from "@/lib/tab-fretboard-toggle"
+import {
+  enumerateTargetPositions,
+  buildTour,
+  attributeHit,
+  nextTargetNote,
+  cellKey,
+  type CellPos,
+} from "@/lib/single-note-tour"
+import { guitarPositionToMidi } from "@/lib/guitar-sound"
 import { applyRootFontSize } from "@/lib/display-scale"
 import { themeBackgroundColor } from "@/lib/theme-colors"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -128,6 +137,12 @@ import { toast } from "sonner"
 import { createTranslator } from '@/lib/i18n'
 
 const FRET_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]
+
+/** 单音全指板配置的本地存储键（见页面里的持久化 effect） */
+const SINGLE_NOTE_STORAGE_KEY = 'fretmaster.single-note.v1'
+
+/** 单音全指板：位置提示方式（无提示 / 精确到弦品） */
+type SingleNotePrompt = 'none' | 'exact'
 
 /** 音阶练习「练习序列」里表示一弦三音（3NPS）的选项 id */
 /**
@@ -323,18 +338,22 @@ export default function FretMasterPage() {
   const practiceAnswerModeRef = useRef<"fretboard" | "buttons">("fretboard") // 答题模式 ref，供音频检测回调使用
   const [highlightedTargetPosition, setHighlightedTargetPosition] = useState<{stringIndex: number, fret: number} | null>(null) // 高亮的目标位置
   const highlightedTargetPositionRef = useRef<{ stringIndex: number; fret: number } | null>(null) // 目标位置 ref，供音频/MIDI 回调读取
-  // 指板点击路径暂存的位置（handleMIDINoteInput 消费后清除；音频/MIDI 直发时为 null，回退到目标位置）
-  const lastFretClickPositionRef = useRef<{ stringIndex: number; fret: number } | null>(null)
   useEffect(() => {
     highlightedTargetPositionRef.current = highlightedTargetPosition
   }, [highlightedTargetPosition])
 
-  // 逐位置掌握度统计：记录一次判定（找音练习三路径共用：指板点击 / 音频 / MIDI / 按钮）
-  const recordPositionStat = useCallback((isCorrect: boolean) => {
-    const pos = lastFretClickPositionRef.current ?? highlightedTargetPositionRef.current
-    lastFretClickPositionRef.current = null
-    if (!pos) return
-    recordPositionResult(user.instrument, pos.stringIndex, pos.fret, isCorrect)
+  /**
+   * 逐位置掌握度统计：记录一次判定（找音练习三路径共用：指板点击 / 音频 / MIDI / 按钮）。
+   *
+   * 🚨 点击位置必须**由调用方显式传入**，不能再塞进一个共享 ref 里等下游消费：
+   *    点击后会延迟 100ms 才走 handleMIDINoteInput，期间如果麦克风/其它路径先跑了一次，
+   *    就会把 ref 里的位置「偷走」，导致连点时位置记到别的格子上、单音模式还会多记一次命中。
+   *    音频路径没有位置信息 ⇒ 回退到当前高亮目标位置（与旧行为一致）。
+   */
+  const recordPositionStat = useCallback((isCorrect: boolean, pos?: CellPos) => {
+    const target = pos ?? highlightedTargetPositionRef.current
+    if (!target) return
+    recordPositionResult(user.instrument, target.stringIndex, target.fret, isCorrect)
   }, [user.instrument])
 
   // 切换乐器时加载该乐器的位置统计（幂等）；同时预取当前乐器
@@ -345,6 +364,91 @@ export default function FretMasterPage() {
   // 找音练习建议
   const [showPracticeSuggestions, setShowPracticeSuggestions] = useState(false)
   const [currentPracticeSuggestion, setCurrentPracticeSuggestion] = useState<string>("")
+
+  // ==================== 单音全指板（找音练习子模式）====================
+  // 目标音固定，一轮内要弹到它在品域内的所有落点；可提示位置、可随机换音、可连线。
+  // 配置走本地 state（与 pitchFindingTime / showAllNotes 同级），不写 store。
+  const [singleNoteEnabled, setSingleNoteEnabled] = useState(false)
+  const [singleNoteNote, setSingleNoteNote] = useState('E')
+  const [singleNoteRandomNote, setSingleNoteRandomNote] = useState(true)
+  const [singleNotePrompt, setSingleNotePrompt] = useState<SingleNotePrompt>('exact')
+  const [singleNoteQuota, setSingleNoteQuota] = useState<number | 'all'>('all')
+  const [singleNoteShowLines, setSingleNoteShowLines] = useState(true)
+  /** 本轮已命中次数（= 进度分子，达到配额后换轮） */
+  const [singleNoteHits, setSingleNoteHits] = useState(0)
+  /** 本轮已找到的位置，按弹奏顺序（连线按这个顺序画） */
+  const [singleNoteFound, setSingleNoteFound] = useState<CellPos[]>([])
+  /** 本轮已跳过（按不到）的位置：不计进度、不画连线，但不再作为提示目标 */
+  const [singleNoteSkipped, setSingleNoteSkipped] = useState<CellPos[]>([])
+  /** 最近一次命中的八度（E2 / E3 …），短暂显示后自动消失；seq 用于同八度连续命中时重新计时 */
+  const [singleNoteLastHit, setSingleNoteLastHit] = useState<{ octave: number; seq: number } | null>(null)
+  /** 已经练过的音，用于「随机换音」时 12 个音不重复 */
+  const singleNoteSeenRef = useRef<string[]>([])
+  /** 本轮开始时刻（ms）：一轮跑完时用来报「用时 x.x 秒」 */
+  const singleNoteRoundStartedAtRef = useRef(Date.now())
+  /** 「这一层已找完、已落到相邻八度」提示的节流时刻（避免连续拨弦刷屏） */
+  const singleNoteOctaveHintAtRef = useRef(0)
+  /** 自动循环：一轮结束后按 C→C♯→…→B 顺序换下一个音（与「随机换音」互斥） */
+  const [singleNoteCycle, setSingleNoteCycle] = useState(false)
+  /** 一轮小结：留在界面上直到用户关掉或开始下一轮（toast 太短，等于看完就没了） */
+  const [singleNoteSummary, setSingleNoteSummary] = useState<{
+    found: number
+    skipped: number
+    seconds: number
+    missedFrets: number[]
+  } | null>(null)
+
+  // 配置持久化：刷新后不用每次重设。放 localStorage（纯界面偏好），不进 store 以免污染设置导入导出。
+  // 只在客户端挂载后读一次 —— 静态导出会预渲染，直接读 window 会在构建期炸。
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SINGLE_NOTE_STORAGE_KEY)
+      if (!raw) return
+      const saved = JSON.parse(raw) as Record<string, unknown>
+      if (typeof saved.enabled === 'boolean') setSingleNoteEnabled(saved.enabled)
+      // 🚨 只判 `typeof` 不够：被手改过 / 旧版本写坏的存储值会让「目标音」变成一个
+      //    不在 NOTES 里的字符串（枚举出 0 个落点、整轮空转）或配额为 0/负数/小数
+      //    （一轮永远推不完）。这里按真实取值域校验，非法值一律回退默认。
+      if (typeof saved.note === 'string' && NOTES.includes(saved.note)) setSingleNoteNote(saved.note)
+      if (typeof saved.randomNote === 'boolean') setSingleNoteRandomNote(saved.randomNote)
+      if (typeof saved.cycle === 'boolean') setSingleNoteCycle(saved.cycle)
+      if (saved.prompt === 'none' || saved.prompt === 'exact') setSingleNotePrompt(saved.prompt)
+      if (
+        saved.quota === 'all' ||
+        (typeof saved.quota === 'number' && Number.isInteger(saved.quota) && saved.quota > 0)
+      ) setSingleNoteQuota(saved.quota)
+      if (typeof saved.showLines === 'boolean') setSingleNoteShowLines(saved.showLines)
+    } catch {
+      // 旧版本/被手改坏的存储值：忽略，继续用默认值
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        SINGLE_NOTE_STORAGE_KEY,
+        JSON.stringify({
+          enabled: singleNoteEnabled,
+          note: singleNoteNote,
+          randomNote: singleNoteRandomNote,
+          cycle: singleNoteCycle,
+          prompt: singleNotePrompt,
+          quota: singleNoteQuota,
+          showLines: singleNoteShowLines,
+        }),
+      )
+    } catch {
+      // 隐私模式下 localStorage 可能不可写：不影响练习
+    }
+  }, [
+    singleNoteEnabled,
+    singleNoteNote,
+    singleNoteRandomNote,
+    singleNoteCycle,
+    singleNotePrompt,
+    singleNoteQuota,
+    singleNoteShowLines,
+  ])
 
   // ==================== 统计模块状态 ====================
   // 练习统计：状态、记录与「从服务器加载 / 落库」全在 usePracticeStats（同名解构，正文用法不变）
@@ -370,8 +474,10 @@ export default function FretMasterPage() {
   const fretZoneStart = practiceSettings.fretZoneStart
   const fretZoneSize = practiceSettings.fretZoneSize
   const octaveShiftEnabled = practiceSettings.octaveShiftEnabled
+  const setOctaveShiftEnabled = store.setOctaveShiftEnabled
   const octaveShiftMode = practiceSettings.octaveShiftMode
   const weaknessWeightedEnabled = practiceSettings.weaknessWeightedEnabled
+  const setWeaknessWeightedEnabled = store.setWeaknessWeightedEnabled
   const [pitchFindingTime, setPitchFindingTime] = useState(5) // 找音练习时长（分钟）
 
   // 音程练习：state/ref 与出题回调均由 useIntervalExercise 提供（同名解构，正文用法不变）
@@ -576,6 +682,16 @@ export default function FretMasterPage() {
   const [showPracticeSummary, setShowPracticeSummary] = useState(false)
   const [practiceSummaryData, setPracticeSummaryData] = useState<{correct: number, total: number, duration: number}>({correct: 0, total: 0, duration: 0})
 
+  /**
+   * 关闭成绩单：全屏里做完练习时**顺带退出全屏**。
+   * 否则关掉弹窗后会停在一个没有内容的全屏页，用户还以为卡住了。
+   * 「再练一次」不走这里（要留在全屏继续练）。
+   */
+  const closePracticeSummary = useCallback(() => {
+    setShowPracticeSummary(false)
+    if (isFullscreen) setFullscreenMode(false)
+  }, [isFullscreen, setFullscreenMode])
+
   // 和弦练习状态
 
   // 和弦转换练习状态
@@ -687,8 +803,8 @@ export default function FretMasterPage() {
     handleDragEnd,
   } = useStructureWindowDrag()
 
-  // Refs
-  const handleMIDINoteInputRef = useRef<((note: string) => void) | null>(null)
+  // MIDI note-on 按 (音名, 八度) 调用；八度参与「上行/下行」与单音落点判定。
+  const handleMIDINoteInputRef = useRef<((note: string, octave?: number) => void) | null>(null)
   const generateNewTargetRef = useRef<(() => void) | null>(null)
   const nextChordRef = useRef<(() => void) | null>(null)
   const practiceCardRef = useRef<HTMLDivElement | null>(null)
@@ -1111,7 +1227,173 @@ export default function FretMasterPage() {
   // 生成新的目标音符
   const previousTargetRef = useRef<string | null>(null)
 
+  /**
+   * 单音全指板：为某个音构建「一轮」。
+   *   · `tour`  —— 本轮要弹的位置顺序（就近排序，连线最顺）；
+   *   · `total` —— 本轮需要命中的次数（次数上限与位置总数取较小值）。
+   * 空弦/品域/弦选择/品数任一变化都会重建，因此不做缓存，按需现算（6 弦 × 24 品，成本可忽略）。
+   * 范围**固定跟着指板当前显示的品数**（练习设置里的 fretCount）：显示 12 品就弹 12 品内
+   * 所有该音，15 品就 15 品内全部。不再另设「品域」上限——两个上限互相打架时，
+   * 「全部」其实只覆盖了前半段，用户以为弹完了其实没弹到。
+   */
+  const buildSingleNoteRoundFor = useCallback((note: string) => {
+    // 🚨 调弦必须显式传下去：`getNoteAtPosition` 默认读全局调弦，而全局调弦是靠渲染期
+    //    `setStringTuning` 写的 —— 换乐器（不同调弦、同弦数）时本回调的身份不会变，
+    //    按旧调弦枚举出来的落点会残留一整轮。
+    const positions = enumerateTargetPositions({
+      targetNote: note,
+      maxFret: fretCount,
+      allowedStringIndexes: resolveAvailableStringIndexes(selectedStrings, STRING_COUNT),
+      tuning: resolveInstrumentConfig(user.instrument).tuning,
+    })
+    // 八度梯子：空弦组 → 4弦2品 → 2弦5品 → 5弦7品 → 3弦9品 → 1弦12品 → 下一把位……
+    const tour = buildTour(positions, 'octave')
+    const total =
+      singleNoteQuota === 'all' ? tour.length : Math.min(singleNoteQuota, tour.length)
+    return { tour, total }
+  }, [fretCount, selectedStrings, STRING_COUNT, singleNoteQuota, user.instrument])
+
+  /** 当前音的一轮（仅用于渲染进度与位置校验；未开启时为空） */
+  const singleNoteRound = useMemo(
+    () =>
+      singleNoteEnabled
+        ? buildSingleNoteRoundFor(singleNoteNote)
+        : { tour: [] as CellPos[], total: 0 },
+    [singleNoteEnabled, buildSingleNoteRoundFor, singleNoteNote],
+  )
+
+  /**
+   * 当前该弹的位置 = tour 里**第一个既没找到、也没跳过**的落点。
+   * 🚨 不能用 `tour[hits]` 当下标：无提示模式下用户可以任意顺序弹，跳过的位置也不算进度。
+   */
+  const singleNotePromptPos = useMemo(() => {
+    if (!singleNoteEnabled) return null
+    const foundKeys = new Set(singleNoteFound.map(cellKey))
+    const skippedKeys = new Set(singleNoteSkipped.map(cellKey))
+    return (
+      singleNoteRound.tour.find(
+        (p) => !foundKeys.has(cellKey(p)) && !skippedKeys.has(cellKey(p)),
+      ) ?? null
+    )
+  }, [singleNoteEnabled, singleNoteRound, singleNoteFound, singleNoteSkipped])
+
+  /** 已找到位置集合（key = 弦-品）：位置地图与配色层共用 */
+  const singleNoteFoundKeys = useMemo(
+    () => new Set(singleNoteFound.map(cellKey)),
+    [singleNoteFound],
+  )
+
+  /** 已跳过（放弃）位置集合：位置地图上画成灰色，与「还没找到」区分 */
+  const singleNoteSkippedKeys = useMemo(
+    () => new Set(singleNoteSkipped.map(cellKey)),
+    [singleNoteSkipped],
+  )
+
+  /**
+   * 连线落点（按巡游顺序，只取已找到的）。
+   * 相邻两点若在本轮巡游里**跨过了没找到的位置**，这一段走虚线 —— 一眼能看出缺口在哪。
+   */
+  const singleNotePath = useMemo(() => {
+    if (!singleNoteEnabled) return undefined
+    const tour = singleNoteRound.tour
+    const indexOf = new Map(tour.map((p, i) => [cellKey(p), i]))
+    const found = tour.filter(p => singleNoteFoundKeys.has(cellKey(p)))
+    return found.map((p, i) => {
+      const prev = found[i - 1]
+      const gap = !!prev && (indexOf.get(cellKey(p))! - indexOf.get(cellKey(prev))!) > 1
+      return { ...p, dashed: gap }
+    })
+  }, [singleNoteEnabled, singleNoteRound, singleNoteFoundKeys])
+
+  /** 命中后短暂显示的八度标签（1.6s 后自动消失） */
+  useEffect(() => {
+    if (!singleNoteLastHit) return
+    const timer = setTimeout(() => setSingleNoteLastHit(null), 1600)
+    return () => clearTimeout(timer)
+  }, [singleNoteLastHit])
+
+  /**
+   * 单音全指板配置变更。
+   * 🚨 与「限制品区 / 八度切换 / 弱点加权」互斥：这三项都会改写出题位置，
+   * 和「固定音 + 固定 tour」同时开启会互相抢题，所以开启时一并关掉。
+   */
+  const handleSingleNoteChange = useCallback(
+    (patch: Partial<{
+      enabled: boolean
+      note: string
+      randomNote: boolean
+      cycle: boolean
+      prompt: SingleNotePrompt
+      quota: number | 'all'
+      showLines: boolean
+    }>) => {
+      if (patch.enabled === true) {
+        setFretZoneEnabled(false)
+        setOctaveShiftEnabled(false)
+        setWeaknessWeightedEnabled(false)
+        // 按钮答题是从「高亮的目标位置」反推答案，单音模式下没有唯一位置 ⇒ 强制指板模式
+        if (practiceAnswerMode === 'buttons') setPracticeAnswerMode('fretboard')
+      }
+      if (patch.enabled !== undefined) setSingleNoteEnabled(patch.enabled)
+      if (patch.note !== undefined) setSingleNoteNote(patch.note)
+      if (patch.randomNote !== undefined) setSingleNoteRandomNote(patch.randomNote)
+      if (patch.cycle !== undefined) setSingleNoteCycle(patch.cycle)
+      // 「随机换音」与「自动循环」互斥（都只管下一轮换什么音）
+      if (patch.randomNote === true) setSingleNoteCycle(false)
+      if (patch.cycle === true) setSingleNoteRandomNote(false)
+      if (patch.prompt !== undefined) setSingleNotePrompt(patch.prompt)
+      if (patch.quota !== undefined) setSingleNoteQuota(patch.quota)
+      if (patch.showLines !== undefined) setSingleNoteShowLines(patch.showLines)
+      // 改了会影响本轮内容的配置 ⇒ 视作重新开始，把「随机换音练过哪些音」的记录也清掉，
+      // 否则改一次设置后下一轮仍会被很久以前的记录影响（连续跳过好几个音）。
+      const restartsRound =
+        patch.enabled !== undefined ||
+        patch.note !== undefined ||
+        patch.randomNote !== undefined ||
+        patch.prompt !== undefined ||
+        patch.quota !== undefined
+      if (restartsRound) singleNoteSeenRef.current = []
+      if (patch.enabled === false) {
+        // 退出时清掉本模式的运行时痕迹，避免残留高亮/连线
+        setSingleNoteHits(0)
+        setSingleNoteFound([])
+        setSingleNoteSkipped([])
+        setSingleNoteLastHit(null)
+      }
+    },
+    [practiceAnswerMode, setFretZoneEnabled, setOctaveShiftEnabled, setWeaknessWeightedEnabled],
+  )
+
+  /**
+   * 答题方式切换。
+   * 🚨 切到「辨音（按钮答题）」时必须顺手关掉单音全指板：按钮答题是从「唯一的高亮目标位置」
+   *    反推答案，而单音模式一整轮只有一个音名、多个落点 ⇒ 两者同时开就是死局
+   *    （单音强制指板模式，按钮面板却已经切过来了）。
+   */
+  const handlePracticeAnswerModeChange = useCallback(
+    (mode: "fretboard" | "buttons") => {
+      if (mode === 'buttons' && singleNoteEnabled) handleSingleNoteChange({ enabled: false })
+      setPracticeAnswerMode(mode)
+    },
+    [singleNoteEnabled, handleSingleNoteChange],
+  )
+
   const generateNewTarget = useCallback(() => {
+    // 单音全指板：目标音固定，只按当前位置推进；首题/重开一轮都从这里进
+    if (singleNoteEnabled) {
+      const { tour } = buildSingleNoteRoundFor(singleNoteNote)
+      setSingleNoteHits(0)
+      setSingleNoteFound([])
+      setSingleNoteSkipped([])
+      setTargetNote(singleNoteNote)
+      previousTargetRef.current = singleNoteNote
+      setHighlightedTargetPosition(singleNotePrompt === 'exact' ? (tour[0] ?? null) : null)
+      // 这是「显式开始新一轮」（按 P 开始练习 / 开始按钮）⇒ 重置本轮计时并送走上一轮小结。
+      // 🚨 `restartSingleNoteRound` 里**不能**这么做（否则小结刚出现就被盖掉）。
+      singleNoteRoundStartedAtRef.current = Date.now()
+      setSingleNoteSummary(null)
+      return
+    }
     // 总是生成指板位置（在 fretboard 模式下不会被使用，但确保 buttons 模式下始终有值）
     // 🚨 弦号 → 行下标**一律**走唯一真相源（`lib/string-index.ts`）。
     // 历史坑：这里原写成 `STRING_COUNT - 弦号`（镜像映射），而渲染端
@@ -1197,7 +1479,242 @@ export default function FretMasterPage() {
     }
 
     // 不在此处记录练习统计 —— 仅在用户答对时记录（见 handleMIDINoteInput）
-  }, [STRING_COUNT, selectedStrings, fretCount, fretZoneEnabled, weaknessWeightedEnabled, octaveShiftEnabled, intervalRootMode, fretZoneStart, fretZoneSize, user.instrument, octaveShiftMode, setRootNote])
+  }, [STRING_COUNT, selectedStrings, fretCount, fretZoneEnabled, weaknessWeightedEnabled, octaveShiftEnabled, intervalRootMode, fretZoneStart, fretZoneSize, user.instrument, octaveShiftMode, setRootNote, singleNoteEnabled, singleNoteNote, singleNotePrompt, buildSingleNoteRoundFor])
+
+  /**
+   * 重开一轮：清空本轮的找到/跳过记录，切到 `nextNote`，并按提示方式点亮第一格。
+   */
+  const restartSingleNoteRound = useCallback(
+    (nextNote: string) => {
+      const nextRound = buildSingleNoteRoundFor(nextNote)
+      setSingleNoteHits(0)
+      setSingleNoteFound([])
+      setSingleNoteSkipped([])
+      setSingleNoteNote(nextNote)
+      setTargetNote(nextNote)
+      previousTargetRef.current = nextNote
+      setHighlightedTargetPosition(singleNotePrompt === 'exact' ? (nextRound.tour[0] ?? null) : null)
+      singleNoteRoundStartedAtRef.current = Date.now()
+      // 🚨 这里**不要**清 `singleNoteSummary`：一轮结束时先 set 小结、紧接着就调本函数开下一轮，
+      //    清掉等于用户永远看不到小结（本轮成绩被下一轮覆盖）。小结留到
+      //    「下一轮首次命中/跳过」或用户点 ✕ 时再退场。
+    },
+    [buildSingleNoteRoundFor, singleNotePrompt],
+  )
+
+  /**
+   * 一轮跑完（配额已满 / 位置全被找到或跳过）：先把小结留在界面上，再按换音策略开下一轮。
+   * `summary` 由调用方传入 —— 调用瞬间 setState 还没落地，闭包里的数组是上一帧的。
+   */
+  const finishSingleNoteRound = useCallback(
+    (summary: { found: CellPos[]; skipped: CellPos[] }) => {
+      const seconds = Math.max(0, (Date.now() - singleNoteRoundStartedAtRef.current) / 1000)
+      const { tour } = buildSingleNoteRoundFor(singleNoteNote)
+      const doneKeys = new Set([...summary.found, ...summary.skipped].map(cellKey))
+      // 漏掉的把位：本轮该找却没找到也没跳过（配额模式下最容易出现）
+      const missedFrets = [...new Set(
+        tour.filter((p) => !doneKeys.has(cellKey(p))).map((p) => p.fret),
+      )].sort((a, b) => a - b)
+      setSingleNoteSummary({
+        found: summary.found.length,
+        skipped: summary.skipped.length,
+        seconds,
+        missedFrets,
+      })
+      // 换音策略：随机换音 > 自动循环（C→B）> 同音重来
+      if (singleNoteRandomNote) {
+        const seen = [...singleNoteSeenRef.current, singleNoteNote]
+        const next = nextTargetNote(singleNoteNote, seen, true)
+        // 12 个音都练过 ⇒ 重新开始计
+        singleNoteSeenRef.current = seen.length >= NOTES.length ? [next] : seen
+        restartSingleNoteRound(next)
+        return
+      }
+      if (singleNoteCycle) {
+        const index = findNoteIndexInArray(singleNoteNote, NOTES)
+        const next = NOTES[(index + 1) % NOTES.length]
+        restartSingleNoteRound(next)
+        return
+      }
+      restartSingleNoteRound(singleNoteNote)
+    },
+    [singleNoteRandomNote, singleNoteCycle, singleNoteNote, restartSingleNoteRound, buildSingleNoteRoundFor],
+  )
+
+  /**
+   * 单音全指板：命中后的结算与推进（由 usePracticeMatch 在计分后回调）。
+   *
+   * 返回 `true` 表示本模式已自行推进，钩子不再调用默认的 `generateNewTarget`。
+   * 🚨 音频路径没有位置信息，只能「猜」：优先当前提示位置，其次用检测到的八度去匹配
+   *    本轮里还没去过的同八度位置（见下面的落点归属）。`exact` 提示下的麦克风练习
+   *    因此只是引导 —— 真正的严格校验只在点指板时发生。
+   */
+  const advanceSingleNote = useCallback(
+    (payload: { via: 'audio' | 'click'; position?: CellPos; octave?: number }): boolean => {
+      if (!singleNoteEnabled) return false
+      const { tour, total } = buildSingleNoteRoundFor(singleNoteNote)
+      const foundKeys = new Set(singleNoteFound.map(cellKey))
+      const skippedKeys = new Set(singleNoteSkipped.map(cellKey))
+      const octaveOf = (p: CellPos): number | null => {
+        const midi = guitarPositionToMidi(p.stringIndex, p.fret)
+        return midi === null ? null : Math.floor(midi / 12) - 1
+      }
+
+      // 落点归属（唯一「猜」的一步）统一走 lib/single-note-tour.ts 的 attributeHit。
+      // 🚨 无提示模式下也必须把「弹对的位置」算出来：麦克风拿不到弦品，但拿得到八度，
+      //    用八度在本轮剩余位置里落一个，弹对才有反馈（否则指板上永远不亮）。
+      const playedPos = attributeHit({
+        tour,
+        found: singleNoteFound,
+        skipped: singleNoteSkipped,
+        prompt: singleNotePrompt,
+        promptPos: singleNotePromptPos,
+        position: payload.position,
+        octave: payload.octave,
+        octaveOf,
+      })
+
+      // 🚨 已找到的格子重复命中 ⇒ 幂等返回：不重复计数、不重复写八度标签。
+      //    无提示模式下没有「当前目标」可拦，用户点同一个已点过的格子（或麦克风再响一次）
+      //    以前会无条件 hits+1，可以靠反复点同一格把配额刷满、提前结束一轮。
+      if (playedPos && foundKeys.has(cellKey(playedPos))) return true
+
+      // 新一轮的第一次动作 ⇒ 上一轮小结退场（它只在「一轮结束到下一轮开始」之间可见）
+      if (singleNoteSummary) setSingleNoteSummary(null)
+
+      if (playedPos && !foundKeys.has(cellKey(playedPos))) {
+        setSingleNoteFound((prev) => [...prev, playedPos!])
+      }
+      if (playedPos) {
+        // 逐位置掌握度：以前只有普通练习写，单音模式的位置从来没进过统计（热力图始终是空的）
+        recordPositionResult(user.instrument, playedPos.stringIndex, playedPos.fret, true)
+        // 落点靠「相邻八度」兜底 ⇒ 这一层已经找完了，给一句轻提示（1.2s 内不重复，避免刷屏）
+        if (
+          singleNotePrompt === 'none' &&
+          payload.octave !== undefined &&
+          octaveOf(playedPos) !== payload.octave &&
+          Date.now() - singleNoteOctaveHintAtRef.current > 1200
+        ) {
+          singleNoteOctaveHintAtRef.current = Date.now()
+          toast.info(t('single_note_octave_fallback'))
+        }
+      }
+      // 八度标签：有落点用落点的八度，没有（'none' 音频）就用检测到的八度
+      const hitOctave = playedPos ? octaveOf(playedPos) : (payload.octave ?? null)
+      if (hitOctave !== null) {
+        setSingleNoteLastHit((prev) => ({ octave: hitOctave, seq: (prev?.seq ?? 0) + 1 }))
+      }
+
+      const nextHits = singleNoteHits + 1
+      const nextFound =
+        playedPos && !foundKeys.has(cellKey(playedPos))
+          ? [...singleNoteFound, playedPos]
+          : singleNoteFound
+      // 「覆盖完所有位置」也结束一轮：配额 = all 且用户跳过若干位置时，光靠次数永远推不完
+      const covered = new Set([
+        ...foundKeys,
+        ...skippedKeys,
+        ...(playedPos ? [cellKey(playedPos)] : []),
+      ]).size
+      if (nextHits >= Math.max(1, total) || covered >= tour.length) {
+        finishSingleNoteRound({ found: nextFound, skipped: singleNoteSkipped })
+        return true
+      }
+
+      setSingleNoteHits(nextHits)
+      if (singleNotePrompt === 'exact') {
+        const nextFoundKeys = new Set(nextFound.map(cellKey))
+        const nextPos = tour.find((p) => !nextFoundKeys.has(cellKey(p)) && !skippedKeys.has(cellKey(p))) ?? null
+        setHighlightedTargetPosition(nextPos)
+      } else {
+        setHighlightedTargetPosition(null)
+      }
+      return true
+    },
+    [
+      singleNoteEnabled,
+      buildSingleNoteRoundFor,
+      singleNoteNote,
+      singleNotePrompt,
+      singleNoteHits,
+      singleNotePromptPos,
+      singleNoteFound,
+      singleNoteSkipped,
+      singleNoteSummary,
+      finishSingleNoteRound,
+      user.instrument,
+      t,
+    ],
+  )
+
+  /**
+   * 「跳过」：当前提示位置按不到（缺角 / 超出舒适把位）时放弃它。
+   * 不计进度、不画连线，只是把它从提示队列里移除；位置全部跳过则视作一轮结束。
+   */
+  const skipSingleNotePosition = useCallback(() => {
+    if (!singleNoteEnabled) return
+    const pos = singleNotePromptPos
+    if (!pos) return
+    const nextSkipped = [...singleNoteSkipped, pos]
+    // 跳过也是「新一轮的第一次动作」⇒ 上一轮小结退场
+    if (singleNoteSummary) setSingleNoteSummary(null)
+    // 跳过也算一次「这个位置没掌握」：写进逐位置统计，热力图才看得出哪些把位总被放弃
+    recordPositionResult(user.instrument, pos.stringIndex, pos.fret, false)
+    const foundKeys = new Set(singleNoteFound.map(cellKey))
+    const skippedKeys = new Set(nextSkipped.map(cellKey))
+    const { tour } = buildSingleNoteRoundFor(singleNoteNote)
+    const remaining = tour.filter(p => !foundKeys.has(cellKey(p)) && !skippedKeys.has(cellKey(p)))
+    if (remaining.length === 0) {
+      finishSingleNoteRound({ found: singleNoteFound, skipped: nextSkipped })
+      return
+    }
+    setSingleNoteSkipped(nextSkipped)
+    setHighlightedTargetPosition(singleNotePrompt === 'exact' ? remaining[0] : null)
+  }, [
+    singleNoteEnabled,
+    singleNotePromptPos,
+    singleNoteSkipped,
+    singleNoteFound,
+    singleNoteSummary,
+    buildSingleNoteRoundFor,
+    singleNoteNote,
+    singleNotePrompt,
+    finishSingleNoteRound,
+    user.instrument,
+  ])
+
+  /**
+   * 单音全指板 + 精确提示：点击指板时校验位置。
+   * 未开启 / 非精确提示 ⇒ 恒为 true（= 只校验音名，行为与旧版一致）。
+   */
+  const isPracticePositionAllowed = useCallback(
+    (pos: CellPos): boolean => {
+      if (!singleNoteEnabled || singleNotePrompt !== 'exact') return true
+      // 本轮已结束或没有位置可提示：不拦截（避免把最后一题卡死）
+      if (!singleNotePromptPos) return true
+      return singleNotePromptPos.stringIndex === pos.stringIndex && singleNotePromptPos.fret === pos.fret
+    },
+    [singleNoteEnabled, singleNotePrompt, singleNotePromptPos],
+  )
+
+  /**
+   * 单音全指板的配置变化 ⇒ 重开一轮（目标音 / 品域 / 次数 / 提示方式 / 弦选择）。
+   * 放在这里而不是 render 期，避免「改一个下拉就把指板点亮位置改掉」的渲染副作用。
+   */
+  useEffect(() => {
+    if (!singleNoteEnabled) return
+    const { tour } = buildSingleNoteRoundFor(singleNoteNote)
+    setSingleNoteHits(0)
+    setSingleNoteFound([])
+    setSingleNoteSkipped([])
+    setTargetNote(singleNoteNote)
+    previousTargetRef.current = singleNoteNote
+    setHighlightedTargetPosition(singleNotePrompt === 'exact' ? (tour[0] ?? null) : null)
+    singleNoteRoundStartedAtRef.current = Date.now()
+  }, [singleNoteEnabled, singleNoteNote, singleNoteQuota, singleNotePrompt, selectedStrings, buildSingleNoteRoundFor])
+
+  // 单音全指板的「空格 = 跳过 / Enter = 重开本轮」接在 hooks/use-global-shortcuts.ts 里
+  // （页面不许再开第二个 window keydown，见 __tests__/shortcuts-help-dialog.test.ts 的护栏）。
 
   // 音频答题路径：五模式判定 + 计分/连击/推进 + 冷却。判定口径见 lib/answer-judge.ts 与
   // lib/pitch-match.ts；实现在 hooks/use-practice-match.ts（逐行搬出，deps 照实写全）。
@@ -1211,6 +1728,11 @@ export default function FretMasterPage() {
     },
     practice: {
       targetNoteRef, targetNote, generateNewTargetRef, generateNewTarget,
+      onPracticeCorrect: advanceSingleNote,
+      isPracticePositionAllowed,
+      // 单音全指板：整轮只找一个音，用户要连续弹多个位置 ⇒ 不要 800ms 冷却
+      // （冷却期收音链路整帧丢弃，第二下拨弦的起音信号会丢，表现为「第二个音很久才响应」）。
+      hitCooldownMs: singleNoteEnabled ? 0 : undefined,
     },
     interval: {
       currentIntervalExerciseRef, currentIntervalExercise, setCurrentIntervalExercise, setIntervalPracticeStep,
@@ -1229,11 +1751,11 @@ export default function FretMasterPage() {
       getTransposedChordsRef, currentChordIndexRef, currentChordIndex, nextChordRef,
       chordDegreeCurrentStepRef, setChordDegreeCurrentStep, practiceLevelRef, practiceLevel,
       getLevelOptions, levelOptionsRef, shouldVoiceLeadRef, nextChordInfoRef,
-      lastChordNoteRef,
+      lastChordNoteRef, chordExerciseOrder,
     },
     actions: {
       recordPositionStat, setScore, triggerCorrectFeedback, triggerWrongFeedback,
-      playFeedbackSound, setHighlightedFrets, clearFretClickTimers, lastFretClickPositionRef,
+      playFeedbackSound, setHighlightedFrets, clearFretClickTimers,
       fretClickTimersRef, fretZoneEnabled, fretZoneStart, fretZoneSize,
       fretCount,
     },
@@ -1280,11 +1802,13 @@ export default function FretMasterPage() {
   // 安全网：辨音模式下如果 highlightedTargetPosition 为 null，重新生成目标位置
   useEffect(() => {
     if (activeTab !== 'practice' || practiceAnswerMode !== 'buttons') return
+    // 单音全指板的「无提示 / 把位提示」本来就没有精确位置，重新生成只会死循环
+    if (singleNoteEnabled) return
     if (!highlightedTargetPosition) {
       logger.debug('辨音模式安全网：highlightedTargetPosition 为 null，重新生成目标')
       generateNewTarget()
     }
-  }, [activeTab, practiceAnswerMode, highlightedTargetPosition, generateNewTarget])
+  }, [activeTab, practiceAnswerMode, highlightedTargetPosition, generateNewTarget, singleNoteEnabled])
 
   // 练习开始时自动聚焦到练习卡片
   useEffect(() => {
@@ -1469,6 +1993,10 @@ export default function FretMasterPage() {
     generateNewTarget, generateIntervalExerciseRef,
     nextChordExercise, nextScaleExercise, nextChord,
     focusModeEnabled: focusMode?.enabled,
+    // 单音全指板：空格 = 跳过当前提示位置，Enter = 重开本轮（见 hooks/use-global-shortcuts.ts）
+    singleNoteActive: singleNoteEnabled,
+    onSingleNoteSkip: skipSingleNotePosition,
+    onSingleNoteRestart: () => restartSingleNoteRound(singleNoteNote),
   })
 
   // 指板标注的音程集合 = 用户选中 ∪ 当前题显示的音程（含 down/random/either 方向的互补音程，
@@ -1497,12 +2025,17 @@ export default function FretMasterPage() {
           scaleKey, selectedScale, scaleExerciseSequence,
           transposedChords, currentChordIndex,
           threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells,
+          singleNoteTarget: singleNoteEnabled ? singleNoteNote : undefined,
+          singleNoteFoundKeys: singleNoteEnabled ? singleNoteFoundKeys : undefined,
+          singleNoteSkippedKeys: singleNoteEnabled ? singleNoteSkippedKeys : undefined,
+          // 无提示：未找到的落点一个都不画（画出来就等于把答案圈在指板上）
+          singleNoteHideUnfound: singleNoteEnabled && singleNotePrompt === 'none',
         },
         note,
         stringIndex,
         fret,
       ),
-    [activeTab, highlightedFrets, targetNote, showAllNotes, isPlaying, chordExerciseTargetChord, rootNote, fretboardIntervals, scaleKey, selectedScale, currentChordIndex, practiceAnswerMode, highlightedTargetPosition, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, scaleExerciseSequence, transposedChords, threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells]
+    [activeTab, highlightedFrets, targetNote, showAllNotes, isPlaying, chordExerciseTargetChord, rootNote, fretboardIntervals, scaleKey, selectedScale, currentChordIndex, practiceAnswerMode, highlightedTargetPosition, fretZoneEnabled, fretZoneStart, fretZoneSize, fretCount, scaleExerciseSequence, transposedChords, threeNpsTarget, threeNpsCellKeys, nextThreeNpsCells, singleNoteEnabled, singleNoteNote, singleNotePrompt, singleNoteFoundKeys, singleNoteSkippedKeys]
   )
 
   // 格式化时间
@@ -1745,7 +2278,12 @@ export default function FretMasterPage() {
               <Card
                 ref={practiceCardRef}
                 tabIndex={0}
-                className="outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className={cn(
+                  "outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                  // 练习进行中给整张练习卡一圈很轻的呼吸描边（视觉上「正在练」），
+                  // 只读状态用 .practice-live 的 ::after，不参与命中测试。
+                  isPlaying && "practice-live",
+                )}
                 role="region"
                 aria-label={t('fretboard_title')}
               >
@@ -1791,6 +2329,7 @@ export default function FretMasterPage() {
                       <Button
                         variant={isPlaying ? "destructive" : "default"}
                         size="sm"
+                        className="press-scale"
                         onClick={togglePractice}
                         aria-label={isPlaying ? t('btn_stop') : t('btn_start')}
                       >
@@ -1809,7 +2348,9 @@ export default function FretMasterPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="px-6 pt-0 pb-3">
+                {/* key 随页签变化 ⇒ 控制面板重新挂载并播放一次轻抬入场动画
+                    （只影响控制区，指板与得分状态不受影响） */}
+                <CardContent key={activeTab} className="tab-panel-in px-6 pt-0 pb-3">
                   {/* 音频输入未开启提示：练习模式识别依赖 micEnabled（store 默认 false），
                       而调音器走完全独立的音频链路 —— 用户无法从「调音器可用」推断出这条已开启 */}
                   {!isTauri && !micEnabled &&
@@ -1821,7 +2362,7 @@ export default function FretMasterPage() {
                     <PracticeModeControls
                       t={t}
                       practiceAnswerMode={practiceAnswerMode}
-                      onPracticeAnswerModeChange={setPracticeAnswerMode}
+                      onPracticeAnswerModeChange={handlePracticeAnswerModeChange}
                       formatNoteByAccidentalSetting={formatNoteByAccidentalSetting}
                       targetNote={targetNote}
                       stringCount={STRING_COUNT}
@@ -1846,7 +2387,51 @@ export default function FretMasterPage() {
                       generateNewTarget={generateNewTarget}
                       formatTime={formatTime}
                       currentPracticeSuggestion={currentPracticeSuggestion}
+                      singleNote={{
+                        enabled: singleNoteEnabled,
+                        note: singleNoteNote,
+                        randomNote: singleNoteRandomNote,
+                        cycle: singleNoteCycle,
+                        prompt: singleNotePrompt,
+                        quota: singleNoteQuota,
+                        showLines: singleNoteShowLines,
+                        done: singleNoteHits,
+                        total: singleNoteRound.total,
+                        // 跳过只对「有提示」的模式有意义：'none' 下没有当前目标可跳
+                        canSkip: singleNotePrompt !== 'none' && singleNotePromptPos !== null,
+                        lastHit: singleNoteLastHit,
+                      }}
+                      onSingleNoteChange={handleSingleNoteChange}
+                      onSingleNoteSkip={skipSingleNotePosition}
                     />
+                  )}
+
+                  {/* 单音全指板：一轮小结。toast 2.5s 就消失，等于看完就没了 ⇒ 留成可关闭的小条 */}
+                  {activeTab === "practice" && singleNoteEnabled && singleNoteSummary && (
+                    <div className="flex items-start gap-2 rounded-md border border-border/40 bg-card/40 px-2.5 py-1.5 text-xs">
+                      <div className="flex-1 space-y-0.5">
+                        <div className="font-medium tabular-nums">
+                          {t('single_note_round_done')
+                            .replace('{found}', String(singleNoteSummary.found))
+                            .replace('{skipped}', String(singleNoteSummary.skipped))
+                            .replace('{seconds}', singleNoteSummary.seconds.toFixed(1))}
+                        </div>
+                        {singleNoteSummary.missedFrets.length > 0 && (
+                          <div className="text-muted-foreground">
+                            {t('single_note_missed_frets').replace('{frets}', singleNoteSummary.missedFrets.join(', '))}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => setSingleNoteSummary(null)}
+                        aria-label={t('practice_summary_close')}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   )}
                   
                   {/* Interval Controls */}
@@ -2116,46 +2701,58 @@ export default function FretMasterPage() {
               )}
 
 
-              {/* 正确答案反馈浮动窗口 */}
-              {/* 找音练习已有品格内提示，跳过此遮挡性浮动层避免遮挡指板 */}
-              {showCorrectFeedback && activeTab !== 'practice' && (
-                <div
-                  role="alert"
-                  aria-live="assertive"
-                  aria-atomic="true"
-                  className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
-                >
-                  <div className="bg-green-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl animate-pulse">
-                    <Check className="h-16 w-16 text-white" />
-                  </div>
-                  <div className="absolute mt-32 text-2xl font-bold text-green-500 animate-bounce">
-                    ✓ {correctFeedbackNote ? formatNoteByAccidentalSetting(correctFeedbackNote) : ''}
-                  </div>
-                </div>
-              )}
-
-              {showWrongFeedback && activeTab !== 'practice' && (
-                <div
-                  role="alert"
-                  aria-live="assertive"
-                  aria-atomic="true"
-                  className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
-                >
-                  <div className="bg-red-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl" style={{animation: 'shake 0.4s ease-in-out'}}>
-                    <X className="h-16 w-16 text-white" />
-                  </div>
-                  <div className="absolute mt-32 text-2xl font-bold text-red-500">
-                    ✗ {wrongFeedbackNote ? formatNoteByAccidentalSetting(wrongFeedbackNote) : ''}
-                  </div>
+              {/* 正误反馈：小型浮动胶囊（右上角）
+                  原先这里是 `fixed inset-0` 居中大圆 + animate-pulse/bounce ——
+                  正好落在指板中央，弹对一次就遮一次指板，动效也很跳。现在收成右上角
+                  一枚轻量胶囊：不铺满整屏、不盖指板，只做一次 280ms 的柔和落位。
+                  找音练习已有格子内反馈，仍然跳过；单音全指板是例外 ——
+                  它只有在「弹了个别的音」时才需要这个胶囊（弹对靠格子点亮）。 */}
+              {(activeTab !== 'practice' || (singleNoteEnabled && showWrongFeedback)) && (showCorrectFeedback || showWrongFeedback) && (
+                <div className="fixed top-16 right-3 sm:top-20 sm:right-6 z-[100] pointer-events-none flex flex-col items-end gap-1.5">
+                  {showCorrectFeedback && activeTab !== 'practice' && (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      className="feedback-toast feedback-toast--correct"
+                    >
+                      <span className="feedback-toast__icon">
+                        <Check className="h-4 w-4" />
+                      </span>
+                      <span className="text-xs font-semibold text-green-600 dark:text-green-400">
+                        {correctFeedbackNote ? formatNoteByAccidentalSetting(correctFeedbackNote) : ''}
+                      </span>
+                    </div>
+                  )}
+                  {showWrongFeedback && (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      className="feedback-toast feedback-toast--wrong"
+                    >
+                      <span className="feedback-toast__icon">
+                        <X className="h-4 w-4" />
+                      </span>
+                      <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+                        {wrongFeedbackNote ? formatNoteByAccidentalSetting(wrongFeedbackNote) : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
               {showPracticeSummary && (
                 <PracticeSummaryDialog
                   open={showPracticeSummary}
-                  onOpenChange={(open) => !open && setShowPracticeSummary(false)}
+                  onOpenChange={(open) => !open && closePracticeSummary()}
+                  onClose={closePracticeSummary}
                   data={practiceSummaryData}
-                  onPracticeAgain={togglePractice}
+                  onPracticeAgain={() => {
+                    // 「再练一次」留在当前显示模式（全屏就继续全屏）
+                    setShowPracticeSummary(false)
+                    togglePractice()
+                  }}
                   t={t}
                 />
               )}
@@ -2184,6 +2781,11 @@ export default function FretMasterPage() {
                     chordExerciseTargetChord={chordExerciseTargetChord}
                     FRET_MARKERS={FRET_MARKERS}
                     targetNote={targetNote}
+                    singleNoteTarget={singleNoteEnabled ? singleNoteNote : undefined}
+                    singleNoteFound={singleNoteEnabled ? singleNoteFound : undefined}
+                    singleNoteSkipped={singleNoteEnabled ? singleNoteSkipped : undefined}
+                    singleNoteHideUnfound={singleNoteEnabled && singleNotePrompt === 'none'}
+                    connectPoints={singleNoteEnabled && singleNoteShowLines ? singleNotePath : undefined}
                     practiceAnswerMode={practiceAnswerMode}
                     highlightedTargetPosition={highlightedTargetPosition}
                     threeNpsTarget={threeNpsTarget}
@@ -2210,6 +2812,8 @@ export default function FretMasterPage() {
                   currentChordIndex={currentChordIndex}
                   chordExerciseTargetChord={chordExerciseTargetChord}
                   targetNote={targetNote}
+                  singleNoteTarget={singleNoteEnabled ? singleNoteNote : undefined}
+                  connectPoints={singleNoteEnabled && singleNoteShowLines ? singleNotePath : undefined}
                   practiceAnswerMode={practiceAnswerMode}
                   highlightedTargetPosition={highlightedTargetPosition}
                   threeNpsTarget={threeNpsTarget}
@@ -2405,6 +3009,11 @@ export default function FretMasterPage() {
             threeNpsTarget={threeNpsTarget}
             threeNpsCellKeys={threeNpsCellKeys}
             nextThreeNpsCells={nextThreeNpsCells}
+            singleNoteTarget={singleNoteEnabled ? singleNoteNote : undefined}
+            singleNoteFound={singleNoteEnabled ? singleNoteFound : undefined}
+            singleNoteSkipped={singleNoteEnabled ? singleNoteSkipped : undefined}
+            singleNoteHideUnfound={singleNoteEnabled && singleNotePrompt === 'none'}
+            connectPoints={singleNoteEnabled && singleNoteShowLines ? singleNotePath : undefined}
           />
         )}
 

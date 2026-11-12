@@ -12,7 +12,7 @@
 
 "use client"
 
-import { memo } from 'react'
+import { memo, type ReactNode, type Ref } from 'react'
 import { cn } from '@/lib/utils'
 
 /** 一个格子的渲染信息（由调用方算好，渲染层不解释语义） */
@@ -23,6 +23,17 @@ export interface TrainerCellView {
   role: string
   /** 是否显示圆点 */
   visible: boolean
+  /**
+   * 单音全指板的落点状态（省略 = 不参与位置地图，CAGED 整幅与其他练习都不传）。
+   *   · `prompt`  当前要弹的位置（精确提示）—— 发光 + 呼吸圈
+   *   · `found`   本轮已弹对 —— 实心
+   *   · `pending` 还没找到 —— 空心圈（等着被收集）
+   *   · `skipped` 已跳过 —— 灰色 + 删除线
+   *
+   * 🚨 与 `visible` 是两件事：`visible` 管「画不画圆点/文字」，`state` 管「画成什么样」。
+   * 单音模式的目标落点不写音名（写出来就是答案），但圆点必须画出来。
+   */
+  state?: 'prompt' | 'found' | 'pending' | 'skipped'
   /**
    * 该格的**音名**，只用于无障碍标签里的 `{note}` 占位符。
    *
@@ -49,6 +60,13 @@ export interface TrainerFretboardProps {
   isCellEnabled?: (stringIndex: number) => boolean
   /** 整块指板的无障碍标签（已翻译好的文案） */
   ariaLabel?: string
+  /**
+   * 覆盖层（单音连线等）。画在 `.ft-grid` 里、与格子同一个滚动容器，
+   * 这样横向滚动时线和格子一起动（挂在 `.ft-scroll` 外面就会错位）。
+   */
+  overlay?: ReactNode
+  /** `.ft-grid` 的 ref：给调用方（`useFretboardLines`）当测量基准 */
+  overlayRef?: Ref<HTMLDivElement>
 }
 
 /**
@@ -78,6 +96,8 @@ export const TrainerFretboard = memo(function TrainerFretboard({
     onCellClick,
     isCellEnabled,
     ariaLabel,
+    overlay,
+    overlayRef,
 }: TrainerFretboardProps) {
     const stringCount = tuning.length
     const gridTemplateColumns = `var(--ft-open-w) repeat(${fretCount}, minmax(0, 1fr))`
@@ -88,7 +108,8 @@ export const TrainerFretboard = memo(function TrainerFretboard({
     return (
         <div className="ft-stage" data-fretboard-trainer="1">
             <div className="ft-scroll">
-                <div className="ft-grid">
+                <div className="ft-grid" ref={overlayRef}>
+                    {overlay}
                     <div
                         className="ft-board"
                         style={{ gridTemplateColumns }}
@@ -115,6 +136,7 @@ export const TrainerFretboard = memo(function TrainerFretboard({
                                             className="ft-dot"
                                             data-role={cell?.role ?? 'default'}
                                             data-visible={cell && cell.visible ? '1' : '0'}
+                                            data-state={cell?.state}
                                         >
                                             {cell && cell.visible ? cell.text : ''}
                                         </span>
@@ -128,6 +150,7 @@ export const TrainerFretboard = memo(function TrainerFretboard({
                                             className={className}
                                             data-string={stringIndex}
                                             data-fret={fret}
+                                            data-position={`${stringIndex}-${fret}`}
                                             data-role={cell?.role}
                                             // 🚨 弦粗**两个分支都要设**：只设在 button 分支的话，
                                             // 只读的「整幅 CAGED」会全落到 `--ft-string-w` 的兜底 1px
@@ -167,6 +190,7 @@ export const TrainerFretboard = memo(function TrainerFretboard({
                                         className={className}
                                         data-string={stringIndex}
                                         data-fret={fret}
+                                        data-position={`${stringIndex}-${fret}`}
                                         data-role={cell?.role}
                                         style={{
                                             ['--ft-string-w' as string]: `${trainerStringLineWidth(stringIndex)}px`,

@@ -488,13 +488,13 @@ describe('源码护栏：音频路径的计分/统计口径与 MIDI 路径一致
   //    提交信息与代码不符。这组用例把口径真正钉死。
   it('五个模式都要有「未命中」计分路径', () => {
     const fnBody = audioMatchBody()
-    // 每个模式的**失败**分支各一条；practice 用 `scoreDeltaFor(matched)` 一次覆盖两侧，
-    // 其余四个模式命中/未命中分开写 ⇒ false 恰好 4 条。
+    // 每个模式的**失败**分支各一条；practice 用 `scoreDeltaFor(matched)` 一次覆盖两侧。
+    // 音程另有第五条：音级对了但「上行/下行」站错边（八度不符）也算一次未命中。
     const misses = fnBody.match(/scoreDeltaFor\(false\)/g) ?? []
     expect(
       misses.length,
-      '音频路径的未命中计分缺分支（interval / scale / chord_exercise / chord 各一条）'
-    ).toBe(4)
+      '音频路径的未命中计分缺分支（interval / scale / chord_exercise / chord 各一条 + 音程方向不符）'
+    ).toBe(5)
     // 反向钉子：practice 分支的「一次覆盖两侧」也要在
     expect(fnBody.match(/scoreDeltaFor\(matched\)/g) ?? []).toHaveLength(1)
   })
@@ -505,8 +505,8 @@ describe('源码护栏：音频路径的计分/统计口径与 MIDI 路径一致
     expect(fnBody).not.toMatch(/correct: prev\.correct \+ 1/)
     // 更强的结构约束：本函数体内 `setScore` 的调用点数必须等于 `scoreDeltaFor` 的使用数
     // ⇒ 不可能再有「自算一套 delta」的漏网分支。数字变了就说明新增了模式，回来补护栏。
-    expect((fnBody.match(/setScore\(/g) ?? []).length).toBe(12)
-    expect((fnBody.match(/scoreDeltaFor\(/g) ?? []).length).toBe(12)
+    expect((fnBody.match(/setScore\(/g) ?? []).length).toBe(13)
+    expect((fnBody.match(/scoreDeltaFor\(/g) ?? []).length).toBe(13)
   })
 
   it('找音练习的逐位置统计要命中/未命中都记（此前恒传字面量 true）', () => {

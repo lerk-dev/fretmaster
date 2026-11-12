@@ -121,6 +121,23 @@ describe('结构', () => {
     expect(new Set(pairs.map(([s, f]) => `${s}-${f}`)).size).toBe(STD.length * (1 + FRETS))
   })
 
+  it('每个格子都带 data-position="弦-品"（连线覆盖层靠它测量；缺了线画不出来）', () => {
+    const p = mount()
+    expect(p.cellAt(2, 7)!.getAttribute('data-position')).toBe('2-7')
+    expect(p.cells().filter((el) => !el.getAttribute('data-position')).length).toBe(0)
+  })
+
+  it('可点击分支（button）同样带 data-position', () => {
+    const p = mount({ onCellClick: vi.fn() })
+    expect(p.cellAt(0, 0)!.tagName).toBe('BUTTON')
+    expect(p.cellAt(0, 0)!.getAttribute('data-position')).toBe('0-0')
+  })
+
+  it('overlay 画在 .ft-grid 内（与格子同一滚动容器，横向滚动不会脱节）', () => {
+    const p = mount({ overlay: createElement('span', { className: 'probe-overlay' }) })
+    expect(p.container.querySelector('.ft-grid .probe-overlay')).not.toBeNull()
+  })
+
   it('品号行：第一格是 openLabel，之后是 1..fretCount', () => {
     const p = mount()
     const nums = [...p.container.querySelectorAll('.ft-num--open, .ft-nums > span:not(.ft-num--open)')]
@@ -216,6 +233,32 @@ describe('可见性与角色（textContent ≠ 屏幕所见）', () => {
     expect(p.cellAt(0, 7)!.getAttribute('data-role')).toBeNull()
   })
 })
+
+describe('单音全指板：落点状态（data-state —— 3D 琴颈的「提示效果」）', () => {
+  const cells = new Map<string, TrainerCellView>([
+    ['0-0', { text: '', role: 'target', visible: true, note: 'E', state: 'prompt' }],
+    ['1-5', { text: '', role: 'target', visible: true, note: 'E', state: 'pending' }],
+    ['2-9', { text: '', role: 'target', visible: true, note: 'E', state: 'found' }],
+    ['3-2', { text: '', role: 'target', visible: true, note: 'E', state: 'skipped' }],
+    ['4-7', { text: 'E', role: 'tone', visible: true, note: 'E' }],
+  ])
+
+  it('state 原样透传到圆点；不传 state 的格子没有该属性', () => {
+    const p = mount({ cells })
+    expect(p.dotOf(0, 0)!.getAttribute('data-state')).toBe('prompt')
+    expect(p.dotOf(1, 5)!.getAttribute('data-state')).toBe('pending')
+    expect(p.dotOf(2, 9)!.getAttribute('data-state')).toBe('found')
+    expect(p.dotOf(3, 2)!.getAttribute('data-state')).toBe('skipped')
+    expect(p.dotOf(4, 7)!.getAttribute('data-state')).toBeNull()
+  })
+
+  it('🚨 不写音名（text 为空）但 visible=true 的圆点必须真的可见', () => {
+    const p = mount({ cells })
+    expect(p.dotOf(0, 0)!.getAttribute('data-visible')).toBe('1')
+    expect(p.dotOf(0, 0)!.textContent).toBe('')
+  })
+})
+
 
 describe('🚨 弦粗 --ft-string-w：两个分支都要设', () => {
   it('六弦的宽度与参考站深色主题一致（1 / 1.5 / 2 / 2.5 / 3.2 / 4.2）', () => {
@@ -384,5 +427,13 @@ describe('🚨 配色层守卫：每个可能出现的 role 都必须在 globals
 
   it('data-visible 的开关规则存在（缺了 ⇒ 圆点永远不显示）', () => {
     expect(css).toMatch(/\.ft-dot\[data-visible='1'\]\s*\{/)
+  })
+
+  it('单音落点状态（prompt / pending / found / skipped）都有样式规则', () => {
+    for (const s of ['prompt', 'pending', 'found', 'skipped']) {
+      expect(css, `缺 data-state='${s}' 的样式（该状态会静默无效果）`).toMatch(
+        new RegExp(`\\.ft-dot\\[data-state='${s}'\\]\\s*\\{`),
+      )
+    }
   })
 })
