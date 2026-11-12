@@ -471,6 +471,7 @@ export default function FretMasterPage() {
   const fretCount = practiceSettings.fretCount
   const setFretCount = store.setFretCount
   const fretZoneEnabled = practiceSettings.fretZoneEnabled
+  const setFretZoneEnabled = store.setFretZoneEnabled
   const fretZoneStart = practiceSettings.fretZoneStart
   const fretZoneSize = practiceSettings.fretZoneSize
   const octaveShiftEnabled = practiceSettings.octaveShiftEnabled
