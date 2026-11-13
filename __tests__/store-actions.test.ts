@@ -22,6 +22,8 @@ import {
   useAppStore,
   clampMetronomeBeats,
   clampMetronomeBpm,
+  clampAccompanimentVolume,
+  ACCOMPANIMENT_VOLUME_DEFAULT,
   METRONOME_BEATS_DEFAULT,
   METRONOME_BEATS_OPTIONS,
   METRONOME_BPM_MAX,
@@ -189,6 +191,15 @@ const CASES: Case[] = [
   { label: 'setMetronomeSound → metronome.sound', call: () => S().setMetronomeSound(false), changed: [{ path: 'metronome.sound', to: false }] },
   { label: 'setMetronomeFlash → metronome.flash', call: () => S().setMetronomeFlash(true), changed: [{ path: 'metronome.flash', to: true }] },
   { label: 'setMetronomeVisualize → metronome.visualize（原本缺省，需新建键）', call: () => S().setMetronomeVisualize(true), changed: [{ path: 'metronome.visualize', to: true }] },
+  // #2 独立音量 / 预备拍
+  { label: 'setMetronomeVolume → metronome.volume', call: () => S().setMetronomeVolume(42), changed: [{ path: 'metronome.volume', to: 42 }] },
+  { label: 'setMetronomeVolume → 越界钳到 100', call: () => S().setMetronomeVolume(250), changed: [{ path: 'metronome.volume', to: 100 }] },
+  { label: 'setMetronomeCountIn → metronome.countIn', call: () => S().setMetronomeCountIn(true), changed: [{ path: 'metronome.countIn', to: true }] },
+  // #5 风格伴奏
+  { label: 'setAccompanimentEnabled → metronome.accompanimentEnabled', call: () => S().setAccompanimentEnabled(true), changed: [{ path: 'metronome.accompanimentEnabled', to: true }] },
+  { label: 'setAccompanimentStyle → metronome.accompanimentStyle', call: () => S().setAccompanimentStyle('bossa'), changed: [{ path: 'metronome.accompanimentStyle', to: 'bossa' }] },
+  { label: 'setAccompanimentVolume → metronome.accompanimentVolume', call: () => S().setAccompanimentVolume(35), changed: [{ path: 'metronome.accompanimentVolume', to: 35 }] },
+  { label: 'setAccompanimentVolume → 负数钳到 0', call: () => S().setAccompanimentVolume(-20), changed: [{ path: 'metronome.accompanimentVolume', to: 0 }] },
   {
     label: 'setMetronomeSettings → 只合并传入的键',
     call: () => S().setMetronomeSettings({ bpm: 100, sound: false }),
@@ -389,5 +400,21 @@ describe('节拍器参数的钳制（#4 / #14：脏值会把调度器退化成�
     expect(clampMetronomeBeats(9)).toBe(METRONOME_BEATS_DEFAULT)
     expect(clampMetronomeBpm(400)).toBe(METRONOME_BPM_MAX)
     expect(clampMetronomeBpm(Number.NaN)).toBe(DEFAULTS.bpm)
+  })
+})
+
+describe('伴奏风格的钳制（#5：非法值会让下拉显示空白）', () => {
+  it('非白名单值收敛到默认 swing（从非默认值出发才看得出收敛）', () => {
+    S().setAccompanimentStyle('bossa')
+    expect(S().metronome.accompanimentStyle).toBe('bossa')
+    S().setAccompanimentStyle('jazz' as never)
+    expect(S().metronome.accompanimentStyle).toBe('swing')
+  })
+
+  it('clampAccompanimentVolume 越界 / 非法值都收敛', () => {
+    expect(clampAccompanimentVolume(150)).toBe(100)
+    expect(clampAccompanimentVolume(-3)).toBe(0)
+    expect(clampAccompanimentVolume(Number.NaN)).toBe(ACCOMPANIMENT_VOLUME_DEFAULT)
+    expect(clampAccompanimentVolume('40' as never)).toBe(ACCOMPANIMENT_VOLUME_DEFAULT)
   })
 })

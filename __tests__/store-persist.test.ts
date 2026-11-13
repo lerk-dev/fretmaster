@@ -288,3 +288,46 @@ describe('老存档的用户设置补齐', () => {
     expect(migrated.user.agcEnabled).toBe(true)
   })
 })
+
+/**
+ * 伴奏（#5）同样是「后加字段」，而且风格字符串会被 Radix Select 直接消费 ——
+ * 非法值不是「看起来怪」，而是**下拉显示空白、用户无法再选回来**。
+ */
+describe('老存档的伴奏设置补齐（#5）', () => {
+  const oldMetronome = {
+    enabled: true,
+    bpm: 90,
+    beatsPerMeasure: 4,
+    sound: true,
+    flash: false,
+  }
+
+  it('老 blob 没有伴奏字段 ⇒ 补默认：关闭 / swing / 60', () => {
+    const migrated = migratePersistedState({ metronome: oldMetronome }, 2)
+    expect(migrated.metronome.accompanimentEnabled).toBe(false)
+    expect(migrated.metronome.accompanimentStyle).toBe('swing')
+    expect(migrated.metronome.accompanimentVolume).toBe(60)
+  })
+
+  it('非法风格收敛到 swing，越界音量钳到 0..100', () => {
+    const migrated = migratePersistedState({
+      metronome: { ...oldMetronome, accompanimentStyle: 'jazz', accompanimentVolume: 500 },
+    }, 2)
+    expect(migrated.metronome.accompanimentStyle).toBe('swing')
+    expect(migrated.metronome.accompanimentVolume).toBe(100)
+  })
+
+  it('用户显式配置保留（不覆盖成默认）', () => {
+    const migrated = migratePersistedState({
+      metronome: {
+        ...oldMetronome,
+        accompanimentEnabled: true,
+        accompanimentStyle: 'bossa',
+        accompanimentVolume: 25,
+      },
+    }, 2)
+    expect(migrated.metronome.accompanimentEnabled).toBe(true)
+    expect(migrated.metronome.accompanimentStyle).toBe('bossa')
+    expect(migrated.metronome.accompanimentVolume).toBe(25)
+  })
+})

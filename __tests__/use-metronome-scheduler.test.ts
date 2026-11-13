@@ -21,6 +21,9 @@ import { getMetronomeBeat, resetMetronomeClock, subscribeMetronomeBeat } from '@
 /** 假 AudioContext：记录每一次「咔哒」被排在音频时钟的哪一刻、什么音色 */
 const audio = vi.hoisted(() => {
   interface Click { freq: number; gain: number; start: number; stop: number }
+  /** 伴奏音符（鼓/贝斯）：带 setValueAtTime 频率的振荡器 —— 咔哒只用 frequency.value。 */
+  interface Tone { type: string; freqs: number[]; gain: number; start: number; stop: number }
+  interface Noise { start: number; stop: number }
   const state = {
     currentTime: 0,
     /** 'running' | 'suspended' | 'closed' */
@@ -28,6 +31,8 @@ const audio = vi.hoisted(() => {
     /** resume() 是否真的让上下文进入 running（真实环境里是异步且可能不生效） */
     autoResume: true,
     clicks: [] as Click[],
+    tones: [] as Tone[],
+    noises: [] as Noise[],
     resumeCalls: 0,
     closeCalls: 0,
     createCalls: 0,
@@ -35,6 +40,7 @@ const audio = vi.hoisted(() => {
   let draftGain = 0
   class FakeAudioContext {
     destination = {}
+    sampleRate = 48000
     get state() { return state.ctxState }
     get currentTime() { return state.currentTime }
     constructor() {
@@ -55,15 +61,26 @@ const audio = vi.hoisted(() => {
       return Promise.resolve()
     }
     createOscillator() {
+      const freqs: number[] = []
       const osc = {
-        frequency: { value: 0 },
+        frequency: {
+          value: 0,
+          setValueAtTime(v: number) { freqs.push(v) },
+          exponentialRampToValueAtTime(v: number) { freqs.push(v) },
+        },
         type: '',
         connect() {},
         start(when: number) {
-          state.clicks.push({ freq: osc.frequency.value, gain: draftGain, start: when, stop: 0 })
+          // 咔哒用 frequency.value 直接赋值；伴奏用 setValueAtTime ⇒ 以此区分两类节点
+          if (freqs.length === 0) {
+            state.clicks.push({ freq: osc.frequency.value, gain: draftGain, start: when, stop: 0 })
+          } else {
+            state.tones.push({ type: osc.type, freqs: [...freqs], gain: draftGain, start: when, stop: 0 })
+          }
         },
         stop(when: number) {
-          const last = state.clicks[state.clicks.length - 1]
+          const list = freqs.length > 0 ? state.tones : state.clicks
+          const last = list[list.length - 1]
           if (last) last.stop = when
         },
       }
@@ -73,11 +90,35 @@ const audio = vi.hoisted(() => {
       const gain = {
         gain: {
           setValueAtTime(v: number) { draftGain = v },
+          linearRampToValueAtTime(v: number) { draftGain = Math.max(draftGain, v) },
           exponentialRampToValueAtTime() {},
         },
         connect() {},
       }
       return gain
+    }
+    // ---- 伴奏（#5）需要的节点 ----
+    createBuffer(_channels: number, length: number) {
+      return { getChannelData: () => new Float32Array(length) }
+    }
+    createBufferSource() {
+      return {
+        buffer: null as unknown,
+        connect() {},
+        start(when: number) { state.noises.push({ start: when, stop: 0 }) },
+        stop(when: number) {
+          const last = state.noises[state.noises.length - 1]
+          if (last) last.stop = when
+        },
+      }
+    }
+    createBiquadFilter() {
+      return {
+        type: '',
+        frequency: { value: 0, setValueAtTime() {} },
+        Q: { value: 0, setValueAtTime() {} },
+        connect() {},
+      }
     }
   }
   return { state, FakeAudioContext }
@@ -92,7 +133,7 @@ vi.mock('@/lib/utils', async (importOriginal) => {
 
 let root: Root | null = null
 let container: HTMLDivElement | null = null
-let published: { seq: number; index: number }[] = []
+let published: { seq: number; index: number; countIn: boolean }[] = []
 let unsubscribe: (() => void) | null = null
 
 const BASE: MetronomeSchedulerOptions = {
@@ -103,6 +144,8 @@ const BASE: MetronomeSchedulerOptions = {
   sound: true,
   flash: false,
   visualize: false,
+  volume: 100,
+  countIn: false,
 }
 
 function Harness(props: MetronomeSchedulerOptions) {
@@ -152,13 +195,15 @@ beforeEach(() => {
   audio.state.ctxState = 'running'
   audio.state.autoResume = true
   audio.state.clicks = []
+  audio.state.tones = []
+  audio.state.noises = []
   audio.state.resumeCalls = 0
   audio.state.closeCalls = 0
   audio.state.createCalls = 0
   published = []
   act(() => resetMetronomeClock())
   unsubscribe = subscribeMetronomeBeat((beat) => {
-    published.push({ seq: beat.seq, index: beat.index })
+    published.push({ seq: beat.seq, index: beat.index, countIn: beat.countIn })
   })
 })
 afterEach(() => {
@@ -409,5 +454,127 @@ describe('lib/metronome-clock', () => {
     expect(getMetronomeBeat()).toBe(a)
     act(() => resetMetronomeClock())
     expect(getMetronomeBeat()).not.toBe(a)
+  })
+
+  describe('预备拍与独立音量（#2）', () => {
+    it('开启预备拍：先数满一小节（拍号 4 ⇒ 4 拍），之后回到正式小节', () => {
+      const p = mount({ bpm: 60, beatsPerMeasure: 4, countIn: true })
+      // 4 拍预备 + 至少 2 拍正式，共 6 拍 ≈ 6 秒
+      p.runMs(6200)
+      const countInBeats = published.filter((b) => b.countIn)
+      const normalBeats = published.filter((b) => !b.countIn)
+      expect(countInBeats, '预备拍数量应等于拍号').toHaveLength(4)
+      expect(countInBeats.map((b) => b.index)).toEqual([0, 1, 2, 3])
+      expect(normalBeats.length, '预备结束后应继续正式小节').toBeGreaterThanOrEqual(2)
+      p.unmount()
+    })
+
+    it('关闭预备拍：一拍预备都没有', () => {
+      const p = mount({ bpm: 60, beatsPerMeasure: 4, countIn: false })
+      p.runMs(3200)
+      expect(published.some((b) => b.countIn)).toBe(false)
+      p.unmount()
+    })
+
+    it('独立音量：50% 时每次 click 的增益是 100% 的一半', () => {
+      const pFull = mount({ bpm: 60, volume: 100 })
+      pFull.runMs(1100)
+      const fullGain = audio.state.clicks[0].gain
+      pFull.unmount()
+
+      audio.state.clicks = []
+      published = []
+      act(() => resetMetronomeClock())
+      const pHalf = mount({ bpm: 60, volume: 50 })
+      pHalf.runMs(1100)
+      const halfGain = audio.state.clicks[0].gain
+      pHalf.unmount()
+      expect(halfGain).toBeCloseTo(fullGain * 0.5, 6)
+    })
+
+    it('音量为 0：仍然广播拍点（可视化不断），但不发声', () => {
+      const p = mount({ bpm: 60, volume: 0 })
+      p.runMs(1100)
+      expect(audio.state.clicks).toHaveLength(0)
+      expect(published.length, '静音也要继续走拍').toBeGreaterThanOrEqual(2)
+      p.unmount()
+    })
+  })
+})
+
+describe('风格伴奏（#5）', () => {
+  const accompaniment = {
+    enabled: true,
+    styleId: 'rock' as const,
+    volume: 100,
+    chord: { root: 'C', type: 'Major' },
+  }
+
+  it('节拍器关着、只有伴奏开着：照样建时钟并出声（鼓 + 贝斯），但没有咔哒', () => {
+    const p = mount({ enabled: false, sound: false, visualize: false, bpm: 60, accompaniment })
+    p.runMs(1100)
+    expect(audio.state.clicks, '节拍器总开关关闭 ⇒ 无咔哒').toHaveLength(0)
+    // rock 第 1 拍：kick + hat + 贝斯
+    expect(audio.state.noises.length, '踩镲走噪声源').toBeGreaterThan(0)
+    const bass = audio.state.tones.find((t) => t.type === 'triangle')
+    expect(bass, '应有贝斯（三角波）').toBeTruthy()
+    expect(bass!.freqs[0], 'C2 = 65.41Hz').toBeCloseTo(65.406, 2)
+    p.unmount()
+  })
+
+  it('鼓点排在「拍点 + 拍内偏移」上（rock 1& 的踩镲 = 拍头 + 1/2 拍）', () => {
+    const p = mount({ bpm: 120, accompaniment })
+    p.runMs(700)
+    const first = audio.state.clicks[0].start // 第 1 拍的音频时刻（含提前量）
+    // rock：第 1 拍 sub 2 有踩镲 → first + 0.25s（120BPM 一拍 0.5s）
+    expect(audio.state.noises.some((n) => Math.abs(n.start - (first + 0.25)) < 1e-6)).toBe(true)
+    p.unmount()
+  })
+
+  it('swing：后半拍推迟到 2/3 拍处（与直音的 1/2 拍差 1/6 拍）', () => {
+    const straight = mount({ bpm: 120, accompaniment })
+    straight.runMs(700)
+    const straightFirst = audio.state.clicks[0].start
+    expect(audio.state.noises.some((n) => Math.abs(n.start - (straightFirst + 0.25)) < 1e-6)).toBe(true)
+    straight.unmount()
+
+    audio.state.clicks = []
+    audio.state.noises = []
+    published = []
+    act(() => resetMetronomeClock())
+    const swung = mount({ bpm: 120, accompaniment: { ...accompaniment, styleId: 'swing' } })
+    swung.runMs(1100)
+    const swungFirst = audio.state.clicks[0].start
+    // swing 第 2 拍后半拍的 ride：拍点 0.5s + 2/3 拍（0.3333s）
+    expect(audio.state.noises.some((n) => Math.abs(n.start - (swungFirst + 0.5 + 0.5 * (2 / 3))) < 1e-6)).toBe(true)
+    swung.unmount()
+  })
+
+  it('预备拍期间不出伴奏（数拍只有咔哒，没有律动）', () => {
+    const p = mount({ bpm: 60, beatsPerMeasure: 4, countIn: true, accompaniment })
+    p.runMs(3800) // 4 拍预备尚未结束
+    expect(audio.state.noises, '预备拍不应有鼓').toHaveLength(0)
+    expect(audio.state.tones, '预备拍不应有贝斯/底鼓').toHaveLength(0)
+    p.runMs(1500) // 进入正式小节
+    expect(audio.state.noises.length, '正式小节开始出鼓').toBeGreaterThan(0)
+    p.unmount()
+  })
+
+  it('伴奏音量按百分比缩放鼓点增益（50% ⇒ 一半）', () => {
+    const full = mount({ bpm: 60, accompaniment })
+    full.runMs(700)
+    const fullKick = audio.state.tones.find((t) => t.type === 'sine')!
+    full.unmount()
+
+    audio.state.clicks = []
+    audio.state.tones = []
+    audio.state.noises = []
+    published = []
+    act(() => resetMetronomeClock())
+    const half = mount({ bpm: 60, accompaniment: { ...accompaniment, volume: 50 } })
+    half.runMs(700)
+    const halfKick = audio.state.tones.find((t) => t.type === 'sine')!
+    expect(halfKick.gain).toBeCloseTo(fullKick.gain * 0.5, 6)
+    half.unmount()
   })
 })

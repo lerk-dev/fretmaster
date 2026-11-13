@@ -1,11 +1,15 @@
 // 构建时自动更新版本号和日期
 // 运行方式: node scripts/update-version.js
 //
-// 🚨 版本号有四处副本，必须一起改（2026-10-02 之前只改了前两处）：
+// 🚨 版本号有五处副本，必须一起改（2026-10-02 之前只改了前两处）：
 //   1. package.json          —— 前端/Node 侧
 //   2. lib/version.ts        —— 前端展示用（自动生成）
 //   3. src-tauri/Cargo.toml  —— Rust crate 版本
 //   4. src-tauri/tauri.conf.json —— ⚠️ **这个才是安装包文件名的来源**
+//   5. package-lock.json     —— 顶层和 packages[""] 各有一份项目自身的版本号。
+//      该字段不参与依赖解析，但 `npm install` 会把它回写成 package.json 的值；
+//      长期落后时每次手动对齐都会复发（2026-11-12 / 11-13 连续两次），
+//      所以由本脚本在 prebuild 时一并同步。
 // 漏掉第 4 处的后果：安装包叫 `FretMaster_0.2.157_x64-setup.exe`，
 // 而应用内显示 0.2.219 —— 两个数字对不上，用户无法判断装的是哪版。
 // 用正则做**定点替换**而不是 JSON.parse/stringify，是为了保住原文件的
@@ -55,10 +59,12 @@ fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n')
  * @param {string} relPath 相对项目根的路径
  * @param {RegExp} pattern 带捕获组
  * @param {number} versionGroup 纯版本号所在的捕获组序号（1-based）
+ * @param {{ all?: boolean }} opts `all` = 替换文件里**所有**匹配（多副本文件用；
+ *        不带 g 的 String.replace 只换第一处，会留半份旧值）
  * @returns {'updated'|'unchanged'} 实际是否发生了替换
  * @throws {Error} 模式未命中 —— 说明文件结构变了，**当场失败**比静默漏改安全
  */
-function stampVersion(relPath, pattern, versionGroup) {
+function stampVersion(relPath, pattern, versionGroup, { all = false } = {}) {
   const abs = path.join(ROOT, relPath)
   const src = fs.readFileSync(abs, 'utf8')
 
@@ -81,8 +87,13 @@ function stampVersion(relPath, pattern, versionGroup) {
     )
   }
 
+  // 替换用的正则：`all` 时保留 g 标志 ⇒ 一次把文件里所有副本都换掉。
+  // package-lock.json 有顶层 + packages[""] 两处，只换第一处等于没修。
+  const replaceRe = all
+    ? new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`)
+    : probe
   let hit = false
-  const replaced = src.replace(probe, (...args) => {
+  const replaced = src.replace(replaceRe, (...args) => {
     const matched = args[0]
     const captured = args[versionGroup] // 纯版本号
     hit = true
@@ -140,6 +151,16 @@ const VERSION_TARGETS = [
     pattern: /^(\s*"version":\s*")([^"]+)(")/m,
     versionGroup: 2,
   },
+  {
+    file: 'package-lock.json',
+    // ⚠️ lock 里有**两处**项目自身的版本号（顶层 + packages[""]），
+    //    另有几百个依赖的 version —— 直接全局替换 `"version"` 会把依赖全毁。
+    //    只认紧跟 `"name": "fretmaster"` 的那一行（两处形状相同），
+    //    并用 all: true 一次替换干净；`\r?\n` 兼容本仓的 CRLF。
+    pattern: /^([ \t]*"name": "fretmaster",\r?\n[ \t]*"version": ")([^"]+)(")/gm,
+    versionGroup: 2,
+    all: true,
+  },
 ]
 
 for (const target of VERSION_TARGETS) {
@@ -148,7 +169,7 @@ for (const target of VERSION_TARGETS) {
     const srcBefore = fs.readFileSync(abs, 'utf8')
     const oldVersion = (srcBefore.match(target.pattern) || [])[target.versionGroup] || ''
 
-    const r = stampVersion(target.file, target.pattern, target.versionGroup)
+    const r = stampVersion(target.file, target.pattern, target.versionGroup, { all: target.all })
 
     if (r === 'updated') {
       // 逐字节校验前后缀没被动过（损坏版能通过 JSON.parse，只能这样查）

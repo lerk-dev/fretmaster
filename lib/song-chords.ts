@@ -41,6 +41,89 @@ export function clampChordIndex(index: number, length: number): number {
   return Math.min(Math.max(Math.trunc(index), 0), length - 1)
 }
 
+/** 和弦进行播放顺序（与页面的 `chordPlayOrder` 同口径） */
+export type ChordPlayOrder = 'asc' | 'desc' | 'random'
+
+/** 循环片段：闭区间的和弦下标（含 start 与 end） */
+export interface ChordLoopRange {
+  start: number
+  end: number
+}
+
+/**
+ * 规整循环片段：空列表 → null；越界钳制；start/end 倒置时自动交换。
+ * 列表变短（删自定义和弦 / 换歌）后调用它，避免区间越界导致「卡在区间外」。
+ */
+export function normalizeChordLoop(
+  loop: ChordLoopRange | null | undefined,
+  length: number
+): ChordLoopRange | null {
+  if (!loop || length <= 0) return null
+  const a = clampChordIndex(loop.start, length)
+  const b = clampChordIndex(loop.end, length)
+  return a <= b ? { start: a, end: b } : { start: b, end: a }
+}
+
+/**
+ * 计算下一个和弦下标。
+ *
+ * - `loop == null`：保持原有全列表语义（正序/倒序回绕、随机全列表）；
+ * - 有循环片段时只在 `[start, end]` 内推进，正序到 end 回到 start，倒序反之；
+ * - 随机在区间内取，且区间长度 > 1 时避免连续重复（体验上「卡住同一个和弦」）。
+ * - 当前下标落在区间外（刚开启循环 / 列表变化）⇒ 正序从 start、倒序从 end 开始。
+ */
+export function nextChordIndexInLoop(
+  current: number,
+  length: number,
+  order: ChordPlayOrder,
+  loop: ChordLoopRange | null | undefined
+): number {
+  if (length <= 0) return 0
+  const range = normalizeChordLoop(loop, length)
+  const start = range ? range.start : 0
+  const end = range ? range.end : length - 1
+  const cur = clampChordIndex(current, length)
+
+  if (order === 'random') {
+    const size = end - start + 1
+    if (size <= 1) return start
+    // 区间外的当前值不在候选里，不必排除
+    if (cur < start || cur > end) {
+      return start + Math.floor(Math.random() * size)
+    }
+    // 在 size-1 个候选里抽，命中 cur 及之后的下标整体后移一位
+    const offset = Math.floor(Math.random() * (size - 1))
+    const candidate = start + offset
+    return candidate >= cur ? candidate + 1 : candidate
+  }
+
+  if (cur < start || cur > end) return order === 'desc' ? end : start
+  if (order === 'desc') return cur <= start ? end : cur - 1
+  return cur >= end ? start : cur + 1
+}
+
+/**
+ * 这一跳是否「完成了一轮」（供「循环时随机转调」复用）。
+ * 随机顺序不判定（与旧行为一致：随机模式从不触发换调）。
+ */
+export function didChordLoopWrap(
+  current: number,
+  next: number,
+  length: number,
+  order: ChordPlayOrder,
+  loop: ChordLoopRange | null | undefined
+): boolean {
+  if (length <= 0 || order === 'random') return false
+  const range = normalizeChordLoop(loop, length)
+  const start = range ? range.start : 0
+  const end = range ? range.end : length - 1
+  const cur = clampChordIndex(current, length)
+  if (cur < start || cur > end) return false
+  return order === 'desc'
+    ? next === end && cur === start
+    : next === start && cur === end
+}
+
 export const parseIrealPro = (text: string) => {
   const chords: { root: string; type: string; bass?: string }[] = []
   

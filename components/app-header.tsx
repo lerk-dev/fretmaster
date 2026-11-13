@@ -341,6 +341,10 @@ export const AppHeader = memo(function AppHeader({
               onFlashChange={setMetronomeFlash}
               visualize={metronomeSettings.visualize ?? false}
               onVisualizeChange={(v) => store.setMetronomeSettings({ ...metronomeSettings, visualize: v })}
+              volume={metronomeSettings.volume}
+              onVolumeChange={(v) => store.setMetronomeVolume(v[0])}
+              countIn={metronomeSettings.countIn}
+              onCountInChange={store.setMetronomeCountIn}
             />
             
             <SettingsAudioSection

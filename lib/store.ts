@@ -5,6 +5,7 @@ import { InstrumentType } from './practice-suggestions'
 import { CustomSong } from './custom-song-editor'
 import { logger } from './logger'
 import type { PianoKeyboardStyle } from './piano-keyboard-style'
+import { isAccompanimentStyleId, type AccompanimentStyleId } from './style-patterns'
 
 /**
  * 给底层 Storage 包一层 300ms 写入合并（debounce）。
@@ -286,6 +287,27 @@ export function clampMetronomeBeats(value: unknown): number {
     : METRONOME_BEATS_DEFAULT
 }
 
+// 节拍器音量（0..100，百分比）。**唯一真相源**：设置滑块与调度器增益都引用它。
+export const METRONOME_VOLUME_MIN = 0
+export const METRONOME_VOLUME_MAX = 100
+const METRONOME_VOLUME_DEFAULT = 70
+
+/** 把任意输入夹到 0..100；非有限值回落默认音量。 */
+export function clampMetronomeVolume(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return METRONOME_VOLUME_DEFAULT
+  return Math.min(METRONOME_VOLUME_MAX, Math.max(METRONOME_VOLUME_MIN, Math.round(value)))
+}
+
+// 伴奏音量（0..100，百分比）。与节拍器音量互相独立：鼓/贝斯很响时可以单独压低。
+export const ACCOMPANIMENT_VOLUME_DEFAULT = 60
+export const ACCOMPANIMENT_STYLE_DEFAULT: AccompanimentStyleId = 'swing'
+
+/** 把任意输入夹到 0..100；非有限值回落默认伴奏音量。 */
+export function clampAccompanimentVolume(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ACCOMPANIMENT_VOLUME_DEFAULT
+  return Math.min(METRONOME_VOLUME_MAX, Math.max(METRONOME_VOLUME_MIN, Math.round(value)))
+}
+
 // 节拍器设置
 export interface MetronomeSettings {
   enabled: boolean
@@ -295,6 +317,19 @@ export interface MetronomeSettings {
   sound: boolean
   flash: boolean
   visualize?: boolean
+  /** 节拍器**独立**音量（0..100），与其它反馈音互不影响 */
+  volume: number
+  /** 开始练习前先数一小节预备拍（拍号决定拍数） */
+  countIn: boolean
+  /**
+   * 风格伴奏（#5）：鼓 + 贝斯。
+   * 放在 metronome 切片里是因为它与节拍器**共用同一个音频时钟**
+   * （`hooks/use-metronome-scheduler.ts` 的 lookahead），没有独立的调度器。
+   */
+  accompanimentEnabled: boolean
+  accompanimentStyle: AccompanimentStyleId
+  /** 伴奏独立音量（0..100），与节拍器音量互不影响 */
+  accompanimentVolume: number
 }
 
 // 反馈音设置
@@ -493,6 +528,12 @@ export interface AppActions {
   setMetronomeSound: (sound: boolean) => void
   setMetronomeFlash: (flash: boolean) => void
   setMetronomeVisualize: (visualize: boolean) => void
+  setMetronomeVolume: (volume: number) => void
+  setMetronomeCountIn: (countIn: boolean) => void
+  // 伴奏（#5）：与节拍器共用时钟，设置也放在同一切片
+  setAccompanimentEnabled: (enabled: boolean) => void
+  setAccompanimentStyle: (style: AccompanimentStyleId) => void
+  setAccompanimentVolume: (volume: number) => void
   setMetronomeSettings: (settings: Partial<MetronomeSettings>) => void
   
   // 反馈音操作
@@ -681,6 +722,11 @@ const initialState: AppState = {
     beatsPerMeasure: METRONOME_BEATS_DEFAULT,
     sound: true,
     flash: false,
+    volume: METRONOME_VOLUME_DEFAULT,
+    countIn: false,
+    accompanimentEnabled: false,
+    accompanimentStyle: ACCOMPANIMENT_STYLE_DEFAULT,
+    accompanimentVolume: ACCOMPANIMENT_VOLUME_DEFAULT,
   },
   
   feedbackSound: {
@@ -866,6 +912,18 @@ export function migratePersistedState(persistedState: any, version: number): any
       if (typeof persistedState.metronome.enabled !== 'boolean') persistedState.metronome.enabled = false
       if (typeof persistedState.metronome.sound !== 'boolean') persistedState.metronome.sound = true
       if (typeof persistedState.metronome.flash !== 'boolean') persistedState.metronome.flash = false
+      // 音量与预备拍同属「后加字段」：老 blob 没有 ⇒ 补默认（音量还要夹到 0..100）。
+      persistedState.metronome.volume = clampMetronomeVolume(persistedState.metronome.volume)
+      if (typeof persistedState.metronome.countIn !== 'boolean') persistedState.metronome.countIn = false
+      // 伴奏（#5）：同样是后加字段。风格必须收敛到白名单，否则下拉会显示空白（Radix Select）。
+      if (typeof persistedState.metronome.accompanimentEnabled !== 'boolean') {
+        persistedState.metronome.accompanimentEnabled = false
+      }
+      if (!isAccompanimentStyleId(persistedState.metronome.accompanimentStyle)) {
+        persistedState.metronome.accompanimentStyle = ACCOMPANIMENT_STYLE_DEFAULT
+      }
+      persistedState.metronome.accompanimentVolume =
+        clampAccompanimentVolume(persistedState.metronome.accompanimentVolume)
     }
     if (persistedState.fullscreenMode !== undefined) {
       persistedState.isFullscreen = persistedState.fullscreenMode
@@ -1018,7 +1076,18 @@ export const useAppStore = create<AppState & AppActions>()(
       setMetronomeSound: (sound) => set((state) => ({ metronome: { ...state.metronome, sound } })),
       setMetronomeFlash: (flash) => set((state) => ({ metronome: { ...state.metronome, flash } })),
       setMetronomeVisualize: (visualize) => set((state) => ({ metronome: { ...state.metronome, visualize } })),
-      // 部分更新：只有显式带了 bpm / beatsPerMeasure 才钳制（`undefined` 表示「本次不改」）。
+      setMetronomeVolume: (volume) => set((state) => ({ metronome: { ...state.metronome, volume: clampMetronomeVolume(volume) } })),
+      setMetronomeCountIn: (countIn) => set((state) => ({ metronome: { ...state.metronome, countIn } })),
+      // 伴奏（#5）
+      setAccompanimentEnabled: (enabled) => set((state) => ({ metronome: { ...state.metronome, accompanimentEnabled: enabled } })),
+      // 白名单收敛：非法风格会让下拉显示空白（Radix Select 找不到对应选项）
+      setAccompanimentStyle: (style) => set((state) => ({
+        metronome: { ...state.metronome, accompanimentStyle: isAccompanimentStyleId(style) ? style : ACCOMPANIMENT_STYLE_DEFAULT }
+      })),
+      setAccompanimentVolume: (volume) => set((state) => ({
+        metronome: { ...state.metronome, accompanimentVolume: clampAccompanimentVolume(volume) }
+      })),
+      // 部分更新：只有显式带了 bpm / beatsPerMeasure / volume 才钳制（`undefined` 表示「本次不改」）。
       setMetronomeSettings: (settings) => set((state) => ({
         metronome: {
           ...state.metronome,
@@ -1026,6 +1095,10 @@ export const useAppStore = create<AppState & AppActions>()(
           ...(settings.bpm !== undefined ? { bpm: clampMetronomeBpm(settings.bpm) } : {}),
           ...(settings.beatsPerMeasure !== undefined
             ? { beatsPerMeasure: clampMetronomeBeats(settings.beatsPerMeasure) }
+            : {}),
+          ...(settings.volume !== undefined ? { volume: clampMetronomeVolume(settings.volume) } : {}),
+          ...(settings.accompanimentVolume !== undefined
+            ? { accompanimentVolume: clampAccompanimentVolume(settings.accompanimentVolume) }
             : {}),
         }
       })),

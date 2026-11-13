@@ -27,6 +27,11 @@ export interface MetronomeBeat {
   index: number
   /** 是否重音拍（等价于 `index === 0`，预先算好省得订阅者各写一遍） */
   accent: boolean
+  /**
+   * 是否为「预备拍」（#2）。
+   * 开始练习时先数一小节，订阅者据此显示「预备」而不是把它当成正式小节。
+   */
+  countIn: boolean
 }
 
 type BeatListener = (beat: MetronomeBeat) => void
@@ -37,7 +42,7 @@ const listeners = new Set<BeatListener>()
  * 初始快照 = 「第 1 拍、尚未开始」。订阅者首次挂载（练习中途打开可视化）会先拿到它，
  * 随即被下一次广播覆盖 —— 这样不需要任何「先 mount 再手动拉一次」的补充逻辑。
  */
-let snapshot: MetronomeBeat = { seq: 0, index: 0, accent: true }
+let snapshot: MetronomeBeat = { seq: 0, index: 0, accent: true, countIn: false }
 
 /**
  * 订阅拍事件。返回退订函数（供 `useSyncExternalStore` 直接使用）。
@@ -59,8 +64,8 @@ export function getMetronomeBeat(): MetronomeBeat {
  * 广播一拍。**仅排程器可调用**。
  * 每次调用都会生成一个**新的**快照对象（`Object.is` 才会变 ⇒ 订阅者才会重渲染）。
  */
-export function publishMetronomeBeat(index: number): void {
-  snapshot = { seq: snapshot.seq + 1, index, accent: index === 0 }
+export function publishMetronomeBeat(index: number, countIn = false): void {
+  snapshot = { seq: snapshot.seq + 1, index, accent: index === 0, countIn }
   // 复制一份再遍历：监听者在回调里退订（组件卸载）不得影响本轮其他监听者。
   for (const listener of [...listeners]) {
     // 单个订阅者抛错不许拖垮时钟（否则一个画错的可视化组件会连带停掉发声）。
@@ -78,7 +83,7 @@ export function publishMetronomeBeat(index: number): void {
  * 跨会话继续用同一个 `seq` 不会影响显示。
  */
 export function resetMetronomeClock(): void {
-  snapshot = { seq: 0, index: 0, accent: true }
+  snapshot = { seq: 0, index: 0, accent: true, countIn: false }
   for (const listener of [...listeners]) {
     try {
       listener(snapshot)

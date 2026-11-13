@@ -69,6 +69,8 @@ export interface GuitarRunFretboardProps {
   threeNpsCellKeys: ReadonlyMap<string, unknown>
   /** 一弦三音：下一把位预览 */
   nextThreeNpsCells?: ReadonlyMap<string, ThreeNpsPreviewKind>
+  /** 和弦指法（#4）：每弦绝对品号，null = 不弹；仅做视觉标记 */
+  voicingFrets?: (number | null)[] | null
   /**
    * 皮肤变体（默认 GuitarRun）：
    *   · `'guitarrun'` —— 原版霓虹圆点（`.gr-*`）；
@@ -142,6 +144,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
   threeNpsTarget,
   threeNpsCellKeys,
   nextThreeNpsCells,
+  voicingFrets,
   skin = 'guitarrun',
 }: GuitarRunFretboardProps) {
   const activeTab = useAppStore((s) => s.activeTab)
@@ -281,6 +284,8 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
                   ? 'prompt'
                   : 'pending'
             : undefined,
+          // 和弦指法（#4）：3D 皮肤也要标出来
+          voicing: voicingFrets?.[stringIndex] === fret,
         })
       }
     }
@@ -351,6 +356,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
                       // 当前位置提示：和「已找到」同为目标角色，光靠实心圆分不出来，
                       // 再加一层呼吸光环（样式见 app/globals.css 的 .gr-cell--prompt）
                       isPromptCell && 'gr-cell--prompt',
+                      voicingFrets?.[stringIndex] === fret && 'gr-cell--voicing',
                       isSingleNoteCell && !isPromptCell && !isFoundCell && !isSkippedCell && !isHiddenCell && 'gr-cell--pending',
                       isSkippedCell && 'gr-cell--skipped',
                     )}
@@ -359,6 +365,7 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
                     data-position={`${stringIndex}-${fret}`}
                     data-role={isHiddenCell ? 'none' : role}
                     data-marker={isMarker ? '1' : undefined}
+                    data-voicing={voicingFrets?.[stringIndex] === fret ? '1' : undefined}
                     style={{ ['--gr-string-w' as string]: `${stringLineWidth(stringIndex)}px` }}
                   >
                     <span className="gr-note-dot" data-visible={showText ? '1' : '0'}>

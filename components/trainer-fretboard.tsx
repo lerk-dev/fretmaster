@@ -42,6 +42,8 @@ export interface TrainerCellView {
    * 真实发生过（只替换了 `{string}` / `{fret}`），所以做成必填字段让类型系统兜住。
    */
   note: string
+  /** 和弦指法标记（#4）：给格子加外环，不改变角色配色 */
+  voicing?: boolean
 }
 
 export interface TrainerFretboardProps {
@@ -128,6 +130,7 @@ export const TrainerFretboard = memo(function TrainerFretboard({
                                     isOpen && 'ft-cell--open',
                                     !interactive && 'ft-cell--static',
                                     !enabled && 'ft-cell--disabled',
+                                    cell?.voicing && 'ft-cell--voicing',
                                 )
                                 const inner = (
                                     <>
@@ -152,6 +155,7 @@ export const TrainerFretboard = memo(function TrainerFretboard({
                                             data-fret={fret}
                                             data-position={`${stringIndex}-${fret}`}
                                             data-role={cell?.role}
+                                            data-voicing={cell?.voicing ? '1' : undefined}
                                             // 🚨 弦粗**两个分支都要设**：只设在 button 分支的话，
                                             // 只读的「整幅 CAGED」会全落到 `--ft-string-w` 的兜底 1px
                                             // ⇒ 六根弦一样粗，静默丢掉「低音弦更粗」的视觉线索。
@@ -192,6 +196,7 @@ export const TrainerFretboard = memo(function TrainerFretboard({
                                         data-fret={fret}
                                         data-position={`${stringIndex}-${fret}`}
                                         data-role={cell?.role}
+                                        data-voicing={cell?.voicing ? '1' : undefined}
                                         style={{
                                             ['--ft-string-w' as string]: `${trainerStringLineWidth(stringIndex)}px`,
                                         }}

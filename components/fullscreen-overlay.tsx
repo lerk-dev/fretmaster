@@ -147,6 +147,8 @@ interface FullscreenOverlayProps {
   threeNpsCellKeys: ReadonlyMap<string, unknown>
   /** 一弦三音：下一把位预览 */
   nextThreeNpsCells: ReadonlyMap<string, ThreeNpsPreviewKind>
+  /** 和弦指法（#4）：全屏层与主区共用同一份标记 */
+  voicingFrets?: (number | null)[] | null
   // —— 单音全指板：全屏层必须和主区用同一份输入，否则进全屏后位置地图/连线整个消失 ——
   /** 单音全指板：目标音名（未开启为 undefined） */
   singleNoteTarget?: string
@@ -221,6 +223,7 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
   threeNpsTarget,
   threeNpsCellKeys,
   nextThreeNpsCells,
+  voicingFrets,
   singleNoteTarget,
   singleNoteFound,
   singleNoteSkipped,
@@ -702,6 +705,7 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
               threeNpsTarget={threeNpsTarget}
               threeNpsCellKeys={threeNpsCellKeys}
               nextThreeNpsCells={nextThreeNpsCells}
+              voicingFrets={voicingFrets}
               skin={user.fretboardStyle === 'trainer' ? 'trainer' : 'guitarrun'}
         />
       ) : (
@@ -737,6 +741,7 @@ export const FullscreenOverlay = memo(function FullscreenOverlay({
           threeNpsTarget={threeNpsTarget}
           threeNpsCellKeys={threeNpsCellKeys}
           nextThreeNpsCells={nextThreeNpsCells}
+          voicingFrets={voicingFrets}
           FRET_MARKERS={FRET_MARKERS}
         />
       )}

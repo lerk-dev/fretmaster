@@ -4,6 +4,15 @@ import { useEffect, useRef } from 'react'
 import { getAudioContextClass } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import { publishMetronomeBeat } from '@/lib/metronome-clock'
+import {
+  getStylePattern,
+  drumHitsAtBeat,
+  bassHitsAtBeat,
+  hitOffsetSeconds,
+  bassMidiForChord,
+  type AccompanimentStyleId,
+} from '@/lib/style-patterns'
+import { scheduleDrumHit, scheduleBassNote } from '@/lib/backing-audio'
 
 /**
  * useMetronomeScheduler —— 节拍器的**单一**调度器（#14）。
@@ -50,6 +59,29 @@ export interface MetronomeSchedulerOptions {
   sound: boolean
   flash: boolean
   visualize: boolean
+  /**
+   * 节拍器独立音量（0..100，百分比）。
+   * 与 sound/flash 同属「只经 ref 读取」：拖音量条不得重建时钟。
+   */
+  volume: number
+  /**
+   * 预备拍：起拍时先数一小节（拍号决定拍数）再进入正常小节。
+   * 同样只经 ref 读取（改开关不重建时钟）。
+   */
+  countIn: boolean
+  /**
+   * 风格伴奏（#5）：鼓 + 贝斯。**复用同一个 lookahead 时钟** —— 这样鼓点、贝斯、
+   * 咔哒全部排在同一个音频时间轴上，不会各自漂移；也省掉第二套调度器。
+   * 只经 ref 读取（切风格 / 调音量 / 换和弦都不重建时钟）。
+   */
+  accompaniment?: {
+    enabled: boolean
+    styleId: AccompanimentStyleId
+    /** 0..100 */
+    volume: number
+    /** 当前和弦；null = 只出鼓（例如还没选好和弦） */
+    chord: { root: string; type: string } | null
+  }
 }
 
 /** 排程提前量（秒）：每轮把音频时钟未来这段窗口内的拍一次排完 */
@@ -83,6 +115,9 @@ export function useMetronomeScheduler({
   sound,
   flash,
   visualize,
+  volume,
+  countIn,
+  accompaniment,
 }: MetronomeSchedulerOptions): void {
   // ── 实时值镜像 ─────────────────────────────────────────────────────────────
   // 排程循环是「排程一次、跑很久」，闭包里拿到的是启动那一刻的值；
@@ -93,12 +128,29 @@ export function useMetronomeScheduler({
   const flashRef = useRef(flash)
   const bpmRef = useRef(bpm)
   const beatsRef = useRef(DEFAULT_BEATS_PER_MEASURE)
+  const volumeRef = useRef(volume)
+  const countInRef = useRef(countIn)
+  // 伴奏（#5）：同样只经 ref 读取 —— 切风格/调音量/换和弦不应重启时钟。
+  const accEnabledRef = useRef(false)
+  const accStyleRef = useRef<AccompanimentStyleId>('swing')
+  const accVolumeRef = useRef(0)
+  const accChordRef = useRef<{ root: string; type: string } | null>(null)
   useEffect(() => {
     enabledRef.current = enabled
     soundRef.current = sound
     flashRef.current = flash
     bpmRef.current = bpm
     beatsRef.current = normalizeBeats(beatsPerMeasure)
+    volumeRef.current = Number.isFinite(volume) ? Math.min(100, Math.max(0, volume)) : 100
+    countInRef.current = countIn
+    accEnabledRef.current = !!accompaniment?.enabled
+    if (accompaniment) {
+      accStyleRef.current = accompaniment.styleId
+      accVolumeRef.current = Number.isFinite(accompaniment.volume)
+        ? Math.min(100, Math.max(0, accompaniment.volume))
+        : 0
+      accChordRef.current = accompaniment.chord
+    }
   })
 
   const audioCtxRef = useRef<AudioContext | null>(null)
@@ -106,6 +158,8 @@ export function useMetronomeScheduler({
   const nextBeatTimeRef = useRef(0)
   /** 下一拍在小节内的 0-based 位置 */
   const beatInMeasureRef = useRef(0)
+  /** 预备拍剩余拍数（0 = 已进入正式小节）。只在时钟启动时按 countIn 初始化。 */
+  const remainingCountInRef = useRef(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   /** 已排程的「可视化/闪光」回调，停止时必须全部清掉（否则会在停止后继续闪） */
   const pendingTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
@@ -114,6 +168,8 @@ export function useMetronomeScheduler({
   // 于是拖动速度滑块时时钟不重启、相位连续（拍间隔从下一拍起生效）。
   const bpmValid = Number.isFinite(bpm) && bpm > 0
   const beatsValid = Number.isFinite(beatsPerMeasure) && beatsPerMeasure >= 1
+  // 伴奏开着时即使节拍器关着也要跑时钟（鼓/贝斯需要同一个拍源）
+  const accEnabled = !!accompaniment?.enabled
 
   useEffect(() => {
     const clearPendingTimers = () => {
@@ -126,7 +182,7 @@ export function useMetronomeScheduler({
     }
 
     // 可视化单独开启时也要走拍（修前可视化有独立时钟，与节拍器开关无关）。
-    const wantClock = enabled || visualize
+    const wantClock = enabled || visualize || accEnabled
     if (!isPlaying || !wantClock || !bpmValid || !beatsValid) {
       if (pollRef.current !== null) {
         clearInterval(pollRef.current)
@@ -152,7 +208,9 @@ export function useMetronomeScheduler({
       gainNode.connect(ctx.destination)
       oscillator.frequency.value = accent ? ACCENT_FREQ : WEAK_FREQ
       oscillator.type = 'sine'
-      gainNode.gain.setValueAtTime(accent ? ACCENT_GAIN : WEAK_GAIN, when)
+      // 独立音量（#2）：基准增益 × 百分比。0 时调用方根本不排程。
+      const volumeScale = volumeRef.current / 100
+      gainNode.gain.setValueAtTime((accent ? ACCENT_GAIN : WEAK_GAIN) * volumeScale, when)
       gainNode.gain.exponentialRampToValueAtTime(0.01, when + CLICK_DURATION_SEC)
       oscillator.start(when)
       oscillator.stop(when + CLICK_DURATION_SEC)
@@ -169,6 +227,44 @@ export function useMetronomeScheduler({
       pendingTimersRef.current.add(id)
     }
 
+    /**
+     * 把某一拍的鼓/贝斯点排进音频线程（#5）。
+     * `when` 是该**拍点**的时刻，拍内 16 分位置在此之上加偏移（含 swing 的 2:1 位移）。
+     */
+    const scheduleAccompanimentBeat = (ctx: AudioContext, when: number, beatInMeasure: number) => {
+      const style = getStylePattern(accStyleRef.current)
+      const chord = accChordRef.current
+      const beatDuration = 60 / bpmRef.current
+      const master = accVolumeRef.current / 100
+      try {
+        for (const hit of drumHitsAtBeat(style, beatInMeasure)) {
+          scheduleDrumHit(
+            ctx,
+            when + hitOffsetSeconds(hit.sub, beatDuration, style.swing),
+            hit.instrument,
+            hit.velocity,
+            master
+          )
+        }
+        // 没有当前和弦时只出鼓：贝斯音高需要根音才能算
+        if (!chord) return
+        for (const hit of bassHitsAtBeat(style, beatInMeasure)) {
+          const midi = bassMidiForChord(chord, hit.tone, hit.octave)
+          if (midi === null) continue
+          scheduleBassNote(
+            ctx,
+            when + hitOffsetSeconds(hit.sub, beatDuration, style.swing),
+            midi,
+            (beatDuration / 4) * hit.lengthSubs,
+            hit.velocity,
+            master
+          )
+        }
+      } catch (error) {
+        logger.debug('伴奏排程失败（已忽略）', error)
+      }
+    }
+
     /** 一轮：把提前量窗口内的拍全部排好。窗口比一轮长 ⇒ 单轮主线程卡顿不会丢拍。 */
     const poll = () => {
       const ctx = audioCtxRef.current
@@ -182,12 +278,20 @@ export function useMetronomeScheduler({
       while (nextBeatTimeRef.current < horizon) {
         const when = nextBeatTimeRef.current
         const index = beatInMeasureRef.current
-        if (ctx && enabledRef.current && soundRef.current) {
+        // 预备拍（#2）：起拍前 remaining 拍都标成 countIn，之后回到正式小节。
+        const isCountIn = remainingCountInRef.current > 0
+        if (isCountIn) remainingCountInRef.current -= 1
+        if (ctx && enabledRef.current && soundRef.current && volumeRef.current > 0) {
           try {
             scheduleClick(ctx, when, index === 0)
           } catch (error) {
             logger.debug('节拍器发声失败', error)
           }
+        }
+        // 风格伴奏（#5）：把这一拍的鼓/贝斯点排进音频线程。
+        // 预备拍期间不排 —— 数拍时应该只有咔哒，不该有律动。
+        if (ctx && !isCountIn && accEnabledRef.current && accVolumeRef.current > 0) {
+          scheduleAccompanimentBeat(ctx, when, index)
         }
         // 视听一致：把拍事件挂在**音频时刻**上换算成 setTimeout 延迟。
         const delayMs = Math.max(0, (when - now()) * 1000)
@@ -195,7 +299,7 @@ export function useMetronomeScheduler({
         // 回调是**之后**才执行的，那时 TDZ 早已结束，用 const 即可。
         const timerId = setTimeout(() => {
           pendingTimersRef.current.delete(timerId)
-          publishMetronomeBeat(index)
+          publishMetronomeBeat(index, isCountIn)
           if (enabledRef.current && flashRef.current) flashOnce()
         }, delayMs)
         pendingTimersRef.current.add(timerId)
@@ -206,7 +310,8 @@ export function useMetronomeScheduler({
     }
 
     // 需要出声才建音频上下文；纯可视化时用 wall clock，不白占一个音频实例。
-    if (enabled && sound) {
+    // 伴奏（#5）也算「需要出声」：节拍器关着但伴奏开着时同样要建。
+    if ((enabled && sound) || accEnabled) {
       try {
         if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
           const AudioCtx = getAudioContextClass()
@@ -221,6 +326,7 @@ export function useMetronomeScheduler({
 
     // 起拍：从**重音拍**开始（每次开始练习都重新数 1），并留一点启动余量。
     beatInMeasureRef.current = 0
+    remainingCountInRef.current = countInRef.current ? beatsRef.current : 0
     nextBeatTimeRef.current = now() + START_LEAD_SEC
 
     poll()
@@ -237,7 +343,7 @@ export function useMetronomeScheduler({
     // 没有 bpm / beatsPerMeasure / sound / flash 的**数值**：
     // 把数值放进来会让每一次拖动滑块都重启时钟（相位跳变，正是本次要修的 bug）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, enabled, visualize, bpmValid, beatsValid])
+  }, [isPlaying, enabled, visualize, accEnabled, bpmValid, beatsValid])
 
   // 卸载时释放音频上下文（与启动/停止无关，只做一次）。
   useEffect(() => {

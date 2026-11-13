@@ -12,8 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
+import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { CHORD_TYPES, NOTES, NOTES_FLAT } from '@/lib/page-theory-data'
+import { STYLE_PATTERNS, type AccompanimentStyleId } from '@/lib/style-patterns'
 import { ALL_PRACTICE_LEVELS } from '@/lib/practice-levels'
 import { translateOr } from '@/lib/i18n'
 import { formatChordName, normalizeNoteName } from '@/lib/page-theory-functions'
@@ -43,6 +45,24 @@ interface ChordProgressionControlsProps {
   /** 循环进行 */
   progressionRepeat: boolean
   onProgressionRepeatChange: (v: boolean) => void
+  /** 当前和弦列表长度（循环片段下拉的选项范围） */
+  chordCount: number
+  /** 循环片段开关：只循环某几个和弦（#3） */
+  chordLoopEnabled: boolean
+  onChordLoopEnabledChange: (v: boolean) => void
+  /** 循环区间（闭区间下标） */
+  chordLoopStart: number
+  onChordLoopStartChange: (v: number) => void
+  chordLoopEnd: number
+  onChordLoopEndChange: (v: number) => void
+  /** 风格伴奏（#5）：鼓 + 贝斯 */
+  accompanimentEnabled: boolean
+  onAccompanimentEnabledChange: (v: boolean) => void
+  accompanimentStyle: AccompanimentStyleId
+  onAccompanimentStyleChange: (v: AccompanimentStyleId) => void
+  /** 0..100 */
+  accompanimentVolume: number
+  onAccompanimentVolumeChange: (v: number) => void
   /** 声部连接 */
   shouldVoiceLead: boolean
   onShouldVoiceLeadChange: (v: boolean) => void
@@ -105,6 +125,19 @@ export const ChordProgressionControls = memo(function ChordProgressionControls({
   onChordPlayOrderChange,
   progressionRepeat,
   onProgressionRepeatChange,
+  chordCount,
+  chordLoopEnabled,
+  onChordLoopEnabledChange,
+  chordLoopStart,
+  onChordLoopStartChange,
+  chordLoopEnd,
+  onChordLoopEndChange,
+  accompanimentEnabled,
+  onAccompanimentEnabledChange,
+  accompanimentStyle,
+  onAccompanimentStyleChange,
+  accompanimentVolume,
+  onAccompanimentVolumeChange,
   shouldVoiceLead,
   onShouldVoiceLeadChange,
   shouldRandomizeKeyOnRepeat,
@@ -280,7 +313,115 @@ export const ChordProgressionControls = memo(function ChordProgressionControls({
     </div>
   </div>
 
-  {/* 第三行：自定义和弦（折叠） */}
+  {/* 第三行：循环片段（#3）——只循环第 N~M 个和弦 */}
+  <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1.5">
+      <Label htmlFor="chordLoop" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+        {t('chord_loop')}
+      </Label>
+      <Switch
+        id="chordLoop"
+        checked={chordLoopEnabled}
+        onCheckedChange={onChordLoopEnabledChange}
+        disabled={chordCount < 2}
+        className="scale-90"
+      />
+    </div>
+    {chordLoopEnabled && (
+      <>
+        <Select
+          value={String(chordLoopStart)}
+          onValueChange={(v) => {
+            const start = Number(v)
+            onChordLoopStartChange(start)
+            // 起点越过终点时把终点带过去，保证区间恒有效
+            if (start > chordLoopEnd) onChordLoopEndChange(start)
+          }}
+        >
+          <SelectTrigger className="h-8 text-xs w-[88px] px-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: chordCount }, (_, i) => (
+              <SelectItem key={i} value={String(i)} className="text-xs">
+                {t('chord_loop_from')} {i + 1}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={String(chordLoopEnd)}
+          onValueChange={(v) => {
+            const end = Number(v)
+            onChordLoopEndChange(end)
+            if (end < chordLoopStart) onChordLoopStartChange(end)
+          }}
+        >
+          <SelectTrigger className="h-8 text-xs w-[88px] px-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: chordCount }, (_, i) => (
+              <SelectItem key={i} value={String(i)} className="text-xs">
+                {t('chord_loop_to')} {i + 1}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-2xs text-muted-foreground">{t('chord_loop_hint')}</span>
+      </>
+    )}
+  </div>
+
+  {/* 第四行：风格伴奏（#5）——鼓 + 贝斯，与节拍器共用时钟 */}
+  <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1.5">
+      <Label htmlFor="accompaniment" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+        {t('accompaniment')}
+      </Label>
+      <Switch
+        id="accompaniment"
+        checked={accompanimentEnabled}
+        onCheckedChange={onAccompanimentEnabledChange}
+        className="scale-90"
+      />
+    </div>
+    {accompanimentEnabled && (
+      <>
+        <Select
+          value={accompanimentStyle}
+          onValueChange={(v) => onAccompanimentStyleChange(v as AccompanimentStyleId)}
+        >
+          <SelectTrigger className="h-8 text-xs w-[104px] px-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STYLE_PATTERNS.map((pattern) => (
+              <SelectItem key={pattern.id} value={pattern.id} className="text-xs">
+                {t(pattern.nameKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2 w-[132px]">
+          <Label className="text-xs text-muted-foreground whitespace-nowrap">
+            {t('accompaniment_volume')}
+          </Label>
+          <Slider
+            value={[accompanimentVolume]}
+            onValueChange={(v) => onAccompanimentVolumeChange(v[0])}
+            min={0}
+            max={100}
+            step={1}
+            aria-label={t('accompaniment_volume')}
+            className="flex-1"
+          />
+        </div>
+      </>
+    )}
+  </div>
+
+  {/* 第五行：自定义和弦（折叠） */}
   <Accordion type="multiple" defaultValue={[]} className="w-full">
     <AccordionItem value="custom" className="border-0">
       <AccordionTrigger className="text-xs py-1.5 px-2 bg-card/30 rounded-md border border-border/30 hover:no-underline">

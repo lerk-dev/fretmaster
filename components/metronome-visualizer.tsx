@@ -22,6 +22,7 @@ export const MetronomeVisualizer = memo(function MetronomeVisualizer({
   enabled,
   isPlaying,
   beatsPerMeasure = 4,
+  language = 'zh-CN',
 }: MetronomeVisualizerProps) {
   // 🚨 拍事件来自 `lib/metronome-clock.ts`（由 `hooks/use-metronome-scheduler.ts`
   // 在**音频时钟**上排程后广播）。本组件**不再自己起定时器** —— 修前它和声音各有一个
@@ -125,6 +126,13 @@ export const MetronomeVisualizer = memo(function MetronomeVisualizer({
             />
           ))}
         </div>
+
+        {/* 预备拍（#2）：起拍那一小节标出来，避免把它当成正式小节 */}
+        {beat.countIn && (
+          <div className="text-xs font-medium text-primary animate-pulse">
+            {language === 'en' ? 'Count-in' : '预备'}
+          </div>
+        )}
 
         <div className="flex items-end gap-0.5 h-6">
           {beatHistory.map((beatIndex, i) => (

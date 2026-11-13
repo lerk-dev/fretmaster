@@ -21,7 +21,8 @@ import { useTuner } from "@/hooks/use-tuner"
 import { useAudioInput, type DetectedPitchForMatch } from "@/hooks/use-audio-input"
 import { logger } from "@/lib/logger"
 import { SONG_PROGRESSIONS } from "@/lib/page-songs"
-import { transposeSongChords, clampChordIndex } from "@/lib/song-chords"
+import { transposeSongChords, clampChordIndex, normalizeChordLoop, nextChordIndexInLoop, didChordLoopWrap, type ChordLoopRange } from "@/lib/song-chords"
+import { getChordVoicings, type ChordVoicing } from "@/lib/chord-voicings"
 import { filterAndGroupSongs } from "@/lib/song-filters"
 import { setStringTuning } from "@/lib/string-tuning"
 import type {
@@ -535,6 +536,10 @@ export default function FretMasterPage() {
   } = useChordLibrary({ t, chordScaleDisplay, chordSymbols })
   const [currentChordIndex, setCurrentChordIndex] = useState(0)
   const [chordPlayOrder, setChordPlayOrder] = useState<"asc" | "desc" | "random">(store.chordProgression.playOrder)
+  // 循环片段（#3）：只循环某几个和弦；区间用闭区间下标，null = 不循环
+  const [chordLoopEnabled, setChordLoopEnabled] = useState(false)
+  const [chordLoopStart, setChordLoopStart] = useState(0)
+  const [chordLoopEnd, setChordLoopEnd] = useState(0)
   const [practiceLevel, setPracticeLevel] = useState(store.chordProgression.selectedLevelId)
   // 调性状态：存储音名（如 "E"），小调状态单独存储
   const isKeyMinor = (key: string): boolean => key.endsWith('m')
@@ -558,6 +563,46 @@ export default function FretMasterPage() {
     const clamped = clampChordIndex(currentChordIndex, transposedChords.length)
     if (clamped !== currentChordIndex) setCurrentChordIndex(clamped)
   }, [transposedChords, currentChordIndex])
+
+  // 循环片段：状态也要跟着列表长度收敛（否则下拉里会留下不存在的选项）
+  const chordLoopRange = useMemo<ChordLoopRange | null>(
+    () => (chordLoopEnabled ? normalizeChordLoop({ start: chordLoopStart, end: chordLoopEnd }, transposedChords.length) : null),
+    [chordLoopEnabled, chordLoopStart, chordLoopEnd, transposedChords.length]
+  )
+  useEffect(() => {
+    if (!chordLoopEnabled) return
+    const normalized = normalizeChordLoop({ start: chordLoopStart, end: chordLoopEnd }, transposedChords.length)
+    if (!normalized) return
+    if (normalized.start !== chordLoopStart) setChordLoopStart(normalized.start)
+    if (normalized.end !== chordLoopEnd) setChordLoopEnd(normalized.end)
+  }, [chordLoopEnabled, chordLoopStart, chordLoopEnd, transposedChords.length])
+
+  // 开启循环 / 开始练习时，若当前和弦不在循环区间内，跳到区间起点
+  useEffect(() => {
+    if (!isPlaying || !chordLoopRange) return
+    if (currentChordIndex < chordLoopRange.start || currentChordIndex > chordLoopRange.end) {
+      setCurrentChordIndex(chordLoopRange.start)
+    }
+  }, [isPlaying, chordLoopRange, currentChordIndex])
+
+  // 和弦指法（#4）：当前和弦的标准按法 + 变体，标到指板上
+  const currentChordForVoicing = transposedChords[currentChordIndex]
+  const chordVoicings = useMemo(
+    () => currentChordForVoicing
+      ? getChordVoicings(currentChordForVoicing.root, currentChordForVoicing.type, instrumentConfig.tuning, practiceSettings.fretCount)
+      : [],
+    [currentChordForVoicing, instrumentConfig.tuning, practiceSettings.fretCount]
+  )
+  const [voicingIndex, setVoicingIndex] = useState(0)
+  // 换和弦/换调后回到第一指法（通常是开放把位），避免沿用上一个和弦的「第 3 个变体」
+  useEffect(() => { setVoicingIndex(0) }, [currentChordForVoicing])
+  const activeVoicing: ChordVoicing | null = chordVoicings.length > 0
+    ? chordVoicings[Math.min(voicingIndex, chordVoicings.length - 1)]
+    : null
+  const voicingFrets = activeVoicing?.frets ?? null
+  const formatVoicingLabel = (voicing: ChordVoicing) => voicing.kind === 'open'
+    ? t('chord_voicing_open')
+    : `${voicing.shape}${language === 'en' ? '-shape ' : '型 '}${voicing.baseFret} ${t('chord_voicing_fret')}`
   
   const [levelForceNaturalFive, setLevelForceNaturalFive] = useState(true)
   const [levelEndOnStartingInterval, setLevelEndOnStartingInterval] = useState(false)
@@ -728,6 +773,11 @@ export default function FretMasterPage() {
   const metronomeSound = metronomeSettings.sound
   const metronomeFlash = metronomeSettings.flash
   const metronomeBeats = metronomeSettings.beatsPerMeasure
+  // 风格伴奏（#5）：鼓 + 贝斯，与节拍器共用同一个时钟
+  const accompanimentEnabled = metronomeSettings.accompanimentEnabled
+  const setAccompanimentEnabled = store.setAccompanimentEnabled
+  const setAccompanimentStyle = store.setAccompanimentStyle
+  const setAccompanimentVolume = store.setAccompanimentVolume
 
   // 节拍器的**单一**调度器（#14）：由音频时钟 lookahead 排程，并把拍事件广播给可视化。
   // 放在这里（而不是页面下方的效果块里）是为了让声音与画面共用同一个时钟 —— 见 hook 注释。
@@ -739,6 +789,17 @@ export default function FretMasterPage() {
     sound: metronomeSound,
     flash: metronomeFlash,
     visualize: metronomeSettings.visualize ?? false,
+    volume: metronomeSettings.volume,
+    countIn: metronomeSettings.countIn,
+    // 只在和弦页出声：其它练习页没有稳定的「当前和弦」，鼓点跟着走会显得莫名其妙
+    accompaniment: {
+      enabled: accompanimentEnabled && activeTab === 'chord',
+      styleId: metronomeSettings.accompanimentStyle,
+      volume: metronomeSettings.accompanimentVolume,
+      chord: currentChordForVoicing
+        ? { root: currentChordForVoicing.root, type: currentChordForVoicing.type }
+        : null,
+    },
   })
   
   // 音频输入状态 - 从 Store 获取
@@ -1825,14 +1886,7 @@ export default function FretMasterPage() {
       const chords = customChords.length > 0 ? customChords : (selectedSong.chords || []).map(c => parseChord(c))
       if (chords.length === 0) return
 
-      let nextIndex: number
-      if (chordPlayOrder === "random") {
-        nextIndex = Math.floor(Math.random() * chords.length)
-      } else if (chordPlayOrder === "desc") {
-        nextIndex = currentChordIndex === 0 ? chords.length - 1 : currentChordIndex - 1
-      } else {
-        nextIndex = (currentChordIndex + 1) % chords.length
-      }
+      const nextIndex = nextChordIndexInLoop(currentChordIndex, chords.length, chordPlayOrder, chordLoopRange)
 
       const chord = chords[nextIndex]
       if (chord) {
@@ -1845,7 +1899,7 @@ export default function FretMasterPage() {
         })
       }
     }
-  }, [activeTab, isPlaying, currentChordIndex, customChords, selectedSong, chordPlayOrder, progressionKey, practiceLevel, getLevelOptions])
+  }, [activeTab, isPlaying, currentChordIndex, customChords, selectedSong, chordPlayOrder, chordLoopRange, progressionKey, practiceLevel, getLevelOptions])
 
   const updateLevelOptions = useCallback((levelId: string) => {
     const level = ALL_SOLO_LEVELS.find(l => l.id === levelId)
@@ -1918,62 +1972,29 @@ export default function FretMasterPage() {
   const nextChord = useCallback(() => {
     // 重置和弦音步骤
     setChordDegreeCurrentStep(0)
-    
-    // 使用预生成的下一题信息
-    if (nextChordInfo) {
-      const chords = customChords.length > 0 ? customChords : (selectedSong.chords || []).map(c => parseChord(c))
-      const nextIndex = nextChordInfo.index
-      // 检测是否完成一轮（索引回到0且之前不是0）
-      if (nextIndex === 0 && currentChordIndex === chords.length - 1) {
-        // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
-        // 如果开启随机转调，随机选择新的调
-        if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
-          const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
-          const newKey = allKeys[Math.floor(Math.random() * allKeys.length)]
-          setProgressionKey(newKey)
-          logger.debug('随机转调到:', newKey)
-        }
-      }
-      setCurrentChordIndex(nextIndex)
-    } else {
-      // 如果没有预览信息，重新计算
-      const chords = customChords.length > 0 ? customChords : (selectedSong.chords || []).map(c => parseChord(c))
-      if (chords.length === 0) return
-      let nextIndex: number
-      if (chordPlayOrder === "random") {
-        nextIndex = Math.floor(Math.random() * chords.length)
-        setCurrentChordIndex(nextIndex)
-      } else if (chordPlayOrder === "desc") {
-        nextIndex = currentChordIndex === 0 ? chords.length - 1 : currentChordIndex - 1
-        // 检测是否完成一轮（倒序时，索引变为最后一个且之前是第一个）
-        if (nextIndex === chords.length - 1 && currentChordIndex === 0) {
-          // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
-          // 如果开启随机转调，随机选择新的调
-          if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
-            const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
-            const newKey = allKeys[Math.floor(Math.random() * allKeys.length)]
-            setProgressionKey(newKey)
-            logger.debug('随机转调到:', newKey)
-          }
-        }
-        setCurrentChordIndex(nextIndex)
-      } else {
-        nextIndex = (currentChordIndex + 1) % chords.length
-        // 检测是否完成一轮（正序时，索引变为0且之前是最后一个）
-        if (nextIndex === 0 && currentChordIndex === chords.length - 1) {
-          // 统计已改为会话级记录：会话结束时统一在 useEffect 中记录
-          // 如果开启随机转调，随机选择新的调
-          if (shouldRandomizeKeyOnRepeat && progressionRepeat) {
-            const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
-            const newKey = allKeys[Math.floor(Math.random() * allKeys.length)]
-            setProgressionKey(newKey)
-            logger.debug('随机转调到:', newKey)
-          }
-        }
-        setCurrentChordIndex(nextIndex)
-      }
+
+    const chords = customChords.length > 0 ? customChords : (selectedSong.chords || []).map(c => parseChord(c))
+    if (chords.length === 0) return
+
+    // 预生成的下一题与「循环区间」一致时直接采用（随机模式才不会每跳一次重新摇一次）；
+    // 区间外（刚开循环 / 列表变化）则按当前区间重算。
+    const inLoop = (index: number) => !chordLoopRange
+      || (index >= chordLoopRange.start && index <= chordLoopRange.end)
+    const nextIndex = nextChordInfo && inLoop(nextChordInfo.index)
+      ? nextChordInfo.index
+      : nextChordIndexInLoop(currentChordIndex, chords.length, chordPlayOrder, chordLoopRange)
+
+    // 跑完一轮：随机转调（循环片段下同样按区间回绕判定）
+    if (shouldRandomizeKeyOnRepeat && progressionRepeat
+      && didChordLoopWrap(currentChordIndex, nextIndex, chords.length, chordPlayOrder, chordLoopRange)) {
+      const allKeys = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+      const newKey = allKeys[Math.floor(Math.random() * allKeys.length)]
+      setProgressionKey(newKey)
+      logger.debug('随机转调到:', newKey)
     }
-  }, [nextChordInfo, customChords, selectedSong, chordPlayOrder, currentChordIndex, shouldRandomizeKeyOnRepeat, progressionRepeat])
+
+    setCurrentChordIndex(nextIndex)
+  }, [nextChordInfo, customChords, selectedSong, chordPlayOrder, chordLoopRange, currentChordIndex, shouldRandomizeKeyOnRepeat, progressionRepeat])
 
   // 单独更新 nextChordRef（避免循环依赖）
   useEffect(() => {
@@ -2505,6 +2526,19 @@ export default function FretMasterPage() {
                       onChordPlayOrderChange={setChordPlayOrder}
                       progressionRepeat={progressionRepeat}
                       onProgressionRepeatChange={setProgressionRepeat}
+                      chordCount={transposedChords.length}
+                      chordLoopEnabled={chordLoopEnabled}
+                      onChordLoopEnabledChange={setChordLoopEnabled}
+                      chordLoopStart={chordLoopStart}
+                      onChordLoopStartChange={setChordLoopStart}
+                      chordLoopEnd={chordLoopEnd}
+                      onChordLoopEndChange={setChordLoopEnd}
+                      accompanimentEnabled={accompanimentEnabled}
+                      onAccompanimentEnabledChange={setAccompanimentEnabled}
+                      accompanimentStyle={metronomeSettings.accompanimentStyle}
+                      onAccompanimentStyleChange={setAccompanimentStyle}
+                      accompanimentVolume={metronomeSettings.accompanimentVolume}
+                      onAccompanimentVolumeChange={setAccompanimentVolume}
                       shouldVoiceLead={shouldVoiceLead}
                       onShouldVoiceLeadChange={setShouldVoiceLead}
                       shouldRandomizeKeyOnRepeat={shouldRandomizeKeyOnRepeat}
@@ -2792,6 +2826,7 @@ export default function FretMasterPage() {
                     threeNpsTarget={threeNpsTarget}
                     threeNpsCellKeys={threeNpsCellKeys}
                     nextThreeNpsCells={nextThreeNpsCells}
+                    voicingFrets={activeTab === 'chord' ? voicingFrets : null}
                     // 两套「圆点皮肤」共用同一个组件，只有外观不同（skin 决定用 .gr-* 还是 .ft-*）
                     skin={user.fretboardStyle === 'trainer' ? 'trainer' : 'guitarrun'}
                   />
@@ -2820,6 +2855,7 @@ export default function FretMasterPage() {
                   threeNpsTarget={threeNpsTarget}
                   threeNpsCellKeys={threeNpsCellKeys}
                   nextThreeNpsCells={nextThreeNpsCells}
+                  voicingFrets={activeTab === 'chord' ? voicingFrets : null}
                   FRET_MARKERS={FRET_MARKERS}
                 />
                 )
@@ -2867,7 +2903,40 @@ export default function FretMasterPage() {
                   即便内部内容全空也会留下一个空卡片（用户反馈「提示没了但框还在」）。
                   interval 早就是 `isPlaying` 门控，这里与之对齐。 */}
               {activeTab === "chord" && isPlaying && (
-                <ChordDegreesDisplay
+                <>
+                  {/* 指法图库（#4）：当前和弦的标准按法/变体，指板上以琥珀色外环标出 */}
+                  <div className="flex items-center justify-center gap-2 text-xs" data-testid="chord-voicing-bar">
+                    <span className="text-muted-foreground">{t('chord_voicing')}</span>
+                    {activeVoicing ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setVoicingIndex((prev) => (prev - 1 + chordVoicings.length) % chordVoicings.length)}
+                          aria-label={t('chord_voicing_prev')}
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="font-mono tabular-nums">
+                          {Math.min(voicingIndex, chordVoicings.length - 1) + 1}/{chordVoicings.length}
+                          <span className="text-muted-foreground ml-1.5">{formatVoicingLabel(activeVoicing)}</span>
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setVoicingIndex((prev) => (prev + 1) % chordVoicings.length)}
+                          aria-label={t('chord_voicing_next')}
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">{t('chord_voicing_none')}</span>
+                    )}
+                  </div>
+                  <ChordDegreesDisplay
                   t={t}
                   transposedChords={transposedChords}
                   currentChordIndex={currentChordIndex}
@@ -2878,6 +2947,7 @@ export default function FretMasterPage() {
                   getNextChordDisplay={getNextChordDisplay}
                   nextChord={nextChord}
                 />
+                </>
               )}
               
               {/* 音阶练习 - 显示练习序列（与指板同屏，理由同上） */}
@@ -3010,6 +3080,7 @@ export default function FretMasterPage() {
             threeNpsTarget={threeNpsTarget}
             threeNpsCellKeys={threeNpsCellKeys}
             nextThreeNpsCells={nextThreeNpsCells}
+            voicingFrets={activeTab === 'chord' ? voicingFrets : null}
             singleNoteTarget={singleNoteEnabled ? singleNoteNote : undefined}
             singleNoteFound={singleNoteEnabled ? singleNoteFound : undefined}
             singleNoteSkipped={singleNoteEnabled ? singleNoteSkipped : undefined}

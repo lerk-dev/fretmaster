@@ -1519,6 +1519,22 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* ==================== 和弦指法（#4） ====================
+ * 只加一圈琥珀色外环，**不改变**任何角色配色/判定：
+ * 指法是「提示层」，不能盖掉「对/错/目标」的语义。三套皮肤共用同一种颜色。 */
+.fret-cell--voicing {
+  box-shadow: inset 0 0 0 2px rgba(251, 191, 36, 0.9);
+}
+.gr-cell--voicing .gr-note-dot {
+  outline: 2px solid rgba(251, 191, 36, 0.9);
+  outline-offset: 2px;
+}
+.ft-cell--voicing .ft-dot {
+  outline: 2px solid rgba(251, 191, 36, 0.9);
+  outline-offset: 3px;
+}
+
+
 /* ---------- 单音全指板：落点状态（3D 琴颈皮肤） ----------
    两层含义分开：`data-role` 决定「什么音」（配色），`data-state` 决定「这个落点处在哪个阶段」。
    🚨 必须放在上面所有 `[data-role]` 规则**之后**：两者特异性相同（0,2,0），靠先后顺序覆盖。

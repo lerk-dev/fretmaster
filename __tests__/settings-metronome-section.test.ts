@@ -44,6 +44,8 @@ function mount(overrides: Record<string, unknown> = {}) {
     onSoundChange: vi.fn(),
     onFlashChange: vi.fn(),
     onVisualizeChange: vi.fn(),
+    onVolumeChange: vi.fn(),
+    onCountInChange: vi.fn(),
   }
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -56,6 +58,8 @@ function mount(overrides: Record<string, unknown> = {}) {
     sound: false,
     flash: false,
     visualize: false,
+    volume: 70,
+    countIn: false,
     ...handlers,
     ...overrides,
   }
@@ -74,6 +78,7 @@ function mount(overrides: Record<string, unknown> = {}) {
     ...handlers,
     switches: () => [...container.querySelectorAll('[role="switch"]')] as HTMLElement[],
     slider: () => container.querySelector('[role="slider"]') as HTMLElement | null,
+    sliders: () => [...container.querySelectorAll('[role="slider"]')] as HTMLElement[],
     text: () => container.textContent ?? '',
     /** 拍号下拉（选项 portal 到 body，故打开时查 document） */
     openBeats: () => {
@@ -90,18 +95,18 @@ function mount(overrides: Record<string, unknown> = {}) {
 }
 
 describe('结构', () => {
-  it('渲染 4 个开关 + 1 个速度滑块 + 1 个拍号下拉', () => {
+  it('渲染 5 个开关 + 2 个滑块（速度 / 音量）+ 1 个拍号下拉', () => {
     const p = mount()
-    expect(p.switches()).toHaveLength(4)
-    expect(p.slider()).not.toBeNull()
+    expect(p.switches()).toHaveLength(5)
+    expect(p.sliders()).toHaveLength(2)
     // 拍号（#14 新增）是 Select 而不是第 5 个 Switch —— 拍号是离散选项，不是开关
     expect(p.container.querySelectorAll('[role="combobox"]')).toHaveLength(1)
     p.unmount()
   })
 
-  it('折叠标题与五个标签文案都走 t()', () => {
+  it('折叠标题与各标签文案都走 t()', () => {
     const p = mount()
-    for (const key of ['device_metronome', 'device_tempo', 'metronome_beats', 'metronome_sound', 'metronome_flash', 'metronome_visualize']) {
+    for (const key of ['device_metronome', 'device_tempo', 'metronome_beats', 'metronome_sound', 'metronome_volume', 'metronome_count_in', 'metronome_flash', 'metronome_visualize']) {
       expect(p.text(), `缺 ${key}`).toContain(t(key))
     }
     p.unmount()
@@ -119,10 +124,11 @@ describe('结构', () => {
 
 describe('开关的受控状态（radix Switch 点击不触发回调，只断言状态）', () => {
   it('四个开关的 checked 与 props 一一对应', () => {
-    const p = mount({ enabled: true, sound: false, flash: true, visualize: false })
-    const [en, sound, flash, vis] = p.switches()
+    const p = mount({ enabled: true, sound: false, flash: true, visualize: false, countIn: true })
+    const [en, sound, countIn, flash, vis] = p.switches()
     expect(en.getAttribute('aria-checked')).toBe('true')
     expect(sound.getAttribute('aria-checked')).toBe('false')
+    expect(countIn.getAttribute('aria-checked')).toBe('true')
     expect(flash.getAttribute('aria-checked')).toBe('true')
     expect(vis.getAttribute('aria-checked')).toBe('false')
     p.unmount()
@@ -167,6 +173,27 @@ describe('速度滑块', () => {
       expect(Number(s.getAttribute('aria-valuemax'))).toBeGreaterThanOrEqual(bpm)
       p.unmount()
     }
+  })
+})
+
+describe('音量与预备拍（#2 新增）', () => {
+  it('音量滑块范围 0–100、当前值来自 props，显示百分比', () => {
+    const p = mount({ volume: 35 })
+    const vol = p.sliders()[1]
+    expect(vol.getAttribute('aria-valuemin')).toBe('0')
+    expect(vol.getAttribute('aria-valuemax')).toBe('100')
+    expect(vol.getAttribute('aria-valuenow')).toBe('35')
+    expect(p.text()).toContain('35%')
+    p.unmount()
+  })
+
+  it('预备拍开关是独立开关，且受控于 props', () => {
+    const off = mount({ countIn: false })
+    expect(off.switches()[2].getAttribute('aria-checked')).toBe('false')
+    off.unmount()
+    const on = mount({ countIn: true })
+    expect(on.switches()[2].getAttribute('aria-checked')).toBe('true')
+    on.unmount()
   })
 })
 

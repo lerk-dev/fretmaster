@@ -16,7 +16,7 @@ import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/
 // BPM 合法区间与 store 的钳制逻辑同源 —— 别在这里写死 40/240，
 // 否则改一处漏一处会让「滑块范围」与「实际钳制范围」分叉。
 // 拍号同理：选项必须来自 store 的白名单常量（见其注释）。
-import { METRONOME_BEATS_OPTIONS, METRONOME_BPM_MAX, METRONOME_BPM_MIN } from '@/lib/store'
+import { METRONOME_BEATS_OPTIONS, METRONOME_BPM_MAX, METRONOME_BPM_MIN, METRONOME_VOLUME_MAX, METRONOME_VOLUME_MIN } from '@/lib/store'
 
 interface SettingsMetronomeSectionProps {
   t: (key: string) => string
@@ -34,6 +34,12 @@ interface SettingsMetronomeSectionProps {
   onFlashChange: (v: boolean) => void
   visualize: boolean
   onVisualizeChange: (v: boolean) => void
+  /** 节拍器独立音量（0..100） */
+  volume: number
+  onVolumeChange: (v: number[]) => void
+  /** 开始练习前的预备拍（一小节） */
+  countIn: boolean
+  onCountInChange: (v: boolean) => void
 }
 
 export function SettingsMetronomeSection({
@@ -50,6 +56,10 @@ export function SettingsMetronomeSection({
   onFlashChange,
   visualize,
   onVisualizeChange,
+  volume,
+  onVolumeChange,
+  countIn,
+  onCountInChange,
 }: SettingsMetronomeSectionProps) {
   return (
     <AccordionItem value="metronome" className="border-b-0">
@@ -98,6 +108,27 @@ export function SettingsMetronomeSection({
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{t('metronome_sound')}</span>
         <Switch checked={sound} onCheckedChange={onSoundChange} />
+      </div>
+      {/* 音量（#2）：节拍器独立音量，只影响 click，不改其它反馈音 */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">{t('metronome_volume')}</span>
+          <span className="font-mono">{volume}%</span>
+        </div>
+        <Slider
+          value={[volume]}
+          onValueChange={onVolumeChange}
+          min={METRONOME_VOLUME_MIN}
+          max={METRONOME_VOLUME_MAX}
+          step={1}
+        />
+      </div>
+      {/* 预备拍（#2）：开始练习先数一小节，随后进入正常小节 */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground" title={t('metronome_count_in_hint')}>
+          {t('metronome_count_in')}
+        </span>
+        <Switch checked={countIn} onCheckedChange={onCountInChange} />
       </div>
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{t('metronome_flash')}</span>

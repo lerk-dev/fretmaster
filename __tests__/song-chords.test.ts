@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { transposeSongChords, parseIrealPro, irealQualityToProjectType, extractIrealChords, clampChordIndex } from '@/lib/song-chords'
+import { transposeSongChords, parseIrealPro, irealQualityToProjectType, extractIrealChords, clampChordIndex, normalizeChordLoop, nextChordIndexInLoop, didChordLoopWrap } from '@/lib/song-chords'
 import { getKeyNote } from '@/lib/page-theory-functions'
 import { SONG_PROGRESSIONS } from '@/lib/page-songs'
 
@@ -260,5 +260,71 @@ describe('源码级：页面必须在列表变化时真的调用钳制（防止 
     // 只算不写 = 摆设：必须真的把钳制结果写回 state（否则越界依旧）
     expect(src, 'effect 算出了 clamped 却没写回 currentChordIndex —— 钳制等于没做')
       .toContain('if (clamped !== currentChordIndex) setCurrentChordIndex(clamped)')
+  })
+})
+
+describe('循环片段（#3）：normalizeChordLoop / nextChordIndexInLoop / didChordLoopWrap', () => {
+  it('normalizeChordLoop：空列表 / 空区间 → null；越界钳制；倒置自动交换', () => {
+    expect(normalizeChordLoop({ start: 0, end: 2 }, 0)).toBeNull()
+    expect(normalizeChordLoop(null, 5)).toBeNull()
+    expect(normalizeChordLoop({ start: 3, end: 1 }, 5)).toEqual({ start: 1, end: 3 })
+    expect(normalizeChordLoop({ start: -2, end: 99 }, 5)).toEqual({ start: 0, end: 4 })
+  })
+
+  it('没有循环时与旧行为完全一致（正序回绕 / 倒序回绕 / 随机在区间内）', () => {
+    expect(nextChordIndexInLoop(0, 4, 'asc', null)).toBe(1)
+    expect(nextChordIndexInLoop(3, 4, 'asc', null)).toBe(0)
+    expect(nextChordIndexInLoop(0, 4, 'desc', null)).toBe(3)
+    expect(nextChordIndexInLoop(2, 4, 'desc', null)).toBe(1)
+    const randomIndex = nextChordIndexInLoop(0, 4, 'random', null)
+    expect(randomIndex).toBeGreaterThanOrEqual(0)
+    expect(randomIndex).toBeLessThanOrEqual(3)
+  })
+
+  it('正序在区间内回绕：1..2 时 1→2→1', () => {
+    const loop = { start: 1, end: 2 }
+    expect(nextChordIndexInLoop(1, 5, 'asc', loop)).toBe(2)
+    expect(nextChordIndexInLoop(2, 5, 'asc', loop)).toBe(1)
+  })
+
+  it('倒序在区间内回绕：1..2 时 2→1→2', () => {
+    const loop = { start: 1, end: 2 }
+    expect(nextChordIndexInLoop(2, 5, 'desc', loop)).toBe(1)
+    expect(nextChordIndexInLoop(1, 5, 'desc', loop)).toBe(2)
+  })
+
+  it('当前在区间外：正序落到起点、倒序落到终点', () => {
+    const loop = { start: 2, end: 3 }
+    expect(nextChordIndexInLoop(0, 5, 'asc', loop)).toBe(2)
+    expect(nextChordIndexInLoop(4, 5, 'desc', loop)).toBe(3)
+  })
+
+  it('随机只落区间内，且区间 > 1 时不会连续重复', () => {
+    const loop = { start: 2, end: 4 }
+    for (let i = 0; i < 50; i++) {
+      const next = nextChordIndexInLoop(3, 6, 'random', loop)
+      expect(next).toBeGreaterThanOrEqual(2)
+      expect(next).toBeLessThanOrEqual(4)
+      expect(next).not.toBe(3)
+    }
+  })
+
+  it('单和弦区间（start == end）恒返回该和弦', () => {
+    const loop = { start: 2, end: 2 }
+    expect(nextChordIndexInLoop(2, 5, 'asc', loop)).toBe(2)
+    expect(nextChordIndexInLoop(0, 5, 'desc', loop)).toBe(2)
+    expect(nextChordIndexInLoop(2, 5, 'random', loop)).toBe(2)
+  })
+
+  it('didChordLoopWrap：正序在 end→start 判一轮，倒序在 start→end 判一轮，随机不判', () => {
+    const loop = { start: 1, end: 3 }
+    expect(didChordLoopWrap(3, 1, 5, 'asc', loop)).toBe(true)
+    expect(didChordLoopWrap(2, 3, 5, 'asc', loop)).toBe(false)
+    expect(didChordLoopWrap(1, 3, 5, 'desc', loop)).toBe(true)
+    expect(didChordLoopWrap(2, 1, 5, 'desc', loop)).toBe(false)
+    expect(didChordLoopWrap(3, 1, 5, 'random', loop)).toBe(false)
+    // 无循环时沿用全列表回绕
+    expect(didChordLoopWrap(4, 0, 5, 'asc', null)).toBe(true)
+    expect(didChordLoopWrap(0, 4, 5, 'desc', null)).toBe(true)
   })
 })

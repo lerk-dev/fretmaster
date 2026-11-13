@@ -59,6 +59,22 @@ describe('版本号四处一致', () => {
       PKG_VERSION
     )
   })
+
+  it(`package-lock.json 的两处项目版本号都 === ${PKG_VERSION}`, () => {
+    // lock 里有顶层 + packages[""] 两份项目自身的版本号，另有几百个依赖的
+    // version。用 JSON.parse 精确定位这两处，别用「文件里有没有这个字符串」——
+    // 依赖里出现同版本号会让它恒真。
+    // 2026-11-12 / 11-13 连续两次发现它落后：update-version.js 原本不管 lock，
+    // 而 npm install 会把它回写成 package.json 的值 ⇒ 每次手动补都会复发。
+    const lock = JSON.parse(read('package-lock.json')) as {
+      version: string
+      packages: { '': { version: string } }
+    }
+    expect(lock.version, '顶层 version 落后于 package.json').toBe(PKG_VERSION)
+    expect(lock.packages[''].version, 'packages[""] 的 version 落后于 package.json').toBe(
+      PKG_VERSION
+    )
+  })
 })
 
 describe('同步脚本必须登记全部版本号副本', () => {
@@ -80,6 +96,19 @@ describe('同步脚本必须登记全部版本号副本', () => {
     )
   })
 
+  it('登记表覆盖 package-lock.json（否则 prebuild 又会漏改它）', () => {
+    expect(registeredFiles(), `登记表实际内容: ${JSON.stringify(registeredFiles())}`).toContain(
+      'package-lock.json'
+    )
+    // 两处副本 ⇒ 必须开着 all，否则只替换第一处、留半份旧值
+    const block = script.match(/const VERSION_TARGETS = \[([\s\S]*?)\n\]/)![1]
+    const entry = block.split(/\},\s*\{/).find((x) => x.includes("file: 'package-lock.json'"))
+    expect(entry, '登记表里找不到 package-lock.json 条目').toBeTruthy()
+    expect(entry, 'package-lock.json 有两处副本，必须用 all: true 全量替换').toContain(
+      'all: true'
+    )
+  })
+
   it('每个登记目标都有 versionGroup（捕获组序号），且指向纯版本号', () => {
     // 🚨 这里是有真实前科的：第一版硬编码 args[1]，而 tauri.conf.json 的
     //    纯版本号在第 2 组 ⇒ 前缀被当成版本号整段替换，文件被写成
@@ -98,9 +127,12 @@ describe('同步脚本必须登记全部版本号副本', () => {
       //    tsc 会报 TS1501（dotAll 需要 ES2018+）。改用 `[\s\S]` 表达「跨行任意字符」。
       const patternSrc = entry.match(/pattern:\s*(\/[\s\S]*?\/[a-z]*)/)![1]
       const lastSlash = patternSrc.lastIndexOf('/')
+      // ⚠️ 去掉 g 标志：String.match 在带 g 时只返回「匹配文本数组」、**不含捕获组**，
+      //    于是 hit[versionGroup] 恒 undefined（新增 package-lock 条目带 gm 时踩到）。
+      //    本护栏只验证「第一个匹配的捕获组是不是纯版本号」，本就该用非全局匹配。
       const re = new RegExp(
         patternSrc.slice(1, lastSlash),
-        patternSrc.slice(lastSlash + 1)
+        patternSrc.slice(lastSlash + 1).replace('g', '')
       )
       const hit = read(file).match(re)
       expect(hit, `${file} 的模式在真实文件里没命中`).not.toBeNull()

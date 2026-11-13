@@ -72,6 +72,11 @@ interface PracticeFretboardProps {
    * 与 GuitarRun 皮肤共用同一张产出表（`app/page.tsx:nextThreeNpsCells`）。
    */
   nextThreeNpsCells?: ReadonlyMap<string, ThreeNpsPreviewKind>
+  /**
+   * 和弦指法（#4）：每根弦的绝对品号，null = 不弹。
+   * 命中的格子加 `fret-cell--voicing` 外环，仅做视觉标记，不改变配色/判定。
+   */
+  voicingFrets?: (number | null)[] | null
   /** 品记位置（页面模块级常量） */
   FRET_MARKERS: number[]
   /**
@@ -110,6 +115,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
   threeNpsTarget,
   threeNpsCellKeys,
   nextThreeNpsCells,
+  voicingFrets,
   FRET_MARKERS,
   embedded = false,
 }: PracticeFretboardProps) {
@@ -237,6 +243,9 @@ export const PracticeFretboard = memo(function PracticeFretboard({
    */
   const { containerRef, linePoints } = useFretboardLines(connectPoints)
 
+  /** 该格是否属于当前指法（#4）。只做视觉标记，不参与判定/配色。 */
+  const inVoicing = (stringIndex: number, fret: number) => voicingFrets?.[stringIndex] === fret
+
   /**
    * 指板主体：弦分隔线 + 空弦/各品按钮 + 品数行。**全仓只有这一份实现。**
    *
@@ -287,6 +296,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
               disabled={!isStringEnabled}
               data-role={openCell.role}
               data-position={`${stringIndex}-0`}
+              data-voicing={inVoicing(stringIndex, 0) ? '1' : undefined}
               aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(openCell.note)).replace('{string}', String(stringIndexToNumber(stringIndex))).replace('{fret}', '0') : undefined}
               className={cn(
                 // 🚨 字体与 1..n 品**必须同一条栈**（Globals.css 的 --font-fretboard）：
@@ -301,7 +311,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                 // 之前空弦格没有 border，这条线全靠底色对比，浅色主题下几乎看不见。
                 "border-r",
                 isStringEnabled 
-                  ? cn("border-border/50 dark:border-zinc-600/50 text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(openCell.note, stringIndex, 0))
+                  ? cn("border-border/50 dark:border-zinc-600/50 text-foreground/80 bg-secondary/80 hover:bg-secondary", getNoteButtonColor(openCell.note, stringIndex, 0), inVoicing(stringIndex, 0) && "fret-cell--voicing")
                   : "border-border/30 dark:border-zinc-800/50 text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
               )}
             >
@@ -325,6 +335,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                   disabled={!isStringEnabled}
                   data-role={role}
                   data-position={`${stringIndex}-${actualFret}`}
+                  data-voicing={inVoicing(stringIndex, actualFret) ? '1' : undefined}
                   aria-label={isStringEnabled ? t('fretboard_position_label').replace('{note}', formatNoteByAccidentalSetting(note)).replace('{string}', String(stringIndexToNumber(stringIndex))).replace('{fret}', String(actualFret)) : undefined}
                   className={cn(
                     // 🚨 音名字号比空弦列小一档是**刻意**的（刻度 4xs8 < 3xs9 < 2xs10 < xs12）；
@@ -338,7 +349,7 @@ export const PracticeFretboard = memo(function PracticeFretboard({
                     "flex items-center justify-center relative z-10",
                     "border-r",
                     isStringEnabled
-                      ? cn("border-border/50 dark:border-zinc-600/50", getNoteButtonColor(note, stringIndex, actualFret))
+                      ? cn("border-border/50 dark:border-zinc-600/50", getNoteButtonColor(note, stringIndex, actualFret), inVoicing(stringIndex, actualFret) && "fret-cell--voicing")
                       : "border-border/30 dark:border-zinc-800/50 text-muted-foreground/50 bg-muted/30 cursor-not-allowed"
                   )}
                 >

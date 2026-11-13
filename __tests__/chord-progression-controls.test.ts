@@ -43,6 +43,12 @@ import { NOTES, NOTES_FLAT } from '@/lib/page-theory-data'
 ;(Element.prototype as unknown as Record<string, unknown>).setPointerCapture ||= () => { /* noop */ }
 ;(Element.prototype as unknown as Record<string, unknown>).releasePointerCapture ||= () => { /* noop */ }
 ;(Element.prototype as unknown as Record<string, unknown>).scrollIntoView ||= () => { /* noop */ }
+// Radix Slider（伴奏音量）在 layout effect 里用 ResizeObserver 量轨道尺寸
+;(globalThis as Record<string, unknown>).ResizeObserver ||= class {
+  observe() { /* noop */ }
+  unobserve() { /* noop */ }
+  disconnect() { /* noop */ }
+}
 const t = (k: string) => (TRANSLATIONS['zh-CN'] as Record<string, string>)[k] ?? k
 const tEn = (k: string) => (TRANSLATIONS['en'] as Record<string, string>)[k] ?? k
 
@@ -83,6 +89,19 @@ function render(props: Record<string, unknown> = {}) {
       onChordPlayOrderChange: track('order'),
       progressionRepeat: false,
       onProgressionRepeatChange: track('repeat'),
+      chordCount: 5,
+      chordLoopEnabled: false,
+      onChordLoopEnabledChange: track('loopEnabled'),
+      chordLoopStart: 0,
+      onChordLoopStartChange: track('loopStart'),
+      chordLoopEnd: 0,
+      onChordLoopEndChange: track('loopEnd'),
+      accompanimentEnabled: false,
+      onAccompanimentEnabledChange: track('accompanimentEnabled'),
+      accompanimentStyle: 'swing',
+      onAccompanimentStyleChange: track('accompanimentStyle'),
+      accompanimentVolume: 60,
+      onAccompanimentVolumeChange: track('accompanimentVolume'),
       shouldVoiceLead: true,
       onShouldVoiceLeadChange: track('voiceLead'),
       shouldRandomizeKeyOnRepeat: false,
@@ -345,12 +364,12 @@ describe('Select 回调：回传的是 value，不是界面文案', () => {
 })
 
 describe('开关与联动', () => {
-  it('progressionRepeat=false：5 个开关；true：6 个（多出「循环时随机调性」）', () => {
+  it('progressionRepeat=false：7 个开关；true：8 个（多出「循环时随机调性」）', () => {
     const off = render({ progressionRepeat: false })
-    expect(off.snap().switches.length).toBe(5)
+    expect(off.snap().switches.length).toBe(7)
     off.unmount()
     const on = render({ progressionRepeat: true })
-    expect(on.snap().switches.length).toBe(6)
+    expect(on.snap().switches.length).toBe(8)
     on.unmount()
   })
 
@@ -360,7 +379,7 @@ describe('开关与联动', () => {
       showChordFretboard: false, showChordStructure: true, showChordKeyboard: false,
     })
     expect(r.snap().switches.map((s) => s.getAttribute('data-state')))
-      .toEqual(['checked', 'checked', 'checked', 'unchecked', 'checked', 'unchecked'])
+      .toEqual(['checked', 'checked', 'checked', 'unchecked', 'checked', 'unchecked', 'unchecked', 'unchecked'])
     r.unmount()
   })
 
@@ -387,6 +406,70 @@ describe('开关与联动', () => {
     // nextChord 直接作为 onClick 使用，回传的是 SyntheticEvent —— 断言「调用过」
     expect('nextChord' in on.calls).toBe(true)
     on.unmount()
+  })
+})
+
+describe('循环片段（#3）', () => {
+  it('默认不额外渲染循环下拉；开启后出现「从/到」两个下拉', () => {
+    const off = render({ chordCount: 4 })
+    expect(off.snap().comboboxes).toHaveLength(2)      // 调性 + 顺序
+    off.unmount()
+
+    const on = render({ chordCount: 4, chordLoopEnabled: true, chordLoopStart: 1, chordLoopEnd: 3 })
+    expect(on.snap().comboboxes).toHaveLength(4)
+    expect(on.snap().comboboxes[2].textContent).toContain(`${t('chord_loop_from')} 2`)
+    expect(on.snap().comboboxes[3].textContent).toContain(`${t('chord_loop_to')} 4`)
+    on.unmount()
+  })
+
+  it('循环下拉的选项数 = 和弦数，且回传的是 0-based 下标', () => {
+    const r = render({ chordCount: 3, chordLoopEnabled: true, chordLoopStart: 0, chordLoopEnd: 2 })
+    r.pickOption(2, `${t('chord_loop_from')} 2`)
+    expect(r.calls.loopStart).toEqual([[1]])
+    r.unmount()
+  })
+
+  it('起点越过终点时把终点一起带过去（区间恒有效）', () => {
+    const r = render({ chordCount: 5, chordLoopEnabled: true, chordLoopStart: 0, chordLoopEnd: 1 })
+    r.pickOption(2, `${t('chord_loop_from')} 4`)       // 起点选第 4 个（下标 3）> end=1
+    expect(r.calls.loopStart).toEqual([[3]])
+    expect(r.calls.loopEnd).toEqual([[3]])
+    r.unmount()
+  })
+
+  it('和弦数 < 2 时循环开关禁用（单和弦没有「循环片段」可言）', () => {
+    const r = render({ chordCount: 1 })
+    const loopSwitch = r.snap().switches[r.snap().switches.length - 2]
+    expect(loopSwitch.hasAttribute('disabled')).toBe(true)
+    r.unmount()
+  })
+})
+
+describe('风格伴奏（#5）', () => {
+  it('默认关闭：只渲染调性/顺序两个下拉，没有风格下拉与音量滑块', () => {
+    const r = render({ accompanimentEnabled: false })
+    expect(r.snap().comboboxes).toHaveLength(2)
+    expect(r.container.querySelectorAll('[role="slider"]')).toHaveLength(0)
+    r.unmount()
+  })
+
+  it('开启后多出风格下拉与音量滑块，风格选项来自 STYLE_PATTERNS', () => {
+    const r = render({ accompanimentEnabled: true, accompanimentStyle: 'bossa', accompanimentVolume: 55 })
+    expect(r.snap().comboboxes).toHaveLength(3)
+    expect(r.snap().comboboxes[2].textContent).toContain(t('style_bossa'))
+    const sliders = [...r.container.querySelectorAll('[role="slider"]')] as HTMLElement[]
+    expect(sliders).toHaveLength(1)
+    expect(sliders[0].getAttribute('aria-valuenow')).toBe('55')
+    r.unmount()
+  })
+
+  it('开关回传布尔值（已开 → false）；风格下拉回传 style id', () => {
+    const r = render({ accompanimentEnabled: true })
+    r.click(r.snap().switches[r.snap().switches.length - 1])
+    expect(r.calls.accompanimentEnabled).toEqual([[false]])
+    r.pickOption(2, t('style_rock'))
+    expect(r.calls.accompanimentStyle).toEqual([['rock']])
+    r.unmount()
   })
 })
 
