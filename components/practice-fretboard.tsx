@@ -257,6 +257,17 @@ export const PracticeFretboard = memo(function PracticeFretboard({
    */
   const boardBody = (
     <>
+    {/*
+      🚨 横向滚动容器：本皮肤没有 GuitarRun/Trainer 那种 `.gr-scroll`，而格子带
+      `min-w-[20px] sm:min-w-[28px]` ⇒ 品数多 / 窄屏时内容比容器宽，原来直接被
+      `overflow-hidden` 裁掉**且滚不动**（实测 390px：16 品刚好、**17 品起被裁**，
+      24 品裁掉 150px —— 品号只到 18，19–24 品看不到也点不到）。
+      内层 `w-max min-w-full`：内容窄时仍铺满（格子照旧均分），内容宽时跟着内容变宽
+      —— 连线覆盖层（`inset-0`）因此也覆盖到最后一品，横滚时路径线不会被截断。
+      护栏：__tests__/fretboard-skin-parity.test.ts
+    */}
+    <div className="overflow-x-auto">
+    <div className="w-max min-w-full">
     {/* 指板外层容器 - 统一圆角 */}
     <div ref={containerRef} className="relative rounded-lg overflow-hidden border border-border bg-muted/30 dark:bg-zinc-900/30">
       {/* 琴弦之间的虚线分隔 - 深浅主题都显示，浅色主题使用更浅的颜色*/}
@@ -377,17 +388,38 @@ export const PracticeFretboard = memo(function PracticeFretboard({
           const actualFret = fret + 1
           const isMarker = FRET_MARKERS.includes(actualFret)
           return (
-            <div key={actualFret} className="flex-1 flex justify-center min-w-[20px] sm:min-w-[28px]">
+            <div
+              key={actualFret}
+              data-fret-number={actualFret}
+              data-marker={isMarker ? '1' : undefined}
+              className="relative flex-1 flex justify-center min-w-[20px] sm:min-w-[28px]"
+            >
               <span className={cn(
                 "text-xs font-fretboard",
                 isMarker ? "text-primary font-semibold" : "text-muted-foreground"
               )}>
                 {actualFret}
               </span>
+              {/*
+                品记（3/5/7/9/12…）：另两套皮肤都画在指板上（GuitarRun 的
+                `.gr-cell[data-marker='1']::after`、Trainer 的 `.ft-inlay`），
+                经典皮肤原来只有品号变绿 ⇒ 补一个小圆点对齐。
+                画在**品号行**而不是格子里：格子底色承载「对/错/目标」语义，塞圆点会干扰；
+                绝对定位是为了**不改变行高**（否则整块指板会往下挪 6px，挤全屏竖向预算）。
+              */}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute -bottom-1 w-1 h-1 rounded-full",
+                  isMarker ? "bg-primary" : "bg-transparent"
+                )}
+              />
             </div>
           )
         })}
       </div>
+    </div>
+    </div>
     </div>
 
     </>

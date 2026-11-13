@@ -845,6 +845,12 @@
   --gr-open-w: 2.125rem; /* 34px 基准：空弦列宽（装「空弦」标签与圆点） */
   --gr-row-h: 1.875rem;  /* 30px 基准：一行（= 一根弦）的高度 */
   --gr-dot: 1.125rem;    /* 18px 基准：音名圆点直径（装 11px 文字） */
+  /* 品列最小宽度 = 圆点 + 2px（留 2px 缝，既不压住、又尽量少触发横滚）。🚨 没有它时列是 `minmax(0,1fr)` ⇒ 格子被无下限压缩，
+     圆点（固定 px/rem）比格子还宽，相邻圆点互相压住 —— 实测 390px / 24 品：格子 12.8px、
+     圆点 18px（1.41×）；Trainer 更狠（24px 圆点，默认 15 品就 1.18×）。
+     有了下限，格子最多压到圆点装得下的宽度，放不下就交给 `.gr-scroll` 横滚
+     （那条 `overflow-x: auto` 之前因为列能无限压缩而**永远不会触发**，是死代码）。 */
+  --gr-fret-min: calc(var(--gr-dot) + 2px);
   position: relative;
   overflow: hidden;
   padding: 12px 10px 6px;
@@ -869,6 +875,11 @@
 .gr-fretboard {
   position: relative;
   display: grid;
+  /* 🚨 `width: max-content` + `min-width: 100%`：盒子要**跟着列一起变宽**，
+     否则盒子恒等于容器宽度（列溢出到盒子外）⇒ 连线覆盖层（`inset-0`）只有可视宽，
+     滚到右边时路径线被截断。`min-width: 100%` 保证宽容器下仍然铺满（1fr 再分配）。 */
+  width: max-content;
+  min-width: 100%;
   border: 1px solid #343a40;
   border-radius: 4px;
   background: linear-gradient(90deg, #171a1f, #1e1d1b 45%, #15191d);
@@ -876,6 +887,9 @@
 .gr-fret-numbers {
   display: grid;
   align-items: center;
+  /* 与指板同一套列 ⇒ 必须同样跟内容变宽，否则滚到右边时品号与格子错位 */
+  width: max-content;
+  min-width: 100%;
   height: 1.375rem; /* 22px 基准：品数行高（容器随字号缩放） */
   color: #555e67;
   text-align: center;
@@ -1189,6 +1203,10 @@
   --ft-row-h: calc(1.75rem * var(--board-scale, 1));
   --ft-dot: calc(1.5rem * var(--board-scale, 1));
   --ft-num-h: calc(1.25rem * var(--board-scale, 1));
+  /* 品列最小宽度 = 圆点 + 2px（同 `.gr-stage` 的 `--gr-fret-min`）：
+     没有下限时列被无限制压缩 ⇒ 24px 圆点比格子还宽（390px/24 品实测 1.88×，默认 15 品也已
+     1.18×），相邻圆点把音名糊成一团。有下限后放不下就横滚（`.ft-scroll` 才真正生效）。 */
+  --ft-fret-min: calc(var(--ft-dot) + 2px);
   position: relative;
   overflow: hidden;
   padding: 10px 8px 4px;
@@ -1210,13 +1228,19 @@
 }
 .ft-grid {
   min-width: 0;
-  /* 连线覆盖层的定位基准；在 `.ft-scroll` 里 ⇒ 横向滚动时线和格子一起动 */
+  /* 连线覆盖层的定位基准；在 `.ft-scroll` 里 ⇒ 横向滚动时线和格子一起动。
+     `width: max-content` 让这个基准**跟着格子一起变宽**（否则 overlay 只有可视宽，
+     滚到右边时路径线被截断）。 */
+  width: max-content;
+  min-width: 100%;
   position: relative;
 }
 /* 琴颈颈身：木纹 + 纵向明暗（照参考站 .dark-theme .fretboard-body） */
 .ft-board {
   position: relative;
   display: grid;
+  width: max-content;
+  min-width: 100%;
   border-top: 3px solid rgba(255, 255, 255, 0.18);
   border-bottom: 3px solid rgba(255, 255, 255, 0.18);
   border-left: 1px solid rgba(255, 255, 255, 0.05);
@@ -1256,6 +1280,9 @@
 .ft-nums {
   display: grid;
   align-items: center;
+  /* 与指板同一套列 ⇒ 同样跟内容变宽（否则横滚时品号与格子错位） */
+  width: max-content;
+  min-width: 100%;
   height: var(--ft-num-h);
   color: #f1f5f9;
   text-align: center;
@@ -1490,9 +1517,14 @@
     inset 0 2px 4px rgba(255, 255, 255, 0.4);
 }
 .ft-dot[data-role='wrong'] {
-  background: rgba(148, 163, 184, 0.3);
-  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  /* 🚨 必须是**红系**：原来是 `rgba(148,163,184,.3)`（灰蓝），与「压暗 muted」
+     `rgba(100,116,139,.35)` 几乎同色 ⇒ 点错了看不出来（另两套：经典 `bg-red-500`、
+     GuitarRun `#ff4b48` 都醒目）。用 `--ft-danger-*`，与皮肤其它红色语义一致。 */
+  background: linear-gradient(135deg, var(--ft-danger-a) 0%, var(--ft-danger-b) 100%);
+  box-shadow:
+    0 0 15px rgba(239, 68, 68, 0.75),
+    inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  border-color: rgba(254, 202, 202, 0.85);
 }
 .ft-dot[data-role='preview'] {
   background: rgba(96, 165, 250, 0.35);
@@ -1500,9 +1532,11 @@
   border-color: rgba(255, 255, 255, 0.55);
 }
 .ft-dot[data-role='preview-root'] {
-  background: rgba(251, 113, 133, 0.4);
-  box-shadow: 0 0 10px rgba(225, 29, 72, 0.4);
-  border-color: rgba(255, 255, 255, 0.55);
+  /* 「下一把位的根音」：另两套皮肤都是**青柠/酸黄**（经典 `bg-lime-400`、
+     GuitarRun `--gr-acid`），这里原来是玫红 ⇒ 换皮肤会换掉「根音」这个语义色。 */
+  background: rgba(163, 230, 53, 0.55);
+  box-shadow: 0 0 12px rgba(132, 204, 22, 0.55);
+  border-color: rgba(217, 249, 157, 0.9);
 }
 .ft-dot[data-role='preview-start'] {
   background: rgba(251, 146, 60, 0.45);
@@ -1532,6 +1566,39 @@
 .ft-cell--voicing .ft-dot {
   outline: 2px solid rgba(251, 191, 36, 0.9);
   outline-offset: 3px;
+}
+
+/* ==================== 对 / 错的**非颜色**编码（三套皮肤对齐） ====================
+ * 经典皮肤一直有 `✓` / `✗` 角标（`.fret-feedback-*::after`），两套圆点皮肤原来只有
+ * 颜色差别 ⇒ 色觉障碍下分不出「弹对」和「弹错」，换个皮肤就少一层信息。
+ * 这里给圆点补同款小角标：位置挂在圆点右上角外沿（`top/right` 用负值），
+ * 字号用 **px**（乐器比例件，不随 --board-scale 放大，否则会盖住圆点里的音名）。
+ * ⚠️ 不写 `font-family`：故意继承圆点上的 `--font-fretboard`
+ *    （`__tests__/fretboard-font-parity.test.ts` 数的是 `.gr-` 区块里 font-family 的**条数**）。
+ * 护栏：__tests__/fretboard-skin-parity.test.ts */
+.gr-cell--hit .gr-note-dot::after,
+.ft-dot[data-role='matched']::after {
+  content: '✓';
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.gr-cell--wrong .gr-note-dot::after,
+.ft-dot[data-role='wrong']::after {
+  content: '✗';
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 

@@ -14,6 +14,7 @@
 
 import { memo, type ReactNode, type Ref } from 'react'
 import { cn } from '@/lib/utils'
+import { stringIndexToNumber } from '@/lib/string-index'
 
 /** 一个格子的渲染信息（由调用方算好，渲染层不解释语义） */
 export interface TrainerCellView {
@@ -69,6 +70,16 @@ export interface TrainerFretboardProps {
   overlay?: ReactNode
   /** `.ft-grid` 的 ref：给调用方（`useFretboardLines`）当测量基准 */
   overlayRef?: Ref<HTMLDivElement>
+  /**
+   * 新手引导锚点（`data-onboarding` 的值）。
+   *
+   * 🚨 练习皮肤的第三套（`skin='trainer'`）由本组件直接渲染，**不经过**
+   * `.gr-stage` 那层包装 —— 而引导的第 2 步靠 `[data-onboarding='fretboard']`
+   * 找目标。漏传时 `querySelector` 返回 null，spotlight 退化成居中卡片：
+   * 引导还在、但「指板」没有被框出来（实测 trainer 皮肤 hasOnboardingAnchor=false）。
+   * 乐理面板（`components/caged-board.tsx`）不传 ⇒ 那里不会多出一个同名锚点。
+   */
+  dataOnboarding?: string
 }
 
 /**
@@ -100,15 +111,19 @@ export const TrainerFretboard = memo(function TrainerFretboard({
     ariaLabel,
     overlay,
     overlayRef,
+    dataOnboarding,
 }: TrainerFretboardProps) {
     const stringCount = tuning.length
-    const gridTemplateColumns = `var(--ft-open-w) repeat(${fretCount}, minmax(0, 1fr))`
+    // 🚨 品列下限用 `--ft-fret-min`（= 圆点 + 2px），**不是** `minmax(0, 1fr)`：
+    //    0 下限会让格子被压到比圆点还窄（390px/24 品：格子 12.8px、圆点 24px ⇒ 1.88×，
+    //    相邻圆点把音名糊成一团；连默认 15 品也已经 1.18×）。有下限就交给 `.ft-scroll` 横滚。
+    const gridTemplateColumns = `var(--ft-open-w) repeat(${fretCount}, minmax(var(--ft-fret-min), 1fr))`
     // 品记点画在**中间那根弦**上（参考站就在颈身中央，不是最低音弦）
     const inlayStringIndex = Math.floor(stringCount / 2)
     const interactive = typeof onCellClick === 'function'
 
     return (
-        <div className="ft-stage" data-fretboard-trainer="1">
+        <div className="ft-stage" data-fretboard-trainer="1" data-onboarding={dataOnboarding}>
             <div className="ft-scroll">
                 <div className="ft-grid" ref={overlayRef}>
                     {overlay}
@@ -185,7 +200,7 @@ export const TrainerFretboard = memo(function TrainerFretboard({
                                             enabled
                                                 ? t('fretboard_position_label')
                                                       .replace('{note}', cell?.note ?? '')
-                                                      .replace('{string}', String(stringIndex + 1))
+                                                      .replace('{string}', String(stringIndexToNumber(stringIndex)))
                                                       .replace('{fret}', String(fret))
                                                       .replace(/\s+/g, ' ')
                                                       .trim()

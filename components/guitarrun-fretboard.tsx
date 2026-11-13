@@ -216,7 +216,10 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
     ],
   )
 
-  const gridTemplateColumns = `var(--gr-open-w) repeat(${fretCount}, minmax(0, 1fr))`
+  // 🚨 品列下限用 `--gr-fret-min`（= 圆点 + 2px），**不是** `minmax(0, 1fr)`：
+  //    0 下限会让列在窄屏/高品数下被压到比圆点还窄，相邻圆点互相压住（实测 390px/24 品
+  //    格子 12.8px、圆点 18px）；有下限时列放不下就由 `.gr-scroll` 横向滚动。
+  const gridTemplateColumns = `var(--gr-open-w) repeat(${fretCount}, minmax(var(--gr-fret-min), 1fr))`
   const strings = tuning
 
   // 角色判定**只在这里发生一次**：两套皮肤都消费这一份结果，
@@ -305,6 +308,10 @@ export const GuitarRunFretboard = memo(function GuitarRunFretboard({
         // 所以同一个 hook / 同一个覆盖层可以直接复用。
         overlayRef={containerRef}
         overlay={<FretboardPathOverlay points={linePoints} />}
+        // 🚨 新手引导锚点：本分支**不经过** `.gr-stage` 那层包装（那是下面 GuitarRun 分支
+        //    的根节点，带着 `data-onboarding="fretboard"`）⇒ 必须显式传，否则 trainer 皮肤下
+        //    引导第 2 步找不到「指板」，spotlight 退化成居中卡片。
+        dataOnboarding="fretboard"
       />
     )
   }
